@@ -688,3 +688,44 @@ export async function probe(file) {
     bytes: Number(j.format?.size ?? 0),
   };
 }
+
+/**
+ * How much of a finished take is actually animating.
+ *
+ * The container's frame rate is a promise, not a measurement. A browser only
+ * paints when the page changes, so a screen recording of a web app repeats the
+ * last frame through every still moment: takes in `marketing-out/` measure 21-50%
+ * unique frames against a 30fps container, and *that* is what reads as stutter.
+ * A rendered scene measures upward of 90%.
+ *
+ * Worth printing on every take because it is the one number that says which of
+ * those you got, and no encoder setting moves it — the fix is always upstream, in
+ * whether the source was animating at all.
+ *
+ * `mpdecimate` drops frames that are near-identical to their predecessor and
+ * ffmpeg reports how many survived, so kept/total is the ratio. Costs one decode
+ * pass, which on a two-minute 1080p take is a couple of seconds.
+ *
+ * Returns null rather than throwing: this is a diagnostic, and a take must not
+ * fail because a measurement did.
+ */
+export async function uniqueRatio(file, total) {
+  if (!total || total < 2) return null;
+  try {
+    // The count lands on stderr as ffmpeg's usual progress line, which `run`
+    // returns; there is no cleaner way to ask this filter what it kept. So the
+    // stats output has to stay on — `-nostats` suppresses the very line being
+    // parsed here, which makes this return null and look like a broken measurement.
+    const err = await run('ffmpeg', [
+      '-hide_banner', '-v', 'info',
+      '-i', file, '-vf', 'mpdecimate', '-f', 'null', '-',
+    ]);
+    const frames = [...String(err).matchAll(/frame=\s*(\d+)/g)].pop();
+    if (!frames) return null;
+    const kept = Number(frames[1]);
+    if (!Number.isFinite(kept) || kept < 1) return null;
+    return { kept, total, ratio: kept / total };
+  } catch {
+    return null;
+  }
+}

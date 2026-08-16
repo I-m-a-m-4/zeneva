@@ -14,6 +14,11 @@ const CORE_ROUTES: { path: string; priority: number; changeFrequency: MetadataRo
   // Public product page for Terminal. robots.ts used to disallow '/terminal',
   // which prefix-matched this page as well as the signed-in /terminal-alerts.
   { path: '/terminal', priority: 0.85, changeFrequency: 'monthly' },
+  // Public product page for Zen AI. Deliberately '/zen-ai' and not anything
+  // under '/ai-insights' — robots.ts disallows that prefix because the
+  // signed-in chat lives there, and a marketing page beneath it would be
+  // excluded from the index by the same rule.
+  { path: '/zen-ai', priority: 0.85, changeFrequency: 'monthly' },
   { path: '/blog', priority: 0.85, changeFrequency: 'daily' },
   { path: '/use-cases', priority: 0.85, changeFrequency: 'monthly' },
   { path: '/help-center', priority: 0.85, changeFrequency: 'weekly' },

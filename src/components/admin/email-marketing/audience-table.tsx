@@ -43,7 +43,24 @@ import {
 } from '@/lib/behavior-segments';
 import { TONE_CLASSES } from './segment-styles';
 
-export type PlanFilter = 'all' | 'paid' | 'starter';
+/**
+ * Plan filter, per tier rather than just paid/free.
+ *
+ * `lifetime` is not a plan value — it is an `accessLevel` that `effectivePlan`
+ * resolves to `business` — so it cannot be filtered here without the raw business
+ * doc. Tier filtering therefore uses the *effective* plan, which is the right
+ * behaviour anyway: a lapsed Pro should filter as free, because that is what they
+ * currently are.
+ */
+export type PlanFilter = 'all' | 'paid' | 'starter' | 'pro' | 'business';
+
+const PLAN_FILTER_LABELS: Record<PlanFilter, string> = {
+  all: 'All plans',
+  paid: 'Any paid tier',
+  starter: 'Free (Starter)',
+  pro: 'Pro',
+  business: 'Business',
+};
 
 interface AudienceTableProps {
   profiles: BehaviorProfile[];
@@ -77,6 +94,8 @@ export default function AudienceTable({
       if (segmentFilter && p.segment !== segmentFilter) return false;
       if (planFilter === 'paid' && p.plan === 'starter') return false;
       if (planFilter === 'starter' && p.plan !== 'starter') return false;
+      if (planFilter === 'pro' && p.plan !== 'pro') return false;
+      if (planFilter === 'business' && p.plan !== 'business') return false;
       if (contactableOnly && !p.contactable) return false;
       if (!needle) return true;
       return (
@@ -95,10 +114,10 @@ export default function AudienceTable({
     selectableShown.length > 0 && selectableShown.every(id => selectedIds.has(id));
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
       {/* Segment rail. Counts come from the engine over the whole book, so they
           always sum to every non-deleted user regardless of the filters below. */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onSegmentFilterChange(null)}
@@ -147,14 +166,16 @@ export default function AudienceTable({
             />
           </div>
           <Select value={planFilter} onValueChange={v => setPlanFilter(v as PlanFilter)}>
-            <SelectTrigger className="w-[150px]">
-              <Crown className="mr-2 h-3.5 w-3.5" />
+            <SelectTrigger className="w-[170px]">
+              <Crown className="mr-2 h-3.5 w-3.5 shrink-0" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All plans</SelectItem>
-              <SelectItem value="paid">Paying only</SelectItem>
-              <SelectItem value="starter">Free only</SelectItem>
+              {(Object.keys(PLAN_FILTER_LABELS) as PlanFilter[]).map(key => (
+                <SelectItem key={key} value={key}>
+                  {PLAN_FILTER_LABELS[key]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button
@@ -229,14 +250,14 @@ export default function AudienceTable({
                           />
                         </TableCell>
 
-                        <TableCell>
-                          <p className="text-sm font-medium leading-tight">
+                        <TableCell className="max-w-[220px]">
+                          <p className="break-words text-sm font-medium leading-tight">
                             {profile.name || '—'}
                           </p>
-                          <p className="text-[11px] text-muted-foreground">
+                          <p className="break-all text-[11px] text-muted-foreground">
                             {profile.email || 'no email on file'}
                           </p>
-                          <p className="text-[11px] text-muted-foreground truncate max-w-[180px]">
+                          <p className="break-words text-[11px] text-muted-foreground">
                             {profile.businessName}
                           </p>
                           {profile.optedOut && (
@@ -283,7 +304,10 @@ export default function AudienceTable({
                               {profile.topPages.map(page => (
                                 <div key={page.path} className="space-y-0.5">
                                   <div className="flex items-baseline justify-between gap-2 text-[10px]">
-                                    <span className="truncate font-mono">{page.path}</span>
+                                    {/* `truncate` alone does not shrink a flex item —
+                                        min-width defaults to auto, so the path pushes the
+                                        cell wider instead of ellipsising. */}
+                                    <span className="min-w-0 truncate font-mono">{page.path}</span>
                                     <span className="shrink-0 tabular-nums text-muted-foreground">
                                       {page.views.toLocaleString()}
                                     </span>

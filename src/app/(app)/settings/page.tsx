@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star, Download } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star, Download, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Select,
     SelectContent,
@@ -1040,7 +1041,19 @@ function SettingsPageContent() {
                             {loyaltyEnabled && (
                                 <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t">
                                     <div>
-                                        <Label htmlFor="points-per-unit">{t('settings.pointsPerUnit')}</Label>
+                                        <Label htmlFor="points-per-unit" className="flex items-center gap-1.5">
+                                            {t('settings.pointsPerUnit')}
+                                            <TooltipProvider>
+                                                <Tooltip delayDuration={300}>
+                                                    <TooltipTrigger asChild>
+                                                        <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-[250px]">
+                                                        <p>The number of points a customer earns per single unit of currency spent.</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </Label>
                                         <Input
                                             id="points-per-unit"
                                             type="number"
@@ -1147,7 +1160,22 @@ function SettingsPageContent() {
                                     triggerClassName="w-full justify-between font-normal bg-background hover:bg-accent border border-input h-10 px-3 py-2 text-sm rounded-md"
                                 />
                             </div>
-                            <div><Label>{t('settings.defaultTaxRate')}</Label><Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} /></div>
+                            <div>
+                                <Label className="flex items-center gap-1.5 mb-2">
+                                    {t('settings.defaultTaxRate')}
+                                    <TooltipProvider>
+                                        <Tooltip delayDuration={300}>
+                                            <TooltipTrigger asChild>
+                                                <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-[250px]">
+                                                <p>The standard tax rate percentage applied to sales. Set to 0 if tax is not applicable.</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </Label>
+                                <Input type="number" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} />
+                            </div>
                         </div>
                         {(ipCountry === 'Nigeria' || currency === 'NGN') && (
                             <>

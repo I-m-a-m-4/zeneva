@@ -376,6 +376,17 @@ function buildArgs(body: any): string[] {
     // they are opt-in and never inferred.
     if (body?.commit === true) args.push('--commit');
     if (body?.headed === true) args.push('--headed');
+    /*
+     * Enumerated rather than passed through, like `--voice` above: the recorder
+     * throws on an unknown style, and a request that fails at argument-parse time
+     * after the browser has launched wastes the whole launch. Anything that is not
+     * exactly 'cinematic' records plain, which is also what an older client that
+     * does not send the field gets.
+     */
+    if (body?.style === 'cinematic') args.push('--style', 'cinematic');
+    // The camera is opt-in for a quality reason rather than a safety one — see
+    // `--punch` in the recorder's help.
+    if (body?.punch === true) args.push('--punch');
     return args;
 }
 

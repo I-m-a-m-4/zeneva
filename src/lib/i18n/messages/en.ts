@@ -110,6 +110,7 @@ const en = {
     footerResources: 'Resources',
     footerRights: 'All rights reserved.',
     downloadApp: 'Download the app',
+    navZenAi: 'Zen AI',
     navFeatures: 'Features',
     navDownload: 'Download',
     navMission: 'Our Mission',

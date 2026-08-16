@@ -138,7 +138,10 @@ export default function MarketingFooter() {
                 <ul className="mt-3 space-y-2 text-sm">
                   <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkInventory')}</a></li>
                   <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkPos')}</a></li>
-                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkAiInsights')}</a></li>
+                  {/* Zen AI has its own product page now — this used to drop
+                      the visitor at the homepage feature grid. Reuses the
+                      existing linkAiInsights key so no catalogue needs an edit. */}
+                  <li><Link href="/zen-ai" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Zen AI</Link></li>
                   <li><Link href="/terminal" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkTerminal')}</Link></li>
                   <li><Link href="/use-cases" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkUseCases')}</Link></li>
                   <li><Link href="/pricing" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkPricing')}</Link></li>

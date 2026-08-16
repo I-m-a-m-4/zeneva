@@ -1,6 +1,7 @@
 
 
 'use client';
+import { useRouter } from 'next/navigation';
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
@@ -360,7 +361,9 @@ type Message = {
 
 function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
     const firestore = useFirestore();
-    const [messages, setMessages] = React.useState<Message[]>([]);
+    const [messages, setMessages] = React.useState<Message[]>([
+        { sender: 'ai', text: "Hi! I'm Zen AI. Ask me anything about Zeneva, or ask me to add a product to your inventory!" }
+    ]);
     const [input, setInput] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(false);
     const { toast } = useToast();
@@ -377,13 +380,20 @@ function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
 
         try {
             const response = await zenevaSupportChat({ query: input }, await idToken());
-            const aiText = response.answer || (response as any).response || t('support.aiFallback');
+            let aiText = response.answer || (response as any).response || t('support.aiFallback');
+            const isUnanswered = response.isUnanswered || false;
+
+            if (isUnanswered) {
+                aiText = "I'm not quite sure about that. I specialize in Zeneva features like inventory, POS, and analytics. If you need help with something specific, please rephrase or reach out to our human support team!";
+            }
+
             const aiMessage: Message = { sender: 'ai', text: aiText };
             setMessages(prev => [...prev, aiMessage]);
 
             // Log to Firestore for admin review
             if (firestore && userProfile) {
                 try {
+                    // Standard log
                     await addDoc(collection(firestore, 'ai_support_logs'), {
                         userId: userProfile.id,
                         userName: userProfile.name,
@@ -391,8 +401,21 @@ function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
                         businessId: userProfile.currentBusinessId || 'none',
                         query: input,
                         response: aiText,
-                        createdAt: serverTimestamp()
+                        createdAt: serverTimestamp(),
+                        isUnanswered
                     });
+
+                    // Explicitly capture unanswered questions for review
+                    if (isUnanswered) {
+                        await addDoc(collection(firestore, 'ai_unanswered_questions'), {
+                            userId: userProfile.id,
+                            userName: userProfile.name,
+                            businessId: userProfile.currentBusinessId || 'none',
+                            query: input,
+                            createdAt: serverTimestamp(),
+                            status: 'pending' // For admin review workflow
+                        });
+                    }
                 } catch (logError) {
                     console.error("Failed to log AI chat to Firestore:", logError);
                 }

@@ -96,6 +96,17 @@
 
   var pct = function (n) { return (n * 100).toFixed(2) + '%'; };
 
+  /**
+   * Where a still is centred, as a fraction down the frame.
+   *
+   * Not 0.5. The caption owns everything from `caption.headline` (0.68) down and
+   * the dissolve finishes at `fade.clear` (0.641), so the band a still is actually
+   * *seen* in is 0 to 0.64 — whose centre is 0.32. Nudged to 0.36 so a
+   * normally-proportioned still overhangs the dissolve slightly and melts into the
+   * ground, which is the effect, rather than stopping short of it and floating.
+   */
+  var SHOT_CENTRE = 0.36;
+
   var Scene = {
     root: null,
     stage: null,
@@ -157,9 +168,14 @@
        * `perspective` on the wrapper rather than on each still, so every still
        * shares one vanishing point. Per-element perspective gives each its own,
        * which is what makes a 3D scene look like unrelated skewed rectangles.
+       *
+       * Full-bleed, and that matters: the mask stops are fractions of *frame*
+       * height, because that is how they were measured. Sizing this to
+       * `fade.clear` instead — which an earlier draft did — makes them fractions
+       * of 64% of the frame, and the dissolve lands at 41% and eats the product.
        */
       var stage = el('div',
-        'position:absolute;left:0;right:0;top:0;height:' + pct(TOKENS.fade.clear) + ';'
+        'position:absolute;inset:0;'
         + 'perspective:1400px;transform-style:preserve-3d;'
         + '-webkit-mask-image:' + this.maskCss() + ';mask-image:' + this.maskCss() + ';');
 
@@ -237,7 +253,8 @@
       if (!this.stage) return -1;
       var p = placement || {};
       var holder = el('div',
-        'position:absolute;left:50%;top:50%;width:' + (p.width || 86) + '%;'
+        'position:absolute;left:50%;top:' + pct(typeof p.centre === 'number' ? p.centre : SHOT_CENTRE) + ';'
+        + 'width:' + (p.width || 86) + '%;'
         + 'transform-style:preserve-3d;opacity:0;will-change:transform,opacity,filter;');
 
       var img = el('img',
@@ -348,6 +365,32 @@
         }
         self.raf = requestAnimationFrame(frame);
       });
+    },
+
+    /**
+     * Wait until every still can actually be painted.
+     *
+     * Setting `img.src` to a data URI does not decode it synchronously. Without
+     * this, `play` can start while the first shot is still an empty box — and
+     * because a shot enters *from* opacity 0, that failure is invisible in the
+     * scene and only shows up as a take that opens on bare gradient. Awaiting the
+     * decode is the difference between "the animation is subtle" and "the first
+     * beat is missing".
+     *
+     * `decode()` where available, `onload`/`onerror` otherwise, and a broken image
+     * resolves rather than rejecting: a shot that will not decode should cost its
+     * own beat, not the whole take.
+     */
+    ready: function () {
+      var imgs = this.shots.map(function (s) { return s.img; });
+      return Promise.all(imgs.map(function (im) {
+        if (im.complete && im.naturalWidth > 0) return Promise.resolve(true);
+        if (im.decode) return im.decode().then(function () { return true; }, function () { return false; });
+        return new Promise(function (res) {
+          im.onload = function () { res(true); };
+          im.onerror = function () { res(false); };
+        });
+      })).then(function () { return true; });
     },
 
     stop: function () {

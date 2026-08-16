@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, doc, getDoc, getDocs, updateDoc, query, where, increment, documentId } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, query, where, increment, documentId, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -147,6 +147,7 @@ export default function AdminAIUsage() {
   const [isGranting, setIsGranting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const [unansweredQueries, setUnansweredQueries] = useState<any[]>([]);
   const todayStr = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
@@ -184,7 +185,7 @@ export default function AdminAIUsage() {
       const priorChunks: string[][] = [];
       for (let i = 0; i < prior.length; i += 10) priorChunks.push(prior.slice(i, i + 10));
 
-      const [globalDoc, dailySnaps, priorSnaps, bSnap] = await Promise.all([
+      const [globalDoc, dailySnaps, priorSnaps, bSnap, unansweredSnap] = await Promise.all([
         getDoc(doc(firestore, 'platform_stats', 'ai_usage_global')),
         Promise.all(
           chunks.map((ids) =>
@@ -197,6 +198,7 @@ export default function AdminAIUsage() {
           ),
         ),
         getDocs(query(collection(firestore, 'businessInstances'), where('status', '==', 'active'))),
+        getDocs(query(collection(firestore, 'ai_unanswered_queries'), orderBy('createdAt', 'desc'), limit(50))),
       ]);
 
       if (globalDoc.exists()) {
@@ -223,6 +225,7 @@ export default function AdminAIUsage() {
         });
 
       setBusinesses(bData);
+      setUnansweredQueries(unansweredSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (error) {
       console.error('Failed to load AI usage:', error);
       toast({ variant: 'destructive', title: 'Could not load AI analytics', description: 'Check the console for details.' });
@@ -1461,6 +1464,49 @@ export default function AdminAIUsage() {
                   Plan limits climbing is a pricing signal. The injection scan firing repeatedly is a
                   security one — check Cyber Shield for the same window.
                 </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Unanswered Queries ── */}
+      <div className="grid grid-cols-1 gap-4 mb-4">
+        <Card className="border-slate-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MessageSquare className="w-4 h-4 text-orange-600" />
+              Unanswered Queries
+            </CardTitle>
+            <CardDescription>
+              Questions Zen AI could not answer. Use this to identify missing tools or context.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {unansweredQueries.length === 0 ? (
+              <p className="text-sm text-slate-400 py-6">No unanswered queries recorded yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 uppercase">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Date</th>
+                      <th className="px-4 py-3 font-medium">Business ID</th>
+                      <th className="px-4 py-3 font-medium">Question</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {unansweredQueries.map((q) => (
+                      <tr key={q.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                          {q.createdAt?.toDate?.()?.toLocaleString() || 'Unknown'}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{q.businessId}</td>
+                        <td className="px-4 py-3 text-slate-900">{q.question}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>

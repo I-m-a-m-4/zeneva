@@ -2302,5 +2302,26 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
         } catch (e: any) { return fail('Failed to forecast stockouts', e); }
       },
     }),
+    reportUnanswered: tool({
+      description:
+        'Call this when you genuinely do not have the answer to the user\'s question, either because it is outside your business data or you lack the tools for it. It logs the unanswered query so the admin can review it later.',
+      inputSchema: z.object({
+        question: z.string().describe('The user\'s original question that you cannot answer.'),
+      }),
+      execute: async ({ question }) => {
+        try {
+          await db.collection('ai_unanswered_queries').add({
+            businessId,
+            question,
+            createdAt: Timestamp.now(),
+          });
+          return {
+            fallbackText: "I'm sorry, I don't have the answer to that right now.",
+          };
+        } catch (e: any) {
+          return fail('Failed to report unanswered query', e);
+        }
+      },
+    }),
   };
 }

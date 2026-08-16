@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { LineChart, CartesianGrid, XAxis, YAxis, Line, Legend } from 'recharts';
+import { AreaChart, CartesianGrid, XAxis, YAxis, Area, Legend } from 'recharts';
 import { TrendingUp, Bot } from 'lucide-react';
 import type { Receipt } from '@/types';
 import type { ChartConfig } from "@/components/ui/chart";
@@ -123,7 +123,21 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
                     </div>
                 ) : (
                     <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                        <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <AreaChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <defs>
+                                <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-revenue, #f97316)" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="var(--color-revenue, #f97316)" stopOpacity={0.0}/>
+                                </linearGradient>
+                                <linearGradient id="fillProfit" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-profit, #10b981)" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="var(--color-profit, #10b981)" stopOpacity={0.0}/>
+                                </linearGradient>
+                                <linearGradient id="fillCost" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-cost, #ef4444)" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="var(--color-cost, #ef4444)" stopOpacity={0.0}/>
+                                </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                             <YAxis 
@@ -142,10 +156,10 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
                                 content={<ChartTooltipContent indicator="line" formatter={(value) => `${currencySymbol}${Number(value).toLocaleString()}`} />}
                             />
                             <Legend verticalAlign="top" height={36}/>
-                            <Line dataKey="revenue" type="monotone" stroke="var(--color-revenue, #f97316)" strokeWidth={3} dot={false} />
-                            <Line dataKey="profit" type="monotone" stroke="var(--color-profit, #10b981)" strokeWidth={3} dot={false} />
-                            {hasCostData && <Line dataKey="cost" type="monotone" stroke="var(--color-cost, #ef4444)" strokeDasharray="5 5" strokeWidth={2} dot={false} />}
-                        </LineChart>
+                            <Area dataKey="revenue" type="linear" fill="url(#fillRevenue)" fillOpacity={1} stroke="var(--color-revenue, #f97316)" strokeWidth={3} dot={false} />
+                            <Area dataKey="profit" type="linear" fill="url(#fillProfit)" fillOpacity={1} stroke="var(--color-profit, #10b981)" strokeWidth={3} dot={false} />
+                            {hasCostData && <Area dataKey="cost" type="linear" fill="url(#fillCost)" fillOpacity={1} stroke="var(--color-cost, #ef4444)" strokeDasharray="5 5" strokeWidth={2} dot={false} />}
+                        </AreaChart>
                     </ChartContainer>
                 )}
             </CardContent>

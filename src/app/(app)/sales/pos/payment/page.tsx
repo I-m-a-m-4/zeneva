@@ -15,6 +15,7 @@ import { Banknote, CreditCard, Landmark, Loader2, FileText } from "lucide-react"
 import { useBusiness } from '@/context/pos-context';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/context/i18n-context';
+import { trackFeature } from '@/lib/product-telemetry';
 
 export default function PaymentPage() {
     const { subtotal, tax, taxRate, discount, total, setTax, setDiscount, paymentMethod, setPaymentMethod, amountReceived, setAmountReceived, currencySymbol, autoPrint, setAutoPrint } = usePOS();
@@ -124,8 +125,23 @@ export default function PaymentPage() {
                                             id="amountReceived" 
                                             type="number" 
                                             placeholder="Enter cash received..."
-                                            value={amountReceived || ''} 
-                                            onChange={e => setAmountReceived(Number(e.target.value))}
+                                            value={amountReceived || ''}
+                                            onChange={e => {
+                                                const next = Number(e.target.value);
+                                                setAmountReceived(next);
+                                                // Both counted on a transition, not per keystroke.
+                                                // Typing "5000" against a ₦100 total crosses the
+                                                // total at "500" and again at "5000", so testing the
+                                                // crossing rather than the value is what keeps this
+                                                // "did change get calculated" instead of "how many
+                                                // digits did they type".
+                                                if (!amountReceived && next > 0) {
+                                                    trackFeature('pos_amount_received_used');
+                                                }
+                                                if (total > 0 && amountReceived < total && next >= total) {
+                                                    trackFeature('pos_change_shown');
+                                                }
+                                            }}
                                             className="h-12 text-lg font-medium"
                                         />
                                     </div>
@@ -148,11 +164,24 @@ export default function PaymentPage() {
                     <CardContent className="grid sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="discount">{t('pos.discountLabel', { symbol: currencySymbol })}</Label>
-                            <Input id="discount" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} />
+                            <Input id="discount" type="number" value={discount} onChange={e => {
+                                const next = Number(e.target.value);
+                                // On the transition to a non-zero discount, so clearing and
+                                // retyping one figure is not counted as two discounts.
+                                if (!discount && next > 0) trackFeature('pos_discount_applied');
+                                setDiscount(next);
+                            }} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="tax">{t('pos.taxRateLabel')}</Label>
-                            <Input id="tax" type="number" value={taxRate} onChange={e => setTax(Number(e.target.value))} />
+                            <Input id="tax" type="number" value={taxRate} onChange={e => {
+                                const next = Number(e.target.value);
+                                // Only an actual departure from the shop's configured rate counts
+                                // as an override — echoing the default back is not a signal that
+                                // the default is wrong, which is the question this answers.
+                                if (next !== taxRate) trackFeature('pos_tax_override');
+                                setTax(next);
+                            }} />
                         </div>
                     </CardContent>
                 </Card>

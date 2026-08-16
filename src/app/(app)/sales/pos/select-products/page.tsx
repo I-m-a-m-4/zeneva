@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -300,7 +301,7 @@ export default function SelectProductsPage() {
 
 
     const filteredProducts = React.useMemo(() => {
-        let base = [...(products || [])];
+        let base = (products || []).filter(p => !p.parentId); // Hide child variants from main grid
         
         // Apply instant local substring filter
         if (searchTerm.trim()) {
@@ -319,15 +320,16 @@ export default function SelectProductsPage() {
         return base;
     }, [products, searchTerm, categoryFilter]);
 
-    const handleLoadMore = async () => {
-        setIsFetchingMore(true);
-        const count = await fetchMoreProducts();
-        if (count === 0) setHasMore(false);
-        setIsFetchingMore(false);
-    };
+
+
+    const [variantParent, setVariantParent] = React.useState<Product | null>(null);
 
     const handleAddToCart = React.useCallback((product: Product) => {
-        addToCart(product);
+        if (product.type === 'variant') {
+            setVariantParent(product);
+        } else {
+            addToCart(product);
+        }
     }, [addToCart]);
 
     const handleScan = (sku: string) => {
@@ -449,19 +451,19 @@ export default function SelectProductsPage() {
                     ) : (
                         <>
                             {filteredProducts && filteredProducts.length > 0 ? (
-                                <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
-                                    {filteredProducts.map(product => (
-                                        <ProductItem
-                                            key={product.id}
-                                            product={product}
-                                            currencySymbol={currencySymbol}
-                                            handleAddToCart={() => handleAddToCart(product)}
-                                            addToCart={addToCart}
-                                            onPreview={(src, alt) => setPreviewImage({ src, alt })}
-                                        />
-
-
-                                    ))}
+                                <div className="space-y-4">
+                                    <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
+                                        {filteredProducts.map(product => (
+                                            <ProductItem
+                                                key={product.id}
+                                                product={product}
+                                                currencySymbol={currencySymbol}
+                                                handleAddToCart={() => handleAddToCart(product)}
+                                                addToCart={addToCart}
+                                                onPreview={(src, alt) => setPreviewImage({ src, alt })}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-lg min-h-[400px]">
@@ -535,8 +537,8 @@ export default function SelectProductsPage() {
                         <ScrollArea className="flex-1 p-4">
                             <CartContents />
                         </ScrollArea>
-                        <SheetFooter className="p-4 border-t bg-background">
-                            <Button className="w-full" size="lg" onClick={handleNext} disabled={cart.length === 0 || isNavigating}>
+                        <SheetFooter className="mt-4">
+                            <Button className="w-full" onClick={handleNext} disabled={cart.length === 0 || isNavigating}>
                                 {isNavigating && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                                 {t('pos.nextCustomer')}
                             </Button>
@@ -544,6 +546,34 @@ export default function SelectProductsPage() {
                     </SheetContent>
                 </Sheet>
             </div>
+
+            <Dialog open={!!variantParent} onOpenChange={(open) => !open && setVariantParent(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Select Variant for {variantParent?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-2 max-h-[60vh] overflow-y-auto">
+                        {products?.filter(p => p.parentId === variantParent?.id).map(variant => (
+                            <Button 
+                                key={variant.id} 
+                                variant="outline" 
+                                className="justify-between h-auto py-3 hover:bg-muted hover:text-foreground"
+                                onClick={() => {
+                                    addToCart(variant);
+                                    setVariantParent(null);
+                                    toast({ title: t('pos.addedToCart'), description: variant.name });
+                                }}
+                            >
+                                <div className="flex flex-col items-start">
+                                    <span className="font-medium">{variant.variantValue}</span>
+                                    <span className="text-xs text-muted-foreground">{variant.stock} in stock</span>
+                                </div>
+                                <span className="font-bold">{currencySymbol}{variant.price.toLocaleString()}</span>
+                            </Button>
+                        ))}
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {isScannerOpen && (
                 <BarcodeScanner

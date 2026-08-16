@@ -33,6 +33,7 @@ import {
   query,
 } from 'firebase/firestore';
 import { AlertTriangle, BanIcon, Mail, RefreshCw, Send, Users } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,6 +53,7 @@ import CampaignResults, {
   type FollowUpLog,
 } from '@/components/admin/email-marketing/campaign-results';
 import { draftForSegment, type EmailDraft } from '@/lib/email-templates';
+import { takeInsightCohort } from '@/lib/insight-cohort';
 
 /** How far back the results tab looks. Deep enough to cover any real campaign. */
 const LOG_LIMIT = 300;
@@ -67,12 +69,12 @@ function HeaderStat({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="rounded-full bg-primary/10 p-2">
+      <CardContent className="flex min-w-0 items-center gap-3 p-4">
+        <div className="shrink-0 rounded-full bg-primary/10 p-2">
           <Icon className="h-4 w-4 text-primary" />
         </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
           <p className="text-xl font-bold tabular-nums">{value}</p>
@@ -83,7 +85,29 @@ function HeaderStat({
 }
 
 export default function EmailMarketingPage() {
+  /*
+   * `useSearchParams` in the console below forces a Suspense boundary: without
+   * one, Next fails the production build for this route rather than warning, and
+   * the message points at prerendering rather than at the hook. The fallback is
+   * never really seen — the console renders its own loading state.
+   */
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          Loading email marketing…
+        </div>
+      }
+    >
+      <EmailMarketingConsole />
+    </React.Suspense>
+  );
+}
+
+function EmailMarketingConsole() {
   const firestore = useFirestore();
+  const searchParams = useSearchParams();
 
   const [users, setUsers] = React.useState<UserProfile[]>([]);
   const [businesses, setBusinesses] = React.useState<BusinessInstance[]>([]);
@@ -226,6 +250,43 @@ export default function EmailMarketingPage() {
     pickTemplate(suggestedSegment ?? 'feature_focused');
   }, [tab, suggestedSegment, pickTemplate]);
 
+  const [audienceNotice, setAudienceNotice] = React.useState<string | null>(null);
+
+  /**
+   * Arriving from a Product Intelligence finding with its cohort attached.
+   *
+   * The ids come from `sessionStorage`, not the URL — see `insight-cohort.ts` for
+   * why. Runs once the audience is loaded so a preselected id that no longer
+   * resolves to a mailable user is dropped rather than silently counted, and only
+   * once: the read consumes the cohort, so a refresh does not re-apply it.
+   */
+  const cohortAppliedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (cohortAppliedRef.current || audienceLoading) return;
+    const cohortId = searchParams?.get('cohort');
+    if (!cohortId) return;
+    cohortAppliedRef.current = true;
+
+    const cohort = takeInsightCohort(cohortId);
+    if (!cohort) {
+      setAudienceNotice(
+        'That insight cohort has expired — it is held for one visit only. Open the finding again from Usage Analytics.',
+      );
+      return;
+    }
+
+    const known = new Set(profiles.map(p => p.userId));
+    const resolved = cohort.userIds.filter(id => known.has(id));
+    setSelectedIds(new Set(resolved));
+    setTab('compose');
+
+    const dropped = cohort.userIds.length - resolved.length;
+    setAudienceNotice(
+      `${resolved.length} selected from “${cohort.label ?? cohortId}”`
+      + (dropped > 0 ? ` · ${dropped} no longer match an active account` : ''),
+    );
+  }, [searchParams, audienceLoading, profiles]);
+
   const toggleOne = React.useCallback((userId: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -240,11 +301,11 @@ export default function EmailMarketingPage() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Mail className="h-6 w-6 text-primary" />
+            <Mail className="h-6 w-6 shrink-0 text-primary" />
             <h1 className="text-2xl font-bold">Email Marketing</h1>
           </div>
           <p className="max-w-2xl text-sm text-muted-foreground">
@@ -272,6 +333,16 @@ export default function EmailMarketingPage() {
         </div>
       )}
 
+      {audienceNotice && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+          <Send className="h-4 w-4 shrink-0 text-primary" />
+          <span className="flex-1">{audienceNotice}</span>
+          <Button variant="ghost" size="sm" onClick={() => setAudienceNotice(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <HeaderStat
           label="Users"
@@ -291,13 +362,15 @@ export default function EmailMarketingPage() {
         <HeaderStat label="Selected" value={selectedIds.size} icon={Send} />
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="audience" className="gap-1.5">
+      <Tabs value={tab} onValueChange={setTab} className="w-full min-w-0">
+        {/* Scrolls rather than overflows: three triggers plus the selection badge
+            is already wider than a small phone. */}
+        <TabsList className="max-w-full justify-start overflow-x-auto">
+          <TabsTrigger value="audience" className="shrink-0 gap-1.5">
             <Users className="h-3.5 w-3.5" />
             Audience
           </TabsTrigger>
-          <TabsTrigger value="compose" className="gap-1.5">
+          <TabsTrigger value="compose" className="shrink-0 gap-1.5">
             <Send className="h-3.5 w-3.5" />
             Compose
             {selectedIds.size > 0 && (
@@ -306,7 +379,7 @@ export default function EmailMarketingPage() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="results" className="gap-1.5">
+          <TabsTrigger value="results" className="shrink-0 gap-1.5">
             <Mail className="h-3.5 w-3.5" />
             Results
           </TabsTrigger>
@@ -363,7 +436,32 @@ export default function EmailMarketingPage() {
         </TabsContent>
 
         <TabsContent value="results" className="mt-4">
-          <CampaignResults logs={logs} isLoading={logsLoading} onRefresh={loadLogs} />
+          <CampaignResults
+            logs={logs}
+            isLoading={logsLoading}
+            onRefresh={loadLogs}
+            onFollowUp={emails => {
+              // Matched on address rather than id: `follow_up_logs` records who was
+              // mailed, not which user document it came from, and one address can
+              // belong to more than one account.
+              const wanted = new Set(emails.map(e => e.trim().toLowerCase()));
+              const matched = profiles.filter(
+                p => p.contactable && p.email && wanted.has(p.email.toLowerCase()),
+              );
+              setSelectedIds(new Set(matched.map(p => p.userId)));
+              // A follow-up is a new message, not a repeat of the one they ignored,
+              // so let the composer reseed from this cohort's own segment.
+              draftSeededRef.current = false;
+              setTab('compose');
+              const missing = wanted.size - matched.length;
+              setAudienceNotice(
+                `${matched.length} selected for a follow-up`
+                + (missing > 0
+                  ? ` · ${missing} skipped (unsubscribed since, or no active account)`
+                  : ''),
+              );
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

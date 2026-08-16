@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Home, Package, ShoppingCart, Users, Menu, FileText, LifeBuoy, Settings, Bug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as React from 'react';
@@ -36,8 +36,15 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ navItems, moreNavItems, isLoading, userEmail }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useI18n();
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+
+  // Eagerly prefetch all navigation routes on mount for instant switching
+  React.useEffect(() => {
+    navItems.forEach((item) => router.prefetch(item.href));
+    moreNavItems.forEach((item) => router.prefetch(item.href));
+  }, [navItems, moreNavItems, router]);
 
   const labelFor = (item: NavItem) => (item.labelKey ? t(item.labelKey) : item.label);
 
@@ -58,8 +65,9 @@ export default function MobileBottomNav({ navItems, moreNavItems, isLoading, use
               <Link 
                 key={item.href} 
                 href={item.href} 
+                prefetch={true}
                 id={`tour-nav-mobile-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                className="flex flex-col items-center justify-center flex-1 h-full"
+                className="flex flex-col items-center justify-center flex-1 h-full touch-manipulation active:opacity-70"
               >
                 <item.icon className={cn('h-6 w-6 mb-1', isActive ? 'text-primary' : 'text-muted-foreground')} />
                 <span className={cn('text-xs', isActive ? 'text-primary font-semibold' : 'text-muted-foreground')}>

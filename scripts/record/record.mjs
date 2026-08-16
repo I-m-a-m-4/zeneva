@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { Cdp } from './cdp.mjs';
 import { launch } from './browser.mjs';
 import { Page, sleep } from './page.mjs';
-import { Recorder, hasFfmpeg, probe } from './capture.mjs';
+import { Recorder, hasFfmpeg, probe, uniqueRatio } from './capture.mjs';
 import { mixAudio, resolveMusic, synthBed } from './audio.mjs';
 import { synthNarration, DEFAULT_VOICE, VOICES } from './narrate.mjs';
 import { FLOWS, FLOW_ROUTES, FLOW_CARDS } from './flows.mjs';
@@ -114,6 +114,13 @@ function parseArgs(argv) {
     // Narration is opt-in because it costs API calls against a real key. The
     // take is identical without it, so nothing silently starts spending.
     narrate: false, voice: DEFAULT_VOICE, voiceStyle: null,
+    /*
+     * `plain` and no camera, so an invocation that says nothing about either
+     * produces the take this recorder has always produced. Both are opt-in for the
+     * same reason narration is: the default must not quietly change what an
+     * existing script or saved request records.
+     */
+    style: 'plain', punch: false,
     timings: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -146,6 +153,21 @@ function parseArgs(argv) {
       case '--silent': out.music = null; out.bed = false; out.clickSfx = false; out.typingSfx = false; break;
       case '--headed': out.headed = true; break;
       case '--commit': out.commit = true; break;
+      /*
+       * Opt-in, like `--commit` and `--headed`, rather than a `--no-punch` pair.
+       * The flows are full of punch calls and nobody chose them; making the camera
+       * something you ask for means the default take is the one whose text stays
+       * sharp. See `Page.punch`.
+       */
+      case '--punch': out.punch = true; break;
+      case '--style': {
+        const v = String(next() ?? '');
+        if (v !== 'plain' && v !== 'cinematic') {
+          throw new Error(`--style must be "plain" or "cinematic", got ${JSON.stringify(v)}`);
+        }
+        out.style = v;
+        break;
+      }
       case '--keep-frames': out.keepFrames = true; break;
       case '--timings': out.timings = true; break;
       case '-h': case '--help': out.help = true; break;
@@ -199,6 +221,20 @@ Zeneva marketing recorder
               Raising this lowers the frame rate the page can paint, because
               Chrome waits for each frame to be acked before painting the next.
   --format    mp4 | webm                         (default: mp4)
+  --style     plain | cinematic                   (default: plain)
+              plain      records the live app. Honest and continuous, but a
+                         browser only repaints when something changes, so still
+                         moments repeat frames — takes measure 21-50% unique
+                         frames against a 30fps container, which is what reads
+                         as stutter.
+              cinematic  screenshots the app at each beat and animates the
+                         stills in 3D over a warm gradient. Every frame is
+                         rendered, so it is smooth throughout and stays sharp
+                         when the camera moves in. Implies no --punch.
+  --punch     let the flows push the camera in. Off by default: a punch is
+              applied at encode time, so it upscales captured pixels and the
+              text softens past about 1.3-1.5x. The hold a punch creates
+              happens either way, so the pacing is unchanged.
   --commit    let the flow actually save (rings up the sale, writes the stock
               count). Off by default: a take is read-only unless you ask.
   --headed    show the browser while recording
@@ -464,6 +500,69 @@ function buildZooms(marks, toVideoTime) {
 }
 
 /**
+ * Timing of a cinematic take, in ms.
+ *
+ * `HOLD` is the number that decides whether the film feels confident or rushed,
+ * and it is longer than it looks like it needs to be on purpose: the still is
+ * already on screen and still moving, so the viewer is reading rather than
+ * waiting. `EXIT` overlaps the next `ENTRY`, which is what stops the scene
+ * flickering to the ground colour between shots.
+ */
+const BEAT = { entry: 950, hold: 1250, exit: 520 };
+
+/**
+ * Turn the stills a cinematic flow collected into a scene timeline.
+ *
+ * Each shot gets three moves that share one eased curve — arrive, settle, leave.
+ * The arrival carries the focus pull (`blur` resolving to zero) and a small
+ * Y-rotation whose sign alternates, so consecutive shots enter from opposite
+ * sides and the sequence reads as a camera working a room rather than a slideshow.
+ *
+ * `to` comes from the flow's own `punch(..., { to })` — the amount it wanted to
+ * push in — and is spent here as a slow continuation *during* the hold rather
+ * than as a jump on arrival. Halved, because the full punch value was chosen for
+ * a hard encode-time crop and reads as too much when it is a real camera.
+ */
+function buildSceneBeats(marks) {
+  const out = [];
+  /*
+   * A single-shot take is the fallback path — a page with no captions and no
+   * punches. One entry plus one hold is barely three seconds, which reads as a
+   * failed export rather than as restraint, so the hold stretches to carry it.
+   * The push continues throughout, so it is a slow dolly on one screen: short,
+   * but a film.
+   */
+  const hold = marks.length === 1 ? BEAT.hold * 3 : BEAT.hold;
+  const stride = BEAT.entry + hold;
+  marks.forEach((m, i) => {
+    const t0 = i * stride;
+    const lean = i % 2 === 0 ? 1 : -1;
+    const push = 1 + Math.max(0, (Number(m.to) || 1) - 1) * 0.5;
+
+    out.push({
+      shot: i, at: t0, ms: BEAT.entry,
+      from: { opacity: 0, z: 0.945, rotY: 7 * lean, x: 1.6 * lean, y: 1.4, blur: 9 },
+      to: { opacity: 1, z: 1, rotY: 0, x: 0, y: 0, blur: 0 },
+    });
+    out.push({
+      shot: i, at: t0 + BEAT.entry, ms: hold,
+      from: { opacity: 1, z: 1, rotY: 0, x: 0, y: 0, blur: 0 },
+      to: { opacity: 1, z: push, rotY: -1.1 * lean, x: 0, y: -0.5, blur: 0 },
+    });
+    // The last shot does not leave — the take ends on it, and fading the final
+    // composition to bare ground before the closing card is a dead beat.
+    if (i < marks.length - 1) {
+      out.push({
+        shot: i, at: t0 + stride, ms: BEAT.exit,
+        from: { opacity: 1, z: push, rotY: -1.1 * lean, y: -0.5, blur: 0 },
+        to: { opacity: 0, z: push + 0.03, rotY: -4 * lean, y: -2.2, blur: 3 },
+      });
+    }
+  });
+  return out;
+}
+
+/**
  * Wall-clock spent in each stage of a take, printed with `--timings`.
  *
  * Speed work on this thing has been wrong twice from reasoning about which part
@@ -542,6 +641,8 @@ async function record(opts, flowId, device, theme, creds, live) {
       device: dev, theme, baseUrl: opts.url, log,
       gate: () => ctl.gate(),
       onStep: (s) => ctl.setStep(s),
+      punch: opts.punch === true,
+      cinematic: opts.style === 'cinematic',
     });
     await page.prepare();
 
@@ -590,6 +691,38 @@ async function record(opts, flowId, device, theme, creds, live) {
     // No in-page device frame: the phone chassis is composited at encode time so
     // it *contains* the screen instead of covering its edges. See capture.encode.
 
+    /*
+     * Cinematic collects its stills *before the camera exists*.
+     *
+     * The recorder's only job in this style is to film the scene, so starting it
+     * first buys nothing and costs real risk: `Page.shot` raises the device scale
+     * factor and lowers it again for every beat, and doing that repeatedly to a
+     * live `Page.startScreencast` is asking a resize storm of the one thing the
+     * take depends on. With no screencast open yet there is nothing to disturb.
+     *
+     * It also deletes the need to hold the camera through the whole flow. A blind
+     * span that long was working against the grain of `Recorder.blind`, which
+     * exists for the couple of seconds a navigation takes.
+     *
+     * `page.offCamera` is still null here, and that is a supported state rather
+     * than an oversight — `Page.goto` checks for it (`filmed || !this.offCamera`)
+     * and simply runs the work. Pausing still works, because the flow's gate is
+     * `page.gate` and has nothing to do with the recorder.
+     */
+    if (opts.style === 'cinematic') {
+      state.phase = 'recording';
+      ctl.setStep('collecting shots');
+      log('cinematic: driving the app off camera…');
+      await registry.flows[flowId](page, { commit: opts.commit });
+
+      if (!page.marks.beats.length) {
+        log('cinematic: no caption or punch beats — shooting the final screen');
+        await page.shootBeat();
+      }
+      log(`cinematic: ${page.marks.beats.length} shot(s)`);
+      clock.lap('shots');
+    }
+
     recorder = new Recorder(cdp, {
       dir: path.join(opts.outDir, '.frames', stamp),
       fps: opts.fps,
@@ -629,17 +762,91 @@ async function record(opts, flowId, device, theme, creds, live) {
     const flow = registry.flows[flowId];
     const cards = registry.cards[flowId] ?? {};
 
-    // The opening card is captured, so it plays here rather than in the flow —
-    // one path for coded flows and recipes alike. See registry.cards.
-    if (cards.open) {
-      ctl.setStep('opening card');
-      await page.card(cards.open);
-      await page.clearCard();
+    if (opts.style === 'cinematic') {
+      /*
+       * The stills were already collected, before the recorder existed. Everything
+       * from here is the film: the scene is the only thing this style ever records.
+       */
+      const shots = page.marks.beats;
+      if (!shots.length) {
+        throw new Error(
+          'cinematic style captured no shots — the page never became screenshottable. '
+          + 'Record this take with --style plain to see what the flow is actually doing.',
+        );
+      }
+
+      // No cursor in a rendered scene: it is not a recording of anyone using
+      // anything, and a stray arrow parked over a still gives that away.
+      await page.zen('show(false)');
+
+      /*
+       * The opening card's words become the fixed caption, held for the whole
+       * take, rather than a screen that plays and leaves.
+       *
+       * That is the reference's own structure and it costs no new copy — so no new
+       * i18n keys, and an operator who has already written a card gets a cinematic
+       * take out of it with nothing more to fill in.
+       */
+      const caption = cards.open
+        ? { title: cards.open.title, subtitle: cards.open.subtitle, cta: cards.open.cta }
+        : null;
+
+      ctl.setStep('building the scene');
+      /*
+       * Building is held, because it is the one part of this style that has to
+       * happen with the camera already rolling.
+       *
+       * Mounting paints the ground immediately while every still is still at
+       * opacity 0, and uploading N base64 screenshots through CDP is not instant —
+       * filmed, that is a few seconds of empty gradient before anything happens.
+       * The take should open on the first shot arriving.
+       */
+      const beats = buildSceneBeats(shots);
+      await page.offCamera('building the scene', async () => {
+        /*
+         * Checked, not assumed.
+         *
+         * `page.scene()` evaluates `window.__zenScene && …`, so if `scene.js` was
+         * never injected — the document predates `prepare()`, say — every call
+         * here quietly evaluates to undefined and does nothing. The take then
+         * films a hidden cursor over a blank app for zero beats and dies much
+         * later in `encode()` with "only N frame(s) captured", which points at
+         * completely the wrong thing. Fail here instead, where the cause is.
+         */
+        const mounted = await page.scene(`mount(${JSON.stringify({ caption })})`);
+        if (mounted !== true) {
+          throw new Error(
+            'the cinematic scene did not mount — scene.js is not present in the page. '
+            + 'It is injected by Page.prepare() only when the style is cinematic.',
+          );
+        }
+        for (const s of shots) {
+          await page.scene(`addShot(${JSON.stringify(s.src)},${JSON.stringify({})})`);
+        }
+        await page.scene(`setBeats(${JSON.stringify(beats)})`);
+        // Still inside the held span: decoding N base64 JPEGs is exactly the kind
+        // of wait that must not be filmed.
+        await page.scene('ready()', { awaitPromise: true });
+      });
+
+      ctl.setStep('playing the scene');
+      log('cinematic: rolling the scene…');
+      // The only thing in this take that is actually filmed.
+      await page.scene('play(900)', { awaitPromise: true });
+      await page.scene('unmount()');
+    } else {
+      // The opening card is captured, so it plays here rather than in the flow —
+      // one path for coded flows and recipes alike. See registry.cards.
+      if (cards.open) {
+        ctl.setStep('opening card');
+        await page.card(cards.open);
+        await page.clearCard();
+      }
+
+      await flow(page, { commit: opts.commit });
+
+      await page.zen('show(false)');
     }
-
-    await flow(page, { commit: opts.commit });
-
-    await page.zen('show(false)');
     // A camera left punched in would crop the closing card, which is full-bleed.
     // Unlike the release on navigation — which overlaps a route load and so is
     // free — this one has nothing to hide behind, so it is waited out.
@@ -707,7 +914,19 @@ async function record(opts, flowId, device, theme, creds, live) {
      * Resolving it here, once, in the order the marks were actually taken, is
      * the only place that is true.
      */
-    const zooms = buildZooms(page.marks.zooms, toVideoTime);
+    /*
+     * A cinematic take moves its camera in the scene, on a CSS transform, so it
+     * must reach the encoder with no camera of its own.
+     *
+     * Not just belt-and-braces. `zoompan` crops on integer pixels, so layering it
+     * over a scene that is already drifting sub-pixel adds the judder this style
+     * exists to remove — and it would re-upscale a still that was captured at 2x
+     * precisely so it would never need upscaling. Two cameras is strictly worse
+     * than either one.
+     */
+    const zooms = opts.style === 'cinematic'
+      ? []
+      : buildZooms(page.marks.zooms, toVideoTime);
     if (zooms.length) log(`camera: ${zooms.length} move(s)`);
 
     await recorder.encode(silentFile, {
@@ -813,6 +1032,22 @@ async function record(opts, flowId, device, theme, creds, live) {
     if (info) {
       log(`  ${info.width}×${info.height} · ${info.seconds.toFixed(1)}s · `
         + `${info.frames} frames @ ${info.fps} · ${(info.bytes / 1e6).toFixed(1)} MB`);
+      /*
+       * The smoothness number, printed on every take.
+       *
+       * Nothing else in this log distinguishes a film that moves from one that
+       * repeats itself — duration, frame count and rate are all identical either
+       * way. Under about 60% the source was not animating, and that is a fact about
+       * the take rather than the encode: no setting here moves it.
+       */
+      const uniq = await uniqueRatio(outFile, info.frames);
+      if (uniq) {
+        const pc = (uniq.ratio * 100).toFixed(0);
+        log(`  ${pc}% unique frames (${uniq.kept}/${uniq.total})`
+          + (uniq.ratio < 0.6
+            ? ' — held frames dominate; --style cinematic renders every frame'
+            : ''));
+      }
     }
     if (opts.timings) log(`  ${clock.report()}`);
     state.phase = 'done';

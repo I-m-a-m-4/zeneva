@@ -65,6 +65,7 @@ import { BranchSwitcher } from '@/components/layout/branch-switcher';
 import { useSessionTracker } from '@/hooks/use-session-tracker';
 import { logErrorToFirestore } from '@/lib/error-logger';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { UpdateRequiredModal } from '@/components/layout/update-required-modal';
 import { useI18n } from '@/context/i18n-context';
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -949,6 +950,18 @@ export default function AuthenticatedLayout({
   const plan = businessInstance?.plan || 'starter';
   const hasLifetimeAccess = businessInstance?.accessLevel === 'lifetime';
 
+  const getAvatarRingClass = (userPlan: string) => {
+    switch (userPlan) {
+      case 'business':
+        return 'bg-[linear-gradient(45deg,#10b981,#06b6d4,#3b82f6,#8b5cf6)] bg-[length:200%_200%] p-[2px] animate-gradient';
+      case 'pro':
+        return 'bg-gradient-to-tr from-blue-400 via-indigo-500 to-purple-600 p-[2px] animate-gradient';
+      case 'starter':
+      default:
+        return 'bg-gradient-to-tr from-amber-400 via-orange-500 to-pink-600 p-[2px] animate-gradient';
+    }
+  };
+
   const filterNavByRole = (items: any[]) => {
     if (!userRole) return [];
     const permissions = currentUserProfile?.permissions || {};
@@ -1233,8 +1246,8 @@ export default function AuthenticatedLayout({
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <div className={cn("rounded-full shrink-0", isPremium && "bg-gradient-to-tr from-amber-400 via-orange-500 to-pink-600 p-[2px] animate-gradient")}>
-                            <Avatar className={cn("h-8 w-8 border border-transparent", isPremium && "border-2 border-background")}>
+                          <div className={cn("rounded-full shrink-0", getAvatarRingClass(plan))}>
+                            <Avatar className="h-8 w-8 border-2 border-background">
                               <AvatarFallback className="bg-muted text-foreground font-semibold">
                                 {fallbackInitials}
                               </AvatarFallback>
@@ -1395,8 +1408,8 @@ export default function AuthenticatedLayout({
                         {isUserLoading ? (
                           <Skeleton className="h-8 w-8 rounded-full" />
                         ) : (
-                          <div className={cn("rounded-full", isPremium && "bg-gradient-to-tr from-amber-400 via-orange-500 to-pink-600 p-[2px] animate-gradient")}>
-                            <Avatar className={cn("h-8 w-8 border border-transparent", isPremium && "border-2 border-background")}>
+                          <div className={cn("rounded-full", getAvatarRingClass(plan))}>
+                            <Avatar className="h-8 w-8 border-2 border-background">
                               <AvatarFallback className="bg-muted text-foreground font-semibold">
                                 {fallbackInitials}
                               </AvatarFallback>
@@ -1640,6 +1653,7 @@ export default function AuthenticatedLayout({
           </div>
         </DialogContent>
       </Dialog>
+      <UpdateRequiredModal />
     </>
     </ErrorBoundary>
   );

@@ -576,6 +576,12 @@ export default function Home() {
                                                     </div>
                                                 </li>
                                             </ul>
+                                            
+                                            <div className="mt-8">
+                                                <Link href="/zen-ai" className="inline-flex items-center gap-2 text-primary font-medium hover:text-primary/80 transition-colors">
+                                                    Learn more about Zen AI <ArrowRight className="w-4 h-4" />
+                                                </Link>
+                                            </div>
                                         </div>
 
                                         <ZenAIInsights />

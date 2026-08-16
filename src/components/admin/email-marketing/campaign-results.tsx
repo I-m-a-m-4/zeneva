@@ -148,14 +148,14 @@ function StatCard({
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <Icon className="h-4 w-4 text-muted-foreground" />
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
         </div>
         <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
-        {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+        {sub && <p className="mt-0.5 break-words text-xs text-muted-foreground">{sub}</p>}
       </CardContent>
     </Card>
   );
@@ -165,9 +165,23 @@ interface CampaignResultsProps {
   logs: FollowUpLog[];
   isLoading: boolean;
   onRefresh: () => void;
+  /**
+   * Hand a set of recipient addresses back to the composer as a new selection.
+   * Absent when the caller has nowhere to put them, in which case the follow-up
+   * panel still reports the finding but offers no button.
+   */
+  onFollowUp?: (emails: string[]) => void;
 }
 
-export default function CampaignResults({ logs, isLoading, onRefresh }: CampaignResultsProps) {
+/** Sent this long ago and still unopened is a follow-up candidate, not a failure. */
+const FOLLOW_UP_AFTER_DAYS = 3;
+
+export default function CampaignResults({
+  logs,
+  isLoading,
+  onRefresh,
+  onFollowUp,
+}: CampaignResultsProps) {
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState('');
   const [viewLog, setViewLog] = React.useState<FollowUpLog | null>(null);
@@ -187,6 +201,78 @@ export default function CampaignResults({ logs, isLoading, onRefresh }: Campaign
   }, [logs]);
 
   const selected = campaigns.find(c => c.key === selectedKey) ?? null;
+
+  /**
+   * Open rate per behavioural segment.
+   *
+   * The single most useful number on this page: it says which *targeting* works,
+   * not which subject line does. A 40% open rate on lapsed users and 8% on
+   * champions is telling you where the attention actually is.
+   */
+  const segmentPerf = React.useMemo(() => {
+    const bySegment = new Map<string, { sent: number; opened: number; unsub: number }>();
+    for (const log of logs) {
+      if (log.status === 'failed') continue;
+      const key = log.segment ?? 'unlabelled';
+      const acc = bySegment.get(key) ?? { sent: 0, opened: 0, unsub: 0 };
+      acc.sent += 1;
+      if (wasOpened(log)) acc.opened += 1;
+      if (log.unsubscribed) acc.unsub += 1;
+      bySegment.set(key, acc);
+    }
+    return [...bySegment.entries()]
+      .map(([key, v]) => ({
+        key,
+        label: BEHAVIOR_SEGMENT_META[key as BehaviorSegment]?.label ?? 'Unlabelled',
+        tone: BEHAVIOR_SEGMENT_META[key as BehaviorSegment]?.tone ?? 'neutral',
+        ...v,
+        openRate: v.sent > 0 ? (v.opened / v.sent) * 100 : 0,
+      }))
+      .sort((a, b) => b.openRate - a.openRate);
+  }, [logs]);
+
+  /**
+   * How *deeply* people engaged, not just whether they opened.
+   *
+   * A single open is often the preview pane loading the pixel. Three or more is
+   * somebody who came back to the message, which is the closest thing to intent
+   * this tracking can see.
+   */
+  const engagement = React.useMemo(() => {
+    const delivered = logs.filter(l => l.status !== 'failed');
+    const bucket = { none: 0, once: 0, few: 0, many: 0 };
+    for (const log of delivered) {
+      const opens = log.openCount ?? 0;
+      if (opens <= 0) bucket.none += 1;
+      else if (opens === 1) bucket.once += 1;
+      else if (opens <= 3) bucket.few += 1;
+      else bucket.many += 1;
+    }
+    return { ...bucket, total: delivered.length };
+  }, [logs]);
+
+  /**
+   * Delivered, given a few days, and still never opened.
+   *
+   * The point of surfacing these separately is that they are not failures — they
+   * are the people a second attempt is actually for. Unsubscribes are excluded,
+   * because mailing them again would be both wrong and unlawful.
+   */
+  const needsFollowUp = React.useMemo(() => {
+    const cutoff = Date.now() - FOLLOW_UP_AFTER_DAYS * 86_400_000;
+    const seen = new Set<string>();
+    const out: FollowUpLog[] = [];
+    for (const log of logs) {
+      if (log.status === 'failed' || log.unsubscribed || wasOpened(log)) continue;
+      const sentAt = toDate(log.sentAt);
+      if (!sentAt || sentAt.getTime() > cutoff) continue;
+      const email = (log.sentTo || '').trim().toLowerCase();
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      out.push(log);
+    }
+    return out;
+  }, [logs]);
 
   const rows = React.useMemo(() => {
     const base = selected ? selected.logs : logs;
@@ -234,14 +320,158 @@ export default function CampaignResults({ logs, isLoading, onRefresh }: Campaign
         </p>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Which targeting works, rather than which subject line does. */}
+        <Card className="min-w-0">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Open rate by segment</CardTitle>
+            <CardDescription className="text-xs">
+              Which behavioural group is actually paying attention. This is the number
+              that should decide who you write to next.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2.5">
+            {segmentPerf.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">Nothing sent yet.</p>
+            ) : (
+              segmentPerf.map(row => (
+                <div key={row.key} className="min-w-0">
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                    <Badge
+                      variant="outline"
+                      className={cn('text-[10px]', TONE_CLASSES[row.tone as keyof typeof TONE_CLASSES])}
+                    >
+                      {row.label}
+                    </Badge>
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {row.opened}/{row.sent} opened
+                      {row.unsub > 0 ? ` · ${row.unsub} unsubscribed` : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-emerald-500"
+                        style={{ width: `${Math.min(100, row.openRate)}%` }}
+                      />
+                    </div>
+                    <span className="w-10 shrink-0 text-right text-[11px] font-bold tabular-nums text-emerald-600">
+                      {row.openRate.toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Depth of engagement. One open is often just a preview pane. */}
+        <Card className="min-w-0">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">How deeply they engaged</CardTitle>
+            <CardDescription className="text-xs">
+              A single open is frequently just a preview pane loading the pixel. Three
+              or more means somebody came back to the message.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {engagement.total === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">Nothing sent yet.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {(
+                  [
+                    ['Never opened', engagement.none, 'bg-muted-foreground/40'],
+                    ['Opened once', engagement.once, 'bg-sky-500'],
+                    ['Opened 2–3 times', engagement.few, 'bg-emerald-500'],
+                    ['Opened 4+ times', engagement.many, 'bg-emerald-600'],
+                  ] as const
+                ).map(([label, count, colour]) => (
+                  <div key={label} className="min-w-0">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="truncate text-xs">{label}</span>
+                      <span className="shrink-0 text-[11px] font-semibold tabular-nums">
+                        {count}
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          ({Math.round((count / engagement.total) * 100)}%)
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn('h-full rounded-full', colour)}
+                        style={{ width: `${(count / engagement.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Not a failure list — the people a second attempt is actually for. */}
+      {needsFollowUp.length > 0 && (
+        <Card className="min-w-0 border-amber-500/30">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  {needsFollowUp.length} worth a second attempt
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Delivered more than {FOLLOW_UP_AFTER_DAYS} days ago and never opened.
+                  Not failures — a different subject line at a different hour often
+                  lands where the first one did not. Anyone who unsubscribed is
+                  excluded.
+                </CardDescription>
+              </div>
+              {onFollowUp && (
+                <Button
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={() =>
+                    onFollowUp(
+                      needsFollowUp.map(l => (l.sentTo || '').trim()).filter(Boolean),
+                    )
+                  }
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Select all {needsFollowUp.length}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-1.5">
+              {needsFollowUp.slice(0, 40).map(log => (
+                <span
+                  key={log.id}
+                  title={log.subject}
+                  className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                >
+                  {log.recipientName || log.sentTo}
+                </span>
+              ))}
+              {needsFollowUp.length > 40 && (
+                <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  +{needsFollowUp.length - 40} more
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <Card>
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-base">Campaigns</CardTitle>
               <CardDescription className="text-xs">Grouped by subject and segment.</CardDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={onRefresh} disabled={isLoading}>
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={onRefresh} disabled={isLoading}>
               <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
             </Button>
           </CardHeader>
@@ -324,8 +554,8 @@ export default function CampaignResults({ logs, isLoading, onRefresh }: Campaign
         <Card>
           <CardHeader className="pb-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">
+              <div className="min-w-0 flex-1">
+                <CardTitle className="break-words text-base">
                   {selected ? selected.subject : 'Every recipient'}
                 </CardTitle>
                 <CardDescription className="text-xs">
@@ -379,9 +609,9 @@ export default function CampaignResults({ logs, isLoading, onRefresh }: Campaign
                           className="cursor-pointer"
                           onClick={() => setViewLog(log)}
                         >
-                          <TableCell className="pl-4">
-                            <p className="text-sm font-medium">{log.recipientName || '—'}</p>
-                            <p className="text-[11px] text-muted-foreground">{log.sentTo}</p>
+                          <TableCell className="max-w-[220px] pl-4">
+                            <p className="break-words text-sm font-medium">{log.recipientName || '—'}</p>
+                            <p className="break-all text-[11px] text-muted-foreground">{log.sentTo}</p>
                             {log.unsubscribed && (
                               <Badge
                                 variant="outline"

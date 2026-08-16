@@ -70,7 +70,7 @@ export default function AIChat({ messages, input, onInputChange, onSendMessage, 
                 <Input
                     value={input}
                     onChange={(e) => onInputChange(e.target.value)}
-                    placeholder="Ask Zen AI a question..."
+                    placeholder="Ask Zen AI, or ask it to add a product..."
                     disabled={isLoading}
                     className="flex-1"
                 />

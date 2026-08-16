@@ -202,7 +202,7 @@ export class Page {
      * narration script would be a second copy of the same sentences, and the two
      * would disagree the first time someone edited one of them.
      */
-    this.marks = { clicks: [], keys: [], zooms: [], narration: [] };
+    this.marks = { clicks: [], keys: [], zooms: [], narration: [], beats: [] };
   }
 
   async prepare() {
@@ -234,6 +234,23 @@ export class Page {
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
       source:
         `try{localStorage.setItem('theme',${JSON.stringify(theme)});` +
+        // Pin the language, for the same reason the theme is pinned: the flows
+        // address the app in English text — `{ text: 'Complete Sale' }` — and the
+        // app ships eleven catalogues. An account whose business
+        // `settings.language` is not English therefore fails *every* exact-text
+        // selector, and it surfaces as "none of these appeared", which reads like a
+        // renamed button rather than a translated one.
+        //
+        // localStorage is the right lever rather than a lucky one: the resolution
+        // order in `src/context/i18n-context.tsx` is explicit device choice →
+        // browser language → English, with the business setting slotting in between
+        // via `adoptLocale()`. A device choice therefore outranks the business.
+        //
+        // The key is duplicated from `LOCALE_STORAGE_KEY` in
+        // `src/lib/i18n/config.ts` because `scripts/record/` deliberately has no
+        // import path into `src/` — same trade as `FLOW_CARD_DEFAULTS`. If that
+        // constant is ever renamed, this string has to move with it.
+        `localStorage.setItem('zeneva_locale','en');` +
         `localStorage.removeItem('zeneva_needs_tour');}catch(e){}\n` +
         HIDE_DEV_UI + '\n' +
         OVERLAY_SRC +
@@ -445,10 +462,37 @@ export class Page {
    * mobile one — Chrome scales the whole surface uniformly into the screencast,
    * so a fraction of the viewport is the same fraction of every captured frame.
    *
+   * ## Three behaviours, chosen by how the take is being cut
+   *
+   * `cinematic` shoots a still instead of marking a move — the flows' punches are
+   * already a list of the moments worth looking at, so they double as the scene's
+   * beat list. `--punch` marks the move described above. The default does neither
+   * and only keeps the pause, so pacing is identical either way. The paragraph
+   * about softness is the reason the default is off, and the reason cinematic
+   * exists: there, a push-in is a downscale of a 2x still and stays sharp.
+   *
    * @param {object|null} spec  what to frame; null holds the current anchor
    * @param {{to?: number, ms?: number, wait?: boolean}} [opts]
    */
   async punch(spec, { to = 1.3, ms = 760, wait = true } = {}) {
+    /*
+     * Cinematic: a punch is a *shot*, not a camera move.
+     *
+     * The flows are already full of these, and each one is a considered statement
+     * that this moment is the interesting one — that is exactly the beat list a
+     * scene needs. Reusing it means the cinematic style needs no new vocabulary in
+     * `flows.mjs` and works on a hand-written recipe for a page nobody has filmed
+     * before, which is the whole point of the option.
+     *
+     * No hold, unlike the two branches below. The flow is running off-camera here,
+     * so a pause films nothing and only costs the operator wall-clock; the pacing
+     * that matters is the scene's, and that is set in `setBeats`.
+     */
+    if (this.cinematic) {
+      await this.shootBeat({ spec, to });
+      return null;
+    }
+
     /*
      * Switched off by the operator (the default).
      *
@@ -582,6 +626,39 @@ export class Page {
     }
   }
 
+  /**
+   * Record one cinematic beat: a clean still of the current screen.
+   *
+   * "Clean" is the important word. The still must not have an overlay caption
+   * burned into it, because the scene draws its own fixed caption over the top and
+   * two sets of words in one frame is unreadable. So the callers are the moments
+   * *before* something is drawn, never after.
+   *
+   * A failure costs this beat and nothing else — same contract as a punch whose
+   * anchor did not match. A take with four good shots and one missing is a take;
+   * a take that threw on the fifth is not.
+   *
+   * @param {{spec?: object|null, to?: number}} [opts]
+   */
+  async shootBeat({ spec = null, to = 1.3 } = {}) {
+    const rect = spec ? await this.find(spec, { required: false, timeoutMs: 1500 }) : null;
+    let src;
+    try {
+      src = await this.shot();
+    } catch (e) {
+      this.log?.(`  (no shot — ${String(e.message).split('\n')[0]})`);
+      return null;
+    }
+    const mark = {
+      src,
+      to,
+      px: rect ? clamp01(rect.x / this.device.width) : 0.5,
+      py: rect ? clamp01(rect.y / this.device.height) : 0.5,
+    };
+    this.marks.beats.push(mark);
+    return mark;
+  }
+
   // ------------------------------------------------------------- gestures
 
   async mouseTo(x, y) {
@@ -696,20 +773,69 @@ export class Page {
    * payment method. Hardcoding either one produces a flow that works on the
    * account it was written against and hangs on every other. Specs are tried in
    * order and the first one present wins.
+   *
+   * ## The failure reports what was on screen, not just what was wanted
+   *
+   * It used to name only the specs it tried, which makes the most common cause of
+   * this error — the app is not in English, so no hardcoded label matches — look
+   * exactly like the second most common one: a button that got renamed. An earlier
+   * version collected the last-tried spec into a variable and then discarded it
+   * with `void seen`, which was the shape of an intention rather than a diagnostic.
+   *
+   * Listing the buttons that *are* there separates those two instantly: a screen
+   * full of French means the locale, a screen with the right buttons under
+   * different names means the flow, and an empty screen means the step before this
+   * one never landed.
    */
   async clickAny(specs, opts = {}) {
     const deadline = Date.now() + (opts.timeoutMs ?? 20_000);
-    let seen = null;
     while (Date.now() < deadline) {
       for (const spec of specs) {
         const rect = await this.find(spec, { required: false, timeoutMs: 900 });
         if (rect) return this.click(spec, opts);
-        seen = spec;
       }
       await sleep(400);
     }
-    void seen;
-    throw new Error(`none of these appeared: ${specs.map((s) => JSON.stringify(s)).join(' / ')}`);
+
+    const wanted = specs.map((s) => JSON.stringify(s)).join(' / ');
+    throw new Error(`none of these appeared: ${wanted}\n  on screen: ${await this.#clickableLabels()}`);
+  }
+
+  /**
+   * Labels of everything currently clickable, for a failure message.
+   *
+   * Best effort by definition — this only ever runs on a path that is already
+   * failing, so it must not be able to fail louder than the error it is
+   * describing. Anything unexpected becomes a short note rather than a throw.
+   *
+   * Deliberately not `find()`: that searches for something specific, and the whole
+   * point here is to report what is present without having to name it first.
+   */
+  async #clickableLabels(limit = 12) {
+    try {
+      const labels = await this.eval(`(() => {
+        const out = [];
+        const seen = new Set();
+        for (const el of document.querySelectorAll('button,[role="button"],a[href]')) {
+          const r = el.getBoundingClientRect();
+          // Visible and in the viewport: an off-screen or collapsed control is not
+          // something the operator could have expected the flow to click.
+          if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > innerHeight) continue;
+          const t = (el.innerText || el.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim();
+          if (!t || t.length > 60 || seen.has(t)) continue;
+          seen.add(t);
+          out.push(t);
+        }
+        return out;
+      })()`);
+      if (!Array.isArray(labels) || !labels.length) {
+        return '(nothing clickable — the step before this one probably did not land)';
+      }
+      const shown = labels.slice(0, limit).map((t) => JSON.stringify(t)).join(', ');
+      return labels.length > limit ? `${shown}, +${labels.length - limit} more` : shown;
+    } catch (e) {
+      return `(could not read the page: ${String(e.message).split('\n')[0]})`;
+    }
   }
 
   /** Wait until the address bar actually shows `expected`. */
@@ -871,6 +997,24 @@ export class Page {
     // the viewer sees. A voice line entering a beat early reads as anticipation;
     // a beat late reads as a mistake.
     if (text) this.marks.narration.push({ at: Date.now() / 1000, text: String(text), ms: ms ?? null });
+    /*
+     * Cinematic: a caption is a beat, and the words belong to the scene.
+     *
+     * This is the beat source that actually generalises. `punch()` is optional —
+     * a recipe for a page nobody has filmed is typically `goto` + `caption` +
+     * `scroll`, with no punches at all — so keying the scene off punches alone
+     * meant "record any new page in this style" produced no shots and failed.
+     * Captions are the one mark every coded flow and every recipe has.
+     *
+     * The overlay caption is deliberately *not* drawn. The scene carries one fixed
+     * caption over everything, which is the look being copied, and a second set of
+     * words burned into the still underneath it would be unreadable. Shooting here
+     * — before anything is drawn — is what keeps the still clean.
+     *
+     * The line still goes into `marks.narration`, so narration reads the script it
+     * always did; it just becomes voice-over rather than subtitles.
+     */
+    if (this.cinematic) return this.shootBeat();
     return this.zen(`caption(${JSON.stringify(text ?? '')}${ms ? `,${ms}` : ''})`);
   }
 

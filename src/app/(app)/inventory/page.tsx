@@ -27,6 +27,7 @@ import {
   Layers,
   Box,
   Activity,
+  ChevronDown,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,7 @@ import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { useBranch } from '@/context/branch-context';
 import { cn } from '@/lib/utils';
+import { trackFeature } from '@/lib/product-telemetry';
 import Papa from 'papaparse';
 import { logAuditEvent } from '@/lib/audit';
 import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
@@ -206,6 +208,47 @@ function InventoryPageContent() {
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
   const [showHealthModal, setShowHealthModal] = React.useState(false);
+  const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
+
+  const toggleExpandParent = (parentId: string) => {
+    setExpandedParentIds(prev => 
+      prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]
+    );
+  };
+
+  const getVariantInfo = React.useCallback((parent: Product) => {
+    const isParent = parent.type === 'variant' || (products || []).some(p => p.parentId === parent.id);
+    if (!isParent) {
+      return {
+        isVariantParent: false,
+        totalStock: parent.stock || 0,
+        priceDisplay: `${currencySymbol}${parent.price?.toLocaleString() || 0}`,
+        variants: []
+      };
+    }
+
+    const variants = (products || []).filter(p => p.parentId === parent.id);
+    const totalStock = variants.length > 0 
+      ? variants.reduce((sum, v) => sum + (v.stock || 0), 0)
+      : (parent.stock || 0);
+
+    const prices = variants.map(v => v.price || 0).filter(p => p > 0);
+    let priceDisplay = `${currencySymbol}${parent.price?.toLocaleString() || 0}`;
+    if (prices.length > 0) {
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      priceDisplay = minPrice === maxPrice 
+        ? `${currencySymbol}${minPrice.toLocaleString()}`
+        : `${currencySymbol}${minPrice.toLocaleString()} - ${currencySymbol}${maxPrice.toLocaleString()}`;
+    }
+
+    return {
+      isVariantParent: true,
+      totalStock,
+      priceDisplay,
+      variants
+    };
+  }, [products, currencySymbol]);
 
   const searchParams = useSearchParams();
   const initialSortBy = (searchParams.get('sortBy') as any) || 'name';
@@ -262,8 +305,8 @@ function InventoryPageContent() {
     // 1. Combine with optimistic products
     let combined = [...(optimisticProducts || []), ...base];
     
-    // 2. Filter out queued deletions
-    let valid = combined.filter(p => !queuedDeletionIds.includes(p.id));
+    // 2. Filter out queued deletions and child variants (child variants sit inside parent expandable sub-rows)
+    let valid = combined.filter(p => !queuedDeletionIds.includes(p.id) && !p.parentId);
 
   // 3. Category
     if (categoryFilter !== 'all') {
@@ -378,6 +421,38 @@ function InventoryPageContent() {
       payload: { productIds: selectedProductIds }
     }, t('inventory.queueDeleting', { count: selectedProductIds.length }));
 
+    // One log per product, carrying the count that was still on the shelf.
+    //
+    // Deleting a product erases the item and its outstanding count together, so
+    // a shortage vanishes with no adjustment left behind to question. That makes
+    // bulk delete the fastest way to clear a lot of missing stock at once, and
+    // `stockAtDeletion` the only trace of it. Cannot be reconstructed afterwards
+    // — the product document is gone. Forensics check S6.
+    for (const id of selectedProductIds) {
+      const deleted = products?.find(p => p.id === id);
+      addToQueue({
+        type: 'add-audit-log',
+        payload: {
+          businessId: business.id,
+          userId: currentUserProfile.id,
+          userName: currentUserProfile.name,
+          userEmail: currentUserProfile.email,
+          userRole: currentUserProfile.role,
+          action: 'product.delete',
+          entityType: 'Product',
+          entityId: id,
+          details: {
+            entityName: deleted?.name ?? null,
+            stockAtDeletion: deleted?.stock ?? 0,
+            price: deleted?.price ?? 0,
+            costPrice: deleted?.costPrice ?? 0,
+            sku: deleted?.sku ?? null,
+            reason: 'Bulk delete from Inventory',
+          }
+        }
+      }, `Logging deletion of ${deleted?.name ?? id}`);
+    }
+
     // We don't need to manually mutate here because we will filter in the UI based on queuedActions
     toast({
       variant: 'default',
@@ -390,6 +465,10 @@ function InventoryPageContent() {
   };
 
   const handleImportSuccess = () => {
+    // Fired on success rather than on opening the dialog: the question is whether
+    // bulk import is how stock actually gets in, and an abandoned import answers
+    // that with a no.
+    trackFeature('inventory_csv_import');
     setIsImportOpen(false);
   };
 
@@ -452,7 +531,9 @@ function InventoryPageContent() {
 
   const handleExport = async () => {
     if (!business?.id) return;
-    
+
+    trackFeature('reports_exported');
+
     toast({ variant: 'default', title: t('inventory.preparingExportTitle'), description: t('inventory.preparingExportDescription') });
 
     try {
@@ -935,103 +1016,124 @@ function InventoryPageContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayedProducts.map((product) => (
-                    <TableRow 
-                      key={product.id} 
-                      data-state={selectedProductIds.includes(product.id) && "selected"} 
-                      className={cn(
-                        "group hover:bg-muted/50 cursor-pointer transition-colors",
-                        (product as any).isOptimistic && "opacity-70 bg-muted/50"
-                      )}
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedProductIds.includes(product.id)}
-                          onCheckedChange={() => handleRowSelect(product.id)}
-                          disabled={(product as any).isOptimistic}
-                        />
-                      </TableCell>
-                      <TableCell className="cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/details?id=${product.id}`)}>
-                        {product.imageUrl ? (
-                          <div 
-                            className="relative h-12 w-12 sm:h-16 sm:w-16" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPreviewImage({ src: product.imageUrl!, alt: product.name });
-                            }}
-                          >
-                            <CachedImage
-                              alt={product.name}
-                              className="aspect-square rounded-md object-cover hover:ring-2 ring-primary/50 transition-all w-full h-full"
-                              src={product.imageUrl}
-                            />
-                            {(product as any).isOptimistic && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
-                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="h-12 w-12 sm:h-16 sm:w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors relative">
-                            <Package className="h-5 w-5 sm:h-6 sm:w-6" />
-                            {(product as any).isOptimistic && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
-                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                              </div>
-                            )}
-                          </div>
-                        )}
+                  {displayedProducts.map((product) => {
+                    const variantInfo = getVariantInfo(product);
+                    const isExpanded = expandedParentIds.includes(product.id);
 
-                      </TableCell>
-                      <TableCell className="font-medium whitespace-normal">
-                        <div className="flex items-center gap-2">
-                          <Link href={(product as any).isOptimistic ? '#' : `/inventory/details?id=${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
-                            {product.name}
-                          </Link>
-                          {product.type === 'composite' && (
-                            <Badge variant="outline" className="text-[10px] h-4 bg-primary/5 text-primary border-primary/20 gap-1 px-1">
-                              <Layers className="h-2 w-2" /> {t('inventory.bundleBadge')}
-                            </Badge>
-                          )}
-                          {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">{t('common.saving')}</Badge>}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                          <span className="font-mono text-[10px] bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
-                          {((product as any).material || product.variantValue) && (
-                            <span className="text-[10px] flex items-center gap-1 opacity-80">
-                               • {((product as any).material ? (product as any).material : '')} 
-                               {product.variantValue && <Badge variant="secondary" className="text-[8px] h-3 px-1 ms-0.5 font-normal">{product.variantValue}</Badge>}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            (product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? "outline" :
-                            (product.stock || 0) > 0 ? "outline" : "destructive"
-                          }
+                    return (
+                      <React.Fragment key={product.id}>
+                        <TableRow 
+                          data-state={selectedProductIds.includes(product.id) && "selected"} 
                           className={cn(
-                            "whitespace-nowrap",
-                            (product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') && "bg-blue-500/10 text-blue-500 border-blue-500/20",
-                            (product.categoryType !== 'service' && product.category?.toLowerCase() !== 'service' && product.category?.toLowerCase() !== 'services') && (product.stock || 0) < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
+                            "group hover:bg-muted/50 cursor-pointer transition-colors",
+                            (product as any).isOptimistic && "opacity-70 bg-muted/50",
+                            variantInfo.isVariantParent && "bg-muted/15 font-semibold"
                           )}
                         >
-                          {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? t('inventory.statusService') : (product.stock || 0) > 0 ? t('inventory.statusInStock') : (product.stock || 0) < 0 ? t('inventory.statusBackordered') : t('inventory.statusOutOfStock')}
-                        </Badge>
-                      </TableCell>
-                      {canManageStock && <TableCell>{currencySymbol}{product.price.toLocaleString()}</TableCell>}
-                      {canManageStock && (
-                        <TableCell className="hidden md:table-cell">
-                          {product.categoryType === 'service' ? (
-                            <span className="text-muted-foreground/40 italic">{t('inventory.notAvailable')}</span>
-                          ) : (
-                            <>
-                              {product.stock || 0} <span className="text-[10px] text-muted-foreground">{product.baseUnit || ''}</span>
-                            </>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedProductIds.includes(product.id)}
+                              onCheckedChange={() => handleRowSelect(product.id)}
+                              disabled={(product as any).isOptimistic}
+                            />
+                          </TableCell>
+                          <TableCell className="cursor-pointer" onClick={() => !(product as any).isOptimistic && router.push(`/inventory/details?id=${product.id}`)}>
+                            {(() => {
+                              const effectiveImageUrl = product.imageUrl || (product.parentId ? products?.find(p => p.id === product.parentId)?.imageUrl : undefined);
+                              return effectiveImageUrl ? (
+                                <div 
+                                  className="relative h-12 w-12 sm:h-16 sm:w-16" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewImage({ src: effectiveImageUrl, alt: product.name });
+                                  }}
+                                >
+                                  <CachedImage
+                                    alt={product.name}
+                                    className="aspect-square rounded-md object-cover hover:ring-2 ring-primary/50 transition-all w-full h-full"
+                                    src={effectiveImageUrl}
+                                  />
+                                {(product as any).isOptimistic && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                  </div>
+                                )}
+                                </div>
+                              ) : (
+                                <div className="h-12 w-12 sm:h-16 sm:w-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors relative">
+                                  <Package className="h-5 w-5 sm:h-6 sm:w-6" />
+                                  {(product as any).isOptimistic && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+                                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="font-medium whitespace-normal">
+                            <div className="flex items-center gap-2">
+                              {variantInfo.isVariantParent && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleExpandParent(product.id);
+                                  }}
+                                >
+                                  {isExpanded ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                </Button>
+                              )}
+                              <Link href={(product as any).isOptimistic ? '#' : `/inventory/details?id=${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
+                                {product.name}
+                              </Link>
+                              {variantInfo.isVariantParent && (
+                                <Badge variant="secondary" className="text-[10px] h-4 cursor-pointer" onClick={() => toggleExpandParent(product.id)}>
+                                  {variantInfo.variants.length} options
+                                </Badge>
+                              )}
+                              {(product as any).isOptimistic && <Badge variant="secondary" className="text-[10px] h-4">{t('common.saving')}</Badge>}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                              <span className="font-mono text-[10px] bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
+                              {((product as any).material || product.variantValue) && (
+                                <span className="text-[10px] flex items-center gap-1 opacity-80">
+                                   • {((product as any).material ? (product as any).material : '')} 
+                                   {product.variantValue && <Badge variant="secondary" className="text-[8px] h-3 px-1 ms-0.5 font-normal">{product.variantValue}</Badge>}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                (product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? "outline" :
+                                variantInfo.totalStock > 0 ? "outline" : "destructive"
+                              }
+                              className={cn(
+                                "whitespace-nowrap",
+                                (product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') && "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                                (product.categoryType !== 'service' && product.category?.toLowerCase() !== 'service' && product.category?.toLowerCase() !== 'services') && variantInfo.totalStock < 0 && "bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/50"
+                              )}
+                            >
+                              {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? t('inventory.statusService') : variantInfo.totalStock > 0 ? t('inventory.statusInStock') : variantInfo.totalStock < 0 ? t('inventory.statusBackordered') : t('inventory.statusOutOfStock')}
+                            </Badge>
+                          </TableCell>
+                          {canManageStock && <TableCell>{variantInfo.priceDisplay}</TableCell>}
+                          {canManageStock && (
+                            <TableCell className="hidden md:table-cell">
+                              {product.categoryType === 'service' ? (
+                                <span className="text-muted-foreground/40 italic">{t('inventory.notAvailable')}</span>
+                              ) : (
+                                <>
+                                  {variantInfo.totalStock} <span className="text-[10px] text-muted-foreground">{product.baseUnit || ''}</span>
+                                </>
+                              )}
+                            </TableCell>
                           )}
-                        </TableCell>
-                      )}
                       <TableCell className="text-end pe-6">
                         <DropdownMenu modal={false}
                           open={openMenuId === product.id} 
@@ -1062,7 +1164,54 @@ function InventoryPageContent() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    {variantInfo.isVariantParent && isExpanded && variantInfo.variants.map((child) => (
+                      <TableRow 
+                        key={child.id}
+                        className="bg-muted/30 hover:bg-muted/60 text-xs border-l-4 border-l-primary transition-colors"
+                      >
+                        <TableCell className="ps-8">
+                          <Checkbox
+                            checked={selectedProductIds.includes(child.id)}
+                            onCheckedChange={() => handleRowSelect(child.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="h-8 w-8 bg-muted rounded flex items-center justify-center text-muted-foreground">
+                            <Package className="h-4 w-4" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2 font-normal ps-6">
+                          <div className="flex items-center gap-2">
+                            <Link href={`/inventory/details?id=${child.id}`} className="hover:underline font-medium text-foreground">
+                              {child.name}
+                            </Link>
+                            <Badge variant="outline" className="text-[9px] h-4 font-mono">
+                              Option: {child.variantValue || child.name}
+                            </Badge>
+                          </div>
+                          <span className="font-mono text-[9px] text-muted-foreground">{child.sku || 'NO-SKU'}</span>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Badge variant={(child.stock || 0) > 0 ? "outline" : "destructive"} className="text-[10px]">
+                            {(child.stock || 0) > 0 ? "In Stock" : "Out of Stock"}
+                          </Badge>
+                        </TableCell>
+                        {canManageStock && <TableCell className="py-2">{currencySymbol}{child.price?.toLocaleString()}</TableCell>}
+                        {canManageStock && (
+                          <TableCell className="hidden md:table-cell py-2">
+                            {child.stock || 0} <span className="text-[10px] text-muted-foreground">{child.baseUnit || ''}</span>
+                          </TableCell>
+                        )}
+                        <TableCell className="text-end pe-6 py-2">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => router.push(`/inventory/details?id=${child.id}`)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </React.Fragment>
+                  );
+                })}
                 </TableBody>
               </Table>
             ) : (

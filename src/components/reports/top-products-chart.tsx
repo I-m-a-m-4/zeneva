@@ -48,9 +48,13 @@ export default function TopProductsChart({ receipts }: TopProductsChartProps) {
         const productSales: Record<string, number> = {};
         filteredReceipts.forEach(receipt => {
             receipt.items.forEach(item => {
-                const isService = products?.some(p => (p.id === item.productId || p.name === item.name) && p.categoryType === 'service');
+                const prod = products?.find(p => p.id === item.productId || p.name === item.name);
+                const isService = prod && prod.categoryType === 'service';
                 if (!isService) {
-                    productSales[item.name] = (productSales[item.name] || 0) + item.quantity;
+                    // Check if item is a variant child — if so, display name cleanly
+                    const parentProd = prod?.parentId ? products?.find(p => p.id === prod.parentId) : null;
+                    const displayName = parentProd ? `${parentProd.name} (${prod?.variantValue || item.name})` : item.name;
+                    productSales[displayName] = (productSales[displayName] || 0) + item.quantity;
                 }
             });
         });

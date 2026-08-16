@@ -378,8 +378,8 @@ export default function BlogLandingPage() {
             {/* CTA Section */}
             <section className="bg-slate-50 py-24 mb-0">
               <div className="container mx-auto px-6">
-                <div className="max-w-5xl mx-auto rounded-[2rem] bg-[#fff6ed] border border-[#ffedd5] p-10 md:p-16 text-center shadow-sm">
-                  <h3 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-950 mb-6">
+                <div className="max-w-5xl mx-auto rounded-[2rem] bg-gradient-to-l from-[#f1dfd1] to-white border border-[#f1dfd1] p-10 md:p-16 text-center shadow-sm">
+                  <h3 className="text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-slate-950 mb-6">
                     Ready to transform your retail operations?
                   </h3>
                   <p className="text-slate-600 text-lg md:text-xl font-medium mb-10 max-w-2xl mx-auto">

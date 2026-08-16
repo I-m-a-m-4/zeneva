@@ -10,7 +10,8 @@ import {
   ChevronLeft,
   Upload,
   CalendarIcon,
-  QrCode
+  QrCode,
+  Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +44,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { usePOS } from '@/context/pos-context';
 import { effectivePlan, productLimit } from '@/lib/plan';
@@ -96,11 +98,15 @@ export default function AddProductPage() {
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [isTauri, setIsTauri] = React.useState(false);
 
+  // Variant Builder State
+  const [variantAttributes, setVariantAttributes] = React.useState<{ name: string; values: string }[]>([{ name: 'Size', values: 'S, M, L' }]);
+  const [variantMatrix, setVariantMatrix] = React.useState<{ combo: string; sku: string; price: number; stock: number; costPrice?: number; imageUrl?: string }[]>([]);
+
   React.useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__);
   }, []);
 
-  const userProfile = currentUserProfile;
+    const userProfile = currentUserProfile;
 
   React.useEffect(() => {
     if (userProfile) {
@@ -130,6 +136,54 @@ export default function AddProductPage() {
       components: [],
     },
   });
+
+  // Update variant matrix when attributes or base price changes
+  React.useEffect(() => {
+    const basePrice = form.getValues('price') || 0;
+    const baseCost = form.getValues('costPrice') || undefined;
+    const baseStock = form.getValues('stock') || 0;
+    const baseSku = form.getValues('sku') || '';
+    
+    // Simple matrix generation based on comma separated values
+    const validAttrs = variantAttributes.filter(a => a.name.trim() && a.values.trim());
+    
+    if (validAttrs.length === 0) {
+      setVariantMatrix([]);
+      return;
+    }
+
+    // Generate cartesian product of values
+    const generateCombos = (attrs: { name: string; values: string }[]) => {
+      let combos: string[][] = [[]];
+      for (const attr of attrs) {
+        const vals = attr.values.split(',').map(v => v.trim()).filter(Boolean);
+        const nextCombos: string[][] = [];
+        for (const val of vals) {
+          for (const combo of combos) {
+            nextCombos.push([...combo, val]);
+          }
+        }
+        combos = nextCombos;
+      }
+      return combos.map(c => c.join(' / '));
+    };
+
+    const newCombos = generateCombos(validAttrs);
+    
+    setVariantMatrix(prev => {
+      return newCombos.map(combo => {
+        const existing = prev.find(p => p.combo === combo);
+        return existing || {
+          combo,
+          sku: baseSku ? `${baseSku}-${combo.replace(/[^a-zA-Z0-9]/g, '')}` : '',
+          price: basePrice,
+          costPrice: baseCost,
+          stock: baseStock,
+          imageUrl: undefined
+        };
+      });
+    });
+  }, [variantAttributes, form.watch('price'), form.watch('costPrice'), form.watch('stock'), form.watch('sku')]);
 
   const { fields: uomFields, append: appendUom, remove: removeUom } = useFieldArray({
     control: form.control,
@@ -323,11 +377,43 @@ export default function AddProductPage() {
       // Remove undefined values
       const cleanData = Object.fromEntries(Object.entries(dataToSave).filter(([_, v]) => v !== undefined));
 
-      // 2. Call context function (Fast/Sync initial queueing)
-      addProductWithImage({
-        ...cleanData,
-        stock: cleanData.stock ?? 0,
-      }, imageFile);
+      if (values.type === 'variant') {
+        // Parent Product
+        const parentData = {
+          ...cleanData,
+          stock: 0,
+        };
+        addProductWithImage(parentData, imageFile);
+
+        // Child Variants
+        variantMatrix.forEach(variant => {
+          const childId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random();
+          const childData = {
+            ...cleanData,
+            id: childId,
+            type: 'single', // child is effectively a single item
+            parentId: newProductId,
+            variantName: 'Variant',
+            variantValue: variant.combo,
+            sku: variant.sku,
+            price: variant.price,
+            costPrice: variant.costPrice,
+            stock: variant.stock,
+            name: `${cleanData.name} - ${variant.combo}`,
+            ...(variant.imageUrl ? { imageUrl: variant.imageUrl } : {})
+          };
+          addToQueue({
+            type: 'add-product',
+            payload: { ...childData, createdAt: Date.now(), updatedAt: Date.now() }
+          }, `Added variant: ${childData.name}`);
+        });
+      } else {
+        // 2. Call context function (Fast/Sync initial queueing)
+        addProductWithImage({
+          ...cleanData,
+          stock: cleanData.stock ?? 0,
+        }, imageFile);
+      }
 
       // 3. Log Audit Event (Non-blocking)
       logAuditEvent(firestore, business.id, userProfile, {
@@ -444,14 +530,26 @@ export default function AddProductPage() {
                             </FormItem>
                             <FormItem className="flex items-center space-x-3 space-y-0">
                               <FormControl>
-                                <RadioGroupItem value="composite" />
+                                <RadioGroupItem value="variant" />
                               </FormControl>
-                              <FormLabel className="font-normal">Composite (Bundle)</FormLabel>
+                              <FormLabel className="font-normal flex items-center gap-1.5">
+                                Variant 
+                                <TooltipProvider>
+                                  <Tooltip delayDuration={300}>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-[250px]">
+                                      <p>A single product with different options like size, color, or material. Each variant has its own stock, price, and SKU.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </FormLabel>
                             </FormItem>
                           </RadioGroup>
                         </FormControl>
                         <FormDescription>
-                          {productType === 'composite' ? "This item is built from other products. Stock is automatically managed." : "Standard individual product with its own stock."}
+                          {productType === 'variant' ? "A product with options like size or color." : "Standard individual product with its own stock."}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -462,7 +560,19 @@ export default function AddProductPage() {
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <FormLabel>Units of Measure (UoM)</FormLabel>
+                      <FormLabel className="flex items-center gap-1.5">
+                        Units of Measure (UoM)
+                        <TooltipProvider>
+                          <Tooltip delayDuration={300}>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[250px]">
+                              <p>Allows selling the same item in different quantities. For example, sell by the Piece, or sell a Carton of 12 for a different price.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormLabel>
                       <Button type="button" variant="outline" size="sm" onClick={() => appendUom({ unitName: "", multiplier: 1 })}>
                         <Plus className="h-4 w-4 mr-2" /> Add UoM
                       </Button>
@@ -526,59 +636,139 @@ export default function AddProductPage() {
                     ))}
                   </div>
 
-                  {productType === 'composite' && (
-                    <>
-                      <Separator />
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Composite Components</FormLabel>
-                          <Button type="button" variant="outline" size="sm" onClick={() => appendComponent({ productId: "", quantity: 1 })}>
-                            <Plus className="h-4 w-4 mr-2" /> Add Component
-                          </Button>
-                        </div>
-                        <FormDescription>Select products that make up this bundle.</FormDescription>
-
-                        {componentFields.map((field, index) => (
-                          <div key={field.id} className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end p-3 border rounded-lg bg-muted/30">
-                            <FormField
-                              control={form.control}
-                              name={`components.${index}.productId`}
-                              render={({ field }) => (
-                                <FormItem className="sm:col-span-3">
-                                  <FormLabel className="text-xs">Product</FormLabel>
-                                  <FormControl>
-                                    <Combobox
-                                      options={products?.filter(p => !p.type || p.type === 'single').map(p => ({
-                                        label: `${p.name} (Stock: ${p.stock})`,
-                                        value: p.id
-                                      })) || []}
-                                      value={field.value}
-                                      onChange={field.onChange}
-                                      placeholder="Select component"
-                                      searchPlaceholder="Search products..."
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`components.${index}.quantity`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Qty</FormLabel>
-                                  <FormControl><Input type="number" {...field} /></FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button type="button" variant="ghost" size="icon" onClick={() => removeComponent(index)} className="text-destructive"><Trash className="h-4 w-4" /></Button>
+                    {productType === 'variant' && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <FormLabel>Variant Attributes</FormLabel>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setVariantAttributes([...variantAttributes, { name: '', values: '' }])}>
+                              <Plus className="h-4 w-4 mr-2" /> Add Attribute
+                            </Button>
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                          <FormDescription>Define attributes like Size and Color (comma separated values).</FormDescription>
+
+                          {variantAttributes.map((attr, index) => (
+                            <div key={index} className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end p-3 border rounded-lg bg-muted/30">
+                              <div className="sm:col-span-2">
+                                <Label className="text-xs">Attribute Name</Label>
+                                <Input 
+                                  placeholder="e.g. Size" 
+                                  value={attr.name} 
+                                  onChange={(e) => {
+                                    const newAttrs = [...variantAttributes];
+                                    newAttrs[index].name = e.target.value;
+                                    setVariantAttributes(newAttrs);
+                                  }} 
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <Label className="text-xs">Values (comma separated)</Label>
+                                <Input 
+                                  placeholder="e.g. S, M, L" 
+                                  value={attr.values} 
+                                  onChange={(e) => {
+                                    const newAttrs = [...variantAttributes];
+                                    newAttrs[index].values = e.target.value;
+                                    setVariantAttributes(newAttrs);
+                                  }} 
+                                />
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => setVariantAttributes(variantAttributes.filter((_, i) => i !== index))} className="text-destructive"><Trash className="h-4 w-4" /></Button>
+                            </div>
+                          ))}
+
+                          {variantMatrix.length > 0 && (
+                            <div className="mt-4">
+                              <Label className="mb-2 block font-semibold text-base">Variant Image, Pricing & Stock</Label>
+                              <div className="border rounded-xl overflow-hidden shadow-sm bg-card">
+                                <table className="w-full text-sm text-left">
+                                  <thead className="bg-muted/80 text-muted-foreground uppercase text-[10px] tracking-wider">
+                                    <tr>
+                                      <th className="px-3 py-3 w-20">Photo</th>
+                                      <th className="px-3 py-3">Variant Option</th>
+                                      <th className="px-3 py-3 w-28">SKU</th>
+                                      <th className="px-3 py-3 w-24">Price</th>
+                                      <th className="px-3 py-3 w-24">Cost</th>
+                                      <th className="px-3 py-3 w-20">Stock</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {variantMatrix.map((v, i) => (
+                                      <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
+                                        <td className="px-3 py-3">
+                                          <div className="relative group">
+                                            {v.imageUrl ? (
+                                              <div className="relative h-12 w-12 rounded-lg overflow-hidden border border-border">
+                                                <img src={v.imageUrl} alt={v.combo} className="h-full w-full object-cover" />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const newM = [...variantMatrix];
+                                                    newM[i].imageUrl = undefined;
+                                                    setVariantMatrix(newM);
+                                                  }}
+                                                  className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
+                                                >
+                                                  Remove
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <label className="h-12 w-12 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary flex flex-col items-center justify-center cursor-pointer bg-muted/20 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary">
+                                                <Upload className="h-4 w-4" />
+                                                <span className="text-[9px] font-medium mt-0.5">Upload</span>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  className="hidden"
+                                                  onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                      const reader = new FileReader();
+                                                      reader.onloadend = () => {
+                                                        const newM = [...variantMatrix];
+                                                        newM[i].imageUrl = reader.result as string;
+                                                        setVariantMatrix(newM);
+                                                      };
+                                                      reader.readAsDataURL(file);
+                                                    }
+                                                  }}
+                                                />
+                                              </label>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-3 py-3 font-semibold text-foreground">{v.combo}</td>
+                                        <td className="px-3 py-3">
+                                          <Input className="h-9" value={v.sku} onChange={(e) => {
+                                            const newM = [...variantMatrix]; newM[i].sku = e.target.value; setVariantMatrix(newM);
+                                          }} />
+                                        </td>
+                                        <td className="px-3 py-3">
+                                          <Input className="h-9" type="number" value={v.price} onChange={(e) => {
+                                            const newM = [...variantMatrix]; newM[i].price = parseFloat(e.target.value) || 0; setVariantMatrix(newM);
+                                          }} />
+                                        </td>
+                                        <td className="px-3 py-3">
+                                          <Input className="h-9" type="number" value={v.costPrice || ''} onChange={(e) => {
+                                            const newM = [...variantMatrix]; newM[i].costPrice = parseFloat(e.target.value) || 0; setVariantMatrix(newM);
+                                          }} />
+                                        </td>
+                                        <td className="px-3 py-3">
+                                          <Input className="h-9" type="number" value={v.stock} onChange={(e) => {
+                                            const newM = [...variantMatrix]; newM[i].stock = parseInt(e.target.value) || 0; setVariantMatrix(newM);
+                                          }} />
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                 </CardContent>
               </Card>
             )}
@@ -653,7 +843,19 @@ export default function AddProductPage() {
                     name="costPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cost Price</FormLabel>
+                        <FormLabel className="flex items-center gap-1.5">
+                          Cost Price
+                          <TooltipProvider>
+                            <Tooltip delayDuration={300}>
+                              <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[250px]">
+                                <p>Entering the cost price allows Zeneva to accurately calculate and display your profit margins in Reports.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormLabel>
                         <FormControl>
                           <Input type="number" step="0.01" placeholder="250.00" {...field} value={field.value ?? ''} />
                         </FormControl>

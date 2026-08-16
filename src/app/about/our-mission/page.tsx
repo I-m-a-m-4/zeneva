@@ -1,12 +1,92 @@
-
 'use client';
+
+/**
+ * `/about/our-mission` — built in the Avelis Health design language.
+ *
+ * Ten bands, alternating cream canvas and ink:
+ *
+ *   1  Hero .................. canvas, animated backdrop
+ *   2  Trade marquee ......... canvas
+ *   3  Why we built Zeneva ... canvas    (new)
+ *   4  Proactive Intelligence  ink
+ *   5  How it works .......... canvas    (new)
+ *   6  What we hold to ....... ink       (new)
+ *   7  Voices of Victory ..... canvas
+ *   8  Talk to us ............ ink       (new, wired to EmailJS)
+ *   9  From the journal ...... canvas    (new)
+ *  10  Closing CTA ........... ink
+ *
+ * The styling system, in one place so it is not re-derived per section:
+ *
+ *   - #f1dfd1 canvas and #161513 ink, alternating light and dark bands. The
+ *     canvas is not the source design's #e9e5d6: it is lifted from the promo
+ *     banner strip in `MarketingHeader` (`bg-[#f1dfd1]`), which sits directly
+ *     above this page and made the two creams read as a mismatch rather than a
+ *     pair. Changing the token is the whole change — no section names a cream
+ *     of its own.
+ *   - Lora for every heading, a sans for every piece of body and UI text. That
+ *     duality is the defining characteristic — see the note on FONTS below.
+ *   - Strictly FLAT. No shadow anywhere, no gradient fills, no rotation on the
+ *     testimonial cards. Depth comes only from layering #ffffff paper on the
+ *     cream canvas, and from typographic scale.
+ *   - 140px section rhythm, ~1100px centred column.
+ *
+ * MOTION. The page had an animated hero once — `InteractiveGrid`, the
+ * `.aura-background` blur and four infinitely floating lucide icons. Those are
+ * blue-glow depth effects and they fight a flat cream page rather than express
+ * it, so the backdrop was rebuilt from scratch instead of restored: concentric
+ * hairline rings that breathe, with a single accent dot orbiting each one. Every
+ * part of it is a 1px hairline outline or a 7px solid dot in a palette token —
+ * nothing that could read as a shadow or a glow. `HERO_RINGS` is the whole
+ * composition; change a number there and the backdrop changes.
+ *
+ * Scroll animation is one shared `<Reveal>`, never a hand-rolled `whileInView`
+ * per section, so the timing curve stays identical down the page. Both it and
+ * the backdrop check `prefers-reduced-motion` — the rings then sit still, which
+ * is a composition in its own right rather than a blank space.
+ *
+ * `.codepen-button-aura` in globals.css is left without a caller by this file.
+ * `InteractiveGrid` and `.aura-background` are still used by other pages.
+ *
+ * FONTS: the source design pairs Lora with Satoshi. Lora is real here, loaded
+ * in `layout.tsx`. Satoshi is a Fontshare face, not a Google one, so it cannot
+ * go through `next/font` without vendoring the woff2 files — and a CDN <link>
+ * would break in the offline Tauri shells. DM Sans stands in for it: already
+ * self-hosted by the root layout, and a geometric sans of much the same
+ * character. To swap real Satoshi in later, vendor the files and change
+ * `--av-sans` in one place.
+ */
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Barcode, Package, Box, Tag } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { InteractiveGrid } from '@/components/interactive-grid';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Bolt,
+  CheckCheck,
+  Download,
+  EyeOff,
+  Loader2,
+  Lock,
+  PlayCircle,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  UserPlus,
+  Send,
+  WifiOff,
+} from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
+import { sendContactFormEmail } from '@/lib/email';
 
+/**
+ * Kept even though this page no longer renders an `<iconify-icon>`: the element
+ * is used on other marketing pages, and this is the declaration that makes it
+ * known to the compiler.
+ */
 declare global {
   namespace JSX {
     interface IntrinsicElements {
@@ -14,6 +94,219 @@ declare global {
     }
   }
 }
+
+/* ------------------------------------------------------------------ tokens */
+
+/**
+ * Scoped to `.av` so none of it reaches the shared `MarketingHeader` and
+ * `MarketingFooter`, which `about/layout.tsx` renders around this page.
+ *
+ * Shadow tokens are deliberately absent rather than set to `none`: there is no
+ * token to reach for, so there is nothing to accidentally apply.
+ *
+ * Keep prose out of the string below — `dangerouslySetInnerHTML` ships every
+ * byte of it to the browser. Explanations belong in comments like this one.
+ */
+const TOKENS = `
+.av {
+  --av-primary: #161513;
+  --av-primary-bright: #262626;
+  --av-primary-deep: #0f0e0e;
+  --av-on-primary: #ffffff;
+  --av-ink: #161513;
+  --av-ink-soft: #a09c9b;
+  --av-on-ink: #ffffff;
+  --av-canvas: #ffffff;
+  --av-paper: #ffffff;
+  --av-cloud: #f1f1ee;
+  --av-hairline: #a09c9b;
+  --av-hairline-strong: #4e5255;
+  --av-link: #f17f3f;
+  --av-link-pressed: #d48f31;
+  --av-blue: #0f62b6;
+  --av-gold: #d48f31;
+
+  --av-r-sm: 8px;
+  --av-r-lg: 16px;
+
+  --av-fast: 150ms;
+  --av-base: 250ms;
+  --av-ease: ease-out;
+
+  --av-serif: var(--font-lora), Lora, Georgia, serif;
+  --av-sans: "DM Sans", "Plus Jakarta Sans", sans-serif;
+
+  font-family: var(--av-sans);
+  background: var(--av-canvas);
+  color: var(--av-ink);
+}
+
+/*
+ * Type scale. Display roles clamp down for the mobile breakpoints, which the
+ * design calls for explicitly ("hero text scales down significantly"); the
+ * desktop end of every clamp is the token's own value.
+ */
+.av-display-xl { font-family: var(--av-serif); font-size: clamp(34px, 5.6vw, 58px); font-weight: 500; line-height: 1.1; }
+.av-display-lg { font-family: var(--av-serif); font-size: clamp(30px, 4.6vw, 48px); font-weight: 500; line-height: 1.2; }
+.av-display-md { font-family: var(--av-serif); font-size: clamp(20px, 2.2vw, 24px); font-weight: 600; line-height: 1.3; }
+.av-body-lg    { font-size: clamp(17px, 1.6vw, 20px); font-weight: 500; line-height: 1.5; }
+.av-body-md    { font-size: 16px; font-weight: 400; line-height: 1.6; }
+.av-caption    { font-size: 14px; font-weight: 500; line-height: 1.4; }
+.av-btn        { font-size: 16px; font-weight: 700; line-height: 1; }
+.av-link       { font-size: 16px; font-weight: 500; line-height: 1; }
+
+/* Keeps body copy off the full 1100px column. */
+.av-measure { max-width: 62ch; }
+
+/*
+ * button-primary. Padding is spacing.md / spacing.lg; min-height lifts the
+ * 48px box to the 44px touch-target floor with room to spare.
+ */
+.av-btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--av-primary); color: var(--av-on-primary);
+  border-radius: var(--av-r-sm); padding: 16px 24px; min-height: 48px;
+  cursor: pointer;
+  transition: background-color var(--av-base) var(--av-ease), color var(--av-base) var(--av-ease), border-color var(--av-base) var(--av-ease);
+}
+.av-btn-primary:hover  { background: var(--av-primary-bright); color: var(--av-on-primary); }
+.av-btn-primary:active { background: var(--av-primary-deep); }
+.av-btn-primary:focus-visible { outline: 2px solid var(--av-blue); outline-offset: 2px; }
+.av-btn-primary:disabled { cursor: not-allowed; }
+
+/* button-secondary */
+.av-btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--av-cloud); color: var(--av-ink);
+  border-radius: var(--av-r-sm); padding: 16px 24px; min-height: 48px;
+  cursor: pointer;
+  transition: background-color var(--av-base) var(--av-ease), color var(--av-base) var(--av-ease), border-color var(--av-base) var(--av-ease);
+}
+.av-btn-secondary:hover { background: var(--av-hairline); color: var(--av-ink); }
+.av-btn-secondary:focus-visible { outline: 2px solid var(--av-blue); outline-offset: 2px; }
+
+/*
+ * button-accent. This is the CTA on the dark bands — button-primary is ink on
+ * ink there, which would be invisible.
+ */
+.av-btn-accent {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--av-gold); color: var(--av-on-ink);
+  border-radius: var(--av-r-sm); padding: 12px 32px; min-height: 48px;
+  cursor: pointer;
+  transition: background-color var(--av-base) var(--av-ease), color var(--av-base) var(--av-ease), border-color var(--av-base) var(--av-ease);
+}
+.av-btn-accent:hover { background: var(--av-link); color: var(--av-on-ink); }
+.av-btn-accent:focus-visible { outline: 2px solid var(--av-on-ink); outline-offset: 2px; }
+.av-btn-accent:disabled { cursor: not-allowed; }
+
+/* card — paper, 16px corners, spacing.xl padding, and no shadow at all. */
+.av-card {
+  background: var(--av-paper);
+  border-radius: var(--av-r-lg);
+  padding: 32px;
+}
+
+/*
+ * A card that has to sit on the paper-white band. Hairline outline instead of a
+ * fill change, because paper-on-paper needs an edge and flat design has no
+ * shadow to give it one.
+ */
+.av-card-outline {
+  background: transparent;
+  border: 1px solid var(--av-hairline);
+  border-radius: var(--av-r-lg);
+  padding: 32px;
+  transition: border-color var(--av-base) var(--av-ease), background-color var(--av-base) var(--av-ease);
+}
+.av-card-outline:hover { border-color: var(--av-ink); }
+.av-card-outline:focus-visible { outline: 2px solid var(--av-blue); outline-offset: 2px; }
+
+.av-a {
+  color: var(--av-link); cursor: pointer;
+  transition: color var(--av-base) var(--av-ease);
+}
+.av-a:hover { color: var(--av-link-pressed); }
+
+/* Pill badge — a hairline outline, no fill, no shadow. */
+.av-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--av-hairline); border-radius: 9999px;
+  padding: 8px 16px;
+}
+
+.av-rail::-webkit-scrollbar { display: none; }
+.av-rail { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* input / input-focus. The focus border is the one place blue appears. */
+.av-input {
+  width: 100%;
+  background: var(--av-paper); color: var(--av-ink);
+  border: 1px solid var(--av-hairline);
+  border-radius: var(--av-r-sm);
+  padding: 12px 16px; min-height: 48px;
+  font-family: var(--av-sans); font-size: 16px; font-weight: 400; line-height: 1.5;
+  cursor: text;
+  transition: border-color var(--av-base) var(--av-ease);
+}
+.av-input::placeholder { color: var(--av-ink-soft); }
+.av-input:focus { outline: none; border-color: var(--av-blue); }
+
+/* ------------------------------------------------- animated hero backdrop */
+
+.av-stage { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.av-stage-inner { position: absolute; inset: 0; animation: av-float 26s ease-in-out infinite; }
+
+.av-ring {
+  position: absolute; top: 50%; left: 50%;
+  border: 1px solid var(--av-hairline);
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  animation-name: av-breathe;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.av-orbit {
+  position: absolute; top: 50%; left: 50%;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  animation-name: av-orbit;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.av-orbit-dot {
+  position: absolute; top: -4px; left: 50%; margin-left: -4px;
+  width: 8px; height: 8px; border-radius: 9999px;
+}
+
+@keyframes av-breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50%      { transform: translate(-50%, -50%) scale(1.04); }
+}
+@keyframes av-orbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes av-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-14px); }
+}
+
+/*
+ * Reduced motion stops every loop on this page, including the trade marquee,
+ * whose animation is declared in globals.css. The rings keep their geometry —
+ * a still composition, not an empty band.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .av .av-ring,
+  .av .av-orbit,
+  .av .av-stage-inner,
+  .av .animate-marquee-left { animation: none !important; }
+}
+`;
+
+/* -------------------------------------------------------------- behaviour */
 
 function useAnimatedCounter(targetValue: number, duration: number = 2000, trigger: boolean = true) {
   const [count, setCount] = useState(0);
@@ -27,10 +320,10 @@ function useAnimatedCounter(targetValue: number, duration: number = 2000, trigge
     const step = (timestamp: number) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      
+
       // Ease-out cubic: progress = 1 - (1 - x)^3 (starts fast, slows down at the end)
       const easeOutProgress = 1 - Math.pow(1 - progress, 3);
-      
+
       setCount(Math.floor(easeOutProgress * (targetValue - startValue) + startValue));
 
       if (progress < 1) {
@@ -46,13 +339,213 @@ function useAnimatedCounter(targetValue: number, duration: number = 2000, trigge
   return count;
 }
 
+/**
+ * One reveal for the whole page, so every band enters on the same curve.
+ *
+ * `once: true` matters as much as the easing: a section that re-animates each
+ * time it scrolls back into view turns a long page into a flicker. `amount`
+ * fires the reveal when a quarter of the block is showing, which lands before
+ * the reader's eye reaches it rather than under it.
+ */
+function Reveal({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const reduce = useReducedMotion();
+
+  return (
+    <motion.div
+      className={className}
+      initial={reduce ? false : { opacity: 0, y: 18 }}
+      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.25 }}
+      transition={{ duration: 0.55, delay, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ content */
+
+const MARQUEE_TRADES = ['Boutiques', 'Supermarkets', 'Pharmacies', 'Gadget Stores', 'Luxury Retail'];
+
+/**
+ * The hero backdrop, in full.
+ *
+ * Sizes are `min(vw, px)` rather than plain pixels, and that is load-bearing: a
+ * ring only looks deliberate when its arcs frame the text column instead of
+ * cutting through it. The vw term keeps the innermost ring just wider than a
+ * phone screen; the px ceiling keeps it just wider than the 62ch paragraph on a
+ * desktop. A fixed 520px ring satisfies neither and draws two hairlines straight
+ * down the middle of the body copy.
+ *
+ * Orbit periods are deliberately not multiples of each other, so the three dots
+ * never settle into a visible formation.
+ */
+const HERO_RINGS: {
+  size: string;
+  opacity: number;
+  breathe: number;
+  orbit: number;
+  dot: string;
+  reverse?: boolean;
+}[] = [
+  { size: 'min(92vw, 900px)', opacity: 0.45, breathe: 16, orbit: 27, dot: 'var(--av-link)' },
+  { size: 'min(128vw, 1240px)', opacity: 0.3, breathe: 21, orbit: 41, dot: 'var(--av-gold)', reverse: true },
+  { size: 'min(168vw, 1620px)', opacity: 0.18, breathe: 27, orbit: 59, dot: 'var(--av-blue)' },
+];
+
+/** Section 3. The left column is the shop today; the right is the shop on Zeneva. */
+const FROM_TO: { from: string; to: string }[] = [
+  {
+    from: 'A screenshot of a bank alert that never cleared.',
+    to: 'Zeneva Terminal confirms the transfer against the bank and announces it at the counter, before the goods leave the shop.',
+  },
+  {
+    from: 'A stock count done by hand after closing, and wrong again by morning.',
+    to: 'Every sale moves the count as it happens, on every till, in every branch.',
+  },
+  {
+    from: 'A report that explains what already went wrong.',
+    to: 'Zen AI reads your own numbers and tells you what to do next, in a sentence.',
+  },
+  {
+    from: 'A shop that stops selling the moment the network does.',
+    to: 'The till keeps taking money offline and reconciles itself when the line comes back.',
+  },
+];
+
+/** Section 5. */
+const STEPS: { n: string; title: string; body: string }[] = [
+  {
+    n: '01',
+    title: 'Bring your shop in',
+    body: 'Import a product list, or scan items in as you go. Branches, staff roles and price lists follow. Nothing has to be perfect on day one — the catalogue is meant to be edited from behind the counter.',
+  },
+  {
+    n: '02',
+    title: 'Sell, network or no network',
+    body: 'The till writes locally first and syncs when it can. A blackout becomes a delay in reporting instead of a stopped sale, and the queue drains itself the moment the line returns.',
+  },
+  {
+    n: '03',
+    title: 'Let the Terminal keep the money honest',
+    body: 'Transfers are confirmed against the bank and called out on the shop floor, so a cashier cannot wave through an alert that never arrived. This is the part owners who cannot stand in the shop all day ask for first.',
+  },
+  {
+    n: '04',
+    title: 'Ask, instead of digging',
+    body: 'Zen AI has forty-two tools pointed at your own data. Ask it which line is dead capital or why last week dipped, and it answers in plain language — then asks your permission before it changes anything.',
+  },
+];
+
+/** Section 6. Each of these is a decision already made in the code, not an aspiration. */
+const PRINCIPLES: { icon: React.ElementType; title: string; body: string }[] = [
+  {
+    icon: WifiOff,
+    title: 'Offline is the default, not the fallback',
+    body: 'Every part of the till assumes the connection will drop, because in the markets we serve it does. Sync is a background chore, never a precondition for trading.',
+  },
+  {
+    icon: CheckCheck,
+    title: 'Nothing writes itself',
+    body: 'Zen AI proposes; you approve. An approved change then goes through the same queue a person uses, so it inherits the same permissions, the same branch and the same offline behaviour.',
+  },
+  {
+    icon: EyeOff,
+    title: 'We do not keep what you type',
+    body: 'Prompt text is never stored. The usage board we look at counts intent labels and nothing else, so there is no archive of your questions — or your customers — for anyone here to read.',
+  },
+  {
+    icon: Download,
+    title: 'Your data leaves with you',
+    body: 'One request exports everything we hold for your business. Staying should be a decision you keep making, not a door that quietly locked behind you.',
+  },
+];
+
+const PILLARS: { icon: React.ElementType; title: string; body: string }[] = [
+  {
+    icon: Bolt,
+    title: 'Instant Visibility',
+    body: 'See your entire business health across all locations in one beautiful, real-time dashboard.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Offline Resilience',
+    body: "Market conditions aren't perfect. Your POS should be. Zeneva works 100% offline and syncs when back online.",
+  },
+  {
+    icon: Lock,
+    title: 'Anti-Theft Terminal',
+    body: 'Eliminate staff cash-pocketing and fake bank alerts. Zeneva Terminal confirms customer transfers instantly and alerts cashiers on-site.',
+  },
+];
+
+const TESTIMONIALS: { quote: string; initials: string; name: string; role: string }[] = [
+  {
+    quote:
+      'Zeneva stopped being just a POS and started being a partner. It told me exactly which luxury silks to stop ordering and where I was losing money on belts.',
+    initials: 'AB',
+    name: 'Dr. Amina Bolanle',
+    role: 'Director, Safeway Dermatology & Laser Center',
+  },
+  {
+    quote:
+      "The offline first approach saved us during network blackouts. We didn't lose a single sale, and everything synced perfectly the moment we got back online.",
+    initials: 'OA',
+    name: 'Olumide Adebayo',
+    role: 'Operations Lead, Lag Retail Ops',
+  },
+  {
+    quote:
+      'I used to spend 4 hours a night reconcilling numbers. Now, Zeneva does it in real-time. My business is finally operating with clarity.',
+    initials: 'CO',
+    name: 'Chisom Okafor',
+    role: 'Founder, The Retail Hub',
+  },
+];
+
+/** Section 9. Real posts — slugs verified against `src/lib/blog-data.ts`. */
+const JOURNAL: { slug: string; category: string; title: string; blurb: string }[] = [
+  {
+    slug: 'zen-ai-copilot-business-insights',
+    category: 'AI Features',
+    title: 'Zen AI Copilot: What It Does and What It Cannot',
+    blurb: 'The honest boundary of the assistant — the questions it answers well, and the ones it will refuse rather than guess at.',
+  },
+  {
+    slug: 'the-power-of-zeneva-terminal',
+    category: 'Product Updates',
+    title: 'Say Goodbye to Fake Alerts: Introducing the Zeneva Terminal',
+    blurb: 'How a transfer actually gets confirmed at the counter, and why a screenshot was never proof of anything.',
+  },
+  {
+    slug: '5-things-you-will-not-miss-about-manual-stock-taking',
+    category: 'Productivity',
+    title: "5 Things You Won't Miss About Manual Stock-taking",
+    blurb: 'Shutting the shop to count, and the four other rituals that quietly stop once the count keeps itself.',
+  },
+];
+
+/* --------------------------------------------------------------------- page */
+
 export default function OurMissionPage() {
+  const { toast } = useToast();
   const railRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState({ totalSalesCount: 2141, platformGmv: 92100000, overallArpu: 2090000 });
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const reduce = useReducedMotion();
 
   const checkScroll = () => {
     if (railRef.current) {
@@ -66,7 +559,7 @@ export default function OurMissionPage() {
     setMounted(true);
     checkScroll();
     window.addEventListener('resize', checkScroll);
-    
+
     // Fetch live cached stats from our API
     fetch('/api/platform-stats')
       .then(res => res.json())
@@ -106,476 +599,803 @@ export default function OurMissionPage() {
     }
   };
 
+  /**
+   * Same EmailJS path the /contact page uses — `sendContactFormEmail` reads the
+   * form element directly, so the `name` attributes below have to keep matching
+   * the template's variables (`from_name`, `from_email`, `project_type`,
+   * `message`). If the contact keys are missing from the environment the helper
+   * throws with the exact variable names, and that message is what the toast
+   * shows.
+   */
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formRef.current) return;
+
+    setIsSubmitting(true);
+    try {
+      await sendContactFormEmail(formRef.current);
+      toast({
+        variant: 'success',
+        title: 'Message sent',
+        description: "We've received it and will get back to you shortly.",
+      });
+      formRef.current.reset();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Submission failed',
+        description: error?.message || 'Something went wrong. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const STATS = [
+    { value: `${animatedSales.toLocaleString()}+`, label: 'Total Sales Count', hideOnMobile: false },
+    { value: formatGMV(animatedGmv), label: 'Platform GMV', hideOnMobile: false },
+    { value: formatARPU(animatedArpu), label: 'Overall ARPU', hideOnMobile: true },
+  ];
+
   return (
-    <div className="bg-[#fcfcfc] text-neutral-900 selection:bg-primary/20 min-h-screen overflow-x-hidden relative">
-      <div className="fixed grid-lines w-full h-full top-0 right-0 left-0 pointer-events-none z-0 opacity-[0.15]"></div>
-      
-      <div className="absolute top-0 left-0 w-full h-[800px] overflow-hidden pointer-events-none z-0">
-        <InteractiveGrid />
-        <div className="aura-background"></div>
-      </div>
+    <div className="av min-h-screen overflow-x-hidden antialiased relative">
+      <style dangerouslySetInnerHTML={{ __html: TOKENS }} />
 
-      <main className="z-10 pt-24 relative font-geist">
-        {/* Hero */}
-        <section className="md:pl-6 md:pr-6 md:pt-20 text-center max-w-5xl mt-20 mr-auto mb-20 ml-auto pt-20 pr-6 pl-6 bg-transparent">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.15]">
-            <motion.div 
-              animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-[15%] left-[15%]"
-            >
-              <Barcode className="w-16 h-16 text-slate-900" />
-            </motion.div>
-            <motion.div 
-              animate={{ y: [0, 20, 0], rotate: [0, -10, 0] }}
-              transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute top-[25%] right-[15%]"
-            >
-              <Package className="w-20 h-20 text-slate-900" />
-            </motion.div>
-            <motion.div 
-              animate={{ y: [0, -15, 0], scale: [1, 1.1, 1] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-              className="absolute bottom-[20%] left-[10%]"
-            >
-              <Box className="w-12 h-12 text-slate-900" />
-            </motion.div>
-            <motion.div 
-              animate={{ y: [0, 25, 0], rotate: [0, 15, 0] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
-              className="absolute bottom-[15%] right-[10%]"
-            >
-              <Tag className="w-24 h-24 text-slate-900" />
-            </motion.div>
+      {/* ---------------------------------------------------------- HERO --- */}
+      {/* pt clears the fixed MarketingHeader (80px, 128px with its banner). */}
+      <section className="relative overflow-hidden px-6 pb-24 pt-40 sm:pt-44 bg-[#F9F8F6]">
+        <div className="absolute inset-0 grid-lines opacity-[0.15] pointer-events-none z-0"></div>
+        {/*
+         * The backdrop. Masked to nothing at the edges so the outer ring never
+         * collides with the section boundary — a mask softens an edge, which is
+         * a different job from a gradient standing in for depth.
+         */}
+        <div
+          className="av-stage"
+          aria-hidden="true"
+          style={{
+            maskImage: 'radial-gradient(circle at 50% 50%, black 55%, transparent 78%)',
+            WebkitMaskImage: 'radial-gradient(circle at 50% 50%, black 55%, transparent 78%)',
+          }}
+        >
+          <div className="av-stage-inner">
+            {HERO_RINGS.map(({ size, opacity, breathe, orbit, dot, reverse }) => (
+              <React.Fragment key={size}>
+                <span
+                  className="av-ring"
+                  style={{ width: size, height: size, opacity, animationDuration: `${breathe}s` }}
+                />
+                <span
+                  className="av-orbit"
+                  style={{
+                    width: size,
+                    height: size,
+                    animationDuration: `${orbit}s`,
+                    animationDirection: reverse ? 'reverse' : 'normal',
+                  }}
+                >
+                  <span className="av-orbit-dot" style={{ background: dot }} />
+                </span>
+              </React.Fragment>
+            ))}
           </div>
-          <div className="inline-flex gap-2 text-xs text-neutral-600 bg-neutral-100 border-neutral-200 border rounded-full mr-auto ml-auto pt-1.5 pr-3 pb-1.5 pl-3 items-center backdrop-blur-sm">
-            {mounted && <iconify-icon icon="solar:stars-linear" class="h-3.5 w-3.5 text-primary" />}
-            <span className="font-geist text-neutral-900 font-semibold">AI-Powered Retail Intelligence</span>
-            <span className="mx-1 h-1 w-1 rounded-full bg-neutral-300"></span>
-            <span className="text-neutral-500 font-geist">Decisions, Not Dashboards</span>
-          </div>
+        </div>
 
-          <h1 
-            className="md:text-7xl lg:text-8xl text-5xl font-medium tracking-tighter font-jakarta mt-6 pt-2 pb-2 drop-shadow-lg leading-tight" 
-            style={{ 
-              maskImage: 'linear-gradient(150deg, transparent, black 30%, black 50%, transparent)', 
-              WebkitMaskImage: 'linear-gradient(150deg, transparent, black 30%, black 50%, transparent)' 
-            }}
+        <div className="relative z-10 mx-auto max-w-[1100px] text-center">
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="flex justify-center"
           >
-            Preventing Theft & Empowering Retailers
-          </h1>
-          <p className="mt-5 text-base md:text-lg text-neutral-600 max-w-2xl mx-auto font-geist">
-            Our biggest mission is to prevent theft and losses, especially for large retailers who cannot always be physically present at their stores. Zeneva unifies your operations into a single, proactive AI intelligence layer.
-          </p>
+            <span
+              className="av-badge av-caption"
+              style={{ color: 'var(--av-ink)', background: 'var(--av-canvas)' }}
+            >
+              <Sparkles className="h-4 w-4" style={{ color: 'var(--av-link)' }} strokeWidth={1.75} />
+              AI-Powered Retail Intelligence
+              <span className="h-1 w-1 rounded-full" style={{ background: 'var(--av-hairline)' }} />
+              <span style={{ color: 'var(--av-ink-soft)' }}>Decisions, Not Dashboards</span>
+            </span>
+          </motion.div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mt-8 items-center justify-center">
-            <Link href="/signup" className="codepen-button-aura">
-              <span>
-                {mounted && <iconify-icon icon="solar:user-plus-linear" class="w-5 h-5 mx-1" />}
-                Join the Mission
-              </span>
+          {/*
+           * The old headline carried a diagonal mask-image gradient that faded
+           * its own first and last words to nothing. Flat design has no use for
+           * it, and the headline is legible end to end without it.
+           */}
+          <motion.h1
+            initial={reduce ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.05, ease: 'easeOut' }}
+            className="av-display-xl mx-auto mt-8 max-w-3xl"
+          >
+            Preventing Theft &amp; Empowering Retailers
+          </motion.h1>
+
+          <motion.p
+            initial={reduce ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.12, ease: 'easeOut' }}
+            className="av-body-lg av-measure mx-auto mt-6"
+            style={{ color: 'var(--av-ink-soft)' }}
+          >
+            Our biggest mission is to prevent theft and losses, especially for
+            large retailers who cannot always be physically present at their
+            stores. Zeneva unifies your operations into a single, proactive AI
+            intelligence layer.
+          </motion.p>
+
+          <motion.div
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row"
+          >
+            <Link href="/signup" className="av-btn-primary av-btn w-full sm:w-auto">
+              <UserPlus className="h-4 w-4" strokeWidth={2.25} />
+              Join the Mission
             </Link>
-            <Link href="/download" className="border border-neutral-200 inline-flex items-center gap-2 hover:bg-neutral-100 transition-colors text-sm font-medium text-neutral-900 font-geist bg-neutral-50 rounded-full pt-3 pr-5 pb-3 pl-5 backdrop-blur-sm">
-              {mounted && <iconify-icon icon="solar:play-circle-linear" class="h-4 w-4 text-primary" />}
+            <Link href="/download" className="av-btn-secondary av-btn w-full sm:w-auto">
+              <PlayCircle className="h-4 w-4" strokeWidth={2.25} />
               Watch Video
             </Link>
-          </div>
-        </section>
+          </motion.div>
+        </div>
+      </section>
 
-        {/* Logo Cloud - Retailers */}
-        <section className="md:mt-32 max-w-7xl mt-24 mr-auto ml-auto pt-16 pr-6 pb-6 pl-6 relative">
-          <div className="text-center">
-            <p className="uppercase text-sm font-medium text-neutral-400 tracking-wide font-geist">
-              Empowering fast-growing retail businesses
-            </p>
-          </div>
-          <div className="overflow-hidden mt-10 relative">
-            <div 
-              style={{ 
-                maskImage: 'linear-gradient(to right, transparent, white 15%, white 85%, transparent)', 
-                WebkitMaskImage: 'linear-gradient(to right, transparent, white 15%, white 85%, transparent)' 
-              }}
-            >
-              <div className="flex gap-6 will-change-transform animate-marquee-left opacity-30">
-                <div className="flex gap-12 shrink-0 items-center">
-                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">BOUTIQUES</span>
-                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">SUPERMARKETS</span>
-                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">PHARMACIES</span>
-                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">GADGET STORES</span>
-                   <span className="text-2xl font-bold text-neutral-400 font-jakarta">LUXURY RETAIL</span>
+      {/* ------------------------------------------------------- MARQUEE --- */}
+      <section className="px-6 pb-16 pt-8">
+        <div className="mx-auto max-w-[1100px]">
+          <p
+            className="av-caption text-center uppercase tracking-[0.18em]"
+            style={{ color: 'var(--av-ink-soft)' }}
+          >
+            Empowering fast-growing retail businesses
+          </p>
+
+          {/* The edge fade is a mask, not a gradient fill — the flat rule is
+              about depth cues, and a marquee still needs its ends softened. */}
+          <div
+            className="mt-12 overflow-hidden"
+            style={{
+              maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
+              WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)',
+            }}
+          >
+            <div className="animate-marquee-left flex gap-12 will-change-transform">
+              {/* Two identical runs, so the loop has no visible seam. */}
+              {[0, 1].map((run) => (
+                <div key={run} className="flex shrink-0 items-center gap-12">
+                  {MARQUEE_TRADES.map((trade) => (
+                    <span
+                      key={trade}
+                      className="av-display-md whitespace-nowrap"
+                      style={{ color: 'var(--av-hairline)' }}
+                    >
+                      {trade}
+                    </span>
+                  ))}
                 </div>
-                <div className="flex gap-12 shrink-0 items-center">
-                   <span className="text-2xl font-bold text-white/20 font-jakarta">BOUTIQUES</span>
-                   <span className="text-2xl font-bold text-white/20 font-jakarta">SUPERMARKETS</span>
-                   <span className="text-2xl font-bold text-white/20 font-jakarta">PHARMACIES</span>
-                   <span className="text-2xl font-bold text-white/20 font-jakarta">GADGET STORES</span>
-                   <span className="text-2xl font-bold text-white/20 font-jakarta">LUXURY RETAIL</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
+      {/* --------------------------------------------- WHY WE BUILT THIS --- */}
+      {/*
+       * This band used a `cloud` fill to separate itself from the marquee above.
+       * Now that every light band is the header's cream, the separation is a
+       * full-bleed hairline instead — which is the flat way to do it anyway, and
+       * leaves `cloud` for the button and chip surfaces it was meant for.
+       */}
+      <section className="border-t px-6 py-[140px]" style={{ borderColor: 'var(--av-hairline)' }}>
+        <div className="mx-auto max-w-[1100px]">
+          <Reveal className="max-w-2xl">
+            <p className="av-caption uppercase tracking-[0.18em]" style={{ color: 'var(--av-ink-soft)' }}>
+              Origin
+            </p>
+            <h2 className="av-display-lg mt-4">Why we built Zeneva</h2>
+            <p className="av-body-lg mt-6" style={{ color: 'var(--av-ink-soft)' }}>
+              Not from a whiteboard. From four things that kept happening in real
+              shops, to owners who had done nothing wrong.
+            </p>
+          </Reveal>
 
-        {/* Intelligent Inventory */}
-        <section className="sm:px-6 sm:mt-24 md:mt-32 max-w-7xl mt-16 mr-auto ml-auto pr-4 pl-4 relative">
-          <div className="max-w-7xl mr-auto ml-auto">
-            <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-              {/* Diagram */}
-              <div 
-                className="bg-[url('https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/5aa83035-c72b-4cb5-9937-66ce103b64ef_1600w.webp')] bg-cover rounded-[36px] pt-5 pr-5 pb-5 pl-5 relative aspect-square lg:aspect-auto" 
-                style={{ 
-                  maskImage: 'linear-gradient(130deg, transparent, black 10%, black 70%, transparent)', 
-                  WebkitMaskImage: 'linear-gradient(130deg, transparent, black 10%, black 70%, transparent)' 
-                }}
+          {/*
+           * Two columns, hairline-ruled. On mobile they stack, so each pair is
+           * labelled — "Today" above "On Zeneva" is the only thing keeping the
+           * comparison readable once the columns are gone.
+           */}
+          <div className="mt-16 border-t" style={{ borderColor: 'var(--av-hairline)' }}>
+            {FROM_TO.map(({ from, to }, i) => (
+              <Reveal key={from} delay={i * 0.06}>
+                <div
+                  className="grid gap-6 border-b py-10 md:grid-cols-2 md:gap-16"
+                  style={{ borderColor: 'var(--av-hairline)' }}
+                >
+                  <div>
+                    <p
+                      className="av-caption uppercase tracking-[0.18em]"
+                      style={{ color: 'var(--av-ink-soft)' }}
+                    >
+                      Today
+                    </p>
+                    <p className="av-body-lg mt-3" style={{ color: 'var(--av-ink-soft)' }}>
+                      {from}
+                    </p>
+                  </div>
+                  <div>
+                    <p
+                      className="av-caption uppercase tracking-[0.18em]"
+                      style={{ color: 'var(--av-link)' }}
+                    >
+                      On Zeneva
+                    </p>
+                    <p className="av-body-lg mt-3" style={{ color: 'var(--av-ink)' }}>
+                      {to}
+                    </p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------- PROACTIVE RETAIL INTELLIGENCE (dark) --- */}
+      <section
+        className="px-6 py-[140px] relative z-10"
+        style={{ background: 'var(--av-primary)', color: 'var(--av-on-ink)' }}
+      >
+        <div className="mx-auto max-w-[1100px]">
+          <div className="grid gap-16 lg:grid-cols-2 lg:items-start">
+            {/* Copy, pillars and stats */}
+            <Reveal>
+              <h2 className="av-display-lg">Proactive Retail Intelligence</h2>
+              <p className="av-body-lg av-measure mt-6" style={{ color: 'var(--av-ink-soft)' }}>
+                Retail businesses generate massive amounts of data, but almost
+                none of it turns into usable judgment. Zeneva changes that
+                balance.
+              </p>
+
+              <div className="mt-12 border-t pt-12" style={{ borderColor: 'var(--av-hairline-strong)' }}>
+                <div className="grid gap-8">
+                  {PILLARS.map(({ icon: Icon, title, body }) => (
+                    <div key={title} className="flex items-start gap-4">
+                      <Icon
+                        className="mt-1 h-5 w-5 flex-shrink-0"
+                        style={{ color: 'var(--av-gold)' }}
+                        strokeWidth={1.75}
+                      />
+                      <div>
+                        <h3 className="av-display-md">{title}</h3>
+                        <p className="av-body-md mt-2" style={{ color: 'var(--av-ink-soft)' }}>
+                          {body}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                className="mt-12 grid grid-cols-2 gap-8 border-t pt-12 md:grid-cols-3"
+                style={{ borderColor: 'var(--av-hairline-strong)' }}
               >
-                <article className="group relative overflow-hidden transition-shadow hover:shadow-md bg-white/80 border-neutral-200 border rounded-3xl shadow-xl backdrop-blur-xl h-full">
-                  <div className="sm:p-10 p-6 flex flex-col h-full">
-                    <div className="flex items-center justify-between gap-4 mb-6">
-                      <h3 className="text-2xl font-semibold tracking-tight text-neutral-900 font-jakarta">Intelligent Inventory</h3>
-                      <span className="inline-flex items-center gap-2 text-xs text-neutral-600 bg-neutral-100 border border-neutral-200 rounded-full px-2.5 py-1 backdrop-blur-sm">
-                        {mounted && <iconify-icon icon="solar:stars-linear" class="text-primary h-4 w-4" />}
-                        Zen AI Engine
-                      </span>
-                    </div>
+                {STATS.map(({ value, label, hideOnMobile }) => (
+                  <div key={label} className={hideOnMobile ? 'hidden md:block' : undefined}>
+                    <p className="av-display-lg" style={{ fontSize: 'clamp(28px, 3vw, 36px)' }}>
+                      {value}
+                    </p>
+                    <p
+                      className="av-caption mt-2 uppercase tracking-[0.18em]"
+                      style={{ color: 'var(--av-ink-soft)' }}
+                    >
+                      {label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
 
-                    {/* Illustration */}
-                    <div className="relative flex-1 rounded-2xl bg-neutral-50 ring-1 ring-inset ring-neutral-200 mb-8 overflow-hidden min-h-[200px]">
-                      <div className="absolute inset-0 p-6 flex flex-col gap-3">
-                         <div className="bg-white border border-neutral-200 p-4 rounded-xl flex items-center justify-between shadow-sm">
-                            <span className="text-sm font-medium text-neutral-700">Automatic Restock Alert</span>
-                            <span className="text-xs text-primary font-bold">Recommended</span>
-                         </div>
-                         <div className="bg-white border border-emerald-500/20 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-                            <div className="h-10 w-10 bg-emerald-500/10 rounded-lg flex items-center justify-center">
-                               {mounted && <iconify-icon icon="solar:ticker-star-linear" class="text-emerald-500 h-5 w-5" />}
-                            </div>
-                            <div className="flex-1">
-                               <p className="text-sm font-medium text-neutral-800">Top Performer: Luxury Silk Scarf</p>
-                               <p className="text-xs text-neutral-500">Sell rate: +45% this week</p>
-                            </div>
-                         </div>
-                         <div className="bg-white border border-amber-500/20 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-                            <div className="h-10 w-10 bg-amber-500/10 rounded-lg flex items-center justify-center">
-                               {mounted && <iconify-icon icon="solar:plain-linear" class="text-amber-500 h-5 w-5" />}
-                            </div>
-                            <div className="flex-1">
-                               <p className="text-sm font-medium text-neutral-800">Dead Capital: Vintage Belt</p>
-                               <p className="text-xs text-neutral-500">Suggestion: Bundle or Discount</p>
-                            </div>
-                         </div>
-                      </div>
-                    </div>
+            {/* The Intelligent Inventory card — paper on ink, and flat. */}
+            <Reveal delay={0.08} className="av-card">
+              <div className="mb-8 flex items-center justify-between gap-4">
+                <h3 className="av-display-md" style={{ color: 'var(--av-ink)' }}>
+                  Intelligent Inventory
+                </h3>
+                <span className="av-badge av-caption" style={{ color: 'var(--av-ink)' }}>
+                  <Sparkles className="h-4 w-4" style={{ color: 'var(--av-link)' }} strokeWidth={1.75} />
+                  Zen AI Engine
+                </span>
+              </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="text-lg font-semibold text-neutral-900 tracking-tight font-jakarta">Foresight, Not Hindsight</h4>
-                        <p className="mt-2 text-sm text-neutral-600 font-geist">Predict potential stockouts before they happen, ensuring you never lose a sale due to empty shelves.</p>
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-semibold tracking-tight text-neutral-900 font-jakarta">Capital Optimization</h4>
-                        <p className="mt-2 text-sm text-neutral-600 font-geist">Automatically identify dead stock and convert trapped capital back into cash flow with smart exit strategies.</p>
-                      </div>
+              {/* Illustration: cloud ground, hairline rows, no shadows. */}
+              <div
+                className="flex flex-col gap-3 rounded-[var(--av-r-lg)] p-4"
+                style={{ background: 'var(--av-cloud)' }}
+              >
+                <div
+                  className="flex items-center justify-between gap-4 rounded-[var(--av-r-sm)] p-4"
+                  style={{ background: 'var(--av-paper)', border: '1px solid var(--av-hairline)' }}
+                >
+                  <span className="av-body-md" style={{ color: 'var(--av-ink)' }}>
+                    Automatic Restock Alert
+                  </span>
+                  <span className="av-caption" style={{ color: 'var(--av-link)' }}>
+                    Recommended
+                  </span>
+                </div>
+
+                <div
+                  className="flex items-center gap-4 rounded-[var(--av-r-sm)] p-4"
+                  style={{ background: 'var(--av-paper)', border: '1px solid var(--av-hairline)' }}
+                >
+                  <TrendingUp className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--av-blue)' }} strokeWidth={1.75} />
+                  <div className="flex-1">
+                    <p className="av-body-md" style={{ color: 'var(--av-ink)' }}>
+                      Top Performer: Luxury Silk Scarf
+                    </p>
+                    <p className="av-caption mt-1" style={{ color: 'var(--av-ink-soft)' }}>
+                      Sell rate: +45% this week
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="flex items-center gap-4 rounded-[var(--av-r-sm)] p-4"
+                  style={{ background: 'var(--av-paper)', border: '1px solid var(--av-hairline)' }}
+                >
+                  <Send className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--av-gold)' }} strokeWidth={1.75} />
+                  <div className="flex-1">
+                    <p className="av-body-md" style={{ color: 'var(--av-ink)' }}>
+                      Dead Capital: Vintage Belt
+                    </p>
+                    <p className="av-caption mt-1" style={{ color: 'var(--av-ink-soft)' }}>
+                      Suggestion: Bundle or Discount
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+                <div>
+                  <h4 className="av-display-md" style={{ color: 'var(--av-ink)' }}>
+                    Foresight, Not Hindsight
+                  </h4>
+                  <p className="av-body-md mt-2" style={{ color: 'var(--av-ink-soft)' }}>
+                    Predict potential stockouts before they happen, ensuring you
+                    never lose a sale due to empty shelves.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="av-display-md" style={{ color: 'var(--av-ink)' }}>
+                    Capital Optimization
+                  </h4>
+                  <p className="av-body-md mt-2" style={{ color: 'var(--av-ink-soft)' }}>
+                    Automatically identify dead stock and convert trapped capital
+                    back into cash flow with smart exit strategies.
+                  </p>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* -------------------------------------------------- HOW IT WORKS --- */}
+      <section className="px-6 py-[140px] bg-[#F9F8F6]">
+        <div className="mx-auto max-w-[1100px]">
+          <Reveal className="max-w-2xl">
+            <p className="av-caption uppercase tracking-[0.18em]" style={{ color: 'var(--av-ink-soft)' }}>
+              How it works
+            </p>
+            <h2 className="av-display-lg mt-4">Four steps, in the order they happen</h2>
+            <p className="av-body-lg mt-6" style={{ color: 'var(--av-ink-soft)' }}>
+              No migration project, no consultant. Most shops are selling on
+              Zeneva the same day they start.
+            </p>
+          </Reveal>
+
+          <div className="mt-16 grid gap-8 md:grid-cols-2">
+            {STEPS.map(({ n, title, body }, i) => (
+              <Reveal key={n} delay={i * 0.07} className="av-card">
+                {/* Lora numeral at hairline weight — the number is a mark, not
+                    a heading, so it stays quiet enough to scan past. */}
+                <span
+                  className="av-display-lg block"
+                  style={{ color: 'var(--av-hairline)', fontSize: 'clamp(36px, 4vw, 44px)' }}
+                >
+                  {n}
+                </span>
+                <h3 className="av-display-md mt-6" style={{ color: 'var(--av-ink)' }}>
+                  {title}
+                </h3>
+                <p className="av-body-md mt-3" style={{ color: 'var(--av-ink-soft)' }}>
+                  {body}
+                </p>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={0.1}>
+            <div className="mt-16 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+              <Link href="/zen-ai" className="av-btn-primary av-btn w-full sm:w-auto">
+                <Sparkles className="h-4 w-4" strokeWidth={2.25} />
+                See what Zen AI can answer
+              </Link>
+              <Link href="/terminal" className="av-a av-link inline-flex items-center gap-2">
+                How the Terminal confirms a transfer
+                <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
+              </Link>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* --------------------------------------------- WHAT WE HOLD TO (dark) */}
+      <section
+        className="px-6 py-[140px] relative z-10"
+        style={{ background: 'var(--av-primary)', color: 'var(--av-on-ink)' }}
+      >
+        <div className="mx-auto max-w-[1100px]">
+          <Reveal className="max-w-2xl">
+            <p className="av-caption uppercase tracking-[0.18em]" style={{ color: 'var(--av-ink-soft)' }}>
+              Principles
+            </p>
+            <h2 className="av-display-lg mt-4">What we hold to</h2>
+            <p className="av-body-lg mt-6" style={{ color: 'var(--av-ink-soft)' }}>
+              Four commitments that are already decisions in the code, not
+              intentions for a later release.
+            </p>
+          </Reveal>
+
+          <div className="mt-16 grid gap-px md:grid-cols-2" style={{ background: 'var(--av-hairline-strong)' }}>
+            {/*
+             * A one-pixel gap over a hairline-coloured ground draws the dividing
+             * rules between cells — a flat alternative to bordering each tile,
+             * which would double up on every shared edge.
+             */}
+            {PRINCIPLES.map(({ icon: Icon, title, body }, i) => (
+              <Reveal key={title} delay={i * 0.06} className="h-full">
+                <div className="h-full p-10" style={{ background: 'var(--av-primary)' }}>
+                  <Icon className="h-6 w-6" style={{ color: 'var(--av-gold)' }} strokeWidth={1.5} />
+                  <h3 className="av-display-md mt-6">{title}</h3>
+                  <p className="av-body-md mt-3" style={{ color: 'var(--av-ink-soft)' }}>
+                    {body}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* -------------------------------------------------- TESTIMONIALS --- */}
+      <section className="px-6 py-[140px]">
+        <div className="mx-auto max-w-[1100px]">
+          <Reveal>
+            <div className="mb-12 flex flex-col justify-between gap-8 md:flex-row md:items-end">
+              <div className="max-w-2xl">
+                <p
+                  className="av-caption uppercase tracking-[0.18em]"
+                  style={{ color: 'var(--av-ink-soft)' }}
+                >
+                  Social Proof
+                </p>
+                <h2 className="av-display-lg mt-4">Voices of Victory</h2>
+                <p className="av-body-lg mt-4" style={{ color: 'var(--av-ink-soft)' }}>
+                  Real stories from the frontlines of retail revolution.
+                </p>
+              </div>
+
+              <Link href="/blog" className="av-a av-link inline-flex items-center gap-2">
+                Read all stories
+                <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
+              </Link>
+            </div>
+          </Reveal>
+
+          {/* The rail. Cards sit flat and square — the old ±1-2deg rotation and
+              drop shadows are exactly what this design language rules out. */}
+          <div
+            className="overflow-hidden"
+            style={{
+              maskImage: 'linear-gradient(90deg, transparent, black 6%, black 94%, transparent)',
+              WebkitMaskImage: 'linear-gradient(90deg, transparent, black 6%, black 94%, transparent)',
+            }}
+          >
+            <div
+              className="av-rail flex snap-x snap-mandatory gap-8 overflow-x-auto scroll-smooth px-2 pb-2"
+              ref={railRef}
+              onScroll={checkScroll}
+            >
+              {TESTIMONIALS.map(({ quote, initials, name, role }) => (
+                <article
+                  key={name}
+                  className="av-card flex min-w-[300px] flex-shrink-0 snap-start flex-col justify-between sm:min-w-[420px] md:min-w-[480px]"
+                >
+                  {/* Lora for the pull-quote: it reads as display, not body. */}
+                  <p className="av-display-md" style={{ color: 'var(--av-ink)' }}>
+                    &ldquo;{quote}&rdquo;
+                  </p>
+                  <div className="mt-8 flex items-center gap-4">
+                    <span
+                      className="av-caption flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[var(--av-r-sm)]"
+                      style={{ background: 'var(--av-cloud)', color: 'var(--av-ink)' }}
+                    >
+                      {initials}
+                    </span>
+                    <div>
+                      <p className="av-body-md" style={{ color: 'var(--av-ink)', fontWeight: 700 }}>
+                        {name}
+                      </p>
+                      <p className="av-caption mt-1" style={{ color: 'var(--av-ink-soft)' }}>
+                        {role}
+                      </p>
                     </div>
                   </div>
                 </article>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              {/* Copy & stats */}
-              <div className="flex flex-col gap-6">
+          <div className="mt-8 flex items-center justify-end gap-4">
+            <button
+              type="button"
+              aria-label="Previous testimonial"
+              className="av-btn-secondary"
+              onClick={() => scroll(-1)}
+              disabled={!canScrollLeft}
+              style={{ opacity: canScrollLeft ? 1 : 0.3, padding: 12, minWidth: 48 }}
+            >
+              <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              aria-label="Next testimonial"
+              className="av-btn-primary"
+              onClick={() => scroll(1)}
+              disabled={!canScrollRight}
+              style={{ opacity: canScrollRight ? 1 : 0.3, padding: 12, minWidth: 48 }}
+            >
+              <ArrowRight className="h-5 w-5" strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------- TALK TO US (dark) --- */}
+      <section
+        className="px-6 py-[140px] relative z-10"
+        style={{ background: 'var(--av-primary)', color: 'var(--av-on-ink)' }}
+      >
+        <div className="mx-auto max-w-[1100px]">
+          <div className="grid gap-16 lg:grid-cols-2 lg:items-start">
+            <Reveal>
+              <p className="av-caption uppercase tracking-[0.18em]" style={{ color: 'var(--av-ink-soft)' }}>
+                Talk to us
+              </p>
+              <h2 className="av-display-lg mt-4">Tell us what your shop needs</h2>
+              <p className="av-body-lg av-measure mt-6" style={{ color: 'var(--av-ink-soft)' }}>
+                Most of what is on this page started as a message like the one
+                you are about to write. Tell us what you sell and what keeps
+                going wrong, and we will tell you honestly whether Zeneva
+                already handles it.
+              </p>
+
+              <div className="mt-12 border-t pt-12" style={{ borderColor: 'var(--av-hairline-strong)' }}>
+                <p className="av-body-md" style={{ color: 'var(--av-ink-soft)' }}>
+                  Would rather read first?
+                </p>
+                <div className="mt-4 flex flex-col gap-3">
+                  <Link href="/help-center" className="av-a av-link inline-flex items-center gap-2">
+                    Help centre
+                    <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
+                  </Link>
+                  <Link href="/pricing" className="av-a av-link inline-flex items-center gap-2">
+                    Pricing, in full
+                    <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
+                  </Link>
+                </div>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.08} className="av-card">
+              <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-6">
                 <div>
-                  <h3 className="sm:text-5xl text-4xl font-medium text-neutral-900 tracking-tight font-jakarta">Proactive Retail Intelligence</h3>
-                  <p className="mt-6 text-lg text-neutral-600 font-geist">Retail businesses generate massive amounts of data, but almost none of it turns into usable judgment. Zeneva changes that balance.</p>
+                  <label
+                    htmlFor="av-name"
+                    className="av-caption block"
+                    style={{ color: 'var(--av-ink)' }}
+                  >
+                    Your name
+                  </label>
+                  <input
+                    id="av-name"
+                    name="from_name"
+                    type="text"
+                    required
+                    autoComplete="name"
+                    placeholder="Amina Bolanle"
+                    className="av-input mt-3"
+                  />
                 </div>
 
-                <div className="border-t border-white/10 pt-8 mt-4">
-                  <div className="grid gap-8">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mt-1">
-                        {mounted && <iconify-icon icon="solar:bolt-linear" class="text-primary w-5 h-5" />}
-                      </div>
-                      <div>
-                         <h4 className="text-lg font-semibold font-jakarta text-neutral-900">Instant Visibility</h4>
-                         <p className="text-sm text-neutral-500 mt-1">See your entire business health across all locations in one beautiful, real-time dashboard.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mt-1">
-                        {mounted && <iconify-icon icon="solar:shield-check-linear" class="text-primary w-5 h-5" />}
-                      </div>
-                      <div>
-                         <h4 className="text-lg font-semibold font-jakarta text-neutral-900">Offline Resilience</h4>
-                         <p className="text-sm text-neutral-500 mt-1">Market conditions aren't perfect. Your POS should be. Zeneva works 100% offline and syncs when back online.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mt-1">
-                        {mounted && <iconify-icon icon="solar:lock-keyhole-linear" class="text-primary w-5 h-5" />}
-                      </div>
-                      <div>
-                         <h4 className="text-lg font-semibold font-jakarta text-neutral-900">Anti-Theft Terminal</h4>
-                         <p className="text-sm text-neutral-500 mt-1">Eliminate staff cash-pocketing and fake bank alerts. Zeneva Terminal confirms customer transfers instantly and alerts cashiers on-site.</p>
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <label
+                    htmlFor="av-email"
+                    className="av-caption block"
+                    style={{ color: 'var(--av-ink)' }}
+                  >
+                    Email
+                  </label>
+                  <input
+                    id="av-email"
+                    name="from_email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="you@yourshop.com"
+                    className="av-input mt-3"
+                  />
                 </div>
 
-                <div className="border-t border-neutral-200 pt-8 mt-4 grid grid-cols-2 md:grid-cols-3 gap-6">
-                   <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">
-                        {animatedSales.toLocaleString()}+
-                      </p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Total Sales Count</p>
-                   </div>
-                   <div>
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">
-                        {formatGMV(animatedGmv)}
-                      </p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Platform GMV</p>
-                   </div>
-                   <div className="hidden md:block">
-                      <p className="text-3xl font-bold font-jakarta text-neutral-900">
-                        {formatARPU(animatedArpu)}
-                      </p>
-                      <p className="text-xs text-neutral-400 font-geist uppercase tracking-widest">Overall ARPU</p>
-                   </div>
+                <div>
+                  <label
+                    htmlFor="av-trade"
+                    className="av-caption block"
+                    style={{ color: 'var(--av-ink)' }}
+                  >
+                    What do you sell?
+                  </label>
+                  {/* name="project_type" — the EmailJS template variable is
+                      shared with /contact and cannot be renamed here alone. */}
+                  <input
+                    id="av-trade"
+                    name="project_type"
+                    type="text"
+                    placeholder="Pharmacy, two branches"
+                    className="av-input mt-3"
+                  />
                 </div>
-              </div>
-            </div>
+
+                <div>
+                  <label
+                    htmlFor="av-message"
+                    className="av-caption block"
+                    style={{ color: 'var(--av-ink)' }}
+                  >
+                    What keeps going wrong?
+                  </label>
+                  <textarea
+                    id="av-message"
+                    name="message"
+                    required
+                    rows={4}
+                    placeholder="Stock never matches the shelf by Friday..."
+                    className="av-input mt-3"
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+
+                <button type="submit" className="av-btn-primary av-btn" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.25} />
+                      Sending
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" strokeWidth={2.25} />
+                      Send message
+                    </>
+                  )}
+                </button>
+
+                <p className="av-caption" style={{ color: 'var(--av-ink-soft)' }}>
+                  Goes to a person, not a queue. We reply within a working day.
+                </p>
+              </form>
+            </Reveal>
           </div>
-        </section>
+        </div>
+      </section>
 
-        
-        {/* Experience Section */}
-        <section className="py-14 md:py-24 bg-[#F8F7F4] border-y border-neutral-100" id="" data-track-region="section" data-track-region-variant="experience-section">
-          <div className="max-w-7xl mx-auto w-full px-6 md:px-8 lg:px-16">
-            <div className="relative z-10 text-center">
-              <svg className="mx-auto mb-4 text-primary" fill="none" height="18" viewBox="0 0 24 18" width="24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14.0288 2.40948V17.9997H23.7527V0H20.0825L14.0288 2.40948Z" fill="currentColor"></path>
-                <path d="M7.13818 5.15704V17.9998H11.6102V3.37427L7.13818 5.15704Z" fill="currentColor"></path>
-                <path d="M0.247559 7.90456V17.9998H4.72567V6.11646L0.247559 7.90456Z" fill="currentColor"></path>
-              </svg>
-              <h2 className="font-display text-neutral-900 m-auto max-w-2xl text-3xl md:text-5xl mb-3 md:mb-4">
-                Enterprise-grade retail management, without the complexity.
-              </h2>
-              <p className="md:text-xl max-w-lg mx-auto mb-11 md:mb-14 text-neutral-600">
-                You're four steps away from taking total control of your retail business. Here's how it works:
-              </p>
-            </div>
-            
-            <div className="mt-11 md:mt-14">
-              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-                {/* Step 1 */}
-                <div className="bg-white border border-neutral-200 lg:hover:bg-primary group lg:hover:text-white flex flex-col justify-between gap-2.5 rounded-2xl p-6 duration-300 shadow-sm hover:shadow-xl transition-all">
-                  <div className="flex justify-between gap-3">
-                    <h2 className="text-2xl lg:text-3xl font-semibold font-jakarta">Set up your store</h2>
-                    <span className="text-2xl lg:text-3xl font-bold opacity-30">01</span>
-                  </div>
-                  <svg className="text-primary lg:group-hover:text-white stroke-neutral-200 lg:group-hover:stroke-white w-full duration-300 lg:group-hover:scale-110 my-6" fill="none" height="165" viewBox="0 0 262 165" width="262" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M178.473 43.8699V85.0603L168.216 90.9729V120.393L157.96 126.317V96.8964L147.703 102.82V61.6295L156.534 56.5287L157.96 55.706V32.1765L168.216 26.2529V49.7934L178.473 43.8699Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M116.931 138.229V150L94.9922 139.03V138.317L95.6613 138.646L106.675 144.153L116.931 138.229Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M137.43 55.7829V126.393L127.174 132.317V144.076L116.928 150V138.23L106.672 144.153V73.5424L115.491 68.4635L116.928 67.6298V55.8596L125.748 50.7587L125.836 50.704L126.505 50.32L127.174 49.936V61.7063L136.761 56.1668L137.43 55.7829Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M137.444 55.7824L136.775 56.1663L127.188 61.7058V50.6597L137.444 55.7824Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M116.931 55.8591V67.6294L115.494 66.9164L94.9922 56.6599V44.8896L105.238 50.0125L105.907 50.3525L115.494 55.1461L116.931 55.8591Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M116.93 67.6296L115.493 68.4633L106.673 73.5422L84.7344 62.5727L94.9909 56.6602L115.493 66.9166L116.93 67.6296Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M157.958 96.896V126.316L137.445 116.06V97.6968L146.276 102.106L147.702 102.82L157.958 96.896Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M157.951 55.7058L156.525 56.5285L147.694 61.6293L137.438 56.5066V55.7827L127.182 50.6598V49.9359L127.094 49.8921L136.012 44.7363L156.525 54.9928L157.951 55.7058Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M168.203 26.2527L157.947 32.1762L146.264 26.3403L136.008 21.2067L146.264 15.2832L168.203 26.2527Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M157.947 32.176V55.7055L156.521 54.9924L136.008 44.736V21.2065L146.264 26.3402L157.947 32.176Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M178.467 43.8699L168.211 49.7933V38.7471L178.467 43.8699Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M147.702 61.6296V102.82L146.276 102.107L137.445 97.6972V56.5068L147.702 61.6296Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M106.673 73.5422V144.152L95.66 138.646L94.9909 138.318L84.7344 133.183V62.5728L106.673 73.5422Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                    <path d="M127.177 49.9358L126.508 50.3197L125.838 50.7038L125.751 50.7585L116.931 55.8594L115.494 55.1463L105.907 50.3526L105.238 50.0127L94.9922 44.8899L105.238 38.9663L127.089 49.892L127.177 49.9358Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.844318"></path>
-                  </svg>
-                  <p className="leading-5 text-sm text-neutral-600 lg:group-hover:text-primary-foreground font-medium">Create your Zeneva account, add your products, and set up your cashiers in minutes. Choose from hundreds of inventory categories.</p>
-                </div>
-
-                {/* Step 2 */}
-                <div className="bg-white border border-neutral-200 lg:hover:bg-primary group lg:hover:text-white flex flex-col justify-between gap-2.5 rounded-2xl p-6 duration-300 shadow-sm hover:shadow-xl transition-all">
-                  <div className="flex justify-between gap-3">
-                    <h2 className="text-2xl lg:text-3xl font-semibold font-jakarta">Connect your devices</h2>
-                    <span className="text-2xl lg:text-3xl font-bold opacity-30">02</span>
-                  </div>
-                  <svg className="text-primary lg:group-hover:text-white stroke-neutral-200 lg:group-hover:stroke-white w-full duration-300 lg:group-hover:scale-110 my-6" fill="none" height="165" viewBox="0 0 262 165" width="262" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M160.234 30.6911L143.395 33.164L103.553 73.3171V108.179C103.553 120.44 106.244 130.205 111.65 137.475C112.605 138.786 113.675 140.028 114.825 141.178C116.78 143.133 118.873 144.721 121.093 145.94L122.565 146.676C128.558 149.483 135.505 149.747 143.395 147.47C154.932 137.475 164.455 124.374 171.977 108.179C179.488 91.9846 183.238 76.6526 183.238 62.1718V27.3096L160.234 30.6911ZM151.884 89.9603L138.162 113.62L120.61 103.613L127.373 91.9386L127.707 91.375L138.162 97.333L159.21 61.0446L159.578 61.2516L166.307 65.0932L151.884 89.9603Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.885296"></path>
-                    <path d="M127.706 91.3755L127.373 91.9391L138.162 97.3335L127.706 91.3755Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.885296"></path>
-                    <path d="M143.399 33.1645L103.556 73.3175L80.5527 61.8156L120.395 21.6626L143.399 33.1645Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.885296"></path>
-                    <path d="M183.243 27.3099L160.239 30.6915L143.4 33.1644L120.396 21.6626L160.239 15.8081L183.243 27.3099Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.885296"></path>
-                    <path d="M121.097 145.94L99.3584 135.082L98.5878 134.703C96.1724 133.449 93.918 131.77 91.8247 129.676C84.3139 122.154 80.5527 111.158 80.5527 96.6776V61.8154L103.556 73.3173V108.179C103.556 120.44 106.248 130.206 111.654 137.475C112.608 138.786 113.678 140.028 114.828 141.178C116.784 143.134 118.877 144.721 121.097 145.94Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.885296"></path>
-                    <path d="M122.787 146.791L122.568 146.676L122.787 146.791Z" fill="currentColor"></path>
-                    <path d="M122.787 146.791L122.568 146.676" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.885296"></path>
-                  </svg>
-                  <p className="leading-5 text-sm text-neutral-600 lg:group-hover:text-primary-foreground font-medium">Link your anti-theft terminal and receipt printers. Zeneva works perfectly offline, so you're ready even without an internet connection.</p>
-                </div>
-
-                {/* Step 3 */}
-                <div className="bg-white border border-neutral-200 lg:hover:bg-primary group lg:hover:text-white flex flex-col justify-between gap-2.5 rounded-2xl p-6 duration-300 shadow-sm hover:shadow-xl transition-all">
-                  <div className="flex justify-between gap-3">
-                    <h2 className="text-2xl lg:text-3xl font-semibold font-jakarta">Start selling</h2>
-                    <span className="text-2xl lg:text-3xl font-bold opacity-30">03</span>
-                  </div>
-                  <svg className="text-primary lg:group-hover:text-white stroke-neutral-200 lg:group-hover:stroke-white w-full duration-300 lg:group-hover:scale-110 my-6" fill="none" height="165" viewBox="0 0 262 165" width="262" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M173.655 47.7149L169.808 49.9391C167.11 51.4986 164.566 53.4543 162.189 55.8319C160.911 57.0846 159.683 58.4396 158.507 59.9224C155.094 64.2047 152.397 68.8961 150.441 74.0092L139.064 80.5669C137.812 78.7517 136.265 77.4608 134.424 76.6554L134.322 76.6169C133.926 76.4508 133.542 76.3229 133.108 76.2079C132.443 76.0162 131.74 75.8883 130.998 75.8116C127.585 75.4665 123.814 76.4892 119.698 78.8669L105.842 86.869L82.9219 100.099V112.984L88.5335 109.738L89.7481 120.143L91.1667 132.21L91.4863 134.933C92.1255 140.583 94.1581 144.546 97.5839 146.834H97.5967C98.2103 147.256 98.8622 147.614 99.5525 147.908C104.193 149.914 109.587 149.122 115.774 145.555C121.104 142.475 125.898 137.937 130.155 131.942C134.411 125.934 137.377 119.555 139.064 112.78L140.649 106.312L141.174 104.152C141.314 103.512 141.455 102.848 141.595 102.17C141.647 101.953 141.685 101.723 141.736 101.493C141.928 100.585 142.107 99.4217 142.298 98.0284L147.067 95.28C147.258 96.6734 147.437 97.7216 147.629 98.4119C147.731 98.7698 147.821 99.1149 147.91 99.4473C148 99.7796 148.102 100.112 148.192 100.432L150.301 106.452C151.541 110.032 153.496 112.575 156.168 114.058C157.088 114.582 158.111 114.979 159.21 115.247C163.467 116.27 168.261 115.247 173.591 112.166C179.765 108.613 185.172 103.154 189.812 95.8043C194.44 88.4669 197.124 81.0271 197.878 73.5107L200.818 44.9153L206.443 41.6685V28.7832L173.655 47.7149ZM131.318 101.646C131.19 103.09 130.909 104.624 130.5 106.286L128.404 114.915C127.471 118.571 125.847 122.022 123.559 125.282C121.271 128.528 118.663 130.996 115.774 132.67C112.399 134.613 109.472 135.022 106.992 133.872C104.512 132.734 103.042 130.408 102.569 126.918L102.071 122.457L100.486 108.331L99.9104 103.18L103.017 101.39L114.828 94.5643L119.698 91.7519C121.079 90.9594 122.357 90.4481 123.533 90.2563C125.924 89.8217 127.88 90.6398 129.388 92.6851C131.011 94.8965 131.65 97.875 131.318 101.646ZM186.783 78.3043C186.322 82.3309 184.854 86.3448 182.374 90.3586C179.893 94.3597 176.966 97.3381 173.591 99.2811C170.689 100.968 168.095 101.493 165.807 100.892C163.518 100.278 161.895 98.6803 160.962 96.1109L159.031 90.1157L158.993 90.0007C157.498 85.7056 157.881 80.7203 160.118 75.0191C162.368 69.3179 165.589 65.2529 169.808 62.8242L172.236 61.418L189.456 51.4729L186.783 78.3043Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                    <path d="M82.9253 100.099V112.984L76.521 109.788V109.776L63.7253 103.384L57.3594 100.201V87.3159L74.9871 96.1235V96.1363L82.9253 100.099Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                    <path d="M134.325 76.617C133.929 76.4508 133.546 76.323 133.111 76.2079C132.446 76.0162 131.743 75.8884 131.002 75.8117C127.589 75.4665 123.818 76.4892 119.702 78.8668L105.845 86.8689L82.9253 100.099L74.9871 96.1365L57.3594 87.3163L94.1359 66.0838C98.252 63.7062 102.023 62.6836 105.436 63.0287C106.816 63.1693 108.082 63.5018 109.22 64.0387L109.501 64.1792L114.985 66.9274L133.047 75.9651L134.325 76.617Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                    <path d="M206.443 28.7829L173.655 47.7146L169.807 49.9388C167.11 51.4983 164.566 53.454 162.188 55.8316C160.91 57.0843 159.683 58.4393 158.507 59.9221C155.094 64.2044 152.397 68.8958 150.441 74.0089L133.452 65.5211L124.875 61.226C126.831 56.1128 129.528 51.4215 132.941 47.1392C136.354 42.8569 140.125 39.5335 144.241 37.1559L180.877 16L206.443 28.7829Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                    <path d="M156.167 114.059L140.648 106.312L141.173 104.152C141.313 103.513 141.454 102.848 141.594 102.17C141.646 101.953 141.684 101.723 141.735 101.493C141.927 100.585 142.106 99.4219 142.298 98.0286L147.066 95.2803C147.257 96.6736 147.436 97.7218 147.628 98.4121C147.73 98.77 147.82 99.1151 147.909 99.4475C147.999 99.7799 148.101 100.112 148.191 100.432L150.3 106.453C151.54 110.032 153.496 112.576 156.167 114.059Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                    <path d="M98.1177 147.102L97.5938 146.846L98.1177 147.102Z" fill="currentColor"></path>
-                    <path d="M98.1177 147.102L97.5938 146.846" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                    <path d="M97.5808 146.834L73.4467 134.881C69.1517 132.785 66.6461 128.541 65.9174 122.15L63.7188 103.384L76.5145 109.776L82.9187 112.984L88.5303 109.738L89.745 120.143L91.1637 132.21L91.4833 134.933C92.1225 140.583 94.1549 144.545 97.5808 146.834Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                    <path d="M150.444 74.009L139.067 80.5667C137.814 78.7515 136.268 77.4605 134.427 76.6552L134.325 76.6167L133.047 75.9776L114.984 66.9273L124.878 61.2261L133.456 65.5211L150.444 74.009Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.983899"></path>
-                  </svg>
-                  <p className="leading-5 text-sm text-neutral-600 lg:group-hover:text-primary-foreground font-medium">Process sales with confidence. Eliminate staff cash-pocketing and fake bank alerts while serving customers faster than ever before.</p>
-                </div>
-
-                {/* Step 4 */}
-                <div className="bg-white border border-neutral-200 lg:hover:bg-primary group lg:hover:text-white flex flex-col justify-between gap-2.5 rounded-2xl p-6 duration-300 shadow-sm hover:shadow-xl transition-all">
-                  <div className="flex justify-between gap-3">
-                    <h2 className="text-2xl lg:text-3xl font-semibold font-jakarta">Track your growth</h2>
-                    <span className="text-2xl lg:text-3xl font-bold opacity-30">04</span>
-                  </div>
-                  <svg className="text-primary lg:group-hover:text-white stroke-neutral-200 lg:group-hover:stroke-white w-full duration-300 lg:group-hover:scale-110 my-6" fill="none" height="165" viewBox="0 0 262 165" width="262" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M138.227 111.949C138.573 112.175 138.933 112.349 139.307 112.482L138.227 111.949Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.02629"></path>
-                    <path d="M189.2 42.667C186.706 37.4935 183.333 33.6801 179.066 31.2533L177.053 30.24H177.013C173.226 28.5466 168.893 27.9199 164.012 28.3066C163.386 28.3599 162.759 28.4266 162.132 28.5199C156.906 29.2666 151.372 31.3333 145.532 34.7068C141.385 37.1068 137.385 39.9736 133.545 43.3337C132.625 44.147 131.705 44.987 130.798 45.8671C129.532 47.0671 128.278 48.3338 127.038 49.6538C126.438 50.2939 125.851 50.9339 125.278 51.5872C120.478 56.974 116.238 62.7875 112.558 69.0277C112.544 69.0544 112.531 69.0677 112.518 69.0944C112.331 69.3877 112.158 69.6811 111.984 69.9744C110.211 73.0278 108.598 76.1346 107.144 79.308C105.078 83.7881 103.304 88.3749 101.851 93.095C99.3707 101.149 98.1172 108.935 98.1172 116.469C98.1172 124.003 99.3707 130.349 101.851 135.523C101.984 135.803 102.117 136.07 102.264 136.336C104.704 141.11 107.944 144.643 111.984 146.95C112.091 147.017 112.198 147.084 112.318 147.137L112.651 147.31L113.331 147.657H113.344C117.305 149.564 121.865 150.31 127.038 149.884C132.812 149.404 138.972 147.284 145.532 143.496C152.079 139.71 158.239 134.723 164.012 128.536C169.786 122.349 174.799 115.576 179.066 108.215C183.333 100.855 186.706 93.1484 189.2 85.0948C191.68 77.0413 192.933 69.2544 192.933 61.7342C192.933 54.214 191.68 47.8538 189.2 42.667ZM159.746 106.855C156.905 111.229 153.506 114.949 149.559 118.042V124.843L141.265 129.643V122.563C137.545 123.709 134.518 123.616 132.198 122.296C131.758 122.042 131.345 121.762 130.958 121.429C129.412 120.122 128.198 118.176 127.305 115.589C127.211 115.296 127.118 115.029 127.038 114.736L127.798 113.962L132.251 109.389L132.532 109.095L134.865 106.682C135.625 109.229 136.732 110.976 138.185 111.922L138.225 111.949L139.305 112.482C139.425 112.522 139.558 112.562 139.692 112.602C141.612 113.122 143.785 112.669 146.239 111.256C148.839 109.762 151.079 107.762 152.932 105.282C154.785 102.815 155.719 100.082 155.719 97.0818C155.719 94.8551 155.012 93.3884 153.626 92.695L153.239 92.5083C153.105 92.455 152.959 92.415 152.812 92.375C152.705 92.3483 152.599 92.3217 152.492 92.3083C150.505 91.8683 147.159 92.0283 142.438 92.775C138.718 93.4017 135.798 93.3484 133.665 92.5883C133.132 92.4017 132.638 92.175 132.198 91.895C130.305 90.695 129.238 88.4149 128.985 85.0281C128.945 84.5215 128.931 83.9881 128.931 83.4414C128.931 83.1481 128.945 82.8547 128.972 82.5481C128.985 81.8947 129.052 81.2414 129.158 80.5614C129.158 80.5347 129.172 80.4947 129.172 80.468C129.305 79.5613 129.505 78.628 129.758 77.6813C130.305 75.6812 131.145 73.6145 132.251 71.4678C132.638 70.7344 133.038 70.0011 133.492 69.2944C135.558 65.9076 138.225 62.8542 141.492 60.1475V53.3473L143.479 52.2006L144.679 51.5072L149.785 48.5605V55.3607C150.265 55.134 150.745 54.934 151.212 54.774C153.506 53.9606 155.626 53.9873 157.559 54.814C159.879 55.8273 161.479 57.6674 162.359 60.3475L154.772 68.2543C154.132 66.5343 153.105 65.3876 151.692 64.8009C150.265 64.2142 148.292 64.6542 145.758 66.121C142.998 67.7077 140.878 69.6144 139.425 71.8144C138.198 73.6412 137.492 75.5345 137.292 77.4813C137.252 77.8679 137.225 78.2546 137.225 78.6546C137.225 79.0946 137.252 79.4947 137.332 79.868C137.518 80.9614 137.985 81.748 138.732 82.2014C139.078 82.4281 139.492 82.5747 139.958 82.6547C141.772 82.9748 145.052 82.6681 149.785 81.7347C153.679 81.108 156.692 81.1747 158.812 81.9614C159.786 82.3081 160.572 82.8147 161.172 83.4681C163.066 85.5482 164.012 88.4816 164.012 92.295C164.012 97.6418 162.586 102.495 159.746 106.855Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.02629"></path>
-                    <path d="M177.268 30.3331C177.201 30.2931 177.121 30.2664 177.055 30.2397L179.068 31.2531C178.481 30.9198 177.881 30.6131 177.268 30.3331Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.02629"></path>
-                    <path d="M177.016 30.2263C173.229 28.5463 168.896 27.9196 164.016 28.3063C163.389 28.3596 162.762 28.4263 162.136 28.5196C156.909 29.2663 151.375 31.333 145.535 34.7064C141.388 37.1065 137.388 39.9732 133.548 43.3333C132.628 44.1467 131.708 44.9867 130.801 45.8667C129.535 47.0668 128.281 48.3335 127.041 49.6535C126.441 50.2935 125.855 50.9335 125.281 51.5869C120.481 56.9737 116.241 62.7872 112.561 69.0274C112.548 69.054 112.534 69.0674 112.521 69.094C112.334 69.3874 112.161 69.6807 111.988 69.9741C110.214 73.0275 108.601 76.1342 107.148 79.3077C105.081 83.7878 103.307 88.3746 101.854 93.0947C99.374 101.148 98.1205 108.935 98.1205 116.469C98.1205 124.002 99.374 130.349 101.854 135.523C101.987 135.803 102.121 136.069 102.267 136.336C104.707 141.109 107.948 144.643 111.988 146.95C112.094 147.017 112.201 147.083 112.321 147.137L87.1202 134.522L85.3202 133.616C81.0535 131.176 77.68 127.376 75.1866 122.189C72.7066 117.015 71.4531 110.655 71.4531 103.135C71.4531 95.6148 72.7066 87.8146 75.1866 79.761C77.68 71.7074 81.0535 64.0006 85.3202 56.6404C89.587 49.2802 94.6005 42.5066 100.374 36.3198C106.147 30.133 112.308 25.1595 118.868 21.3728C125.415 17.586 131.575 15.4526 137.348 14.9726C142.348 14.5592 146.789 15.2393 150.669 17.026L150.842 17.106L151.522 17.4526L177.016 30.2263Z" fill="currentColor" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.02629"></path>
-                    <path d="M113.557 147.764L113.344 147.657L113.557 147.764Z" fill="currentColor"></path>
-                    <path d="M113.557 147.764L113.344 147.657" stroke="inherit" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.02629"></path>
-                  </svg>
-                  <p className="leading-5 text-sm text-neutral-600 lg:group-hover:text-primary-foreground font-medium">Monitor your business from anywhere. Access real-time analytics, daily sales logs, and profitability reports instantly.</p>
-                </div>
-              </div>
-
-              <a className="hover:text-primary flex items-center justify-center gap-3 duration-300 md:text-lg font-medium mt-9 lg:mt-14" href="/faqs">
-                Explore Zeneva's Features
-                <svg fill="none" height="10" viewBox="0 0 6 10" width="6" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M0.75 0.499878L5.25 4.99988L0.75 9.49988" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"></path>
-                </svg>
-              </a>
-            </div>
-          </div>
-        </section>
-        {/* Testimonials */}
-
-        <section className="mb-32 relative max-w-7xl mx-auto px-6 mt-32">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
-            <div className="max-w-2xl">
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary mb-4 block">Social Proof</span>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-neutral-900 font-display">Voices of Victory</h2>
-              <p className="text-xl text-neutral-600 mt-4 font-body leading-relaxed">
-                Real stories from the frontlines of retail revolution.
-              </p>
-            </div>
-            <Link href="/blog" className="group flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-neutral-900 border-b-2 border-primary/20 hover:border-primary transition-all pb-1">
-              Read all stories
-              <iconify-icon icon="solar:arrow-right-up-linear" className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-            </Link>
-          </div>
-          <div className="relative h-[400px]">
-              <div 
-                className="overflow-hidden h-full rounded-2xl relative" 
-                style={{ 
-                  maskImage: 'linear-gradient(90deg, transparent, white 10%, white 90%, transparent)', 
-                  WebkitMaskImage: 'linear-gradient(90deg, transparent, white 10%, white 90%, transparent)' 
-                }}
-              >
-                <div 
-                  className="flex gap-6 overflow-x-auto scroll-smooth px-10 absolute inset-0 items-center hide-scrollbar" 
-                  ref={railRef}
-                  onScroll={checkScroll}
+      {/* --------------------------------------------- FROM THE JOURNAL --- */}
+      <section className="px-6 py-[140px] bg-[#F9F8F6]">
+        <div className="mx-auto max-w-[1100px]">
+          <Reveal>
+            <div className="mb-16 flex flex-col justify-between gap-8 md:flex-row md:items-end">
+              <div className="max-w-2xl">
+                <p
+                  className="av-caption uppercase tracking-[0.18em]"
+                  style={{ color: 'var(--av-ink-soft)' }}
                 >
-                   <article className="min-w-[400px] md:min-w-[500px] bg-white border border-neutral-100 rounded-3xl p-8 backdrop-blur-md -rotate-1 shadow-xl flex-shrink-0">
-                    <p className="text-xl md:text-2xl text-neutral-900 tracking-tight font-jakarta font-medium">
-                      "Zeneva stopped being just a POS and started being a partner. It told me exactly which luxury silks to stop ordering and where I was losing money on belts."
-                    </p>
-                    <div className="mt-8 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center font-bold text-emerald-500">AB</div>
-                      <div>
-                        <div className="text-base font-semibold text-neutral-900">Dr. Amina Bolanle</div>
-                        <div className="text-xs text-neutral-500">Director, Safeway Dermatology & Laser Center</div>
-                      </div>
-                    </div>
-                  </article>
-
-                  <article className="min-w-[400px] md:min-w-[500px] bg-white border border-neutral-100 rounded-3xl p-8 backdrop-blur-md rotate-1 shadow-xl flex-shrink-0">
-                    <p className="text-xl md:text-2xl text-neutral-900 tracking-tight font-jakarta font-medium">
-                      "The offline first approach saved us during network blackouts. We didn't lose a single sale, and everything synced perfectly the moment we got back online."
-                    </p>
-                    <div className="mt-8 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center font-bold text-blue-500">OA</div>
-                      <div>
-                        <div className="text-base font-semibold text-neutral-900">Olumide Adebayo</div>
-                        <div className="text-xs text-neutral-500">Operations Lead, Lag Retail Ops</div>
-                      </div>
-                    </div>
-                  </article>
-
-                  <article className="min-w-[400px] md:min-w-[500px] bg-white border border-neutral-100 rounded-3xl p-8 backdrop-blur-md -rotate-2 shadow-xl flex-shrink-0">
-                    <p className="text-xl md:text-2xl text-neutral-900 tracking-tight font-jakarta font-medium">
-                      "I used to spend 4 hours a night reconcilling numbers. Now, Zeneva does it in real-time. My business is finally operating with clarity."
-                    </p>
-                    <div className="mt-8 flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary">CO</div>
-                      <div>
-                        <div className="text-base font-semibold text-neutral-900">Chisom Okafor</div>
-                        <div className="text-xs text-neutral-500">Founder, The Retail Hub</div>
-                      </div>
-                    </div>
-                  </article>
-                </div>
-
-                <div className="absolute bottom-6 right-10 flex items-center gap-4">
-                  <button 
-                    className="hover:bg-neutral-200 transition-all inline-flex text-neutral-900 bg-neutral-100 w-12 h-12 border-neutral-200 border rounded-full items-center justify-center backdrop-blur-md"
-                    onClick={() => scroll(-1)}
-                    disabled={!canScrollLeft}
-                    style={{ opacity: canScrollLeft ? 1 : 0.3 }}
-                  >
-                    {mounted && <iconify-icon icon="solar:arrow-left-linear" class="w-6 h-6" />}
-                  </button>
-                  <button 
-                    className="w-12 h-12 rounded-full text-white bg-black hover:bg-neutral-800 transition-all inline-flex items-center justify-center shadow-lg"
-                    onClick={() => scroll(1)}
-                    disabled={!canScrollRight}
-                    style={{ opacity: canScrollRight ? 1 : 0.3 }}
-                  >
-                    {mounted && <iconify-icon icon="solar:arrow-right-linear" class="w-6 h-6" />}
-                  </button>
-                </div>
+                  Journal
+                </p>
+                <h2 className="av-display-lg mt-4">The thinking behind the build</h2>
+                <p className="av-body-lg mt-4" style={{ color: 'var(--av-ink-soft)' }}>
+                  Longer pieces on the parts of this page that deserve more than
+                  a paragraph.
+                </p>
               </div>
+
+              <Link href="/blog" className="av-a av-link inline-flex items-center gap-2">
+                All posts
+                <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
+              </Link>
             </div>
-          </section>
+          </Reveal>
 
-          <section className="mx-auto max-w-4xl px-6 mt-32 relative mb-40 text-center">
-             <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600 mb-8 backdrop-blur-sm">
-               {mounted && <iconify-icon icon="solar:rocket-linear" class="h-4 w-4 text-primary" />}
-               <span className="font-geist">Join 30+ Forward-Thinking Retailers</span>
-             </div>
-             <h2 className="text-4xl md:text-6xl lg:text-7xl font-medium tracking-tighter text-neutral-900 mb-8 font-jakarta">Ready to see your business clearly?</h2>
-             <p className="text-neutral-600 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-geist">
-               Stop firefighting and start leading. Experience the future of retail management today with Zeneva.
-             </p>
+          <div className="grid gap-8 md:grid-cols-3">
+            {JOURNAL.map(({ slug, category, title, blurb }, i) => (
+              <Reveal key={slug} delay={i * 0.07}>
+                <Link
+                  href={`/blog/${slug}`}
+                  className="av-card-outline flex h-full flex-col"
+                  style={{ background: 'var(--av-paper)' }}
+                >
+                  <p
+                    className="av-caption uppercase tracking-[0.18em]"
+                    style={{ color: 'var(--av-link)' }}
+                  >
+                    {category}
+                  </p>
+                  <h3 className="av-display-md mt-4" style={{ color: 'var(--av-ink)' }}>
+                    {title}
+                  </h3>
+                  <p className="av-body-md mt-3 flex-1" style={{ color: 'var(--av-ink-soft)' }}>
+                    {blurb}
+                  </p>
+                  <span
+                    className="av-link mt-8 inline-flex items-center gap-2"
+                    style={{ color: 'var(--av-link)' }}
+                  >
+                    Read it
+                    <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
+                  </span>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
 
-             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-               <Link href="/signup" className="codepen-button-aura scale-125 mx-4">
-                  <span>Join the Mission</span>
-               </Link>
-               <Link href="/careers" className="mt-8 sm:mt-0 text-sm font-semibold text-neutral-600 hover:text-primary transition-colors flex items-center gap-2">
-                 Join the Team <iconify-icon icon="solar:arrow-right-linear" />
-               </Link>
-             </div>
-          </section>
-      </main>
+      {/* ----------------------------------------------- CLOSING CTA (dark) */}
+      <section
+        className="px-6 py-[140px] relative z-10"
+        style={{ background: 'var(--av-primary)', color: 'var(--av-on-ink)' }}
+      >
+        <Reveal>
+          <div className="mx-auto max-w-[1100px] text-center">
+            <span className="av-badge av-caption" style={{ borderColor: 'var(--av-hairline-strong)' }}>
+              <Rocket className="h-4 w-4" style={{ color: 'var(--av-gold)' }} strokeWidth={1.75} />
+              Join 30+ Forward-Thinking Retailers
+            </span>
 
-      <style jsx>{`
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
+            <h2 className="av-display-lg mx-auto mt-8 max-w-3xl">
+              Ready to see your business clearly?
+            </h2>
+            <p className="av-body-lg av-measure mx-auto mt-6" style={{ color: 'var(--av-ink-soft)' }}>
+              Stop firefighting and start leading. Experience the future of retail
+              management today with Zeneva.
+            </p>
+
+            <div className="mt-12 flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-8">
+              <Link href="/signup" className="av-btn-accent av-btn w-full sm:w-auto">
+                Join the Mission
+              </Link>
+              <Link href="/careers" className="av-a av-link inline-flex items-center gap-2">
+                Join the Team
+                <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
+              </Link>
+            </div>
+          </div>
+        </Reveal>
+      </section>
     </div>
   );
 }

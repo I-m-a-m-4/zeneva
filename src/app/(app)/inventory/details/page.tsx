@@ -18,8 +18,10 @@ import {
     Trash2,
     Layers,
     QrCode,
-    AlertCircle
+    AlertCircle,
+    Info
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -432,7 +434,40 @@ function EditProductContent() {
                 }, `Logging stock adjustment for ${product.name}`);
             }
 
-            toast({ 
+            // 4. Log price and cost movements as a before/after pair.
+            //
+            // The loss-prevention scan pairs a cut with a later restore to spot
+            // the price-swap (drop the price, sell it cheap, put it back). Both
+            // edits leave the catalogue looking untouched, so this pair of logs
+            // is the only trace it happened. See src/lib/forensics.ts, check S7.
+            const priceMoved = values.price !== product.price;
+            const costMoved = (values.costPrice ?? 0) !== (product.costPrice ?? 0);
+            if (priceMoved || costMoved) {
+                const changes: Record<string, { from: any; to: any }> = {};
+                if (priceMoved) changes.price = { from: product.price ?? 0, to: values.price };
+                if (costMoved) changes.costPrice = { from: product.costPrice ?? 0, to: values.costPrice ?? 0 };
+
+                addToQueue({
+                    type: 'add-audit-log',
+                    payload: {
+                        businessId: business.id,
+                        userId: currentUserProfile.id,
+                        userName: currentUserProfile.name,
+                        userEmail: currentUserProfile.email,
+                        userRole: currentUserProfile.role,
+                        action: 'product.update',
+                        entityType: 'Product',
+                        entityId: product.id,
+                        details: {
+                            entityName: product.name,
+                            changes,
+                            reason: 'Full Edit Page',
+                        }
+                    }
+                }, `Logging price change for ${product.name}`);
+            }
+
+            toast({
                 variant: 'success', 
                 title: 'Changes Queued', 
                 description: `${values.name} will be updated ${navigator.onLine ? 'momentarily' : 'when connection is restored'}.` 
@@ -460,6 +495,34 @@ function EditProductContent() {
             type: 'delete-product',
             payload: { productIds: [productId] }
         }, `Deleting product ${product?.name}`);
+
+        // Record what the system still believed was on the shelf.
+        //
+        // Deleting a product removes the item *and* its outstanding count in one
+        // action, so a shortage disappears with no adjustment left behind to
+        // question — the cleanest way to erase missing stock. `stockAtDeletion`
+        // is the only thing that makes that visible afterwards, and it cannot be
+        // reconstructed once the product document is gone. Forensics check S6.
+        addToQueue({
+            type: 'add-audit-log',
+            payload: {
+                businessId: business.id,
+                userId: currentUserProfile.id,
+                userName: currentUserProfile.name,
+                userEmail: currentUserProfile.email,
+                userRole: currentUserProfile.role,
+                action: 'product.delete',
+                entityType: 'Product',
+                entityId: productId,
+                details: {
+                    entityName: product?.name ?? null,
+                    stockAtDeletion: product?.stock ?? 0,
+                    price: product?.price ?? 0,
+                    costPrice: product?.costPrice ?? 0,
+                    sku: product?.sku ?? null,
+                }
+            }
+        }, `Logging deletion of ${product?.name}`);
 
         toast({ variant: 'default', title: 'Deletion Queued', description: `${product?.name} will be deleted.` });
         router.push('/inventory');
@@ -574,17 +637,17 @@ function EditProductContent() {
                                                             </FormControl>
                                                             <FormLabel className="font-normal">Standard Item</FormLabel>
                                                         </FormItem>
-                                                        <FormItem className="flex items-center space-x-3 space-y-0">
-                                                            <FormControl>
-                                                                <RadioGroupItem value="composite" />
-                                                            </FormControl>
-                                                            <FormLabel className="font-normal">Composite (Bundle)</FormLabel>
-                                                        </FormItem>
-                                                    </RadioGroup>
-                                                </FormControl>
-                                                <FormDescription>
-                                                    {productType === 'composite' ? "This item is built from other products. Stock is automatically managed." : "Standard individual product with its own stock."}
-                                                </FormDescription>
+                                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                                <FormControl>
+                                                                    <RadioGroupItem value="variant" />
+                                                                </FormControl>
+                                                                <FormLabel className="font-normal">Variant</FormLabel>
+                                                            </FormItem>
+                                                        </RadioGroup>
+                                                    </FormControl>
+                                                    <FormDescription>
+                                                        {productType === 'variant' ? "A product with options like size or color." : "Standard individual product with its own stock."}
+                                                    </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
@@ -594,7 +657,19 @@ function EditProductContent() {
 
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
-                                            <FormLabel>Units of Measure (UoM)</FormLabel>
+                                            <FormLabel className="flex items-center gap-1.5">
+                                                Units of Measure (UoM)
+                                                <TooltipProvider>
+                                                    <Tooltip delayDuration={300}>
+                                                        <TooltipTrigger asChild>
+                                                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="max-w-[250px]">
+                                                            <p>Allows selling the same item in different quantities. For example, sell by the Piece, or sell a Carton of 12 for a different price.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </FormLabel>
                                             <Button type="button" variant="outline" size="sm" onClick={() => appendUom({ unitName: "", multiplier: 1 })} disabled={!canManageProduct}>
                                                 <Plus className="h-4 w-4 mr-2" /> Add UoM
                                             </Button>
@@ -658,60 +733,6 @@ function EditProductContent() {
                                         ))}
                                     </div>
 
-                                    {productType === 'composite' && (
-                                        <>
-                                            <Separator />
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between">
-                                                    <FormLabel>Composite Components</FormLabel>
-                                                    <Button type="button" variant="outline" size="sm" onClick={() => appendComponent({ productId: "", quantity: 1 })} disabled={!canManageProduct}>
-                                                        <Plus className="h-4 w-4 mr-2" /> Add Component
-                                                    </Button>
-                                                </div>
-                                                <FormDescription>Select products that make up this bundle.</FormDescription>
-
-                                                {componentFields.map((field, index) => (
-                                                    <div key={field.id} className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end p-3 border rounded-lg bg-muted/30">
-                                                        <FormField
-                                                            control={form.control}
-                                                            name={`components.${index}.productId`}
-                                                            render={({ field }) => (
-                                                                <FormItem className="sm:col-span-3">
-                                                                    <FormLabel className="text-xs">Product</FormLabel>
-                                                                        <FormControl>
-                                                                            <Combobox
-                                                                                options={products?.filter(p => (!p.type || p.type === 'single') && p.id !== productId).map(p => ({
-                                                                                    label: `${p.name} (Stock: ${p.stock})`,
-                                                                                    value: p.id
-                                                                                })) || []}
-                                                                                value={field.value}
-                                                                                onChange={field.onChange}
-                                                                                placeholder="Select component"
-                                                                                searchPlaceholder="Search products..."
-                                                                                disabled={!canManageProduct}
-                                                                            />
-                                                                        </FormControl>
-                                                                    <FormMessage />
-                                                                </FormItem>
-                                                            )}
-                                                        />
-                                                        <FormField
-                                                            control={form.control}
-                                                            name={`components.${index}.quantity`}
-                                                            render={({ field }) => (
-                                                                <FormItem>
-                                                                    <FormLabel className="text-xs">Qty</FormLabel>
-                                                                    <FormControl><Input type="number" {...field} disabled={!canManageProduct} /></FormControl>
-                                                                    <FormMessage />
-                                                                </FormItem>
-                                                            )}
-                                                        />
-                                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeComponent(index)} className="text-destructive" disabled={!canManageProduct}><Trash className="h-4 w-4" /></Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
                                 </CardContent>
                             </Card>
                         )}
@@ -785,7 +806,19 @@ function EditProductContent() {
                                         name="costPrice"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Cost Price</FormLabel>
+                                                <FormLabel className="flex items-center gap-1.5">
+                                                    Cost Price
+                                                    <TooltipProvider>
+                                                        <Tooltip delayDuration={300}>
+                                                            <TooltipTrigger asChild>
+                                                                <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="max-w-[250px]">
+                                                                <p>Entering the cost price allows Zeneva to accurately calculate and display your profit margins in Reports.</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </FormLabel>
                                                 <FormControl>
                                                     <Input type="number" step="0.01" placeholder="250.00" {...field} disabled={!canManageProduct} />
                                                 </FormControl>

@@ -13,6 +13,7 @@ import RetentionCohortChart from '@/components/admin/charts/RetentionCohortChart
 import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessChart';
 import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersChart';
 import OperationsAdoptionPanel from '@/components/admin/charts/OperationsAdoptionPanel';
+import UserActivityDotPlot from '@/components/admin/charts/UserActivityDotPlot';
 import {
     Card,
     CardContent,
@@ -197,6 +198,7 @@ import {
     UserUsageDetailDialog,
     type UsageSession,
 } from '@/components/admin/user-detail/usage-insights';
+import ProductIntelligence from '@/components/admin/usage/product-intelligence';
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -561,7 +563,7 @@ function UserListDialog({ open, onOpenChange, title, description, users, busines
                                 const biz = businesses?.find(b => b.id === u.businessId);
                                 return (
                                     <TableRow key={u.id}>
-                                        <TableCell className="font-medium max-w-[140px] truncate" title={u.name}>{u.name}</TableCell>
+                                        <TableCell className="font-medium max-w-[140px] truncate" title={biz?.name || u.name}>{biz?.name || u.name || 'Unknown User'}</TableCell>
                                         <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground" title={u.email}>{u.email}</TableCell>
                                         <TableCell className="max-w-[130px] truncate" title={biz?.name || 'N/A'}>{biz?.name || 'N/A'}</TableCell>
                                         <TableCell><Badge variant={u.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">{u.status || 'active'}</Badge></TableCell>
@@ -1779,6 +1781,13 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                 </CardContent>
             </Card>
 
+            {/*
+                Product intelligence: what the behaviour data says about the app
+                itself, rather than about who used it. Fed from the `users` array
+                this tab already holds, so the whole section costs no extra reads.
+            */}
+            <ProductIntelligence users={users} />
+
             <UserUsageDetailDialog
                 user={drillUser}
                 business={businesses.find(b => b.id === drillUser?.businessId)}
@@ -2410,10 +2419,13 @@ function AdminDashboardContent({
     const [sortBy, setSortBy] = useState<'active' | 'joined' | 'name'>('active');
     const [filterPlan, setFilterPlan] = useState<'all' | 'starter' | 'pro' | 'business' | 'lifetime'>('all');
 
-    const userOptions = useMemo(() => (users || []).map(user => ({
-        value: user.email,
-        label: `${user.name} (${user.email})`
-    })), [users]);
+    const userOptions = useMemo(() => (users || []).map(user => {
+        const bizName = businesses?.find(b => b.id === user.businessId)?.name;
+        return {
+            value: user.email,
+            label: `${bizName || user.name || 'Unknown User'} (${user.email})`
+        };
+    }), [users, businesses]);
 
     const handleDeleteApplication = async (appId: string) => {
         if (!confirm('Are you sure you want to delete this application?')) return;
@@ -3471,6 +3483,9 @@ function AdminDashboardContent({
                     </div>
                     </Card>
 
+                    {/* Dot Plot moved to overview as requested */}
+                    <UserActivityDotPlot users={users || []} businesses={businesses || []} />
+
                     {/* Operations & feature adoption — tiles plus their own trend, profile and sharing charts. */}
                     <OperationsAdoptionPanel
                         receipts={convertedReceipts || []}
@@ -4038,7 +4053,7 @@ function AdminDashboardContent({
                                                             className="hover:bg-muted/50"
                                                         >
                                                             <TableCell onClick={() => { setSelectedUserForDetail(user); setIsUserDetailOpen(true); }} className="cursor-pointer">
-                                                                <div className="font-medium">{user.name}</div><div className="text-xs text-muted-foreground">{user.email}</div>
+                                                                <div className="font-medium">{business?.name || user.name || 'Unknown User'}</div><div className="text-xs text-muted-foreground">{user.email}</div>
                                                             </TableCell>
                                                             <TableCell onClick={() => { setSelectedUserForDetail(user); setIsUserDetailOpen(true); }} className="cursor-pointer">
                                                                 {business?.name || 'N/A'}

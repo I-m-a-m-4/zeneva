@@ -1,13 +1,14 @@
 
 'use client';
+import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, addDoc, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import type { SupportThread, SupportMessage, UserProfile } from '@/types';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNowStrict, isToday, isYesterday } from 'date-fns';
-import { Loader2, Send, MessageSquare, Archive, Check, CheckCheck, Trash2, Paperclip, Mic, Image as ImageIcon, Play, Pause, X, MoreVertical, Edit2, Clock, ArrowLeft, Megaphone } from 'lucide-react';
+import { Loader2, Send, MessageSquare, Archive, Check, CheckCheck, Trash2, Paperclip, Mic, Image as ImageIcon, Play, Pause, X, MoreVertical, Edit2, Clock, ArrowLeft, Megaphone, Eye, Sparkles, Mail } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic
 import { useI18n } from '@/context/i18n-context';
 import { Bot } from 'lucide-react';
 import { sendDirectUserPush } from '@/actions/notifications';
+import { adminApiFetch } from '@/lib/admin-api';
 
 interface AISupportLog {
     id: string;
@@ -198,12 +200,18 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
     const { t } = useI18n();
     const [reply, setReply] = React.useState('');
     const [isSending, setIsSending] = React.useState(false);
-    
+    const [sendViaEmail, setSendViaEmail] = React.useState(true);
+    const [emailPreviewOpen, setEmailPreviewOpen] = React.useState(false);
+    const [attachedImage, setAttachedImage] = React.useState<string | null>(null);
+
+    // Multi-message selection state for emailing selected messages
+    const [selectionMode, setSelectionMode] = React.useState(false);
+    const [selectedMessageIds, setSelectedMessageIds] = React.useState<string[]>([]);
+
     // Media & Voice states
     const [editModalOpen, setEditModalOpen] = React.useState(false);
     const [editMessageText, setEditMessageText] = React.useState('');
     const [editMessageId, setEditMessageId] = React.useState<string | null>(null);
-    const [attachedImage, setAttachedImage] = React.useState<string | null>(null);
     const [isUploadingImage, setIsUploadingImage] = React.useState(false);
     const [isRecording, setIsRecording] = React.useState(false);
     const [recordingSeconds, setRecordingSeconds] = React.useState(0);
@@ -339,6 +347,23 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                 }).catch((err) => console.warn('Support push error:', err));
             }
 
+            // Also send email to user's Gmail via Resend if option is enabled
+            if (sendViaEmail && thread.userEmail) {
+                adminApiFetch('/api/admin/send-support-reply', {
+                    method: 'POST',
+                    body: {
+                        to: thread.userEmail,
+                        userName: thread.userName,
+                        subject: thread.subject,
+                        message: payload.text
+                    }
+                }).then(data => {
+                      if (data.success) {
+                          toast({ variant: 'success', title: 'Email Delivered', description: `Sent to ${thread.userEmail} via Resend.` });
+                      }
+                  }).catch(err => console.warn('Resend email error:', err));
+            }
+
             setReply('');
             setAttachedImage(null);
             toast({ variant: 'success', title: 'Reply Sent' });
@@ -346,6 +371,64 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
             toast({ variant: 'destructive', title: 'Error', description: 'Could not send reply.' });
         } finally {
             setIsSending(false);
+        }
+    };
+
+    const handleSendSpecificMessageToEmail = async (msgText: string, mediaUrl?: string) => {
+        if (!thread.userEmail) {
+            toast({ variant: 'destructive', title: 'No Email Found', description: 'This user does not have an email address associated with their account.' });
+            return;
+        }
+        try {
+            toast({ title: 'Sending Email...', description: `Dispatching message to ${thread.userEmail}` });
+            const data = await adminApiFetch('/api/admin/send-support-reply', {
+                method: 'POST',
+                body: {
+                    to: thread.userEmail,
+                    userName: thread.userName,
+                    subject: thread.subject,
+                    message: msgText,
+                    mediaUrl: mediaUrl
+                }
+            });
+            if (data.success) {
+                toast({ variant: 'success', title: 'Email Delivered', description: `Message emailed to ${thread.userEmail} via Resend.` });
+            } else {
+                toast({ variant: 'destructive', title: 'Email Failed', description: data.message || 'Could not send email.' });
+            }
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Error', description: err.message || 'Failed to send email.' });
+        }
+    };
+
+    const handleSendSelectedMessagesToEmail = async () => {
+        if (selectedMessageIds.length === 0 || !thread.userEmail) return;
+        const selectedMsgs = (messages || []).filter(m => selectedMessageIds.includes(m.id));
+        
+        try {
+            toast({ title: 'Sending Bulk Email...', description: `Dispatching ${selectedMsgs.length} message(s) to ${thread.userEmail}` });
+            const data = await adminApiFetch('/api/admin/send-support-reply', {
+                method: 'POST',
+                body: {
+                    to: thread.userEmail,
+                    userName: thread.userName,
+                    subject: thread.subject,
+                    messages: selectedMsgs.map(m => ({
+                        senderName: m.senderName,
+                        text: m.text || '',
+                        mediaUrl: m.mediaUrl || null
+                    }))
+                }
+            });
+            if (data.success) {
+                toast({ variant: 'success', title: 'Bulk Email Delivered', description: `${selectedMsgs.length} selected message(s) emailed to ${thread.userEmail}.` });
+                setSelectionMode(false);
+                setSelectedMessageIds([]);
+            } else {
+                toast({ variant: 'destructive', title: 'Email Failed', description: data.message || 'Could not send email.' });
+            }
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Error', description: err.message || 'Failed to send bulk email.' });
         }
     };
 
@@ -529,6 +612,18 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                         <SelectItem value="closed">Closed</SelectItem>
                     </SelectContent>
                 </Select>
+
+                <Button
+                    variant={selectionMode ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => {
+                        setSelectionMode(!selectionMode);
+                        setSelectedMessageIds([]);
+                    }}
+                >
+                    {selectionMode ? 'Cancel Selection' : 'Select Messages'}
+                </Button>
             </div>
 
             {/* Message viewport */}
@@ -538,29 +633,46 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary mt-10" />
                     ) : messages?.map(msg => {
                         const isAdmin = msg.senderId === 'admin';
+                        const isSelected = selectedMessageIds.includes(msg.id);
+
                         return (
-                            <div key={msg.id} className={cn('flex items-end gap-1 group', isAdmin ? 'justify-end' : 'justify-start')}>
+                            <div key={msg.id} className={cn('flex items-end gap-2 group', isAdmin ? 'justify-end' : 'justify-start')}>
+                                 {selectionMode && (
+                                     <input
+                                         type="checkbox"
+                                         checked={isSelected}
+                                         onChange={(e) => {
+                                             if (e.target.checked) setSelectedMessageIds(prev => [...prev, msg.id]);
+                                             else setSelectedMessageIds(prev => prev.filter(id => id !== msg.id));
+                                         }}
+                                         className="h-4 w-4 rounded accent-orange-600 cursor-pointer self-center"
+                                     />
+                                 )}
                                  <div className={cn(
                                      // Wider share of a phone than of a desktop pane: at 70% of a
                                      // 330px viewport a two-word message wraps for no reason.
                                      "max-w-[85%] md:max-w-[70%] rounded-xl p-2.5 relative shadow-sm transition-all duration-300",
                                      isAdmin
                                         ? 'bg-orange-100 dark:bg-orange-950/40 text-slate-800 dark:text-slate-100 rounded-tr-none pr-8'
-                                        : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none'
+                                        : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none pr-8'
                                  )}>
                                     {/* Dropdown menu for Edit/Delete instead of absolute trash button.
                                         Always visible on touch: hover never fires there, so a
                                         hover-only trigger made edit and delete unreachable on a phone. */}
-                                    {isAdmin && (
-                                         <div className="absolute top-1.5 right-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20">
-                                             <DropdownMenu modal={false}>
-                                                 <DropdownMenuTrigger asChild>
-                                                     <button className="h-6 w-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border hover:bg-slate-200 dark:hover:bg-slate-700">
-                                                         <MoreVertical className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-                                                     </button>
-                                                 </DropdownMenuTrigger>
-                                                 <DropdownMenuContent align="end" className="w-[100px]">
-                                                     {msg.text && (
+                                     <div className="absolute top-1.5 right-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20">
+                                         <DropdownMenu modal={false}>
+                                             <DropdownMenuTrigger asChild>
+                                                 <button className="h-6 w-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border hover:bg-slate-200 dark:hover:bg-slate-700">
+                                                     <MoreVertical className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                                                 </button>
+                                             </DropdownMenuTrigger>
+                                             <DropdownMenuContent align="end" className="w-[180px]">
+                                                 {thread.userEmail && (
+                                                     <DropdownMenuItem onClick={() => handleSendSpecificMessageToEmail(msg.text || '📷 Sent an image', msg.mediaUrl)}>
+                                                         📧 Send to User's Gmail
+                                                     </DropdownMenuItem>
+                                                 )}
+                                                 {isAdmin && msg.text && (
                                                          <DropdownMenuItem onClick={() => {
                                                              setEditMessageId(msg.id);
                                                              setEditMessageText(msg.text || '');
@@ -569,13 +681,14 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                                                              <Edit2 className="h-3.5 w-3.5 mr-2" /> Edit
                                                          </DropdownMenuItem>
                                                      )}
+                                                 {isAdmin && (
                                                      <DropdownMenuItem onClick={() => handleDeleteMessage(msg.id)} className="text-red-500 focus:text-red-500">
                                                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
                                                      </DropdownMenuItem>
-                                                 </DropdownMenuContent>
-                                             </DropdownMenu>
-                                         </div>
-                                     )}
+                                                 )}
+                                             </DropdownMenuContent>
+                                         </DropdownMenu>
+                                     </div>
 
                                     {/* Image Attachment inside Bubble */}
                                     {msg.mediaUrl && (
@@ -624,6 +737,44 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
 
             {/* Input action toolbar */}
             <div className="bg-[#f0f0f0] dark:bg-slate-900 p-2 md:p-3 border-t flex flex-col gap-2">
+                {/* Multi-selection email dispatch bar */}
+                {selectionMode && selectedMessageIds.length > 0 && (
+                    <div className="bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-between text-xs font-semibold animate-in fade-in">
+                        <span>{selectedMessageIds.length} message(s) selected</span>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 text-xs bg-white text-orange-600 hover:bg-slate-100 font-bold"
+                            onClick={handleSendSelectedMessagesToEmail}
+                        >
+                            📧 Email Selected to User Gmail
+                        </Button>
+                    </div>
+                )}
+                {/* Email dispatch toggle indicator */}
+                {thread.userEmail && (
+                    <div className="flex items-center justify-between text-[11px] px-1 text-slate-600 dark:text-slate-400">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none font-medium hover:text-slate-900 dark:hover:text-slate-200">
+                            <input 
+                                type="checkbox" 
+                                checked={sendViaEmail} 
+                                onChange={(e) => setSendViaEmail(e.target.checked)} 
+                                className="rounded text-orange-600 focus:ring-orange-500 h-3.5 w-3.5 accent-orange-600"
+                            />
+                            <span>📧 Send copy to Gmail ({thread.userEmail})</span>
+                        </label>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-[10px] text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/50 flex items-center gap-1 font-semibold"
+                            onClick={() => setEmailPreviewOpen(true)}
+                        >
+                            <Eye className="h-3 w-3" /> Preview Email Template
+                        </Button>
+                    </div>
+                )}
+
                 {/* Image attachment preview zone */}
                 {attachedImage && (
                     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-lg border max-w-xs animate-fade-in relative">
@@ -725,6 +876,103 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                     </div>
                 </div>
             )}
+
+            {/* Live Visual Email Template Preview Modal (Minimal Plud Style with Orange/Blue Top Border & Login/Signup Footer) */}
+            <Dialog open={emailPreviewOpen} onOpenChange={setEmailPreviewOpen}>
+                <DialogContent className="max-w-2xl p-0 overflow-hidden bg-slate-100 rounded-2xl border-none shadow-2xl">
+                    <DialogHeader className="p-4 bg-slate-900 text-white flex flex-row items-center justify-between">
+                        <div>
+                            <DialogTitle className="text-base font-bold flex items-center gap-2 text-white">
+                                <Sparkles className="h-4 w-4 text-orange-500" /> Email Template Live Visualization
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-slate-400">
+                                Exact HTML representation delivered to recipient's inbox via Resend.
+                            </DialogDescription>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="p-6 overflow-y-auto max-h-[75vh] flex justify-center bg-stone-100">
+                        <div className="w-full max-w-[580px] bg-white rounded-3xl overflow-hidden shadow-xl border border-stone-200 text-stone-800 font-sans">
+                            
+                            {/* Top Border Line: 75% Zeneva Orange (#ea580c), 25% Hero Dark Navy Blue (#1e293b) */}
+                            <div className="flex h-1.5 w-full">
+                                <div className="w-[75%] bg-[#ea580c] h-full"></div>
+                                <div className="w-[25%] bg-[#1e293b] h-full"></div>
+                            </div>
+
+                            {/* Main Body Content (Plud Minimalist Style) */}
+                            <div className="p-8 space-y-5 bg-white">
+                                <div>
+                                    <span className="text-2xl font-black tracking-tight text-stone-900">
+                                        z<span className="text-[#ea580c]">e</span>neva
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <div className="text-[11px] font-bold text-[#ea580c] uppercase tracking-widest">
+                                        A Note From Zeneva Support
+                                    </div>
+                                    <h2 className="text-xl font-extrabold text-stone-900 mt-1">
+                                        Response to your support ticket
+                                    </h2>
+                                </div>
+
+                                <p className="text-sm text-stone-700">
+                                    Hi <strong className="text-stone-900">{thread.userName || 'Valued Customer'}</strong>,
+                                </p>
+                                <p className="text-xs text-stone-500 leading-relaxed">
+                                    Here is the response regarding your inquiry:
+                                </p>
+                                
+                                {/* Render Selected Messages Array or Single Reply */}
+                                {selectedMessageIds.length > 0 ? (
+                                    <div className="bg-stone-50 border border-stone-100 p-5 rounded-2xl text-xs text-stone-800 font-medium whitespace-pre-wrap leading-relaxed">
+                                        {(messages || []).filter(m => selectedMessageIds.includes(m.id)).map(m => m.text).filter(Boolean).join('\n\n')}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {reply.trim() && (
+                                            <div className="bg-stone-50 border border-stone-100 p-5 rounded-2xl text-xs text-stone-800 font-medium whitespace-pre-wrap leading-relaxed">
+                                                {reply.trim()}
+                                            </div>
+                                        )}
+
+                                        {attachedImage && (
+                                            <div className="mt-3 border border-stone-200 rounded-2xl overflow-hidden bg-stone-50 p-2 text-center">
+                                                <img src={attachedImage} alt="Attachment Preview" className="max-h-64 w-full object-contain rounded-xl inline-block" />
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                <div className="pt-2">
+                                    <span className="inline-block bg-[#ea580c] text-white text-xs font-bold px-7 py-3 rounded-full shadow-sm cursor-pointer">
+                                        View Support Ticket &rarr;
+                                    </span>
+                                </div>
+
+                                <div className="pt-2 text-xs text-stone-500">
+                                    No pressure. We will be here whenever you need assistance.<br />
+                                    <strong className="text-[#ea580c] font-bold">Support Team from Zeneva</strong>
+                                </div>
+                            </div>
+
+                            {/* Minimal Footer (Login & Signup Page Style) */}
+                            <div className="p-6 bg-white border-t border-stone-100 text-center space-y-3">
+                                <div className="flex justify-center items-center gap-4">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/5969/5969020.png" className="h-4 w-4 opacity-50 hover:opacity-100 cursor-pointer" alt="X" />
+                                    <img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" className="h-4 w-4 opacity-50 hover:opacity-100 cursor-pointer" alt="Instagram" />
+                                    <img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" className="h-4 w-4 opacity-50 hover:opacity-100 cursor-pointer" alt="LinkedIn" />
+                                </div>
+                                <div className="text-[11px] text-stone-400 font-medium">
+                                    &copy; 2026 Zeneva Inc. &bull; Terms of Service &bull; Privacy Policy
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
             {/* Fullscreen Image Lightbox Modal using React Portal */}
             {activeLightboxUrl && typeof document !== 'undefined' && createPortal(
                 <div 
@@ -813,6 +1061,19 @@ export default function AdminSupportPage() {
     const { data: aiLogs, isLoading: isAiLogsLoading } = useCollection<AISupportLog>(aiLogsQuery);
     const [selectedAiLog, setSelectedAiLog] = React.useState<AISupportLog | null>(null);
 
+    const emailLogsQuery = useMemoFirebase(
+        () => query(collection(firestore, 'follow_up_logs'), orderBy('sentAt', 'desc')),
+        [firestore]
+    );
+    const { data: rawEmailLogs, isLoading: isEmailLogsLoading } = useCollection<any>(emailLogsQuery);
+    
+    // Client-side filter to avoid requiring a composite index in Firestore
+    const emailLogs = React.useMemo(() => {
+        return (rawEmailLogs || []).filter(log => log.type === 'support_reply');
+    }, [rawEmailLogs]);
+
+    const [selectedEmailLog, setSelectedEmailLog] = React.useState<any | null>(null);
+
     const unreadCount = React.useMemo(() => {
         if (!threads) return 0;
         return threads.filter(t => !t.isReadByAdmin).length;
@@ -830,7 +1091,8 @@ export default function AdminSupportPage() {
      */
     const inThreadOnMobile =
         (activeTab === 'inbox' && !!selectedThread) ||
-        (activeTab === 'ai-logs' && !!selectedAiLog);
+        (activeTab === 'ai-logs' && !!selectedAiLog) ||
+        (activeTab === 'email-logs' && !!selectedEmailLog);
 
     return (
         // 11rem on a phone rather than 10: the admin shell spends 56px on its
@@ -860,6 +1122,11 @@ export default function AdminSupportPage() {
                             <Bot className="h-4 w-4 shrink-0" />
                             <span className="hidden sm:inline">AI Chat Logs</span>
                             <span className="sm:hidden">AI Logs</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="email-logs" className="flex gap-1.5 md:gap-2 items-center text-xs md:text-sm">
+                            <Mail className="h-4 w-4 shrink-0" />
+                            <span className="hidden sm:inline">Sent Emails</span>
+                            <span className="sm:hidden">Emails</span>
                         </TabsTrigger>
                     </TabsList>
 
@@ -1040,6 +1307,99 @@ export default function AdminSupportPage() {
                                 <div className="h-full flex flex-col items-center justify-center bg-card border rounded-lg text-muted-foreground">
                                     <Bot className="h-16 w-16 opacity-50"/>
                                     <p className="mt-4 text-lg font-medium">Select an AI log to review</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="email-logs" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
+                     <div className="h-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-0 md:gap-6">
+                        <div className={cn(
+                            "col-span-1 h-full min-h-0 flex-col",
+                            selectedEmailLog ? 'hidden md:flex' : 'flex',
+                        )}>
+                            <ScrollArea className="flex-1 border rounded-lg bg-card">
+                                {isEmailLogsLoading && <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
+                                {emailLogs && emailLogs.length > 0 ? (
+                                    emailLogs.map(log => (
+                                        <button
+                                            key={log.id}
+                                            onClick={() => setSelectedEmailLog(log)}
+                                            className={cn(
+                                                "w-full text-left p-3 border-b last:border-b-0 hover:bg-muted transition-colors flex flex-col gap-1",
+                                                selectedEmailLog?.id === log.id && 'bg-muted'
+                                            )}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="font-semibold text-sm truncate">{log.sentTo}</p>
+                                                <Badge variant={log.status === 'sent' ? 'default' : 'secondary'} className={cn("text-[9px] px-1.5 h-4 shrink-0 shadow-none", log.status === 'sent' && 'bg-green-600 hover:bg-green-700')}>
+                                                    {log.status}
+                                                </Badge>
+                                            </div>
+                                            <p className="min-w-0 w-full text-xs text-muted-foreground truncate">{log.subject}</p>
+                                            <div className="flex justify-between items-center gap-2 mt-1">
+                                                <p className="min-w-0 flex-1 text-[10px] text-muted-foreground truncate">
+                                                    {log.openCount > 0 ? `${log.openCount} opens` : 'Unopened'}
+                                                </p>
+                                                <p className="shrink-0 text-[10px] text-muted-foreground">
+                                                    {log.sentAt && typeof log.sentAt.toDate === 'function'
+                                                        ? formatDistanceToNowStrict(log.sentAt.toDate(), {addSuffix: true})
+                                                        : ''}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    ))
+                                ) : (
+                                    !isEmailLogsLoading && <div className="p-4 text-center text-muted-foreground">No email logs found.</div>
+                                )}
+                            </ScrollArea>
+                        </div>
+                        <div className={cn(
+                            "h-full min-h-0 md:col-span-2 lg:col-span-3",
+                            selectedEmailLog ? 'block' : 'hidden md:block',
+                        )}>
+                            {selectedEmailLog ? (
+                                <div className="h-full bg-card border rounded-lg flex flex-col">
+                                    <div className="flex items-start gap-2 p-3 md:p-4 border-b">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setSelectedEmailLog(null)}
+                                            className="h-9 w-9 shrink-0 -ml-1 md:hidden"
+                                            aria-label="Back to Email logs"
+                                        >
+                                            <ArrowLeft className="h-5 w-5" />
+                                        </Button>
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="font-semibold text-base md:text-lg">{selectedEmailLog.subject}</h3>
+                                            <div className="mt-1 space-y-0.5 text-xs md:text-sm text-muted-foreground">
+                                                <p className="break-words"><strong>To:</strong> {selectedEmailLog.sentTo} ({selectedEmailLog.recipientName || 'No Name'})</p>
+                                                <div className="break-all flex items-center gap-2">
+                                                    <strong>Status:</strong> 
+                                                    <Badge variant={selectedEmailLog.status === 'sent' ? 'default' : 'secondary'} className={cn("text-[10px] h-4 shadow-none", selectedEmailLog.status === 'sent' && 'bg-green-600 hover:bg-green-700')}>
+                                                        {selectedEmailLog.status}
+                                                    </Badge>
+                                                    {selectedEmailLog.openCount > 0 && <span>• Opened {selectedEmailLog.openCount} time(s)</span>}
+                                                </div>
+                                                <p className="break-all text-xs"><strong>Sent At:</strong> {selectedEmailLog.sentAt?.toDate?.()?.toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 bg-stone-100 p-2 md:p-6 overflow-hidden relative">
+                                        {/* Injecting the rendered email HTML into an iframe for accurate rendering isolation */}
+                                        <iframe 
+                                            srcDoc={selectedEmailLog.html || `<p>No content preview available</p>`}
+                                            className="w-full h-full border border-stone-200 rounded-xl shadow-sm bg-white"
+                                            sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                                            title="Email Preview"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center bg-card border rounded-lg text-muted-foreground">
+                                    <Mail className="h-16 w-16 opacity-50"/>
+                                    <p className="mt-4 text-lg font-medium">Select an email log to view</p>
                                 </div>
                             )}
                         </div>

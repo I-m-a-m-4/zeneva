@@ -214,18 +214,73 @@ export type EmailDraft = {
  * Renderer
  * ------------------------------------------------------------------ */
 
+/**
+ * Palette — neutral-dominant by design.
+ *
+ * The first version of this template was mostly orange: a full-width gradient
+ * bar, a cream footer, orange headings. At that saturation the brand stops
+ * reading as confident and starts reading as a promotion, and a promotion is the
+ * thing an inbox filters.
+ *
+ * So roughly 80% of the surface is now warm neutral (the stone family, which sits
+ * better against Zeneva's orange than a blue-grey would) and orange is reserved
+ * for four things: the CTA button, the wordmark, the rule under the header, and
+ * the accent edge of the callout. Everything else is ink on off-white.
+ */
 const BRAND = {
-  orange: '#f97316',
-  orangeDeep: '#ea580c',
-  orangeInk: '#c2410c',
-  ink: '#18181b',
-  body: '#3f3f46',
-  muted: '#71717a',
-  page: '#f4f2ef',
-  cream: '#fff7ed',
-  creamLine: '#fed7aa',
-  line: '#ececec',
+  orange: '#ea580c',
+  orangeDeep: '#c2410c',
+  orangeSoft: '#fff7ed',
+  ink: '#1c1917',
+  body: '#44403c',
+  muted: '#78716c',
+  faint: '#a8a29e',
+  page: '#f5f5f4',
+  card: '#ffffff',
+  panel: '#fafaf9',
+  line: '#e7e5e4',
 };
+
+/**
+ * Type stacks.
+ *
+ * Bricolage Grotesque is the face the Zeneva logo is set in and DM Sans is the
+ * app's body font, so the mail matches the product rather than approximating it.
+ *
+ * **These will not render everywhere, and that is not a bug to chase.** Gmail —
+ * web and mobile — strips `<link>` and `@import` webfonts outright, so Gmail
+ * readers get the system fallback. Apple Mail, iOS Mail and Outlook.com do load
+ * them. That is why the fallback chain matters as much as the webfont: the mail
+ * has to look deliberate in the fallback, which is the case most recipients see.
+ */
+const FONT_DISPLAY =
+  "'Bricolage Grotesque','DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+const FONT_BODY =
+  "'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+
+const GOOGLE_FONTS_HREF =
+  'https://fonts.googleapis.com/css2'
+  + '?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800'
+  + '&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700'
+  + '&display=swap';
+
+/** Where the generated raster assets live. See scripts/generate-email-assets.mjs. */
+const ASSETS = `${BASE_URL}/email`;
+
+/**
+ * Footer social row.
+ *
+ * Handles copied from the live marketing footer (`marketing-footer.tsx`) so the
+ * two cannot drift. Rendered as **PNG images**, not inline SVG: Gmail strips SVG
+ * entirely, so an `<svg>` icon set would simply be missing for most of the list.
+ */
+export const SOCIAL_LINKS = [
+  { key: 'instagram', label: 'Instagram', href: 'https://www.instagram.com/zeneva_pos/' },
+  { key: 'x', label: 'X', href: 'https://x.com/zeneva_retail' },
+  { key: 'tiktok', label: 'TikTok', href: 'https://www.tiktok.com/@zeneva_retail' },
+  { key: 'youtube', label: 'YouTube', href: 'https://www.youtube.com/@ZenevaPos' },
+  { key: 'whatsapp', label: 'WhatsApp', href: 'https://wa.me/2349064233805' },
+];
 
 /**
  * Render a draft to a complete, standalone HTML document.
@@ -248,12 +303,21 @@ export function renderCampaignEmail(
   const preheader = escapeHtml(fill(draft.preheader));
   const ctaLabel = escapeHtml(fill(draft.ctaLabel));
   const ctaHref = safeUrl(fill(draft.ctaPath));
-  const bodyHtml = renderProse(fill(draft.body), BRAND.orangeInk);
+  const bodyHtml = renderProse(fill(draft.body), BRAND.orangeDeep);
   const calloutText = fill(draft.callout).trim();
-  const calloutHtml = calloutText ? renderProse(calloutText, BRAND.orangeInk) : '';
+  const calloutHtml = calloutText ? renderProse(calloutText, BRAND.orangeDeep) : '';
   const signName = escapeHtml(fill(draft.signOffName));
   const signTitle = escapeHtml(fill(draft.signOffTitle));
   const year = new Date().getFullYear();
+
+  const socialRow = SOCIAL_LINKS.map(
+    s => `<td style="padding:0 5px;">
+                <a href="${s.href}" style="text-decoration:none;">
+                  <img src="${ASSETS}/social-${s.key}.png" width="30" height="30" alt="${s.label}"
+                       style="display:block;border:0;outline:none;text-decoration:none;border-radius:15px;" />
+                </a>
+              </td>`,
+  ).join('');
 
   return `<!doctype html>
 <html lang="en" style="margin:0;padding:0;">
@@ -264,8 +328,33 @@ export function renderCampaignEmail(
 <meta name="color-scheme" content="light" />
 <meta name="supported-color-schemes" content="light" />
 <title>${heading}</title>
+<!--
+  Webfonts, three ways, because no single mechanism covers the field:
+  the <link> is honoured by Apple Mail and iOS Mail, the @import by Outlook.com,
+  and Gmail honours neither and falls back — which is why every element below
+  also carries a full inline stack rather than relying on inheritance.
+  The mso conditional keeps Word's engine on a real sans instead of Times.
+-->
+<!--[if !mso]><!-->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="${GOOGLE_FONTS_HREF}" rel="stylesheet" />
+<!--<![endif]-->
+<style type="text/css">
+  @import url('${GOOGLE_FONTS_HREF}');
+  body, table, td, p, h1, a { -webkit-font-smoothing:antialiased; }
+  a { text-decoration:none; }
+  @media only screen and (max-width:620px) {
+    .z-pad { padding-left:22px !important; padding-right:22px !important; }
+    .z-h1 { font-size:23px !important; }
+  }
+</style>
+<!--[if mso]>
+<style type="text/css">
+  body, table, td, p, h1, a { font-family:'Segoe UI',Arial,sans-serif !important; }
+</style>
+<![endif]-->
 </head>
-<body style="margin:0;padding:0;background-color:${BRAND.page};-webkit-font-smoothing:antialiased;">
+<body style="margin:0;padding:0;background-color:${BRAND.page};font-family:${FONT_BODY};">
 
 <!-- Preheader: the line the inbox shows next to the subject. Hidden in the body,
      and padded with zero-width spaces so the client does not pull body copy in
@@ -276,35 +365,44 @@ export function renderCampaignEmail(
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.page}" style="background-color:${BRAND.page};margin:0;padding:0;">
 <tr>
-<td align="center" style="padding:32px 12px;">
+<td align="center" style="padding:36px 12px;">
 
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background-color:#ffffff;border:1px solid ${BRAND.line};border-radius:16px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background-color:${BRAND.card};border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden;font-family:${FONT_BODY};">
 
-    <!-- Header: live text, so it survives image blocking on a cold send -->
+    <!-- Header. Wordmark is live text so it survives image blocking, which is the
+         default state for a domain that has not sent bulk mail before. The single
+         orange rule underneath is the only brand colour above the fold. -->
     <tr>
-      <td style="padding:26px 32px 22px;border-bottom:1px solid ${BRAND.line};">
+      <td class="z-pad" style="padding:24px 32px 18px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td align="left" style="font-size:22px;font-weight:800;letter-spacing:-0.6px;color:${BRAND.orangeDeep};">
+            <td align="left" style="font-family:${FONT_DISPLAY};font-size:21px;font-weight:800;letter-spacing:-0.5px;color:${BRAND.orange};line-height:1;">
               zeneva
             </td>
-            <td align="right" style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${BRAND.muted};">
+            <td align="right" style="font-family:${FONT_BODY};font-size:10px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:${BRAND.faint};">
               POS &amp; Inventory
             </td>
           </tr>
         </table>
       </td>
     </tr>
+    <tr>
+      <td style="padding:0 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td height="2" bgcolor="${BRAND.orange}" style="background-color:${BRAND.orange};height:2px;line-height:2px;font-size:0;">&nbsp;</td></tr>
+        </table>
+      </td>
+    </tr>
 
     <!-- Hero -->
     <tr>
-      <td style="padding:36px 32px 0;">
+      <td class="z-pad" style="padding:32px 32px 0;">
         ${
           eyebrow
-            ? `<p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${BRAND.orangeInk};">${eyebrow}</p>`
+            ? `<p style="margin:0 0 12px;font-family:${FONT_BODY};font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${BRAND.muted};">${eyebrow}</p>`
             : ''
         }
-        <h1 style="margin:0 0 22px;font-size:26px;line-height:1.28;font-weight:800;letter-spacing:-0.5px;color:${BRAND.ink};">
+        <h1 class="z-h1" style="margin:0 0 20px;font-family:${FONT_DISPLAY};font-size:27px;line-height:1.24;font-weight:800;letter-spacing:-0.6px;color:${BRAND.ink};">
           ${heading}
         </h1>
       </td>
@@ -312,19 +410,21 @@ export function renderCampaignEmail(
 
     <!-- Body -->
     <tr>
-      <td style="padding:0 32px;">
+      <td class="z-pad" style="padding:0 32px;font-family:${FONT_BODY};">
         ${bodyHtml}
       </td>
     </tr>
 
     ${
       calloutHtml
-        ? `<!-- The proof-you-looked panel: this recipient's own numbers -->
+        ? `<!-- The proof-you-looked panel: this recipient's own numbers. Near-neutral
+         fill with a single orange edge, so it reads as a quiet aside rather than
+         a highlighted advert. -->
     <tr>
-      <td style="padding:6px 32px 4px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.cream}" style="background-color:${BRAND.cream};border-left:3px solid ${BRAND.orange};border-radius:0 10px 10px 0;">
+      <td class="z-pad" style="padding:4px 32px 2px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border:1px solid ${BRAND.line};border-left:3px solid ${BRAND.orange};border-radius:0 8px 8px 0;">
           <tr>
-            <td style="padding:18px 20px 2px;">
+            <td style="padding:16px 18px 0;font-family:${FONT_BODY};">
               ${calloutHtml}
             </td>
           </tr>
@@ -334,13 +434,14 @@ export function renderCampaignEmail(
         : ''
     }
 
-    <!-- Bulletproof CTA -->
+    <!-- Bulletproof CTA: a table cell with a background colour, because Outlook
+         ignores padding on an inline element and would render a bare link. -->
     <tr>
-      <td style="padding:26px 32px 8px;">
+      <td class="z-pad" style="padding:28px 32px 4px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td align="center" bgcolor="${BRAND.orangeDeep}" style="background-color:${BRAND.orangeDeep};border-radius:10px;">
-              <a href="${ctaHref}" style="display:inline-block;padding:14px 30px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">
+            <td align="center" bgcolor="${BRAND.orange}" style="background-color:${BRAND.orange};border-radius:8px;">
+              <a href="${ctaHref}" style="display:inline-block;padding:13px 28px;font-family:${FONT_DISPLAY};font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
                 ${ctaLabel}
               </a>
             </td>
@@ -351,43 +452,33 @@ export function renderCampaignEmail(
 
     <!-- Sign-off -->
     <tr>
-      <td style="padding:28px 32px 34px;">
-        <p style="margin:0 0 4px;font-size:15px;color:${BRAND.body};">Thanks for reading,</p>
-        <p style="margin:0;font-size:16px;font-weight:700;color:${BRAND.ink};">${signName}</p>
-        <p style="margin:2px 0 0;font-size:13px;color:${BRAND.muted};">${signTitle}</p>
-        <p style="margin:14px 0 0;font-size:13px;color:${BRAND.muted};">
+      <td class="z-pad" style="padding:26px 32px 30px;">
+        <p style="margin:0 0 4px;font-family:${FONT_BODY};font-size:15px;color:${BRAND.body};">Thanks for reading,</p>
+        <p style="margin:0;font-family:${FONT_DISPLAY};font-size:16px;font-weight:700;color:${BRAND.ink};">${signName}</p>
+        <p style="margin:2px 0 0;font-family:${FONT_BODY};font-size:13px;color:${BRAND.muted};">${signTitle}</p>
+        <p style="margin:16px 0 0;font-family:${FONT_BODY};font-size:13px;line-height:1.6;color:${BRAND.muted};">
           Reply straight to this email &mdash; it comes to me, not a ticket queue.
         </p>
       </td>
     </tr>
 
-    <!-- Brand bar. A background colour rather than an image, so it renders with
-         images off. Kept from the transactional template, which is proven in Gmail. -->
+    <!-- Footer. Neutral, not cream: the old orange footer plus the gradient bar
+         above it were most of why this template read as a promotion. -->
     <tr>
-      <td style="padding:0 32px 32px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.orangeDeep}" style="background:linear-gradient(135deg,${BRAND.orange} 0%,${BRAND.orangeDeep} 100%);background-color:${BRAND.orangeDeep};border-radius:10px;">
-          <tr>
-            <td align="center" style="padding:16px 12px;font-size:13px;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#ffffff;">
-              Zeneva POS &amp; Inventory
-            </td>
-          </tr>
+      <td bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border-top:1px solid ${BRAND.line};padding:24px 32px 26px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 16px;">
+          <tr>${socialRow}</tr>
         </table>
-      </td>
-    </tr>
-
-    <!-- Footer -->
-    <tr>
-      <td bgcolor="${BRAND.cream}" style="background-color:${BRAND.cream};border-top:1px solid ${BRAND.creamLine};padding:26px 32px 30px;text-align:center;">
-        <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:#7c2d12;">
+        <p style="margin:0 0 8px;font-family:${FONT_BODY};font-size:12px;line-height:1.6;color:${BRAND.muted};">
           You are receiving this because you created a Zeneva account.
         </p>
-        <p style="margin:0 0 14px;font-size:12px;line-height:1.6;color:#7c2d12;">
+        <p style="margin:0 0 12px;font-family:${FONT_BODY};font-size:12px;line-height:1.6;color:${BRAND.muted};">
           <a href="${BASE_URL}" style="color:${BRAND.orangeDeep};font-weight:600;text-decoration:none;">zeneva.space</a>
           &nbsp;&middot;&nbsp;
-          <a href="${unsubscribeUrl}" style="color:#7c2d12;text-decoration:underline;">Unsubscribe from these emails</a>
+          <a href="${unsubscribeUrl}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe</a>
         </p>
-        <p style="margin:0;font-size:11px;color:#9a3412;">
-          &copy; ${year} Zeneva POS &amp; Inventory. All rights reserved.
+        <p style="margin:0;font-family:${FONT_BODY};font-size:11px;color:${BRAND.faint};">
+          &copy; ${year} Zeneva POS &amp; Inventory
         </p>
       </td>
     </tr>
@@ -455,6 +546,26 @@ If something is in the way — a product that will not scan, a printer that will
     signOffTitle: 'Founder, Zeneva',
   },
 
+  invested_then_left: {
+    subject: 'You had {{businessName}} set up — then stopped. What happened?',
+    preheader: 'You did the hard part already. A one-line reply tells me what broke.',
+    eyebrow: 'You did the hard part',
+    heading: '{{firstName}}, you got through setup — then stopped',
+    body: `You did the part almost nobody finishes. You got **{{businessName}}** into Zeneva, put your stock in, and spent real time in it. And then, about {{daysSince}} days ago, you stopped.
+
+That combination tells me something quite specific: this was not a case of never getting started. You wanted it to work, you invested to make it work, and then something got in the way.
+
+I would genuinely like to know what. In my experience it is one of four things — a product or price that would not import cleanly, a printer or scanner that would not connect, a number in a report that looked wrong, or it was simply faster to go back to the old way for one busy week and you never came back.
+
+Tell me which one and I will fix it or walk you through it myself. Everything is exactly as you left it, so there is nothing to redo.`,
+    callout:
+      'Why I am writing to you and not to a list: {{usage}} in the app across {{pageViews}} page views, mostly {{topFeatureWhere}}, and nothing since. That is someone who was using this properly.',
+    ctaLabel: 'Pick up where you left off',
+    ctaPath: '/dashboard',
+    signOffName: 'Imam Shaffy',
+    signOffTitle: 'Founder, Zeneva',
+  },
+
   champion: {
     subject: 'You are one of our heaviest users. Can I ask you something?',
     preheader: 'No pitch. I want to know what we should build next.',
@@ -476,7 +587,7 @@ Reply with a sentence. I read every one of these myself, and the last three feat
   },
 
   feature_focused: {
-    subject: 'Since you live in {{topFeature}} — one thing you are missing',
+    subject: 'Since you spend your time {{topFeatureWhere}} — one thing you are missing',
     preheader: 'You are paying for this either way. Might as well use it.',
     eyebrow: 'Worth two minutes',
     heading: '{{firstName}}, you are missing the half you are not using',

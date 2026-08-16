@@ -41,16 +41,23 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
         receipts.forEach(receipt => {
             const productsInReceipt = new Set(receipt.items.map(i => i.productId));
             productsInReceipt.forEach(pid => {
-                // Pre-initialize with receipt item data if available
                 if (!productDataMap[pid]) {
                     const item = receipt.items.find(i => i.productId === pid);
-                    productDataMap[pid] = { revenue: 0, quantity: 0, orderCount: 0, name: item?.name || 'Unknown Product' };
+                    const prod = products?.find(p => p.id === pid || p.name === item?.name);
+                    const parentProd = prod?.parentId ? products?.find(p => p.id === prod.parentId) : null;
+                    const displayName = parentProd ? `${parentProd.name} (${prod?.variantValue || item?.name})` : (item?.name || 'Unknown Product');
+
+                    productDataMap[pid] = { revenue: 0, quantity: 0, orderCount: 0, name: displayName };
                 }
                 productDataMap[pid].orderCount++;
             });
             receipt.items.forEach(item => {
                 if (!productDataMap[item.productId]) {
-                    productDataMap[item.productId] = { revenue: 0, quantity: 0, orderCount: 0, name: item.name };
+                    const prod = products?.find(p => p.id === item.productId || p.name === item.name);
+                    const parentProd = prod?.parentId ? products?.find(p => p.id === prod.parentId) : null;
+                    const displayName = parentProd ? `${parentProd.name} (${prod?.variantValue || item.name})` : item.name;
+
+                    productDataMap[item.productId] = { revenue: 0, quantity: 0, orderCount: 0, name: displayName };
                 }
                 productDataMap[item.productId].revenue += item.price * item.quantity;
                 productDataMap[item.productId].quantity += item.quantity;

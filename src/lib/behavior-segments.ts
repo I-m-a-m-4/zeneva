@@ -90,7 +90,9 @@ export const FAMILY_META: Record<
   }
 > = {
   selling: {
-    label: 'Selling',
+    // Reads correctly in every place it is interpolated: "Mostly Point of sale",
+    // "Has never opened Point of sale", "Open Point of sale".
+    label: 'Point of sale',
     inSentence: 'on the point of sale',
     pitch: 'ring up a sale in a couple of taps, online or offline',
     href: '/sales/pos',
@@ -140,13 +142,23 @@ export const FAMILY_META: Record<
 };
 
 /**
- * The families worth cross-selling into.
+ * The families worth cross-selling into, best pitch first.
  *
- * `selling`, `inventory` and `receipts` are the core loop everyone finds on their
- * own, and `support` is not a feature to upsell. These four are the ones users
- * routinely never discover, and are also the ones that deepen an account.
+ * `selling` leads because it is the single most valuable thing an account can
+ * start doing, and — contrary to the original assumption here that everyone finds
+ * the POS unaided — plenty of deep users never open it. For them the right email
+ * is "you clearly know your way around inventory, now try ringing up a sale",
+ * which is precisely what `feature_focused` sends. `receipts` and `support` stay
+ * out: one follows automatically from selling, and the other is not a feature to
+ * upsell.
  */
-export const HIGH_VALUE_FAMILIES: FeatureFamily[] = ['ai', 'reports', 'customers', 'store'];
+export const HIGH_VALUE_FAMILIES: FeatureFamily[] = [
+  'selling',
+  'ai',
+  'reports',
+  'customers',
+  'store',
+];
 
 /** Family a stored route key belongs to, or null when the route is ambient. */
 export function familyOfRouteKey(key: string): FeatureFamily | null {
@@ -172,6 +184,7 @@ export function pathOfRouteKey(key: string): string {
 export type BehaviorSegment =
   | 'never_activated'
   | 'onboarding_stalled'
+  | 'invested_then_left'
   | 'champion'
   | 'feature_focused'
   | 'casual_active'
@@ -191,8 +204,15 @@ export const BEHAVIOR_SEGMENT_META: Record<
   },
   onboarding_stalled: {
     label: 'Stalled setup',
-    blurb: 'Clicking around for days but has never opened the point of sale.',
+    blurb:
+      'Settled in for days, still shallow, and has never opened the point of sale. Deep users who skip the POS are cross-sold instead, not put here.',
     tone: 'warn',
+  },
+  invested_then_left: {
+    label: 'Invested, then left',
+    blurb:
+      'Put in real time and real setup work — products, stock, quality minutes — and then stopped coming back. The best win-back on the platform: they already proved they wanted it.',
+    tone: 'danger',
   },
   champion: {
     label: 'Champions',
@@ -223,6 +243,7 @@ export const BEHAVIOR_SEGMENT_META: Record<
 
 /** Order the filter rail and the queue render in — most actionable first. */
 export const BEHAVIOR_SEGMENT_ORDER: BehaviorSegment[] = [
+  'invested_then_left',
   'onboarding_stalled',
   'slipping',
   'feature_focused',
@@ -250,6 +271,32 @@ export const CHAMPION_FAMILIES = 3;
 export const FOCUS_SHARE = 0.55;
 /** Grace period before an unfinished setup is worth chasing. */
 export const SETUP_GRACE_DAYS = 3;
+/**
+ * Upper bound on time-in-app for "stalled setup".
+ *
+ * Someone past this has plainly found their way around, so whatever they are
+ * doing is not a stalled setup — even if they have never touched the POS. Without
+ * this bound, heavy inventory-and-reports users were swept into the segment and
+ * would have been told they had not got started.
+ */
+export const STALLED_MAX_SECONDS = 2 * 3600;
+
+/**
+ * "Quality time" — enough use that the account was genuinely being evaluated,
+ * not just opened once.
+ */
+export const QUALITY_SECONDS = 20 * 60;
+/**
+ * The win-back window for `invested_then_left`.
+ *
+ * Opens at 4 days rather than 8 on purpose. Someone who put in real setup work and
+ * then went quiet for the best part of a week is already drifting, and the email
+ * that asks why lands far better then than three weeks later when they have found
+ * another way of working. Anyone seen inside 3 days is left alone — they have not
+ * left, they are just not in the app today.
+ */
+export const LEFT_MIN_DAYS = 4;
+export const LEFT_MAX_DAYS = 45;
 
 /* ------------------------------------------------------------------ *
  * Inputs — loose shapes, matching what the admin page already holds
@@ -267,6 +314,13 @@ export type BehaviorUserLike = {
   totalUsageSeconds?: number | null;
   pagesVisited?: number | null;
   pageViews?: Record<string, number> | null;
+  /**
+   * Product-telemetry counters (see src/lib/product-telemetry.ts). Optional
+   * everywhere: they only exist for users on a build that ships the collector, so
+   * every read of them here treats absence as "not known", never as zero-with-
+   * confidence.
+   */
+  featureUsage?: Record<string, number> | null;
   lastPage?: string | null;
   deviceType?: string | null;
   country?: string | null;
@@ -418,9 +472,21 @@ function buildTopPages(pageViews: Record<string, number>, take = 3): PageUsage[]
 /**
  * Classify one user.
  *
- * Branch order is the point: the first match wins, and the branches run
- * most-actionable first. Somebody who is both dormant and never activated is
- * chased as never-activated, because that is the email that has a chance.
+ * Branch order is load-bearing: the first match wins, so the sequence encodes
+ * which description of a person is the truest one.
+ *
+ * `champion` and `feature_focused` are tested **before** `onboarding_stalled`,
+ * and stalled additionally requires shallow use. Both guards exist because the
+ * first version got this wrong: it treated "has never opened the point of sale"
+ * as sufficient, so a genuine power user — twenty hours across inventory,
+ * reports and customers, simply not using Zeneva to ring up sales — was labelled
+ * a stalled setup and would have been emailed "you are one step from your first
+ * sale". Never opening the POS is not evidence of being stuck; it is evidence of
+ * using the product differently, and for that person the right email is the
+ * cross-sell that `feature_focused` sends.
+ *
+ * So stalled now means what it says: settled in, still around, shallow, and not
+ * selling. Depth is what separates the two, not the absence of one feature.
  */
 export function profileUser(
   user: BehaviorUserLike,
@@ -451,6 +517,25 @@ export function profileUser(
   const unusedHighValue = HIGH_VALUE_FAMILIES.filter(f => !touched.has(f));
 
   const sellingViews = mix.find(m => m.family === 'selling')?.views ?? 0;
+  const inventoryViews = mix.find(m => m.family === 'inventory')?.views ?? 0;
+
+  /**
+   * Did this account actually put work in?
+   *
+   * Setup effort is the thing that separates a win-back worth sending from a cold
+   * signup: someone who loaded stock and spent real minutes has already decided
+   * they want this, so the only question is what stopped them. Any one of three
+   * signals counts — time in the inventory screens, a bulk import, or a completed
+   * sale. Deliberately not `business.productCount`, which is not a stored field
+   * (the dashboard derives it from a full collection scan) and would read as 0 for
+   * everyone here.
+   */
+  const feature = (key: string) => {
+    const v = user.featureUsage?.[key];
+    return typeof v === 'number' && v > 0 ? v : 0;
+  };
+  const invested =
+    inventoryViews > 0 || feature('inventory_csv_import') > 0 || feature('pos_sale_completed') > 0;
 
   // Unknown recency is not the same as inactive: an account with no telemetry is
   // unmeasured, and treating it as dormant would mail every fresh signup a
@@ -473,15 +558,31 @@ export function profileUser(
         : `Only ${humanUsage(usageSeconds)} in the app`,
     );
     if (daysSinceSignup !== null) reasons.push(`Signed up ${daysSinceSignup} days ago`);
-  } else if (seenThisMonth && settledIn && sellingViews === 0) {
-    // `seenThisMonth` matters: without it, somebody who signed up two years ago,
-    // never sold, and has not appeared since would be told they are "one step from
-    // their first sale". Stalled means still around and stuck, not gone.
-    segment = 'onboarding_stalled';
-    priority = 90;
-    reasons.push('Has never opened the point of sale');
-    reasons.push(`${totalViews.toLocaleString()} page views, ${humanUsage(usageSeconds)}`);
-    if (topFeature) reasons.push(`Spends their time ${FAMILY_META[topFeature].inSentence}`);
+  } else if (
+    daysSinceSeen !== null
+    && daysSinceSeen >= LEFT_MIN_DAYS
+    && daysSinceSeen <= LEFT_MAX_DAYS
+    && usageSeconds >= QUALITY_SECONDS
+    && invested
+  ) {
+    /*
+     * Tested above champion and feature_focused on purpose.
+     *
+     * Those two both require having been seen inside 7 days, so a heavy user who
+     * has not appeared for five days would otherwise still be called a champion —
+     * and champion is the one description whose correct action is to send nothing.
+     * Somebody who put this much work in and then stopped is the most valuable
+     * message on the platform; calling them healthy loses it silently.
+     */
+    segment = 'invested_then_left';
+    priority = 96;
+    reasons.push(`Put in ${humanUsage(usageSeconds)}, then stopped`);
+    reasons.push(`Last seen ${daysSinceSeen} days ago`);
+    if (inventoryViews > 0) reasons.push('Had loaded stock into inventory');
+    if (feature('pos_sale_completed') > 0) {
+      reasons.push(`${feature('pos_sale_completed')} sales before going quiet`);
+    }
+    if (topFeature) reasons.push(`Was mostly ${FAMILY_META[topFeature].inSentence}`);
   } else if (seenRecently && usageSeconds >= CHAMPION_SECONDS && familiesTouched >= CHAMPION_FAMILIES) {
     segment = 'champion';
     priority = 40; // low: the correct action is to ask, not to sell
@@ -496,6 +597,12 @@ export function profileUser(
     if (unusedHighValue.length) {
       reasons.push(`Has never opened ${FAMILY_META[unusedHighValue[0]].label}`);
     }
+  } else if (seenThisMonth && settledIn && sellingViews === 0 && usageSeconds < STALLED_MAX_SECONDS) {
+    segment = 'onboarding_stalled';
+    priority = 90;
+    reasons.push('Has never opened the point of sale');
+    reasons.push(`${totalViews.toLocaleString()} page views, ${humanUsage(usageSeconds)}`);
+    if (topFeature) reasons.push(`Spends their time ${FAMILY_META[topFeature].inSentence}`);
   } else if (seenRecently) {
     segment = 'casual_active';
     priority = 55;
@@ -599,6 +706,7 @@ export function behaviorSegmentCounts(
   const counts = {
     never_activated: 0,
     onboarding_stalled: 0,
+    invested_then_left: 0,
     champion: 0,
     feature_focused: 0,
     casual_active: 0,

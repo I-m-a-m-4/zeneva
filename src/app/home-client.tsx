@@ -196,6 +196,13 @@ const features = [
         description: "Enhance security with a detailed, chronological record of all critical events, complete with automated issue scanning.",
         bgColor: "bg-red-100",
         iconColor: "text-red-600"
+    },
+    {
+        icon: Layers,
+        title: "Product Variants Support",
+        description: "Easily manage products with multiple options like sizes, colors, or materials. Zeneva tracks stock and pricing perfectly for each variant.",
+        bgColor: "bg-orange-100",
+        iconColor: "text-orange-600"
     }
 ];
 

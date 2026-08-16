@@ -35,6 +35,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '@/hooks/use-toast';
 import RefreshButton from "@/components/shared/refresh-button";
 import { logAuditEvent } from '@/lib/audit';
+import { safeToDate } from '@/lib/utils';
 import { useI18n } from '@/context/i18n-context';
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -225,10 +226,26 @@ function ReceiptsContent() {
       });
 
       // Log audit event after successful void (Awaiting for reliability)
+      //
+      // A void deletes the receipt, so this log is the *only* surviving record of
+      // the sale. `saleCreatedAt` and `soldBy` are what let the loss-prevention
+      // scan tell a cashier cancelling their own sale minutes later — the classic
+      // cash skim — apart from a manager correcting someone else's mistake the
+      // next day. Nothing can reconstruct either field afterwards.
       await logAuditEvent(firestore, business.id, currentUser, {
         action: 'sale.void',
         entity: { type: 'Receipt', id: receiptToDelete.id, name: `Receipt ${receiptToDelete.id.substring(0, 8)}` },
-        details: { total: receiptToDelete.total, reason: 'Manual void by user' }
+        details: {
+          total: receiptToDelete.total,
+          reason: 'Manual void by user',
+          saleCreatedAt: safeToDate(receiptToDelete.createdAt).toISOString(),
+          soldBy: receiptToDelete.createdBy || undefined,
+          receiptNumber: receiptToDelete.receiptNumber || null,
+          paymentMethod: receiptToDelete.paymentMethod || null,
+          discount: receiptToDelete.discount || 0,
+          itemCount: receiptToDelete.items?.length || 0,
+          customerId: receiptToDelete.customer?.id || null,
+        }
       });
 
       toast({ title: t('receipts.voidedTitle'), description: t('receipts.voidedDescription', { receipt: receiptToDelete.id.substring(0, 8) }), variant: 'success' });
@@ -306,7 +323,17 @@ function ReceiptsContent() {
         await logAuditEvent(firestore, business.id, currentUser, {
           action: 'sale.void',
           entity: { type: 'Receipt', id: receiptId, name: `Receipt ${receiptId.substring(0, 8)}` },
-          details: { total: receiptToVoid.total, reason: 'Bulk manual void' }
+          details: {
+            total: receiptToVoid.total,
+            reason: 'Bulk manual void',
+            saleCreatedAt: safeToDate(receiptToVoid.createdAt).toISOString(),
+            soldBy: receiptToVoid.createdBy || undefined,
+            receiptNumber: receiptToVoid.receiptNumber || null,
+            paymentMethod: receiptToVoid.paymentMethod || null,
+            discount: receiptToVoid.discount || 0,
+            itemCount: receiptToVoid.items?.length || 0,
+            customerId: receiptToVoid.customer?.id || null,
+          }
         });
 
         await voidReceipt(receiptId);

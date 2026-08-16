@@ -20,6 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { logAuditEvent } from '@/lib/audit';
 import { useI18n } from '@/context/i18n-context';
+import { trackFeature } from '@/lib/product-telemetry';
 import { formatNumber, formatDateTime } from '@/lib/i18n/format';
 
 
@@ -170,6 +171,21 @@ function ReviewPageContent() {
                 multiplier: cartItem.multiplier || 1,
                 price: finalPrice,
                 costPrice: costPrice,
+                /*
+                 * Whether the cashier typed this price in, and what the shelf
+                 * said at the time.
+                 *
+                 * A manual price is the most direct way to under-charge without
+                 * a discount showing on the receipt total — the customer can pay
+                 * the full shelf price in cash while the till records less. The
+                 * loss-prevention scan cannot tell that apart from a legitimate
+                 * repricing unless the shelf price is captured *here*, at the
+                 * moment of sale: comparing against the product's current price
+                 * later flags every honest price rise as an override.
+                 * See src/lib/forensics.ts, check D4.
+                 */
+                priceOverridden: !!cartItem.isPriceOverride,
+                listPrice: masterProduct?.price ?? cartItem.originalPrice ?? finalPrice,
             };
         });
 
@@ -180,6 +196,25 @@ function ReviewPageContent() {
 
         const wasScanned = cart.some(c => c.addedViaBarcode);
         const receiptMethod = autoPrint ? 'printed' : (shouldSendEmail ? 'digital' : 'none');
+
+        /*
+         * Product telemetry for the whole POS loop, recorded once here rather than
+         * scattered across the cart, customer picker and print button.
+         *
+         * This is the only point where the sale is known to have actually gone
+         * through, and the page has already derived everything needed — counting a
+         * barcode scan when the item was added would credit abandoned carts too, and
+         * "did shops choose print or email" is only answerable about completed sales.
+         *
+         * `pos_sale_completed` is also the denominator: adoption of every other POS
+         * counter is measured against people who genuinely sell, not against every
+         * account that ever signed up. See src/lib/product-telemetry.ts.
+         */
+        trackFeature('pos_sale_completed');
+        if (wasScanned) trackFeature('pos_barcode_scan');
+        if (selectedCustomer) trackFeature('pos_customer_attached');
+        if (receiptMethod === 'printed') trackFeature('pos_receipt_printed');
+        else if (receiptMethod === 'digital') trackFeature('pos_receipt_emailed');
 
         const receiptData = {
             id: newReceiptId,

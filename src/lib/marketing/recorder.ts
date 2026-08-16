@@ -318,6 +318,44 @@ export const DEVICES: Record<DeviceId, { label: string; note: string; w: number;
 export const DEFAULT_RECORD_URL = 'http://localhost:9007';
 
 /**
+ * One-click targets, so pointing the bot at the hosted site is a choice rather
+ * than a typed URL.
+ *
+ * All three are still run through `cleanRecordUrl` on both sides — these are a
+ * convenience, never a trust boundary. A preset that shipped malformed would be
+ * rejected exactly like a typo.
+ *
+ * Worth knowing which to pick, because they are not interchangeable:
+ *
+ * - **localhost** records what is on this machine right now, including work that
+ *   is not committed. It is also the only one that pays the dev server's
+ *   on-demand compile, which is why `record()` only warms routes for a local URL.
+ * - **A hosted target** records the product as customers actually see it: routes
+ *   are prebuilt, so there is nothing to warm, and there is no dev indicator to
+ *   hide. The cost is that the bot signs a real account into a real deployment,
+ *   and `--commit` there writes to real data. Preview and production are separate
+ *   entries for that reason — they are different blast radii, and the operator
+ *   should have to choose.
+ */
+export const RECORD_TARGETS = [
+  {
+    url: DEFAULT_RECORD_URL,
+    label: 'Local dev',
+    note: 'This machine. Records uncommitted work; pays the dev compile.',
+  },
+  {
+    url: 'https://zeneva.vercel.app',
+    label: 'Preview',
+    note: 'The hosted preview build. Prebuilt routes, no dev indicator.',
+  },
+  {
+    url: 'https://zeneva.space',
+    label: 'Production',
+    note: 'What customers see. Real data — take care with "save for real".',
+  },
+] as const;
+
+/**
  * A target the recorder can be pointed at, or null if it cannot be one.
  *
  * The hosted site is the better subject: nothing to warm, because its routes are
@@ -491,6 +529,8 @@ export function defaultRequest(): RecorderRequest {
     voiceStyle: null,
     commit: false,
     headed: false,
+    style: DEFAULT_STYLE,
+    punch: false,
     recipe: null,
     cards: {},
   };
@@ -507,6 +547,13 @@ export function takeCount(r: Pick<RecorderRequest, 'flows' | 'devices' | 'themes
  * login on top of the flow itself, plus an encode that scales with the footage.
  * Deliberately pessimistic — a progress hint that runs under is worse than one
  * that runs over.
+ *
+ * `style` is deliberately not a factor. A cinematic take is *shorter* than this
+ * predicts on both clocks: it skips every punch's hold while driving the app, and
+ * its film is `beats x ~2.2s` rather than the flow's own length. Correcting for
+ * that would mean guessing how many `punch()` calls a flow makes — unknowable
+ * here for a coded flow — in order to turn an over-estimate into a possible
+ * under-estimate, which is the trade this function exists to refuse.
  */
 export function estimateSeconds(r: RecorderRequest): number {
   const coded = r.flows.reduce((sum, f) => sum + FLOWS[f].seconds, 0);

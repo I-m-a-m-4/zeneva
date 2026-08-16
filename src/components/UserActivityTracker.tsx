@@ -8,6 +8,11 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { usePathname } from 'next/navigation';
 import { AppConfig } from '@/lib/config';
 import { useI18n } from '@/context/i18n-context';
+import {
+    drainTelemetry,
+    recordDwell,
+    recordRoutePerf,
+} from '@/lib/product-telemetry';
 
 /**
  * Routes are keyed on the user doc's `pageViews` map, so the key has to survive
@@ -85,6 +90,29 @@ export function UserActivityTracker() {
     // attached by then, so this costs the same wait the old getDoc did.
     const sessionReadyRef = useRef<Promise<void> | null>(null);
 
+    // ——— Dwell + route render timing ———
+    // Dwell is accumulated in pieces rather than measured as (leave - enter),
+    // because a tab left open in the background is not attention. The visibility
+    // effect below stops and restarts the clock, so what lands in Firestore is
+    // time the page was actually on screen.
+    const routeDwellMsRef = useRef(0);
+    const routeVisibleSinceRef = useRef<number | null>(null);
+    const prevRouteKeyRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        const onVisibility = () => {
+            const now = Date.now();
+            if (document.visibilityState === 'visible') {
+                routeVisibleSinceRef.current = now;
+            } else if (routeVisibleSinceRef.current !== null) {
+                routeDwellMsRef.current += now - routeVisibleSinceRef.current;
+                routeVisibleSinceRef.current = null;
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => document.removeEventListener('visibilitychange', onVisibility);
+    }, []);
+
     // Record every navigation immediately; the flush below drains this buffer.
     useEffect(() => {
         if (!pathname) return;
@@ -93,12 +121,57 @@ export function UserActivityTracker() {
         if (pathname === lastRouteRef.current) return;
         lastRouteRef.current = pathname;
         const at = Date.now();
-        pendingRef.current.push({ key: routeKey(pathname), path: pathname, at });
+        const key = routeKey(pathname);
+
+        // Captured before the ref is overwritten: only a real route-to-route move
+        // is a transition worth timing.
+        const isTransition = prevRouteKeyRef.current !== null;
+
+        // Close out the page being left.
+        if (prevRouteKeyRef.current) {
+            if (routeVisibleSinceRef.current !== null) {
+                routeDwellMsRef.current += at - routeVisibleSinceRef.current;
+            }
+            recordDwell(prevRouteKeyRef.current, routeDwellMsRef.current);
+        }
+        routeDwellMsRef.current = 0;
+        routeVisibleSinceRef.current = document.visibilityState === 'visible' ? at : null;
+        prevRouteKeyRef.current = key;
+
+        pendingRef.current.push({ key, path: pathname, at });
         // Cap the log so a very long session can't grow the journey doc past
         // Firestore's 1 MB limit.
         if (sessionLogRef.current.length < 400) {
             sessionLogRef.current.push({ path: pathname, at });
         }
+
+        if (!isTransition) return;
+
+        /*
+         * How long this route took to become visible.
+         *
+         * Two nested frames on purpose: the first rAF callback still runs *before*
+         * the browser paints, so it would report a time the user never experienced.
+         * The second runs after that paint, which is the moment the page is
+         * actually on screen.
+         *
+         * Deliberately only client-side transitions, never the initial hard load
+         * from Navigation Timing. Mixing a cold boot into the same average would
+         * make whichever page people happen to land on look catastrophically slow
+         * and every other page look fast, which is the opposite of the comparison
+         * this measurement exists to support.
+         */
+        const startedAt = performance.now();
+        let innerFrame = 0;
+        const outerFrame = requestAnimationFrame(() => {
+            innerFrame = requestAnimationFrame(() => {
+                recordRoutePerf(key, performance.now() - startedAt);
+            });
+        });
+        return () => {
+            cancelAnimationFrame(outerFrame);
+            if (innerFrame) cancelAnimationFrame(innerFrame);
+        };
     }, [pathname]);
 
     /**
@@ -245,8 +318,18 @@ export function UserActivityTracker() {
                     // Drains the routes accumulated since the last flush. These
                     // fields ride along on the heartbeat's own set() below: as a
                     // separate batch.set(userRef, …) they were billed as a second
-                    // write despite touching the same document. Field semantics
-                    // are unchanged — same set(), same merge, same keys.
+                    // write despite touching the same document.
+                    //
+                    // Written as a **nested map**, not as `pageViews.${key}` field
+                    // paths. That is not a style preference: `set()` — unlike
+                    // `update()` — does not parse dots as paths, so the old form
+                    // created literal top-level fields named "pageViews.dashboard"
+                    // and `user.pageViews` was undefined on every document in the
+                    // database. Every per-route feature silently read an empty map:
+                    // the admin "Where They Spend Their Time" panel never rendered,
+                    // and behaviour segmentation saw zero views in every area. With
+                    // merge:true a nested map merges key by key, so two devices
+                    // flushing at once both land.
                     const pageViewFields: Record<string, any> = {};
                     const pending = pendingRef.current;
                     if (pending.length > 0) {
@@ -254,7 +337,9 @@ export function UserActivityTracker() {
                         pending.forEach(p => totals.set(p.key, (totals.get(p.key) || 0) + 1));
                         pendingRef.current = [];
 
-                        totals.forEach((count, key) => { pageViewFields[`pageViews.${key}`] = increment(count); });
+                        const perRoute: Record<string, any> = {};
+                        totals.forEach((count, key) => { perRoute[key] = increment(count); });
+                        pageViewFields.pageViews = perRoute;
                         pageViewFields.pagesVisited = increment([...totals.values()].reduce((a, b) => a + b, 0));
                     }
 
@@ -271,6 +356,11 @@ export function UserActivityTracker() {
                         language: localeRef.current,
                         lastPage: pathname || '/',
                         ...pageViewFields,
+                        // Feature counters, dwell time and route render timings.
+                        // Nothing here costs a write of its own — the whole product
+                        // intelligence layer is a few more fields on a write that
+                        // was already happening. See src/lib/product-telemetry.ts.
+                        ...drainTelemetry(),
                     }, { merge: true });
 
                     batch.set(sessionRef, {
@@ -358,10 +448,27 @@ export function UserActivityTracker() {
             if (pending.length > 0) {
                 const totals = new Map<string, number>();
                 pending.forEach(p => totals.set(p.key, (totals.get(p.key) || 0) + 1));
-                totals.forEach((count, key) => { pageViewUpdate[`pageViews.${key}`] = increment(count); });
+                // Nested map, not dotted paths — same reason as the heartbeat above.
+                const perRoute: Record<string, any> = {};
+                totals.forEach((count, key) => { perRoute[key] = increment(count); });
+                pageViewUpdate.pageViews = perRoute;
                 pageViewUpdate.pagesVisited = increment([...totals.values()].reduce((a, b) => a + b, 0));
                 pendingRef.current = [];
             }
+
+            // Close out the page they are leaving from, then take whatever
+            // telemetry has built up since the last heartbeat. Without this, the
+            // dwell on the final page of every session is simply lost — and for a
+            // short session that is most of the session.
+            if (prevRouteKeyRef.current) {
+                if (routeVisibleSinceRef.current !== null) {
+                    routeDwellMsRef.current += Date.now() - routeVisibleSinceRef.current;
+                    routeVisibleSinceRef.current = null;
+                }
+                recordDwell(prevRouteKeyRef.current, routeDwellMsRef.current);
+                routeDwellMsRef.current = 0;
+            }
+            Object.assign(pageViewUpdate, drainTelemetry());
 
             const routeLog = sessionLogRef.current.slice(-400);
             if (routeLog.length > 0) {

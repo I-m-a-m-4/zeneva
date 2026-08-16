@@ -125,15 +125,56 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
               action: 'product.stock_adjustment',
               entityType: 'Product',
               entityId: product.id,
-              details: { 
+              details: {
                 entityName: product.name,
-                oldStock: product.stock, 
-                newStock: values.stock, 
+                oldStock: product.stock,
+                newStock: values.stock,
                 adjustment: values.stock - (product.stock || 0),
                 reason: 'Manual Quick Edit'
               }
             }
           }, `Logging stock adjustment for ${product.name}`);
+        }
+
+        /*
+         * Price and cost changes, recorded as a before/after pair.
+         *
+         * This is the evidence behind the price-swap check in
+         * src/lib/forensics.ts: drop a price, sell the item cheap, put the price
+         * back. Both edits leave the catalogue looking untouched, so the only
+         * trace is the pair of logs — and without the `from` value there is no
+         * way to tell a cut from a rise. Cost changes matter for the opposite
+         * reason: cost is the denominator of every margin figure in the app, so
+         * raising it is how a suspiciously thin margin is made to look ordinary.
+         *
+         * Queued rather than written directly so it survives an offline edit,
+         * matching the stock adjustment above.
+         */
+        const priceMoved = values.price !== product.price;
+        const costMoved = values.costPrice !== (product.costPrice ?? 0);
+        if (priceMoved || costMoved) {
+          const changes: Record<string, { from: any; to: any }> = {};
+          if (priceMoved) changes.price = { from: product.price ?? 0, to: values.price };
+          if (costMoved) changes.costPrice = { from: product.costPrice ?? 0, to: values.costPrice };
+
+          addToQueue({
+            type: 'add-audit-log',
+            payload: {
+              businessId: business.id,
+              userId: userProfile.id,
+              userName: userProfile.name,
+              userEmail: userProfile.email,
+              userRole: userProfile.role,
+              action: 'product.update',
+              entityType: 'Product',
+              entityId: product.id,
+              details: {
+                entityName: product.name,
+                changes,
+                reason: 'Manual Quick Edit',
+              }
+            }
+          }, `Logging price change for ${product.name}`);
         }
       }
 

@@ -51,7 +51,14 @@ async function authHeaders(): Promise<Record<string, string> | null> {
   return { Authorization: `Bearer ${await user.getIdToken()}` };
 }
 
-export function RecorderLive({ onFinished }: { onFinished?: () => void }) {
+/**
+ * @param fill  Grow to fill a flex parent instead of sizing to a viewport
+ *              fraction. For the editor layout, where the container owns the
+ *              height and this is the element that should absorb whatever is
+ *              left. Off by default, so any existing caller renders exactly as
+ *              it did before.
+ */
+export function RecorderLive({ onFinished, fill = false }: { onFinished?: () => void; fill?: boolean }) {
   const [live, setLive] = React.useState<LiveStatus | null>(null);
   const [running, setRunning] = React.useState(false);
   const [frameUrl, setFrameUrl] = React.useState<string | null>(null);
@@ -177,6 +184,10 @@ export function RecorderLive({ onFinished }: { onFinished?: () => void }) {
       className={cn(
         'overflow-hidden rounded-2xl border bg-card shadow-sm transition-all',
         running ? 'border-primary/40 shadow-md' : 'border-border',
+        // A flex column, so the stage below can be the child that absorbs the
+        // leftover height. `h-full min-h-0` because this element is itself a flex
+        // child in the editor layout and has to be shrinkable for that to work.
+        fill && 'flex h-full min-h-0 flex-col',
       )}
     >
       {/* Browser chrome. Cosmetic, but it frames the capture as a window rather
@@ -200,31 +211,48 @@ export function RecorderLive({ onFinished }: { onFinished?: () => void }) {
             Live
           </Badge>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 shrink-0 p-0"
-          aria-label={expanded ? 'Shrink the live view' : 'Expand the live view'}
-          onClick={() => setExpanded((e) => !e)}
-        >
-          {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        </Button>
+        {/* Redundant once the container owns the height — there is nothing left to
+            expand into, and a button that does nothing is worse than no button. */}
+        {!fill && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 shrink-0 p-0"
+            aria-label={expanded ? 'Shrink the live view' : 'Expand the live view'}
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </Button>
+        )}
       </div>
 
       {/* Stage */}
       <div
         className={cn(
-          'flex items-center justify-center bg-neutral-950 p-4 transition-[min-height]',
-          expanded ? 'min-h-[76vh]' : portrait ? 'min-h-[520px]' : 'min-h-[380px]',
+          'flex items-center justify-center bg-neutral-950 p-4',
+          // `fill` hands height control to the parent: `min-h-0` is the part that
+          // actually matters, because a flex child defaults to min-height:auto and
+          // would refuse to shrink below its content, pushing the page taller
+          // instead of letterboxing inside the space it was given.
+          fill
+            ? 'min-h-0 flex-1'
+            : cn('transition-[min-height]', expanded ? 'min-h-[76vh]' : portrait ? 'min-h-[520px]' : 'min-h-[380px]'),
         )}
       >
         {frameUrl ? (
           <div
             className={cn(
-              'relative w-full overflow-hidden rounded-lg bg-black shadow-2xl ring-1 ring-white/10',
-              portrait ? 'mx-auto max-w-[320px]' : 'max-w-full',
+              'relative overflow-hidden rounded-lg bg-black shadow-2xl ring-1 ring-white/10',
+              // Filling means constraining on *both* axes and letting the aspect
+              // ratio pick which one binds — `w-full` alone would overflow a short
+              // container vertically.
+              fill ? 'max-h-full max-w-full' : 'w-full',
+              portrait && !fill ? 'mx-auto max-w-[320px]' : '',
+              !portrait && !fill ? 'max-w-full' : '',
             )}
-            style={{ aspectRatio: ratio, maxHeight: expanded ? '72vh' : '58vh' }}
+            style={fill
+              ? { aspectRatio: ratio, height: '100%' }
+              : { aspectRatio: ratio, maxHeight: expanded ? '72vh' : '58vh' }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

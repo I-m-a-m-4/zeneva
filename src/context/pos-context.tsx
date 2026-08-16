@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback, useRef } from 'react';
-import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats, AuditLog } from '@/types';
+import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfile, OnlineOrder, QueuedAction, BusinessStats, AuditLog, HeldSale } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { getAuth } from 'firebase/auth';
@@ -53,6 +53,7 @@ import {
 } from '@/lib/constants';
 import { safeToDate } from '@/lib/utils';
 import { isSubscriptionActive as resolveSubscriptionActive } from '@/lib/plan';
+import { trackFeature } from '@/lib/product-telemetry';
 import { useBranch } from './branch-context';
 
 interface POSContextType {
@@ -2097,7 +2098,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         setIsCacheHydrated(false);
         lastReceiptBackfillKeyRef.current = -1;
       }
-      setLastUserId(effectiveUserId); 
+      setLastUserId(effectiveUserId || null); 
     }
     
     // Safety check: only allow impersonation if current user is super admin
@@ -2227,7 +2228,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const holdCurrentSale = useCallback((notes?: string) => {
     if (cart.length === 0) return;
-    
+
+    // Tracked in the context rather than at the two call sites, so a third button
+    // added later is counted without anyone remembering to instrument it.
+    trackFeature('pos_hold_sale');
+
     const newHeldSale: HeldSale = {
       id: uuidv4(),
       items: [...cart],
@@ -2410,7 +2415,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     const isOnline = isRealOnline;
-    let results: { month: string, revenue: number }[] = [];
+    let results: { month: string, revenue: number, count: number }[] = [];
 
     // For a specific sub-branch, skip Firestore aggregates (they can't filter by branchId)
     // and compute directly from the already branch-filtered receipts state.
@@ -2418,13 +2423,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (isSubBranch) {
       const targetReceipts = receipts || [];
       if (targetReceipts.length > 0) {
-        const monthly: Record<string, number> = {};
+        const monthly: Record<string, { revenue: number, count: number }> = {};
         targetReceipts.forEach(r => {
           const date = safeToDate(r.createdAt);
           const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          monthly[key] = (monthly[key] || 0) + (r.total || 0);
+          if (!monthly[key]) monthly[key] = { revenue: 0, count: 0 };
+          monthly[key].revenue += (r.total || 0);
+          monthly[key].count += 1;
         });
-        results = Object.entries(monthly).map(([month, revenue]) => ({ month, revenue }));
+        results = Object.entries(monthly).map(([month, data]) => ({ month, revenue: data.revenue, count: data.count }));
       }
       return results.sort((a,b) => b.month.localeCompare(a.month)).slice(0, monthCount);
     }
@@ -2448,10 +2455,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
           );
           
           monthPromises.push(getAggregateFromServer(q, {
-            revenue: sum('total')
+            revenue: sum('total'),
+            count: count()
           }).then(snap => ({
             month: `${currentYear}-${String(i + 1).padStart(2, '0')}`,
-            revenue: snap.data().revenue || 0
+            revenue: snap.data().revenue || 0,
+            count: snap.data().count || 0
           })));
         }
 
@@ -2466,7 +2475,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       try {
         const res = await getMonthlyRevenue(businessId, monthCount);
         if (res && res.length > 0) {
-          results = res;
+          results = res.map(m => ({ ...m, count: 0 }));
         }
       } catch (err) {
         console.error("SQLite Monthly Fetch Failed:", err);
@@ -2477,13 +2486,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (results.length === 0) {
       const targetReceipts = syncedReceipts.length > 0 ? syncedReceipts : (receipts || []);
       if (targetReceipts && targetReceipts.length > 0) {
-        const monthly: Record<string, number> = {};
+        const monthly: Record<string, { revenue: number, count: number }> = {};
         targetReceipts.forEach(r => {
           const date = safeToDate(r.createdAt);
           const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          monthly[key] = (monthly[key] || 0) + (r.total || 0);
+          if (!monthly[key]) monthly[key] = { revenue: 0, count: 0 };
+          monthly[key].revenue += (r.total || 0);
+          monthly[key].count += 1;
         });
-        results = Object.entries(monthly).map(([month, revenue]) => ({ month, revenue }));
+        results = Object.entries(monthly).map(([month, data]) => ({ month, revenue: data.revenue, count: data.count }));
       }
     }
 
@@ -2497,8 +2508,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const existing = results.find(m => m.month === key);
         if (existing) {
           existing.revenue += (receipt.total || 0);
+          existing.count += 1;
         } else {
-          results.push({ month: key, revenue: receipt.total || 0 });
+          results.push({ month: key, revenue: receipt.total || 0, count: 1 });
         }
       }
     });

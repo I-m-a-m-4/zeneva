@@ -251,11 +251,11 @@ export default function MasteringZenevaClient() {
               </div>
 
               {/* Next Steps CTA */}
-              <div className="mt-24 rounded-[2.5rem] bg-slate-100 text-slate-900 p-8 md:p-16 relative overflow-hidden group border border-dashed border-slate-200">
+              <div className="mt-24 rounded-[2.5rem] bg-gradient-to-l from-[#f1dfd1] to-white text-slate-900 p-8 md:p-16 relative overflow-hidden group border border-dashed border-[#f1dfd1]">
                 <div className="absolute inset-0 grid-lines opacity-10 pointer-events-none"></div>
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
                   <div className="max-w-md">
-                    <h3 className="text-3xl md:text-4xl font-black tracking-tight mb-4 leading-tight text-slate-950">Ready to transform your retail operations?</h3>
+                    <h3 className="text-3xl md:text-4xl font-semibold tracking-tight mb-4 leading-tight text-slate-950">Ready to transform your retail operations?</h3>
                     <p className="text-slate-600 font-medium text-lg">Join the thousands of retailers using Zeneva to automate profit and scale without limits.</p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">

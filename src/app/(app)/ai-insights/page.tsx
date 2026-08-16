@@ -26,6 +26,7 @@ import { ZenStatus, labelForTool } from '@/components/ai-insights/zen-status';
 import { Markdown } from '@/components/ai-insights/markdown';
 import { ToolResult } from '@/components/ai-insights/tool-renderer';
 import { validateProposal, buildSaleFromProposal } from '@/components/ai-insights/proposal-guard';
+import { trackFeature } from '@/lib/product-telemetry';
 import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
 import { aiMonthlyLimit, effectivePlan } from '@/lib/plan';
@@ -280,6 +281,10 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
     const trimmed = text.trim();
     if (!trimmed || !authRef.current.businessId) return;
     turnStartRef.current = Date.now();
+    // A count only — no prompt text ever leaves this function. Zen AI's privacy
+    // boundary (see docs/zen-ai.md) is that prompts are never stored, and a
+    // counter of how many questions were asked does not cross it.
+    trackFeature('ai_prompt_sent');
     sendMessage({ text: trimmed });
   }, [sendMessage]);
 
@@ -446,6 +451,10 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
     }
 
     try {
+      // Counted after validation passes, so a refused proposal is not recorded as
+      // trust in the model — the question is whether people let Zen AI write, and
+      // a rejected write is the opposite of a yes.
+      trackFeature('ai_proposal_approved');
       if (action.action === 'STOCK_ADJUSTMENT' || action.action === 'PRICE_CHANGE' || action.action === 'THRESHOLD_CHANGE') {
         const field = action.action === 'STOCK_ADJUSTMENT' ? 'stock'
           : action.action === 'PRICE_CHANGE' ? 'price'

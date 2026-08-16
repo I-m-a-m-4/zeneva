@@ -107,27 +107,22 @@ export default function MarketingStudioPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2.5 font-headline text-3xl font-black tracking-tight">
-            <Clapperboard className="h-7 w-7 text-primary" />
-            Marketing Studio
-          </h1>
-          <p className="mt-1 max-w-2xl text-muted-foreground">
-            Product videos, two ways. The recorder drives the real app in a real browser and
-            hands back an MP4; the drawn demos render from code, so they export identically at
-            any size and never touch an account.
-          </p>
-        </div>
+    <div className="space-y-4">
+      {/* Header. Deliberately compact: the recorder tab below is a viewport-first
+          layout, and every row spent here is a row taken off the picture. The
+          longer explanation of the two modes lives on the tab that needs it. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="flex items-center gap-2 font-headline text-2xl font-black tracking-tight">
+          <Clapperboard className="h-6 w-6 text-primary" />
+          Marketing Studio
+        </h1>
         <Badge variant="outline" className="shrink-0 gap-1.5 border-primary/30 text-primary">
           <Film className="h-3.5 w-3.5" />
           {DEMOS.length} demos
         </Badge>
       </div>
 
-      <Tabs defaultValue="record" className="space-y-6">
+      <Tabs defaultValue="record" className="space-y-4">
         <TabsList className="grid w-full max-w-lg grid-cols-2">
           <TabsTrigger value="record" className="gap-2">
             <Bot className="h-4 w-4" /> Record the real app

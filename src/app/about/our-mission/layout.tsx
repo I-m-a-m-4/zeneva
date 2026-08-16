@@ -1,4 +1,21 @@
 import { Metadata } from 'next';
+import { Lora } from 'next/font/google';
+
+/**
+ * Lora carries every heading on this page — the serif/sans split is the whole
+ * point of the design language, so it is not optional decoration.
+ *
+ * Loaded through `next/font` rather than a `<link>` to a font CDN: next/font
+ * self-hosts the file at build time, which keeps it working inside the Tauri
+ * shells (they have no network guarantee) and scopes the preload to this route
+ * instead of every page on the site.
+ */
+const lora = Lora({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-lora',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Our Mission | Empowering Retailers Worldwide',
@@ -17,5 +34,7 @@ export default function MissionLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  // A real element, not a fragment — the font variable has to land on a node
+  // for the page below to inherit it.
+  return <div className={lora.variable}>{children}</div>;
 }

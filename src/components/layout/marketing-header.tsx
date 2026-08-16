@@ -48,6 +48,7 @@ export default function MarketingHeader() {
   };
 
   const navLinks = [
+    { href: "/zen-ai", labelKey: "home.navZenAi" },
     { href: "/#features", labelKey: "home.navFeatures" },
     { href: "/download", labelKey: "home.navDownload" },
     { href: "/about/our-mission", labelKey: "home.navMission" },

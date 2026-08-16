@@ -11,8 +11,10 @@ export function NativeNotificationListener() {
   const initializedRef = React.useRef(false);
 
   React.useEffect(() => {
-    initNativeNotificationPermissions();
-  }, []);
+    if (user?.uid) {
+      initNativeNotificationPermissions();
+    }
+  }, [user?.uid]);
 
   React.useEffect(() => {
     if (!user?.uid || !db) return;

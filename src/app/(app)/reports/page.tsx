@@ -6,7 +6,7 @@ import { useBranch } from '@/context/branch-context';
 import type { Receipt, Customer } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Trophy, Flame, Sparkles, AlertCircle, Crown, Zap, Rocket } from 'lucide-react';
+import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Trophy, Flame, Sparkles, AlertCircle, Crown, Zap, Rocket, Target } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopProductsChart from '@/components/reports/top-products-chart';
 import TopServicesChart from '@/components/reports/top-services-chart';
@@ -33,6 +33,9 @@ import PaymentMethodDistribution from '@/components/reports/payment-method-analy
 import DeadStockAnalysis from '@/components/reports/dead-stock-analysis';
 import HourlySalesHeatmap from '@/components/reports/hourly-sales-heatmap';
 import BasketAnalysis from '@/components/reports/basket-analysis';
+import ProfitLossStatement from '@/components/reports/profit-loss-statement';
+import RevenueForecastCard from '@/components/reports/revenue-forecast-card';
+import InventoryDepletionCard from '@/components/reports/inventory-depletion-card';
 import { firestore } from '@/firebase/instance';
 import { collection, getDocs } from 'firebase/firestore';
 
@@ -154,8 +157,8 @@ function AutoComputingBanner({ score }: { score: number }) {
         : COMPUTE_STEPS[stepIndex];
 
     const tagColor = score >= 90 ? 'text-emerald-500 bg-emerald-500/10' :
-                     score >= 75 ? 'text-indigo-500 bg-indigo-500/10' :
-                     'text-amber-500 bg-amber-500/10';
+        score >= 75 ? 'text-indigo-500 bg-indigo-500/10' :
+            'text-amber-500 bg-amber-500/10';
 
     return (
         <div className="relative rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm">
@@ -234,9 +237,9 @@ function AutoComputingBanner({ score }: { score: number }) {
                             className={cn(
                                 "h-1 flex-1 rounded-full transition-all duration-300",
                                 i < stepIndex ? "bg-indigo-500" :
-                                i === stepIndex && !completed ? "bg-indigo-400 animate-pulse" :
-                                completed ? "bg-emerald-500" :
-                                "bg-muted"
+                                    i === stepIndex && !completed ? "bg-indigo-400 animate-pulse" :
+                                        completed ? "bg-emerald-500" :
+                                            "bg-muted"
                             )}
                         />
                     ))}
@@ -267,7 +270,7 @@ export default function ReportsDashboard() {
             const skuCount = products?.length || 0;
 
             const peers: any[] = [];
-            
+
             // 1. Attempt to fetch real snapshot scores from firestore
             try {
                 const snapshotQuery = collection(firestore, 'store_health_snapshots');
@@ -299,7 +302,7 @@ export default function ReportsDashboard() {
             // 2. Generate simulated peers to fill up to 400 competitors
             const seedString = userBusinessName;
             let seed = Array.from(seedString).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            
+
             const pseudorandom = () => {
                 const x = Math.sin(seed++) * 10000;
                 return x - Math.floor(x);
@@ -395,10 +398,10 @@ export default function ReportsDashboard() {
     }, [allReceipts, date]);
 
     const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    const isBaseLoading = isNative 
+    const isBaseLoading = isNative
         ? (isPosLoading && (!allReceipts || allReceipts.length === 0))
         : isPosLoading;
-    
+
     const hasDataToDisplay = (reportBatchReceipts && reportBatchReceipts.length > 0) || (receipts && receipts.length > 0);
     const showBlankScreenSpinner = (isBaseLoading || isFetchingBatch) && !hasDataToDisplay;
 
@@ -420,7 +423,7 @@ export default function ReportsDashboard() {
 
         targetReceipts.forEach(r => {
             if (r.customer?.id) uniqueCustomerIds.add(r.customer.id);
-            
+
             let receiptProductSum = 0;
             let receiptServiceSum = 0;
 
@@ -428,7 +431,7 @@ export default function ReportsDashboard() {
                 uniqueProductIds.add(i.productId);
                 const product = products.find(p => p.id === i.productId);
                 const itemRevenue = (Number(i.price) || 0) * (Number(i.quantity) || 0);
-                
+
                 if (product?.categoryType === 'service') {
                     totalServicesSold += i.quantity;
                     receiptServiceSum += itemRevenue;
@@ -520,14 +523,14 @@ export default function ReportsDashboard() {
                 setIsFetchingBatch(true);
                 const timeout = setTimeout(() => {
                     if (isFetchingBatch) {
-                        toast({ 
-                            title: 'Loading Data...', 
+                        toast({
+                            title: 'Loading Data...',
                             description: 'It is taking a bit longer. If you are offline, we are showing your local synchronized data.',
                             variant: 'default'
                         });
                     }
                 }, 4000);
-                
+
                 try {
                     const res = await fetchReceiptsInRange(new Date(dateFromTime), new Date(dateToTime));
                     setReportBatchReceipts(res);
@@ -543,26 +546,26 @@ export default function ReportsDashboard() {
 
     React.useEffect(() => {
         const fetchHistory = async () => {
-             const res = await fetchMonthlyAnalytics(12);
-             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-             
-             const dataMap: Record<string, number> = {};
-             res.forEach(m => {
-                 let label = m.month;
-                 if (label.includes('-')) {
+            const res = await fetchMonthlyAnalytics(12);
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+            const dataMap: Record<string, number> = {};
+            res.forEach(m => {
+                let label = m.month;
+                if (label.includes('-')) {
                     const monthIdx = parseInt(label.split('-')[1]) - 1;
                     label = monthNames[monthIdx] || label;
-                 }
-                 dataMap[label] = m.revenue;
-             });
+                }
+                dataMap[label] = m.revenue;
+            });
 
-             const paddedStats = monthNames.map(m => ({
-                 month: m,
-                 sales: dataMap[m] || 0,
-                 totalSales: dataMap[m] || 0
-             }));
+            const paddedStats = monthNames.map(m => ({
+                month: m,
+                sales: dataMap[m] || 0,
+                totalSales: dataMap[m] || 0
+            }));
 
-             setMonthlyStats(paddedStats);
+            setMonthlyStats(paddedStats);
         }
 
         fetchHistory();
@@ -622,496 +625,499 @@ export default function ReportsDashboard() {
                 isLoading={isPosLoading}
             >
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
-                  <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
-                      <TabsList className="flex flex-col md:grid md:grid-cols-3 w-full md:w-[500px] h-auto gap-1">
-                          <TabsTrigger value="analytics" className="text-sm font-semibold w-full">Analytics Dashboard</TabsTrigger>
-                          <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">Daily Sales Items</TabsTrigger>
-                          <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">Business Rating</TabsTrigger>
-                      </TabsList>
-                      <div className="flex flex-wrap items-center gap-4">
-                          {activeTab === 'analytics' && (
-                              <>
-                                  <DateRangePicker date={date} onDateChange={setDate} />
-                                  {isFetchingBatch && (
-                                      <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
-                                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                          <span>Updating metrics...</span>
-                                      </div>
-                                  )}
-                              </>
-                          )}
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-9">
-                                <Download className="mr-2 h-4 w-4" />Export Report
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={handleDownloadImage}>
-                                <ImageIcon className="h-4 w-4 mr-2" />
-                                Export as High-Res Image
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => window.print()}>
-                                <Printer className="h-4 w-4 mr-2" />
-                                Export as PDF (Print)
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                      </div>
-                  </div>
+                    <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
+                        <TabsList className="flex flex-col md:grid md:grid-cols-4 w-full md:w-[650px] h-auto gap-1">
+                            <TabsTrigger value="analytics" className="text-sm font-semibold w-full">Analytics Dashboard</TabsTrigger>
+                            <TabsTrigger value="profit-loss" className="text-sm font-semibold w-full">Profit & Loss</TabsTrigger>
+                            <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">Daily Sales Items</TabsTrigger>
+                            <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">Business Rating</TabsTrigger>
+                        </TabsList>
+                        <div className="flex flex-wrap items-center gap-4">
+                            {(activeTab === 'analytics' || activeTab === 'profit-loss') && (
+                                <>
+                                    <DateRangePicker date={date} onDateChange={setDate} />
+                                    {isFetchingBatch && (
+                                        <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                            <span>Updating metrics...</span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-9">
+                                        <Download className="mr-2 h-4 w-4" />Export Report
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={handleDownloadImage}>
+                                        <ImageIcon className="h-4 w-4 mr-2" />
+                                        Export as High-Res Image
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => window.print()}>
+                                        <Printer className="h-4 w-4 mr-2" />
+                                        Export as PDF (Print)
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
 
-                  {showBlankScreenSpinner ? (
-                      <div className="flex h-64 items-center justify-center animate-pulse">
-                          <div className="flex flex-col items-center gap-3">
-                              <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                              <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
-                          </div>
-                      </div>
-                  ) : (
-                      <>
-                        <TabsContent value="analytics" className="space-y-6 mt-0">
-                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-                                <ReportStatCard
-                                    title="Revenue"
-                                    value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={DollarSign}
-                                    description="Total earnings"
-                                />
-                                <ReportStatCard
-                                    title="Net Cost"
-                                    value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={FileText}
-                                    description="Total cost of sales"
-                                />
-                                <ReportStatCard
-                                    title="Net Profit"
-                                    value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={Coins}
-                                    description="Earnings minus costs"
-                                />
-                                <ReportStatCard
-                                    title="Product Revenue"
-                                    value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={Package}
-                                    description="Revenue from physical goods"
-                                />
-                                <ReportStatCard
-                                    title="Service Revenue"
-                                    value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={TrendingUp}
-                                    description="Revenue from services"
-                                />
-                                <ReportStatCard
-                                    title="Sales"
-                                    value={finalReportData?.totalSales.toLocaleString() || '0'}
-                                    icon={ShoppingCart}
-                                    description="Total transactions"
-                                />
-                                <ReportStatCard
-                                    title="Unique Products"
-                                    value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
-                                    icon={Package}
-                                    description="Different products sold"
-                                />
-                                <ReportStatCard
-                                    title="Units Sold"
-                                    value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
-                                    icon={Layers}
-                                    description="Total pieces moved"
-                                />
-                                 <ReportStatCard
-                                    title="Daily Velocity"
-                                    value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
-                                    icon={TrendingUp}
-                                    description="Sales per day"
-                                />
-                                <ReportStatCard
-                                    title="Daily Revenue"
-                                    value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={DollarSign}
-                                    description="Average revenue per day"
-                                />
-                                <ReportStatCard
-                                    title="Catalog Size"
-                                    value={finalReportData?.catalogSize?.toLocaleString() || '0'}
-                                    icon={Package}
-                                    description="Total unique products in inventory"
-                                />
-                                <ReportStatCard
-                                    title="Avg Order"
-                                    value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={FileText}
-                                    description="Revenue per sale"
-                                />
-                                <ReportStatCard
-                                    title="Customers"
-                                    value={finalReportData?.totalCustomers.toLocaleString() || '0'}
-                                    icon={Users}
-                                    description="Total unique buyers"
-                                />
+                    {showBlankScreenSpinner ? (
+                        <div className="flex h-64 items-center justify-center animate-pulse">
+                            <div className="flex flex-col items-center gap-3">
+                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                                <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
                             </div>
-
-                             <FeatureGate
-                                 requiredPlan="business"
-                                 currentPlan={business?.plan}
-                                 hasLifetimeAccess={hasLifetimeAccess}
-                                 featureName="Advanced Visual Analytics"
-                                 featureDescription="Unlock deep dive visual charts, sales trends, and profit margins to truly understand your business."
-                             >
-                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-                                     <div className="lg:col-span-5">
-                                         <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
-                                     </div>
-                                 </div>
-
-                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                                     <TopProductsChart receipts={deepReceipts} />
-                                     <TopServicesChart receipts={deepReceipts} />
-                                 </div>
-
-                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-                                    <div className="lg:col-span-3">
-                                        <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
-                                    </div>
-                                    <div className="lg:col-span-2">
-                                        <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                    </div>
+                        </div>
+                    ) : (
+                        <>
+                            <TabsContent value="analytics" className="space-y-6 mt-0">
+                                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+                                    <ReportStatCard
+                                        title="Revenue"
+                                        value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                        icon={DollarSign}
+                                        description="Total earnings"
+                                    />
+                                    <ReportStatCard
+                                        title="Net Cost"
+                                        value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                        icon={FileText}
+                                        description="Total cost of sales"
+                                    />
+                                    <ReportStatCard
+                                        title="Net Profit"
+                                        value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                        icon={Coins}
+                                        description="Earnings minus costs"
+                                    />
+                                    <ReportStatCard
+                                        title="Product Revenue"
+                                        value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                        icon={Package}
+                                        description="Revenue from physical goods"
+                                    />
+                                    <ReportStatCard
+                                        title="Service Revenue"
+                                        value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                        icon={TrendingUp}
+                                        description="Revenue from services"
+                                    />
+                                    <ReportStatCard
+                                        title="Sales"
+                                        value={finalReportData?.totalSales.toLocaleString() || '0'}
+                                        icon={ShoppingCart}
+                                        description="Total transactions"
+                                    />
+                                    <ReportStatCard
+                                        title="Unique Products"
+                                        value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
+                                        icon={Package}
+                                        description="Different products sold"
+                                    />
+                                    <ReportStatCard
+                                        title="Units Sold"
+                                        value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
+                                        icon={Layers}
+                                        description="Total pieces moved"
+                                    />
+                                    <ReportStatCard
+                                        title="Daily Velocity"
+                                        value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
+                                        icon={TrendingUp}
+                                        description="Sales per day"
+                                    />
+                                    <ReportStatCard
+                                        title="Daily Revenue"
+                                        value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                        icon={DollarSign}
+                                        description="Average revenue per day"
+                                    />
+                                    <ReportStatCard
+                                        title="Catalog Size"
+                                        value={finalReportData?.catalogSize?.toLocaleString() || '0'}
+                                        icon={Package}
+                                        description="Total unique products in inventory"
+                                    />
+                                    <ReportStatCard
+                                        title="Avg Order"
+                                        value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                        icon={FileText}
+                                        description="Revenue per sale"
+                                    />
+                                    <ReportStatCard
+                                        title="Customers"
+                                        value={finalReportData?.totalCustomers.toLocaleString() || '0'}
+                                        icon={Users}
+                                        description="Total unique buyers"
+                                    />
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-                                    <div className="lg:col-span-3">
-                                        <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                    </div>
-                                    <div className="lg:col-span-2">
-                                        <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-6 mt-6">
-                                    <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
-                                    <HourlySalesHeatmap receipts={deepReceipts} />
-                                    <BasketAnalysis receipts={deepReceipts} />
-                                </div>
                                 <FeatureGate
                                     requiredPlan="business"
                                     currentPlan={business?.plan}
                                     hasLifetimeAccess={hasLifetimeAccess}
-                                    featureName="Customer Intelligence & Inventory Velocity"
-                                    featureDescription="Unlock advanced CRM analytics, customer lifetime value, and optimize stock levels with data-driven ABC analysis."
+                                    featureName="Advanced Visual Analytics"
+                                    featureDescription="Unlock deep dive visual charts, sales trends, and profit margins to truly understand your business."
                                 >
-                                    <div className="grid grid-cols-1 gap-6 mt-6">
-                                        <CustomerAnalytics 
-                                            customers={customers || []} 
-                                            receipts={deepReceipts} 
-                                            currencySymbol={currencySymbol} 
-                                            totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers} 
-                                        />
-                                        <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                        <RevenueForecastCard receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                        <InventoryDepletionCard receipts={deepReceipts} products={products || []} />
                                     </div>
-                                </FeatureGate>
-                             </FeatureGate>
-                        </TabsContent>
-                        <TabsContent value="daily-sales" className="mt-0">
-                            <DailySalesItemsTable receipts={allReceipts || []} products={products || []} currencySymbol={currencySymbol} />
-                        </TabsContent>
-                        <TabsContent value="business-rating" className="mt-0 space-y-6">
-                            {/* Gamification Level & Streak Header */}
-                            <div className="grid gap-4 md:grid-cols-3">
-                                {/* Store Tier Rank Card */}
-                                <Card className="p-6 border border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-background to-background rounded-xl relative overflow-hidden group">
-                                    <div className="absolute -top-12 -right-12 bg-amber-500/10 w-32 h-32 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all duration-500" />
-                                    <div className="flex items-start gap-4 relative z-10">
-                                        <div className="p-3 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl text-white shrink-0">
-                                            <Crown className="h-6 w-6" />
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                        <div className="lg:col-span-5">
+                                            <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
                                         </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground font-bold tracking-wider uppercase mb-1">Store Tier Rank</p>
-                                            <h4 className="text-xl font-black text-foreground leading-tight">
-                                                {userScore === 0 ? "Unranked" : userScore >= 90 ? "Level 6: Market Dominator" : userScore >= 80 ? "Level 5: Retail Elite" : userScore >= 60 ? "Level 4: Retail Commander" : "Level 1: Local Vendor"}
-                                            </h4>
-                                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 font-bold">
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                        <TopProductsChart receipts={deepReceipts} />
+                                        <TopServicesChart receipts={deepReceipts} />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                        <div className="lg:col-span-3">
+                                            <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                        </div>
+                                        <div className="lg:col-span-2">
+                                            <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                        <div className="lg:col-span-3">
+                                            <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                        </div>
+                                        <div className="lg:col-span-2">
+                                            <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-6 mt-6">
+                                        <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
+                                        <HourlySalesHeatmap receipts={deepReceipts} />
+                                        <BasketAnalysis receipts={deepReceipts} />
+                                    </div>
+                                    <FeatureGate
+                                        requiredPlan="business"
+                                        currentPlan={business?.plan}
+                                        hasLifetimeAccess={hasLifetimeAccess}
+                                        featureName="Customer Intelligence & Inventory Velocity"
+                                        featureDescription="Unlock advanced CRM analytics, customer lifetime value, and optimize stock levels with data-driven ABC analysis."
+                                    >
+                                        <div className="grid grid-cols-1 gap-6 mt-6">
+                                            <CustomerAnalytics
+                                                customers={customers || []}
+                                                receipts={deepReceipts}
+                                                currencySymbol={currencySymbol}
+                                                totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers}
+                                            />
+                                            <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
+                                        </div>
+                                    </FeatureGate>
+                                </FeatureGate>
+                            </TabsContent>
+                            <TabsContent value="profit-loss" className="mt-0">
+                                <ProfitLossStatement 
+                                    receipts={deepReceipts} 
+                                    products={products || []} 
+                                    currencySymbol={currencySymbol} 
+                                />
+                            </TabsContent>
+                            <TabsContent value="daily-sales" className="mt-0">
+                                <DailySalesItemsTable receipts={allReceipts || []} products={products || []} currencySymbol={currencySymbol} />
+                            </TabsContent>
+                            <TabsContent value="business-rating" className="mt-0 space-y-6">
+                                {/* Gamification Level & Streak Header */}
+                                <div className="grid gap-4 md:grid-cols-3">
+                                    {/* Store Tier Rank Card */}
+                                    <Card className="border border-border/60 bg-card">
+                                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                            <CardTitle className="text-sm font-semibold text-muted-foreground">Store Tier Rank</CardTitle>
+                                            <Trophy className="h-4 w-4 text-muted-foreground" />
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-xl font-black text-foreground">
+                                                {userScore === 0 ? "Unranked" : userScore >= 90 ? "Level 6: Dominator" : userScore >= 80 ? "Level 5: Elite" : userScore >= 60 ? "Level 4: Commander" : "Level 1: Vendor"}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
                                                 {userScore === 0 ? "Start logging to rank up" : `Top ${Math.max(1, 100 - userScore)}% of peer merchants`}
                                             </p>
-                                        </div>
-                                    </div>
-                                </Card>
+                                        </CardContent>
+                                    </Card>
 
-                                {/* Consistency Streak Card */}
-                                <Card className="p-6 border border-orange-500/20 bg-gradient-to-br from-orange-500/10 via-background to-background rounded-xl relative overflow-hidden group">
-                                    <div className="absolute -bottom-12 -left-12 bg-orange-500/10 w-32 h-32 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all duration-500" />
-                                    <div className="flex items-start gap-4 relative z-10">
-                                        <div className="p-3 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl text-white shrink-0 relative">
-                                            {userScore > 0 && <div className="absolute inset-0 bg-white/20 animate-pulse rounded-xl blur-md" />}
-                                            <Zap className={`h-6 w-6 relative z-10 ${userScore > 0 ? 'animate-bounce' : 'opacity-50'}`} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground font-bold tracking-wider uppercase mb-1">Consistency Streak</p>
-                                            <h4 className="text-xl font-black text-foreground leading-tight">
+                                    {/* Consistency Streak Card */}
+                                    <Card className="border border-border/60 bg-card">
+                                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                            <CardTitle className="text-sm font-semibold text-muted-foreground">Consistency Streak</CardTitle>
+                                            <Flame className="h-4 w-4 text-muted-foreground" />
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-xl font-black text-foreground">
                                                 {userScore === 0 ? "No Streak Yet" : "7-Day Log Integrity"}
-                                            </h4>
-                                            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1.5 font-bold flex items-center gap-1">
-                                                {userScore === 0 ? "Consistency is key" : <>1.2x multiplier active <Zap className="h-3 w-3 inline fill-current" /></>}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {userScore === 0 ? "Consistency is key" : "1.2x multiplier active"}
                                             </p>
-                                        </div>
-                                    </div>
-                                </Card>
+                                        </CardContent>
+                                    </Card>
 
-                                {/* Next Tier Goal Card */}
-                                <Card className="p-6 border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-background to-background rounded-xl relative overflow-hidden group">
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-indigo-500/5 w-32 h-32 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all duration-500" />
-                                    <div className="flex items-start gap-4 relative z-10">
-                                        <div className="p-3 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-xl text-white shrink-0">
-                                            <Rocket className="h-6 w-6" />
-                                        </div>
-                                        <div className="w-full">
-                                            <p className="text-xs text-muted-foreground font-bold tracking-wider uppercase mb-1">Next Tier Goal</p>
-                                            <h4 className="text-xl font-black text-foreground leading-tight">
+                                    {/* Next Tier Goal Card */}
+                                    <Card className="border border-border/60 bg-card">
+                                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                            <CardTitle className="text-sm font-semibold text-muted-foreground">Next Tier Goal</CardTitle>
+                                            <Target className="h-4 w-4 text-muted-foreground" />
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-xl font-black text-foreground">
                                                 {userScore >= 90 ? 'Platinum Tier' : userScore >= 80 ? 'Elite Tier' : userScore >= 60 ? 'Gold Tier' : 'Silver Tier'}
-                                            </h4>
-                                            <div className="flex items-center gap-3 mt-2.5 w-full">
-                                                <div className="h-2 bg-indigo-950/10 dark:bg-indigo-950/50 rounded-full flex-1 overflow-hidden">
-                                                    <div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full" style={{ width: `${Math.min(100, userScore + 15)}%` }} />
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-2 w-full">
+                                                <div className="h-2 bg-muted rounded-full flex-1 overflow-hidden">
+                                                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, userScore + 15)}%` }} />
                                                 </div>
-                                                <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400">{Math.min(100, userScore + 15)}%</span>
+                                                <span className="text-[11px] font-bold text-muted-foreground">{Math.min(100, userScore + 15)}%</span>
                                             </div>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
-
-                            {/* Core Health Matrix & Performance Pillars */}
-                            <Card className="p-8 border border-border/50 bg-card shadow-sm rounded-xl">
-                                <div className="mx-auto flex flex-col lg:flex-row items-center justify-between gap-12 py-4">
-                                    {/* Left side circular score display */}
-                                    <div className="flex flex-col items-center text-center shrink-0 w-full lg:w-72">
-                                        <div className="relative w-48 h-48 flex items-center justify-center rounded-full border-[10px] border-emerald-500/20 bg-emerald-500/5">
-                                            {/* Circular border track matching image */}
-                                            <div className="absolute inset-0 rounded-full border-[6px] border-emerald-500 border-t-transparent animate-spin-slow opacity-85" style={{ transform: 'rotate(45deg)' }} />
-                                            <div className="flex flex-col items-center leading-none">
-                                                <span className="text-6xl font-black tracking-tight text-foreground">
-                                                    {userScore}
-                                                </span>
-                                                <span className="text-[10px] font-extrabold tracking-widest text-emerald-500 uppercase mt-2">Score</span>
-                                            </div>
-                                        </div>
-                                        <h3 className="text-2xl font-black text-emerald-500 mt-6 leading-none">
-                                            {userScore >= 90 ? 'Elite' : userScore >= 75 ? 'Strong' : userScore >= 50 ? 'Fair' : 'Needs Attention'}
-                                        </h3>
-                                        <p className="text-xs text-muted-foreground mt-2 font-medium">
-                                            {userScore === 0 ? "You have not added any products yet." : `Your inventory setup is superior to ${Math.max(10, Math.floor(userScore * 0.8))}% of grocery retailers globally.`}
-                                        </p>
-                                    </div>
-
-                                    {/* Right side metrics list */}
-                                    <div className="flex-1 w-full space-y-6">
-                                        {/* Metric 1 */}
-                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                            <div className="flex justify-between items-center text-sm font-semibold">
-                                                <span className="text-foreground flex items-center gap-1.5">
-                                                    Availability <span className="text-xs text-muted-foreground font-normal">· 35% Weight</span>
-                                                </span>
-                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0} / 100</span>
-                                            </div>
-                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                <div 
-                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0}%` }}
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                {userScore === 0 ? "No inventory data available." : "Reorder points are set correctly. Only a few items currently out of stock."}
-                                            </p>
-                                        </div>
-
-                                        {/* Metric 2 */}
-                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                            <div className="flex justify-between items-center text-sm font-semibold">
-                                                <span className="text-foreground flex items-center gap-1.5">
-                                                    Efficiency <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
-                                                </span>
-                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0} / 100</span>
-                                            </div>
-                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                <div 
-                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0}%` }}
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                {userScore === 0 ? "No sales velocity data." : "Turnover velocity is moderate. Some dead stock items identified."}
-                                            </p>
-                                        </div>
-
-                                        {/* Metric 3 */}
-                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                            <div className="flex justify-between items-center text-sm font-semibold">
-                                                <span className="text-foreground flex items-center gap-1.5">
-                                                    Data Quality <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
-                                                </span>
-                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0} / 100</span>
-                                            </div>
-                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                <div 
-                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0}%` }}
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                {userScore === 0 ? "Missing SKU, Image, or Category data." : "Key fields are reasonably complete for most products."}
-                                            </p>
-                                        </div>
-
-                                        {/* Metric 4 */}
-                                        <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                            <div className="flex justify-between items-center text-sm font-semibold">
-                                                <span className="text-foreground flex items-center gap-1.5">
-                                                    Integrity <span className="text-xs text-muted-foreground font-normal">· 15% Weight</span>
-                                                </span>
-                                                <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0} / 100</span>
-                                            </div>
-                                            <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                <div 
-                                                    className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                    style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0}%` }}
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                {userScore === 0 ? "No transaction logs." : "Logs are extremely consistent. Few manual corrections made."}
-                                            </p>
-                                        </div>
-                                    </div>
+                                        </CardContent>
+                                    </Card>
                                 </div>
-                            </Card>
 
-                            {/* Peer Leaderboard & Competition Panel */}
-                            <div className="grid gap-6 md:grid-cols-3">
-                                {/* Left/Main Leaderboard Card */}
-                                <Card className="p-6 border border-border/50 bg-card shadow-sm rounded-xl md:col-span-2 space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Trophy className="h-5 w-5 text-amber-500" />
-                                            <h4 className="text-sm font-black tracking-tight uppercase text-foreground">Peer Leaderboard (Grocery Segment)</h4>
+                                {/* Core Health Matrix & Performance Pillars */}
+                                <Card className="p-8 border border-border/50 bg-card shadow-sm rounded-xl">
+                                    <div className="mx-auto flex flex-col lg:flex-row items-center justify-between gap-12 py-4">
+                                        {/* Left side circular score display */}
+                                        <div className="flex flex-col items-center text-center shrink-0 w-full lg:w-72">
+                                            <div className="relative w-48 h-48 flex items-center justify-center rounded-full border-[10px] border-emerald-500/20 bg-emerald-500/5">
+                                                {/* Circular border track matching image */}
+                                                <div className="absolute inset-0 rounded-full border-[6px] border-emerald-500 border-t-transparent animate-spin-slow opacity-85" style={{ transform: 'rotate(45deg)' }} />
+                                                <div className="flex flex-col items-center leading-none">
+                                                    <span className="text-6xl font-black tracking-tight text-foreground">
+                                                        {userScore}
+                                                    </span>
+                                                    <span className="text-[10px] font-extrabold tracking-widest text-emerald-500 uppercase mt-2">Score</span>
+                                                </div>
+                                            </div>
+                                            <h3 className="text-2xl font-black text-emerald-500 mt-6 leading-none">
+                                                {userScore >= 90 ? 'Elite' : userScore >= 75 ? 'Strong' : userScore >= 50 ? 'Fair' : 'Needs Attention'}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground mt-2 font-medium">
+                                                {userScore === 0 ? "You have not added any products yet." : `Your inventory setup is superior to ${Math.max(10, Math.floor(userScore * 0.8))}% of grocery retailers globally.`}
+                                            </p>
                                         </div>
-                                        <span className="text-[10px] bg-muted border text-muted-foreground px-2 py-0.5 rounded-full font-bold">Global</span>
-                                    </div>
-                                    <div className="divide-y divide-border/40">
-                                        {/* Top 3 Global Competitors */}
-                                        {leaderboard.slice(0, 3).map((peer) => (
-                                            <div key={peer.rank} className="flex items-center justify-between py-3">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-sm font-black text-muted-foreground w-6 text-center">
-                                                        {peer.rank === 1 ? '🥇' : peer.rank === 2 ? '🥈' : '🥉'}
-                                                    </span>
-                                                    <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-xs font-black text-amber-600">
-                                                        {peer.initials}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-bold text-foreground">{peer.name}</p>
-                                                        <p className="text-[10px] text-muted-foreground">{peer.details}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-extrabold text-foreground">{peer.score}</span>
-                                                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">
-                                                        {peer.tag}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
 
-                                        {/* Ellipsis separator if user is lower rank */}
-                                        {userRank > 5 && (
-                                            <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
-                                                ... {userRank - 4} other global competitors ...
-                                            </div>
-                                        )}
-
-                                        {/* User context slice (immediate competitors directly above & below) */}
-                                        {leaderboard.filter(p => p.rank >= userRank - 1 && p.rank <= userRank + 1 && p.rank > 3).map((peer) => (
-                                            <div 
-                                                key={peer.rank} 
-                                                className={cn(
-                                                    "flex items-center justify-between py-3 px-2 -mx-2 my-0.5 transition-all duration-300",
-                                                    peer.isUser ? "bg-primary/5 border border-primary/20 rounded-lg my-1 animate-pulse" : "opacity-75"
-                                                )}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <span className={cn("text-sm w-6 text-center font-bold", peer.isUser ? "text-primary font-black animate-bounce" : "text-muted-foreground")}>
-                                                        {peer.rank}
+                                        {/* Right side metrics list */}
+                                        <div className="flex-1 w-full space-y-6">
+                                            {/* Metric 1 */}
+                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                                <div className="flex justify-between items-center text-sm font-semibold">
+                                                    <span className="text-foreground flex items-center gap-1.5">
+                                                        Availability <span className="text-xs text-muted-foreground font-normal">· 35% Weight</span>
                                                     </span>
-                                                    <div className={cn(
-                                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
-                                                        peer.isUser ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                                                    )}>
-                                                        {peer.initials}
-                                                    </div>
-                                                    <div>
-                                                        <p className={cn("text-sm font-bold", peer.isUser ? "text-foreground font-extrabold" : "text-foreground")}>
-                                                            {peer.name}
-                                                        </p>
-                                                        <p className={cn("text-[10px]", peer.isUser ? "text-primary font-bold" : "text-muted-foreground")}>
-                                                            {peer.details}
-                                                        </p>
-                                                    </div>
+                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0} / 100</span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={cn("text-sm font-extrabold", peer.isUser ? "text-primary font-black" : "text-foreground")}>
-                                                        {peer.score}
-                                                    </span>
-                                                    <span className={cn(
-                                                        "text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded",
-                                                        peer.isUser ? "bg-emerald-500/15 text-emerald-600" : "bg-emerald-500/10 text-emerald-500"
-                                                    )}>
-                                                        {peer.tag}
-                                                    </span>
+                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                    <div
+                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0}%` }}
+                                                    />
                                                 </div>
+                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                    {userScore === 0 ? "No inventory data available." : "Reorder points are set correctly. Only a few items currently out of stock."}
+                                                </p>
                                             </div>
-                                        ))}
 
-                                        {/* Bottom ellipsis separator if there are more below */}
-                                        {userRank < 398 && (
-                                            <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
-                                                ... {400 - userRank - 1} other global competitors ...
+                                            {/* Metric 2 */}
+                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                                <div className="flex justify-between items-center text-sm font-semibold">
+                                                    <span className="text-foreground flex items-center gap-1.5">
+                                                        Efficiency <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
+                                                    </span>
+                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0} / 100</span>
+                                                </div>
+                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                    <div
+                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                    {userScore === 0 ? "No sales velocity data." : "Turnover velocity is moderate. Some dead stock items identified."}
+                                                </p>
                                             </div>
-                                        )}
+
+                                            {/* Metric 3 */}
+                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                                <div className="flex justify-between items-center text-sm font-semibold">
+                                                    <span className="text-foreground flex items-center gap-1.5">
+                                                        Data Quality <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
+                                                    </span>
+                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0} / 100</span>
+                                                </div>
+                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                    <div
+                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                    {userScore === 0 ? "Missing SKU, Image, or Category data." : "Key fields are reasonably complete for most products."}
+                                                </p>
+                                            </div>
+
+                                            {/* Metric 4 */}
+                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
+                                                <div className="flex justify-between items-center text-sm font-semibold">
+                                                    <span className="text-foreground flex items-center gap-1.5">
+                                                        Integrity <span className="text-xs text-muted-foreground font-normal">· 15% Weight</span>
+                                                    </span>
+                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0} / 100</span>
+                                                </div>
+                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
+                                                    <div
+                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
+                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
+                                                    {userScore === 0 ? "No transaction logs." : "Logs are extremely consistent. Few manual corrections made."}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </Card>
 
-                                {/* Competition Rules / Gamification Explainer */}
-                                <Card className="p-6 border border-border/50 bg-gradient-to-br from-amber-500/5 to-transparent rounded-xl flex flex-col justify-between">
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2 text-amber-500">
-                                            <Sparkles className="h-5 w-5 animate-spin-slow" />
-                                            <span className="text-sm font-black tracking-tight uppercase">Leaderboard Mechanics</span>
+                                {/* Peer Leaderboard & Competition Panel */}
+                                <div className="grid gap-6 md:grid-cols-3">
+                                    {/* Left/Main Leaderboard Card */}
+                                    <Card className="p-6 border border-border/50 bg-card shadow-sm rounded-xl md:col-span-2 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Trophy className="h-5 w-5 text-amber-500" />
+                                                <h4 className="text-sm font-black tracking-tight uppercase text-foreground">Peer Leaderboard (Grocery Segment)</h4>
+                                            </div>
+                                            <span className="text-[10px] bg-muted border text-muted-foreground px-2 py-0.5 rounded-full font-bold">Global</span>
                                         </div>
-                                        <p className="text-xs text-muted-foreground leading-relaxed">
-                                            Competition ranking is computed daily. Merchants gain points by improving reorder point coverage, reducing dead stock capital, and maintaining clean catalog descriptions.
-                                        </p>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between text-[11px] font-bold">
-                                                <span className="text-muted-foreground">Log Accuracy</span>
-                                                <span className="text-emerald-500">+15 pts</span>
+                                        <div className="divide-y divide-border/40">
+                                            {/* Top 3 Global Competitors */}
+                                            {leaderboard.slice(0, 3).map((peer) => (
+                                                <div key={peer.rank} className="flex items-center justify-between py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-sm font-black text-muted-foreground w-6 text-center">
+                                                            {peer.rank === 1 ? '🥇' : peer.rank === 2 ? '🥈' : '🥉'}
+                                                        </span>
+                                                        <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-xs font-black text-amber-600">
+                                                            {peer.initials}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-foreground">{peer.name}</p>
+                                                            <p className="text-[10px] text-muted-foreground">{peer.details}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-extrabold text-foreground">{peer.score}</span>
+                                                        <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">
+                                                            {peer.tag}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {/* Ellipsis separator if user is lower rank */}
+                                            {userRank > 5 && (
+                                                <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
+                                                    ... {userRank - 4} other global competitors ...
+                                                </div>
+                                            )}
+
+                                            {/* User context slice (immediate competitors directly above & below) */}
+                                            {leaderboard.filter(p => p.rank >= userRank - 1 && p.rank <= userRank + 1 && p.rank > 3).map((peer) => (
+                                                <div
+                                                    key={peer.rank}
+                                                    className={cn(
+                                                        "flex items-center justify-between py-3 px-2 -mx-2 my-0.5 transition-all duration-300",
+                                                        peer.isUser ? "bg-primary/5 border border-primary/20 rounded-lg my-1 animate-pulse" : "opacity-75"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={cn("text-sm w-6 text-center font-bold", peer.isUser ? "text-primary font-black animate-bounce" : "text-muted-foreground")}>
+                                                            {peer.rank}
+                                                        </span>
+                                                        <div className={cn(
+                                                            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
+                                                            peer.isUser ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                                                        )}>
+                                                            {peer.initials}
+                                                        </div>
+                                                        <div>
+                                                            <p className={cn("text-sm font-bold", peer.isUser ? "text-foreground font-extrabold" : "text-foreground")}>
+                                                                {peer.name}
+                                                            </p>
+                                                            <p className={cn("text-[10px]", peer.isUser ? "text-primary font-bold" : "text-muted-foreground")}>
+                                                                {peer.details}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn("text-sm font-extrabold", peer.isUser ? "text-primary font-black" : "text-foreground")}>
+                                                            {peer.score}
+                                                        </span>
+                                                        <span className={cn(
+                                                            "text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded",
+                                                            peer.isUser ? "bg-emerald-500/15 text-emerald-600" : "bg-emerald-500/10 text-emerald-500"
+                                                        )}>
+                                                            {peer.tag}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {/* Bottom ellipsis separator if there are more below */}
+                                            {userRank < 398 && (
+                                                <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
+                                                    ... {400 - userRank - 1} other global competitors ...
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Card>
+
+                                    {/* Competition Rules / Gamification Explainer */}
+                                    <Card className="p-6 border border-border/50 bg-gradient-to-br from-amber-500/5 to-transparent rounded-xl flex flex-col justify-between">
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 text-amber-500">
+                                                <Sparkles className="h-5 w-5 animate-spin-slow" />
+                                                <span className="text-sm font-black tracking-tight uppercase">Leaderboard Mechanics</span>
                                             </div>
-                                            <div className="flex items-center justify-between text-[11px] font-bold">
-                                                <span className="text-muted-foreground">Dead Stock below 10%</span>
-                                                <span className="text-emerald-500">+25 pts</span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-[11px] font-bold">
-                                                <span className="text-muted-foreground">Perfect Catalog Details</span>
-                                                <span className="text-emerald-500">+20 pts</span>
+                                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                                Competition ranking is computed daily. Merchants gain points by improving reorder point coverage, reducing dead stock capital, and maintaining clean catalog descriptions.
+                                            </p>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between text-[11px] font-bold">
+                                                    <span className="text-muted-foreground">Log Accuracy</span>
+                                                    <span className="text-emerald-500">+15 pts</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[11px] font-bold">
+                                                    <span className="text-muted-foreground">Dead Stock below 10%</span>
+                                                    <span className="text-emerald-500">+25 pts</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[11px] font-bold">
+                                                    <span className="text-muted-foreground">Perfect Catalog Details</span>
+                                                    <span className="text-emerald-500">+20 pts</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="pt-4 border-t border-border mt-4 text-[10px] text-muted-foreground">
-                                        Ranks reset at the end of the month. Keep logs consistent to retain your commander badge!
-                                    </div>
-                                </Card>
-                            </div>
+                                        <div className="pt-4 border-t border-border mt-4 text-[10px] text-muted-foreground">
+                                            Ranks reset at the end of the month. Keep logs consistent to retain your commander badge!
+                                        </div>
+                                    </Card>
+                                </div>
 
 
-                        </TabsContent>
-                      </>
-                  )}
+                            </TabsContent>
+                        </>
+                    )}
                 </Tabs>
             </FeatureGate>
         </div>

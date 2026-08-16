@@ -4,7 +4,7 @@ import * as React from 'react';
 import {
   Loader2, Play, Square, Download, AlertTriangle, Info, RefreshCw, Terminal,
   Sun, Moon, Monitor, Smartphone, Music, KeyRound, CheckCircle2, Video, Trash2,
-  Eye, EyeOff, Mic,
+  Eye, EyeOff, Mic, Sparkles, Globe, SlidersHorizontal,
 } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,14 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { adminApiFetch, AdminApiError, adminApiBase } from '@/lib/admin-api';
 import { RecorderLive } from '@/components/admin/recorder-live';
+import { StudioToolbar, type ToolbarGroup } from '@/components/admin/recorder-toolbar';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { RecorderRecipe } from '@/components/admin/recorder-recipe';
 import { FlowTitleCards } from '@/components/admin/recorder-cards';
 import { RecorderTrim } from '@/components/admin/recorder-trim';
 import {
   FLOWS, DEVICES, FLOW_IDS, DEVICE_IDS, THEME_IDS, FPS_RANGE, QUALITY_RANGE,
-  VOICE_IDS, VOICES, VOICE_STYLE_MAX, DEFAULT_RECORD_URL,
+  VOICE_IDS, VOICES, VOICE_STYLE_MAX, DEFAULT_RECORD_URL, STYLE_IDS, STYLES, RECORD_TARGETS,
   cleanRecordUrl, defaultRequest, takeCount, estimateSeconds, durationLabel,
   type Recipe, type RecorderRequest, type RecorderStatus, type RecorderTake,
   type FlowId, type DeviceId, type ThemeId, type VoiceId,
@@ -120,6 +122,15 @@ export function RecorderPanel() {
 
   const lastJob = status?.job ?? null;
   const wasJustDone = lastJob && lastJob.state === 'done' && lastJob.takes.length > 0;
+
+  /**
+   * Whether the tool drawer under the viewport is open.
+   *
+   * Open by default. A studio whose controls are hidden on arrival looks broken
+   * rather than tidy, and every one of these existed as a visible card before —
+   * collapsing is for once you have set them, not for first sight.
+   */
+  const [toolsOpen, setToolsOpen] = React.useState(true);
 
   const start = async () => {
     setStarting(true);
@@ -227,6 +238,121 @@ export function RecorderPanel() {
   const target = req.url === null ? DEFAULT_RECORD_URL : cleanRecordUrl(req.url);
   const badUrl = req.url !== null && target === null;
   const remote = target !== null && !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(target);
+
+  /*
+   * The toolbar is the *transport* bar, not a second copy of the inspector.
+   *
+   * Where to record, and go. Everything that configures a take — flows, device,
+   * theme, style, audio, voice — stays in the drawer below, in its original
+   * markup. Reproducing those controls up here would mean two editors for one
+   * piece of state, and the second one always drifts.
+   */
+  const matchedTarget = RECORD_TARGETS.find((t) => t.url === (target ?? ''));
+
+  const toolbarGroups: ToolbarGroup[] = [
+    {
+      id: 'target',
+      label: 'Target',
+      // Named, not the raw URL: "Production" is the fact that matters, and a URL
+      // is too long for a trigger. The full address is in the popover.
+      summary: badUrl ? 'Invalid URL' : matchedTarget?.label ?? 'Custom',
+      icon: Globe,
+      attention: badUrl,
+      width: 'sm',
+      content: (
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-medium">Where to record</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              A hosted target needs nothing running locally.
+            </p>
+          </div>
+          <div className="grid gap-1.5">
+            {RECORD_TARGETS.map((t) => {
+              const on = (target ?? '') === t.url;
+              return (
+                <button
+                  key={t.url}
+                  type="button"
+                  disabled={running}
+                  aria-pressed={on}
+                  // Local resolves to null rather than the literal default, so a
+                  // request that never touched this field keeps behaving as one
+                  // that could not have.
+                  onClick={() => setReq((r) => ({
+                    ...r,
+                    url: t.url === DEFAULT_RECORD_URL ? null : t.url,
+                  }))}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-left transition-colors',
+                    'disabled:pointer-events-none disabled:opacity-50',
+                    on
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                      : 'border-border hover:border-primary/40 hover:bg-muted/40',
+                  )}
+                >
+                  <span className={cn('block text-sm font-medium', on && 'text-primary')}>
+                    {t.label}
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                    {t.url}
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">
+                    {t.note}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            A different address, or a port, goes in <span className="font-medium">App to record</span> in
+            the tools below.
+          </p>
+        </div>
+      ),
+    },
+  ];
+
+  /*
+   * Record stays out of every popover: it is the one control that must never be
+   * more than one click away, and it is the reason a transport bar exists.
+   *
+   * The same `start` and the same disabled conditions as the button in the drawer,
+   * referenced rather than reimplemented — two record buttons that could disagree
+   * about whether a run is allowed would be a genuinely nasty bug.
+   */
+  const transport = (
+    <>
+      {/*
+        A plain button, not `CollapsibleTrigger`. The trigger reads its state from
+        Radix context, and the toolbar is a *sibling* of the `Collapsible` rather
+        than a child — using it here throws at render. The Collapsible is
+        controlled through `open`/`onOpenChange` anyway, so toggling the state
+        directly is both correct and less machinery.
+      */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="gap-1.5"
+        aria-expanded={toolsOpen}
+        onClick={() => setToolsOpen((o) => !o)}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        {toolsOpen ? 'Hide tools' : 'Tools'}
+      </Button>
+      <Button
+        size="sm"
+        className="gap-2"
+        disabled={!!blocked || noCreds || noFfmpeg || badUrl || starting || running}
+        onClick={start}
+      >
+        {starting || running
+          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          : <Play className="h-3.5 w-3.5" />}
+        {running ? 'Recording' : `Record ${count}`}
+      </Button>
+    </>
+  );
 
   return (
     <div className="space-y-6">
@@ -407,16 +533,35 @@ export function RecorderPanel() {
         </Card>
       )}
 
-      {/* ------------------------------------------------ live view
+      {/* ------------------------------------------------ the editor
 
-          Above the grid rather than inside a column, because it is the thing to
-          look at while a take runs and a 340px sidebar cannot show a 1920px
-          browser. It stays mounted when nothing is recording: it costs one small
-          poll a second, and having the panel already there is what makes the
-          first frame appear instantly rather than after a layout shift. */}
-      <RecorderLive onFinished={refresh} />
+          Viewport first and tallest, controls under it in a drawer. The old shape
+          had this backwards: `RecorderLive` was capped at 58vh and sat above a
+          two-column stack of nine cards, so the one thing an operator watches was
+          the smallest thing on screen and everything that is set once a session
+          was the largest.
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          Nothing was removed to do this. Every control is the same markup in the
+          same order, one `Collapsible` deeper — which is also why this is safe: a
+          mistake here is a layout that looks wrong, not a feature that stopped
+          working. */}
+      <div className="flex flex-col gap-3">
+        <StudioToolbar groups={toolbarGroups} action={transport} />
+
+        {/*
+          A definite height, not `min-h`. `RecorderLive fill` sizes itself with
+          `h-full`, and a percentage height against an indefinite parent resolves
+          to auto — the picture would collapse to its own content instead of
+          filling. `min-h` then catches short screens, where 62vh is less than a
+          browser frame is worth showing.
+        */}
+        <div className="h-[62vh] min-h-[26rem]">
+          <RecorderLive onFinished={refresh} fill />
+        </div>
+
+        <Collapsible open={toolsOpen} onOpenChange={setToolsOpen}>
+          <CollapsibleContent>
+            <div className="grid gap-6 pt-1 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* ------------------------------------------------ what to record */}
         <div className="space-y-6">
           <Card>
@@ -567,6 +712,87 @@ export function RecorderPanel() {
               </CardContent>
             </Card>
           </div>
+
+          {/* ------------------------------------------------ style */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Style</CardTitle>
+              <CardDescription>
+                How the take is cut. Cinematic is a different pipeline, not a filter —
+                it screenshots the app and animates the stills, so every frame is
+                rendered rather than sampled.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:grid-cols-2">
+              {STYLE_IDS.map((id) => {
+                const on = req.style === id;
+                const Icon = id === 'cinematic' ? Sparkles : Video;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    disabled={running}
+                    onClick={() => setReq((r) => ({ ...r, style: id }))}
+                    aria-pressed={on}
+                    className={cn(
+                      'flex flex-col items-start gap-1.5 rounded-lg border px-3 py-3 text-left transition-all',
+                      'disabled:pointer-events-none disabled:opacity-50',
+                      on
+                        ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                        : 'border-border hover:border-primary/40 hover:bg-muted/40',
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Icon className={cn('h-4 w-4', on ? 'text-primary' : 'text-muted-foreground')} />
+                      <span className={cn('text-sm font-medium', on ? 'text-primary' : 'text-foreground')}>
+                        {STYLES[id].label}
+                      </span>
+                    </span>
+                    <span className="text-[11px] leading-snug text-muted-foreground">
+                      {STYLES[id].hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </CardContent>
+            {req.style === 'cinematic' && (
+              <CardContent className="pt-0">
+                <p className="rounded-md border border-primary/20 bg-primary/5 p-2.5 text-[11px] leading-snug text-muted-foreground">
+                  A still is a still — the take shows the app at the moments it was
+                  screenshotted, not one unbroken session. Use{' '}
+                  <span className="font-medium text-foreground">{STYLES.plain.label}</span>{' '}
+                  when the point is to prove the app really does something in one go.
+                </p>
+              </CardContent>
+            )}
+            {/*
+              Only offered for plain takes. Cinematic moves its camera in the scene,
+              where a push-in is a downscale of a 2x still — so the encode-time
+              punch this switch controls is not part of that pipeline at all, and
+              showing it there would imply a choice that does nothing.
+            */}
+            {req.style === 'plain' && (
+              <CardContent className="pt-0">
+                <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/20 p-3">
+                  <Label htmlFor="rec-punch" className="text-sm font-normal">
+                    Push the camera in
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Frames buttons mid-take. Off by default: the move happens at
+                      encode time, so it upscales captured pixels and text goes soft
+                      past about 1.3&times;. The pause a push creates happens either
+                      way, so pacing is unchanged.
+                    </span>
+                  </Label>
+                  <Switch
+                    id="rec-punch"
+                    checked={req.punch}
+                    disabled={running}
+                    onCheckedChange={(v) => setReq((r) => ({ ...r, punch: v }))}
+                  />
+                </div>
+              </CardContent>
+            )}
+          </Card>
 
           {/* ------------------------------------------------ audio */}
           <Card>
@@ -975,7 +1201,8 @@ export function RecorderPanel() {
               )}
             </CardContent>
           </Card>
-
+        </div>
+        <div className="space-y-6">
           <Card className="border-muted bg-muted/30">
             <CardContent className="flex gap-2.5 p-4">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -994,6 +1221,9 @@ export function RecorderPanel() {
             </CardContent>
           </Card>
         </div>
+      </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       {/* ------------------------------------------------ library */}

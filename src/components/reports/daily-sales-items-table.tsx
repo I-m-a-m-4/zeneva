@@ -16,6 +16,7 @@ import { useFirestore } from '@/firebase';
 import { usePOS } from '@/context/pos-context';
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
+import { trackFeature } from '@/lib/product-telemetry';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import html2canvas from 'html2canvas';
@@ -195,6 +196,9 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       toast({ variant: 'destructive', title: 'No Data', description: 'No items available to export.' });
       return;
     }
+
+    // After the empty guard, so an export of nothing is not counted as one.
+    trackFeature('reports_exported');
 
     const csvData = Papa.unparse(
       filteredItems.map(item => ({

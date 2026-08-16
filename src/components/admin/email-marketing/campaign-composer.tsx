@@ -382,9 +382,9 @@ export default function CampaignComposer({
         <Card>
           <CardHeader className="pb-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Eye className="h-4 w-4 text-primary" />
+                  <Eye className="h-4 w-4 shrink-0 text-primary" />
                   Preview
                 </CardTitle>
                 <CardDescription className="text-xs">
@@ -418,7 +418,7 @@ export default function CampaignComposer({
               )}
             </div>
             {previewProfile && (
-              <p className="pt-1 text-[11px] text-muted-foreground">
+              <p className="min-w-0 break-words pt-1 text-[11px] text-muted-foreground">
                 As seen by <strong>{previewProfile.name || previewProfile.firstName}</strong>{' '}
                 ({previewProfile.email}) · {behaviorContextFor(previewProfile)}
               </p>
@@ -429,7 +429,7 @@ export default function CampaignComposer({
               <>
                 <div className="border-y bg-muted/40 px-4 py-2">
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Subject</p>
-                  <p className="text-sm font-semibold">{preview.subject}</p>
+                  <p className="break-words text-sm font-semibold">{preview.subject}</p>
                 </div>
                 {/*
                   Fully sandboxed iframe, matching the audit dialog in
@@ -445,7 +445,7 @@ export default function CampaignComposer({
                   referrerPolicy="no-referrer"
                   srcDoc={preview.html}
                   title="Campaign email preview"
-                  className="h-[560px] w-full border-0 bg-white"
+                  className="h-[60vh] min-h-[360px] w-full border-0 bg-white"
                 />
               </>
             ) : (

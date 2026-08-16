@@ -86,6 +86,20 @@ export interface UserProfile {
     totalUsageSeconds?: number; // cumulative app usage in seconds (tracked by useSessionTracker)
     pagesVisited?: number; // cumulative page views (tracked by UserActivityTracker)
     pageViews?: Record<string, number>; // per-route view counts; keys normalised by routeKey()
+    /**
+     * Product-intelligence counters, all written by `UserActivityTracker` on its
+     * existing heartbeat so they cost no extra Firestore writes.
+     * See src/lib/product-telemetry.ts for the collector and the event registry.
+     *
+     * `featureUsage` is keyed by a declared event in `FEATURE_EVENTS` — a key that
+     * is not in that registry is dropped rather than stored, because the registry
+     * is what lets the admin board show a feature nobody uses as the zero it is.
+     * `pageDwell` is on-screen time only (the clock stops on tab-hide), and
+     * `pagePerf` times client-side route transitions, never the initial hard load.
+     */
+    featureUsage?: Record<string, number>;
+    pageDwell?: Record<string, { ms: number; n: number }>;
+    pagePerf?: Record<string, { ms: number; n: number }>;
     lastPage?: string; // most recent route this user opened
     appVersion?: string; // Latest app version used by the user
     deviceType?: string; // 'Desktop App' | 'Mobile App' | 'Mobile' | 'Web' - written by UserActivityTracker
@@ -182,6 +196,18 @@ export interface Receipt {
         quantity: number;
         price: number;
         costPrice?: number;
+        /**
+         * True when the cashier typed this price over the shelf price, with
+         * `listPrice` recording what the shelf said at the time.
+         *
+         * Both are captured at the moment of sale because they cannot be
+         * recovered later: comparing a historic sale against the product's
+         * *current* price makes every honest price rise look like an override.
+         * Read by the loss-prevention scan (src/lib/forensics.ts, check D4).
+         * Absent on sales recorded before this was added.
+         */
+        priceOverridden?: boolean;
+        listPrice?: number;
     }[];
     customer?: { id: string, name: string, email: string } | null;
     subtotal: number;

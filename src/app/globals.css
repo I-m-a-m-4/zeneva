@@ -837,8 +837,10 @@ body[data-scroll-locked], html[data-scroll-locked] { margin-right: 0px !importan
   input.text-xs, textarea.text-xs, select.text-xs { font-size: 12px; }
 }
 
-/* Optimize touch interaction and remove click latency on mobile browsers */
+/* Optimize touch interaction and remove 300ms click latency on mobile WebViews */
 a, button, select, input, [role="button"], .clickable {
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
+
 

@@ -379,12 +379,6 @@ export default function DownloadPage() {
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-4">
-                                    <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
-                                        <a href={windowsDownloadUrl}>
-                                            Download Zeneva (113MB)
-                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </a>
-                                    </Button>
                                     <a href={microsoftStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden">
                                         <svg className="w-[180px] h-[54px] block" viewBox="0 0 180 54" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             {/* Background */}
@@ -494,12 +488,9 @@ export default function DownloadPage() {
                                         Native M-series optimization for the most demanding administrative and analytics tasks. Tack-sharp UI for high-resolution Studio Displays and efficient unified memory management.
                                     </p>
                                 </div>
-                                <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
-                                    <a href={macDownloadUrlSilicon}>
-                                        Download Zeneva (116MB)
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                    </a>
-                                </Button>
+                                <div className="text-slate-500 text-sm font-medium italic mt-2">
+                                    Available on the Mac App Store soon.
+                                </div>
                             </div>
 
                             {/* Spec Table */}
@@ -579,12 +570,6 @@ export default function DownloadPage() {
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-4">
-                                    <Button className="bg-[#1e293b] text-white hover:bg-[#0f172a] rounded-md h-auto py-4 px-8 font-medium text-sm tracking-tight gap-3 group font-dm-sans transition-all duration-300 shadow-md" asChild>
-                                        <a href={androidDownloadUrl}>
-                                            Download Zeneva (132MB)
-                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </a>
-                                    </Button>
                                     <a href={googlePlayStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden">
                                         <svg className="w-[180px] h-[54px] block" viewBox="0 0 180 54" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             {/* Background */}
