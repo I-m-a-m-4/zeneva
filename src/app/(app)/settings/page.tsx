@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star, Download, Info } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star, Download, Info, Gauge } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Select,
@@ -243,6 +243,12 @@ function SettingsPageContent() {
     const [loyaltyEnabled, setLoyaltyEnabled] = React.useState(false);
     const [pointsPerUnit, setPointsPerUnit] = React.useState('1');
 
+    // Business rating opt-in. A Switch is binary and the stored flag has three
+    // states, so `undefined` (never asked) hydrates to off here — the switch being
+    // visible *is* the asking, and saving it therefore records a real decision
+    // either way. See the field note in `src/types.ts`.
+    const [ratingEnabled, setRatingEnabled] = React.useState(false);
+
     const [industry, setIndustry] = React.useState('');
     const [country, setCountry] = React.useState('Nigeria');
     const [state, setState] = React.useState('');
@@ -283,6 +289,7 @@ function SettingsPageContent() {
 
             setLoyaltyEnabled(business.settings.loyaltyProgramEnabled || false);
             setPointsPerUnit(String(business.settings.pointsPerUnit || 1));
+            setRatingEnabled(business.settings?.ratingEnabled === true);
 
             setIndustry(business.settings?.industry || '');
             setCountry(business.settings?.country || 'Nigeria');
@@ -980,6 +987,35 @@ function SettingsPageContent() {
                                 </Button>
                             </div>
                         </CardContent>
+                    </Card>
+                )}
+
+                {isOwnerOrAdmin && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Gauge className="h-5 w-5 text-primary" />Business Rating</CardTitle>
+                            <CardDescription>
+                                A score out of 100 built from your own sales, with the biggest money opportunity it can find. Off unless you ask for it.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5 pe-4">
+                                    <Label htmlFor="rating-switch" className="text-base">Show my business rating</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Turning this off hides the score everywhere &mdash; the top bar, the dashboard, Reports, the badges on Achievements, and Zen AI. Nothing is deleted, and your streak keeps counting, so switching it back on picks up where you left off.
+                                    </p>
+                                </div>
+                                <Switch id="rating-switch" checked={ratingEnabled} onCheckedChange={setRatingEnabled} />
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            {/* Dotted field path, as everywhere on this page: it merges into the
+                                existing `settings` map instead of replacing it. */}
+                            <Button type="button" onClick={() => handleSettingsSubmit('rating', { 'settings.ratingEnabled': ratingEnabled })} disabled={isSaving["rating"]}>
+                                {isSaving["rating"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}Save Rating Preference
+                            </Button>
+                        </CardFooter>
                     </Card>
                 )}
 

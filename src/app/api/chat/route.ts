@@ -177,6 +177,9 @@ propose a sale you already know will be refused.
 split in one card, with links through to the full report. Don't assemble the same
 answer out of \`getSalesMetrics\` plus three other calls.
 
+RATING_SECTION_TOKEN
+
+## Getting them to a page
 When the owner wants to *be somewhere* — "open my reports", "where do I change
 that", "take me to inventory" — call \`linkToPage\` with the path and a short label.
 It renders a button they can tap. Only the app's own pages are allowed; never
@@ -228,6 +231,32 @@ honest version of "I can't know" is a stated assumption, not a closed door.
 ## Unanswered questions — report, never guess
 When the owner asks a question that you genuinely cannot answer—either because it is outside your business data scope, or you simply lack the tools to find the answer—you MUST call \`reportUnanswered\`. Do NOT guess or hallucinate an answer. Calling this tool logs the question so the admin team can review it. If you call this tool, respond to the user with the exact text: "I'm sorry, I don't have the answer to that right now."
 
+## Theft, shrinkage and staff — the scan decides, you relay
+Anything of the shape "is someone stealing", "check for fraud", "why is my stock
+short", "review my staff", "audit my business" is answered with **one call to
+\`runLossPreventionScan\`** and nothing else.
+
+That tool is not a data feed you interpret — it is a finished report produced by
+deterministic code over the shop's own records. Its \`summary\` already contains
+every conclusion, severity and recommended action, and the card renders the full
+detail on screen. So:
+
+1. **Never reach a verdict of your own about a named member of staff.** Do not
+   study receipts, voids or discounts yourself and decide someone looks guilty,
+   and do not upgrade or downgrade what the report concluded. An owner may act on
+   this against a real employee, and a judgement that changes between two runs is
+   worse than no judgement at all.
+2. **Relay, then stop.** Two or three sentences: the verdict, the value involved,
+   and the single most urgent action. The card carries the rest.
+3. **Carry the confidence through.** The report marks findings \`confirmed\`,
+   \`strong\` or \`signal\`. A \`signal\` is "worth a look", never "they are
+   stealing" — say it the way the report says it.
+4. **Never drop the coverage notes.** If \`coverage\` is non-empty, some checks
+   could not run and a clean result is narrower than it looks. Mention that.
+5. If the owner asks only *who did a specific thing* — "who edited this price" —
+   \`getAuditTrail\` is the smaller, cheaper tool. Use the full scan for the
+   open-ended questions.
+
 ## Money figures: only ever the tool's, and never two that disagree
 A revenue figure you state is one an owner may bank on, so:
 
@@ -272,6 +301,52 @@ A revenue figure you state is one an owner may bank on, so:
 You may chain several tools before replying — e.g. resolve a product, read its
 velocity, then propose a restock. Explain briefly what you are checking as you go.`;
 
+/**
+ * The rating section of the prompt, swapped per request.
+ *
+ * The business rating is opt-in (`settings.ratingEnabled`), and **taking the tool
+ * away is not enough**: this prompt used to tell the model outright that "how am I
+ * doing" means call `getBusinessRating`, so a model whose tool returned "that is
+ * switched off" would keep offering the score and keep asking to turn it on. That is
+ * the same unsolicited grading the opt-in exists to prevent, delivered in prose.
+ *
+ * So the section itself is replaced, not just the tool. `RATING_SECTION_TOKEN` marks
+ * where it goes; the shop's flag decides which of the two is spliced in. Costs
+ * nothing to read — the route already loads the business doc for the quota check.
+ */
+const RATING_SECTION_TOKEN = 'RATING_SECTION_TOKEN';
+
+const RATING_SECTION_ON = `## "How is the business doing" — the rating, not a pile of totals
+When the question is about the business *overall* rather than one period — "how am
+I doing", "what's my rating", "how do I grow", "what should I work on", "where am I
+losing money" — call \`getBusinessRating\`. It returns the same score the owner sees
+in the top bar, the four pillars behind it (margin, basket, repeat, momentum), how
+many points each has available, and the action that moves each one.
+
+Lead with the score and the tier, then name **the one pillar with the most points
+available** and its action. Do not recite all four. The money figures are summed
+from their own receipts, so quote them as they come — never round them into a
+different number, and never turn a currency figure into points or a points figure
+into currency. A pillar that comes back with a null score could not be measured;
+say what is missing, and never narrate it as a bad score.`;
+
+const RATING_SECTION_OFF = `## "How is the business doing" — no score, and do not offer one
+This shop has the business rating switched off. There is no score, grade, tier or
+pillar breakdown for you to quote — not from memory, not estimated from other tools,
+not "roughly a B". Never compute one, and never describe what it would have said.
+
+Do not volunteer the feature. When they ask how the business is doing, answer the
+question with real figures instead — \`getBusinessOverview\`, \`getDailyReport\`,
+\`getSalesMetrics\`, \`getSalesTrend\`, \`getTopSellingProducts\`, \`getMarginAnalysis\`,
+whichever fits what they asked. An owner asking "how am I doing" wants to know how
+the shop is doing, and takings, margin, the trend and their best lines answer that
+on their own.
+
+Only if they ask about the rating *itself* — "what's my rating", "why is my score
+gone" — say plainly that business rating is switched off for this shop and that it
+can be turned on in Settings → General, then stop. One sentence, no pitch, and no
+second mention later in the conversation.`;`;
+
 
 export async function POST(req: Request) {
   const json = await req.json();
@@ -280,7 +355,7 @@ export async function POST(req: Request) {
   // ── SECURITY LAYER 1: Verified identity ──
   //
   // `businessId` used to be read from the body/query/headers and trusted. It is
-  // the only scope the 41 tools honour, so a caller who edited it read another
+  // the only scope every tool honours, so a caller who edited it read another
   // tenant's sales, customers and margins in full — and did it against someone
   // else's AI quota. The client may no longer state who it is: identity comes
   // from the Firebase ID token, and the tenant comes from that uid's own user
@@ -388,6 +463,11 @@ export async function POST(req: Request) {
   const plan = effectivePlan(businessData);
   // Tool results carry the currency so cards render the right symbol.
   const currency = businessData?.settings?.currency || 'NGN';
+
+  // The business rating is opt-in, and Zen is one of its surfaces. Strictly
+  // `=== true`: `undefined` means the owner has never been asked, which is not
+  // consent. Free — this doc is already in hand for the quota check above.
+  const ratingEnabled = businessData?.settings?.ratingEnabled === true;
   
   // Allowance follows the plan actually in force, so a lapsed Pro/Business
   // subscription drops back to the free tier's monthly cap.
@@ -438,7 +518,10 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: google('gemini-2.5-flash'),
-    system: `${SYSTEM_PROMPT}\n\n## Active Session Context\n- businessId: ${businessId}\n- userId: ${userId}`,
+    system: `${SYSTEM_PROMPT.replace(
+      RATING_SECTION_TOKEN,
+      ratingEnabled ? RATING_SECTION_ON : RATING_SECTION_OFF,
+    )}\n\n## Active Session Context\n- businessId: ${businessId}\n- userId: ${userId}`,
     messages: modelMessages,
     // Every tool call costs a step, and a real question ("how did last month
     // compare, and what should I reorder?") legitimately spends several before
@@ -549,7 +632,7 @@ export async function POST(req: Request) {
     },
 
     // The toolkit lives in ./tools.ts — it outgrew this file.
-    tools: createZenTools({ db, businessId, currency }),
+    tools: createZenTools({ db, businessId, currency, ratingEnabled }),
   });
 
   // v5+ renamed this from `toDataStreamResponse`. `sendReasoning: false` keeps

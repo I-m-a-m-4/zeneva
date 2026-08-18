@@ -849,6 +849,8 @@ const fr: Messages = {
     healthOutOfStock: 'Rupture de stock',
     healthLowStock: 'Stock faible (≤5)',
     healthMissingImages: 'Images manquantes',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'Produits',
     productsDescription: 'Gérez vos produits et suivez leurs performances de vente.',
     scanningCatalogs: 'Analyse du catalogue…',

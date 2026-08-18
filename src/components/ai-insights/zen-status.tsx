@@ -47,6 +47,7 @@ const TOOL_LINES: Record<string, string> = {
   getDataHealthCheck: 'Auditing inventory data',
   getSalesMetrics: 'Totalling the takings',
   getDailyReport: 'Closing off the day book',
+  getBusinessRating: 'Rating the business',
   linkToPage: 'Finding the right page',
   explainHowTo: 'Writing out the steps',
   getSalesTrend: 'Plotting the sales curve',
@@ -66,6 +67,7 @@ const TOOL_LINES: Record<string, string> = {
   getBranchPerformance: 'Comparing branches',
   getStaffPerformance: 'Totalling sales per staff',
   getAuditTrail: 'Reading the audit trail',
+  runLossPreventionScan: 'Sweeping for losses',
   getBusinessOverview: 'Taking a full stock-take',
   proposeStockAdjustment: 'Drafting a stock adjustment',
   proposePriceChange: 'Drafting a price change',
@@ -73,6 +75,7 @@ const TOOL_LINES: Record<string, string> = {
   proposeRestock: 'Drafting a restock',
   proposeLowStockThreshold: 'Drafting a threshold change',
   proposeSale: 'Ringing up the sale',
+  reportUnanswered: 'Logging what I could not answer',
 };
 
 export function labelForTool(toolName: string): string {

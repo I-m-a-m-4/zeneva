@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, orderBy, deleteDoc, doc, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { BarChart3, Loader2, Send, Smartphone, Trash2 } from 'lucide-react';
@@ -25,6 +25,8 @@ import { updateDoc } from 'firebase/firestore';
 import { PushAnalytics } from '@/components/admin/push-analytics';
 import { pushAlertToPhones } from '@/actions/notifications';
 import { idToken } from '@/lib/id-token';
+import { NOTIFICATION_FETCH_LIMIT } from '@/lib/lifecycle-notifications';
+import { notificationDetailLink } from '@/lib/notification-links';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,12 +44,15 @@ const notificationSchema = z.object({
   link: z.string().optional(),
   targetEmail: z.string().email("Invalid email format").or(z.literal("")).optional(),
   /**
-   * Opt-in, and off by default on purpose.
+   * On by default.
    *
-   * This form only ever wrote an in-app `notifications` document, so an alert
-   * marked "sent" reached the bell icon and never anyone's phone. Adding the push
-   * unconditionally would have silently turned every existing draft-and-send habit
-   * into a platform-wide phone buzz, so it is a switch the sender has to reach for.
+   * It was off, and that is the whole reason a broadcast never reached a phone: the
+   * form wrote an in-app document, reported "Notification Sent", and never pushed.
+   * It was defaulted off out of caution when the push was added, on the reasoning
+   * that turning it on silently would convert an existing draft-and-send habit into
+   * a platform-wide buzz. In practice the opposite happened — the cautious default
+   * became a send button that quietly did half the job. It is still a switch, so a
+   * genuinely in-app-only notice is one tap away.
    */
   pushToPhones: z.boolean().optional(),
 });
@@ -156,12 +161,17 @@ export default function AdminNotificationsPage() {
     const [notificationToDelete, setNotificationToDelete] = React.useState<AdminNotification | null>(null);
 
     const form = useForm<NotificationFormValues>({
+        // `link` starts blank so the default destination is the announcement's own
+        // detail view. It used to default to `/support`, which sent every recipient
+        // to the support chat — a page with nothing to say about what was announced.
         resolver: zodResolver(notificationSchema),
-        defaultValues: { title: "", body: "", link: "/support", targetEmail: "", pushToPhones: false },
+        defaultValues: { title: "", body: "", link: "", targetEmail: "", pushToPhones: true },
     });
 
     const notificationsQuery = useMemoFirebase(
-        () => query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc')),
+        // Bounded. This was unbounded, so opening the admin page downloaded every
+        // announcement ever sent — a cost that only ever grows.
+        () => query(collection(firestore, 'notifications'), orderBy('createdAt', 'desc'), limit(NOTIFICATION_FETCH_LIMIT)),
         [firestore]
     );
     const { data: notifications, isLoading } = useCollection<AdminNotification>(notificationsQuery);
@@ -184,8 +194,9 @@ export default function AdminNotificationsPage() {
             // spreading it into the doc would put a stray field on every record.
             const { pushToPhones, ...notification } = values;
 
-            await addDoc(collection(firestore, 'notifications'), {
+            const created = await addDoc(collection(firestore, 'notifications'), {
                 ...notification,
+                link: values.link?.trim() || null,
                 targetEmail: values.targetEmail || null,
                 sentBy: user.uid,
                 createdAt: serverTimestamp(),
@@ -197,7 +208,7 @@ export default function AdminNotificationsPage() {
             const audience = values.targetEmail ? `Notification targeted to ${values.targetEmail}` : 'Your notification has been sent to all users.';
 
             if (!pushToPhones) {
-                toast({ variant: 'success', title: 'Notification Sent', description: audience });
+                toast({ variant: 'success', title: 'Notification Sent', description: `${audience} No phone push — that switch was off.` });
             } else {
                 // The in-app document is already saved at this point. A failed push
                 // therefore has to be reported as a partial success, not as a failure —
@@ -205,7 +216,11 @@ export default function AdminNotificationsPage() {
                 const result = await pushAlertToPhones({
                     title: values.title,
                     body: values.body,
-                    link: values.link || '/notifications',
+                    // With no explicit link, the push points at the announcement's own
+                    // detail view rather than at `/notifications` generally, so a tap
+                    // opens the thing that was sent. The document id only exists after
+                    // the write above, which is why this cannot be baked into the form.
+                    link: values.link?.trim() || notificationDetailLink({ id: created.id, isGlobal: true }),
                     targetEmail: values.targetEmail || null,
                     idToken: await idToken(),
                 });
@@ -221,7 +236,7 @@ export default function AdminNotificationsPage() {
                 }
             }
 
-            form.reset({ title: "", body: "", link: "/support", targetEmail: "", pushToPhones: false });
+            form.reset({ title: "", body: "", link: "", targetEmail: "", pushToPhones: true });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Send Failed', description: error.message || 'An unexpected error occurred.' });
         } finally {
@@ -333,8 +348,11 @@ export default function AdminNotificationsPage() {
                                         )}/>
                                         <FormField control={form.control} name="link" render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Target link</FormLabel>
-                                                <FormControl><Input placeholder="e.g., /support or /terminal-alerts" {...field} /></FormControl>
+                                                <FormLabel>Target link (optional)</FormLabel>
+                                                <FormControl><Input placeholder="e.g., /terminal-alerts" {...field} /></FormControl>
+                                                <FormDescription>
+                                                    Leave blank to open the announcement itself.
+                                                </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}/>
@@ -369,7 +387,8 @@ export default function AdminNotificationsPage() {
                                                     </FormLabel>
                                                     <FormDescription className="text-xs">
                                                         Sends a real device notification on top of the in-app alert, and
-                                                        records who opens it under Analytics.
+                                                        records who opens it under Analytics. Turn it off for an
+                                                        in-app-only notice.
                                                     </FormDescription>
                                                 </div>
                                                 <FormControl>

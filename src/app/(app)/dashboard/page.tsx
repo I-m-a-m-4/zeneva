@@ -4,6 +4,7 @@ import *as React from 'react';
 import dynamic from 'next/dynamic';
 import PageTitle from '@/components/shared/page-title';
 import SummaryCard from '@/components/dashboard/summary-card';
+import TodaysFocus from '@/components/dashboard/todays-focus';
 import {
   DollarSign,
   Package,
@@ -495,6 +496,10 @@ export default function DashboardPage() {
           </Button>
         </div>
       </PageTitle>
+
+      {/* The one thing worth doing today, from the business rating. Gated with the
+          revenue cards below — it quotes money, so it follows the same permission. */}
+      {!isRestricted && <TodaysFocus />}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr">
         {!isRestricted && (

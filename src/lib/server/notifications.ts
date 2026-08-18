@@ -67,7 +67,8 @@ export async function sendNotificationToUser(
             notification: {
                 title: payload.title,
                 body: payload.body,
-                imageUrl: 'https://zeneva.app/zeneva.png',
+                // zeneva.space, not zeneva.app — the latter is not a host we serve.
+                imageUrl: 'https://zeneva.space/zeneva.png',
             },
             data: {
                 url,

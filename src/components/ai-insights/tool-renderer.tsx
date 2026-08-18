@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import Link from 'next/link';
 import { CachedImage } from '@/components/shared/cached-image';
+import { ForensicReportView } from '@/components/audit/forensic-report';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
@@ -1201,6 +1202,22 @@ export function ToolResult({ output, onApprove, onReject, onPick }: {
       return <MetricTiles result={output} />;
     case 'TABLE':
       return <DataTable result={output} />;
+    case 'LOSS_SCAN':
+      // The same report component the audit log page renders, so a scan looks
+      // identical whether it was asked for in chat or run from the button.
+      // Evidence chips deep-link out rather than opening a dialog here — there
+      // is no audit-log table in the chat to open one against.
+      return (
+        <div className="w-full">
+          <ForensicReportView report={output.report} />
+          {output.truncated > 0 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {output.truncated} further finding(s) not shown here — open the Audit Log page for the
+              complete report.
+            </p>
+          )}
+        </div>
+      );
     default:
       // Untagged results are summarised by the model in prose.
       return null;

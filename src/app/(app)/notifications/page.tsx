@@ -2,28 +2,49 @@
 
 import * as React from 'react';
 import { useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, limit, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, limit, doc, writeBatch, updateDoc } from 'firebase/firestore';
 import { usePOS } from '@/context/pos-context';
 import type { UserNotification, AdminNotification } from '@/types';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { safeToDate, cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Globe, X, CheckCircle2, Trash2, ArrowLeft } from 'lucide-react';
+import { Bell, Globe, X, CheckCircle2, Trash2, ArrowLeft, ExternalLink, ArrowUpRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Markdown } from '@/components/ai-insights/markdown';
 import { openExternal } from '@/lib/platform';
 import { collapseDuplicateNotifications, NOTIFICATION_FETCH_LIMIT } from '@/lib/lifecycle-notifications';
+import {
+  filterVisibleAnnouncements,
+  isExternalNotificationLink,
+  notificationDetailLink,
+  resolveNotificationLink,
+} from '@/lib/notification-links';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
+/**
+ * The notification centre, and the place a tapped notification always lands.
+ *
+ * `?n=<id>` opens a per-user notification, `?g=<id>` an announcement. That deep link
+ * is what {@link resolveNotificationLink} falls back to, and it is the reason every
+ * notification now has somewhere to go: before this, a tapped broadcast opened
+ * `/support` — a chat window with nothing to say about the announcement — which is
+ * exactly the "nothing shows" complaint.
+ *
+ * Tapping a row opens the detail panel rather than navigating away. The destination,
+ * where the notification has one, is a button inside the panel. One extra tap, and in
+ * exchange the message itself is always readable: an alert whose page has moved, or
+ * that never had a page, used to be a dead end.
+ */
 export default function NotificationsPage() {
   const firestore = useFirestore();
   const { currentUserProfile } = usePOS();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Same bound as the bell listener in the app layout — see
   // NOTIFICATION_FETCH_LIMIT. This page duplicates both of the layout's
@@ -45,7 +66,10 @@ export default function NotificationsPage() {
     if (isLoadingUserNotifications || isLoadingAdminNotifications) return [];
     const combined = [
       ...(userNotifications || []).map(n => ({ ...n, isGlobal: false })),
-      ...(adminNotifications || []).map(n => ({ ...n, read: true, isGlobal: true }))
+      // Soft-deleted announcements, and announcements addressed to somebody else,
+      // are not this viewer's — see filterVisibleAnnouncements.
+      ...filterVisibleAnnouncements(adminNotifications as any[], currentUserProfile?.email)
+        .map(n => ({ ...n, read: true, isGlobal: true })),
     ];
     combined.sort((a, b) => {
       const dateA = safeToDate(a.createdAt);
@@ -56,7 +80,7 @@ export default function NotificationsPage() {
     // the same announcement sitting in Firestore. Fold them to the newest copy
     // rather than deleting anyone's data. Operational alerts pass through.
     return collapseDuplicateNotifications(combined as any[]);
-  }, [userNotifications, adminNotifications, isLoadingUserNotifications, isLoadingAdminNotifications]);
+  }, [userNotifications, adminNotifications, currentUserProfile?.email, isLoadingUserNotifications, isLoadingAdminNotifications]);
 
   // Counted off the collapsed list so the badge matches what is actually on
   // screen. "Mark all read" and "Clear All" still act on every raw document,
@@ -66,7 +90,40 @@ export default function NotificationsPage() {
     [allNotifications]
   );
 
-  const handleMarkAsRead = React.useCallback(async () => {
+  /* --- the detail panel, driven entirely by the URL ----------------------- */
+
+  const selectedUserId = searchParams.get('n');
+  const selectedGlobalId = searchParams.get('g');
+  const selectedId = selectedUserId || selectedGlobalId;
+
+  const selected = React.useMemo(() => {
+    if (!selectedId) return null;
+    const wantGlobal = !!selectedGlobalId;
+    return (
+      allNotifications.find((n: any) => n.id === selectedId && !!n.isGlobal === wantGlobal) || null
+    );
+  }, [allNotifications, selectedId, selectedGlobalId]);
+
+  const closeDetail = React.useCallback(() => {
+    // replace, not push: a tapped notification should not leave a history entry
+    // that the back button walks straight back into.
+    router.replace('/notifications', { scroll: false });
+  }, [router]);
+
+  const markAsRead = React.useCallback(async (notif: any) => {
+    if (!currentUserProfile || !firestore) return;
+    if (notif.isGlobal || notif.read) return;
+    try {
+      await updateDoc(
+        doc(firestore, `users/${currentUserProfile.id}/notifications`, notif.id),
+        { read: true }
+      );
+    } catch (e) {
+      console.error('Error marking notification as read:', e);
+    }
+  }, [currentUserProfile, firestore]);
+
+  const handleMarkAllAsRead = React.useCallback(async () => {
     if (!currentUserProfile || unreadCount === 0 || !userNotifications || !firestore) return;
     const batch = writeBatch(firestore);
     userNotifications.forEach(notif => {
@@ -109,43 +166,34 @@ export default function NotificationsPage() {
     }
   }, [currentUserProfile, userNotifications, firestore, toast]);
 
-  const getNotificationLink = React.useCallback((notif: any): string => {
-    if (notif.link) return notif.link;
-    if (notif.type === 'billing' || notif.body?.toLowerCase().includes('expire') || notif.body?.toLowerCase().includes('subscribe') || notif.title?.toLowerCase().includes('subscription')) return '/billing';
-    if (notif.type === 'inventory' || notif.body?.toLowerCase().includes('stock') || notif.body?.toLowerCase().includes('backorder')) return '/inventory';
-    if (notif.type === 'sale' || notif.body?.toLowerCase().includes('order')) return '/online-orders';
-    if (notif.type === 'sync') return '/audit-log';
-    if (notif.isGlobal) return '/support';
-    return '/';
-  }, []);
+  const handleNotificationClick = React.useCallback((notif: any) => {
+    void markAsRead(notif);
+    router.replace(notificationDetailLink(notif), { scroll: false });
+  }, [markAsRead, router]);
 
-  const handleNotificationClick = React.useCallback(async (notif: any) => {
-    if (!currentUserProfile || !firestore) return;
-    
-    // Mark as read if user notification
-    if (!notif.isGlobal && !notif.read) {
-      try {
-        const notifRef = doc(firestore, `users/${currentUserProfile.id}/notifications`, notif.id);
-        const { updateDoc } = await import('firebase/firestore');
-        await updateDoc(notifRef, { read: true });
-      } catch (e) {
-        console.error("Error marking notification as read:", e);
-      }
+  /**
+   * The destination button inside the panel, or null.
+   *
+   * Only shown when the notification points somewhere other than this page — a
+   * "Go to notifications" button on the notifications page is noise.
+   */
+  const selectedDestination = React.useMemo(() => {
+    if (!selected) return null;
+    const link = resolveNotificationLink(selected as any);
+    if (!link || link.startsWith('/notifications')) return null;
+    return link;
+  }, [selected]);
+
+  const openDestination = React.useCallback(async () => {
+    if (!selectedDestination) return;
+    // window.open is a no-op inside the Tauri webview, so store listings and other
+    // off-app URLs have to be handed to the shell.
+    if (isExternalNotificationLink(selectedDestination)) {
+      await openExternal(selectedDestination);
+      return;
     }
-
-    const targetLink = getNotificationLink(notif);
-
-    // Store links and other external URLs go through openExternal: window.open
-    // is a no-op inside the Tauri webview, so on desktop and Android the
-    // "download us on the Microsoft Store" notification did nothing at all.
-    // openExternal hands off to the OS and prefers the ms-windows-store deep
-    // link so the Store app opens rather than a browser tab.
-    if (/^https?:\/\//i.test(targetLink)) {
-      await openExternal(targetLink);
-    } else {
-      router.push(targetLink);
-    }
-  }, [currentUserProfile, firestore, router, getNotificationLink]);
+    router.push(selectedDestination);
+  }, [selectedDestination, router]);
 
   return (
     <div className="max-w-4xl mx-auto py-6 sm:py-10 px-4">
@@ -166,21 +214,21 @@ export default function NotificationsPage() {
           </div>
           <p className="text-muted-foreground">Manage your system alerts, updates, and messages.</p>
         </div>
-        
+
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button 
-            variant="outline" 
-            className="flex-1 sm:flex-none border-primary/20 text-primary hover:bg-primary/5" 
-            onClick={handleMarkAsRead} 
+          <Button
+            variant="outline"
+            className="flex-1 sm:flex-none border-primary/20 text-primary hover:bg-primary/5"
+            onClick={handleMarkAllAsRead}
             disabled={unreadCount === 0}
           >
             <CheckCircle2 className="mr-2 h-4 w-4" />
             Mark all read
           </Button>
-          <Button 
-            variant="outline" 
-            className="flex-1 sm:flex-none border-destructive/20 text-destructive hover:bg-destructive/10" 
-            onClick={handleClearAll} 
+          <Button
+            variant="outline"
+            className="flex-1 sm:flex-none border-destructive/20 text-destructive hover:bg-destructive/10"
+            onClick={handleClearAll}
             disabled={!userNotifications || userNotifications.length === 0}
           >
             <Trash2 className="mr-2 h-4 w-4" />
@@ -201,23 +249,23 @@ export default function NotificationsPage() {
         ) : allNotifications.length > 0 ? (
           <div className="grid gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {allNotifications.map((notif) => (
-              <Card 
-                key={notif.id} 
+              <Card
+                key={notif.id}
                 className={cn(
-                  "overflow-hidden border transition-all hover:shadow-md cursor-pointer group hover:bg-muted/30", 
+                  "overflow-hidden border transition-all hover:shadow-md cursor-pointer group hover:bg-muted/30",
                   !notif.isGlobal && !notif.read ? 'bg-primary/5 border-l-4 border-l-primary shadow-sm' : 'bg-card border-border/40 shadow-sm'
                 )}
                 onClick={() => handleNotificationClick(notif)}
               >
                 <CardContent className="p-4 sm:p-5 flex gap-4">
                   <div className={cn(
-                    "h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-full flex items-center justify-center transition-colors", 
-                    notif.isGlobal ? 'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20' : 
+                    "h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-full flex items-center justify-center transition-colors",
+                    notif.isGlobal ? 'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20' :
                     !notif.read ? 'bg-primary text-primary-foreground shadow-md' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
                   )}>
                     {notif.isGlobal ? <Globe className="h-5 w-5 sm:h-6 sm:w-6" /> : <Bell className="h-5 w-5 sm:h-6 sm:w-6" />}
                   </div>
-                  
+
                   <div className="flex-1 space-y-1.5 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
                       <h4 className={cn(
@@ -230,19 +278,19 @@ export default function NotificationsPage() {
                         {notif.createdAt ? formatDistanceToNow(safeToDate(notif.createdAt), { addSuffix: true }) : ''}
                       </span>
                     </div>
-                    
+
                     <Markdown className="text-sm text-muted-foreground leading-relaxed break-words pr-8">
                       {notif.body || ''}
                     </Markdown>
-                    
+
                     <div className="pt-2 flex items-center gap-3">
                       <Badge variant="secondary" className={cn(
                         "text-[10px] font-mono py-0 px-2 h-5 flex items-center",
                         notif.isGlobal ? 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20' : 'bg-primary/10 text-primary hover:bg-primary/20'
                       )}>
-                        {notif.isGlobal ? 'SYSTEM BROADCAST' : (notif.type || 'ACCOUNT ALERT').toUpperCase()}
+                        {notif.isGlobal ? 'SYSTEM BROADCAST' : ((notif as any).type || 'ACCOUNT ALERT').toUpperCase()}
                       </Badge>
-                      
+
                       {!notif.isGlobal && (
                         <Button
                           variant="ghost"
@@ -278,6 +326,73 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+
+      {/* The detail panel. Open whenever the URL names a notification — including on
+          a cold start from a tapped OS notification, which is the case that matters
+          most and the one where nothing used to be shown. */}
+      <Sheet open={!!selectedId} onOpenChange={(open) => { if (!open) closeDetail(); }}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto sm:max-w-2xl sm:mx-auto rounded-t-2xl">
+          {selected ? (
+            <>
+              <SheetHeader className="text-left space-y-3 pr-8">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary" className={cn(
+                    "text-[10px] font-mono py-0 px-2 h-5 flex items-center",
+                    selected.isGlobal ? 'bg-blue-500/10 text-blue-600' : 'bg-primary/10 text-primary'
+                  )}>
+                    {selected.isGlobal ? 'SYSTEM BROADCAST' : ((selected as any).type || 'ACCOUNT ALERT').toUpperCase()}
+                  </Badge>
+                  {selected.createdAt && (
+                    <span className="text-xs text-muted-foreground">
+                      {format(safeToDate(selected.createdAt), 'PPp')}
+                    </span>
+                  )}
+                </div>
+                <SheetTitle className="text-xl font-bold leading-snug">{selected.title}</SheetTitle>
+              </SheetHeader>
+
+              <div className="py-5">
+                <Markdown className="text-sm leading-relaxed text-foreground/90 break-words">
+                  {selected.body || ''}
+                </Markdown>
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 border-t pt-4">
+                <Button variant="ghost" onClick={closeDetail}>Close</Button>
+                {selectedDestination && (
+                  <Button onClick={openDestination} className="gap-2">
+                    {isExternalNotificationLink(selectedDestination) ? (
+                      <>Open link <ExternalLink className="h-4 w-4" /></>
+                    ) : (
+                      <>Go to {selectedDestination.replace(/^\//, '')} <ArrowUpRight className="h-4 w-4" /></>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </>
+          ) : (
+            /* The id is in the URL but not in the fetched window. Rather than an
+               empty panel, say so — the alternative reads as a broken tap. */
+            <>
+              <SheetHeader className="text-left">
+                <SheetTitle className="text-lg font-bold">
+                  {isLoadingUserNotifications || isLoadingAdminNotifications
+                    ? 'Opening notification…'
+                    : 'This notification is no longer available'}
+                </SheetTitle>
+              </SheetHeader>
+              {!(isLoadingUserNotifications || isLoadingAdminNotifications) && (
+                <p className="py-5 text-sm text-muted-foreground">
+                  It may have been cleared, or it is older than the most recent {NOTIFICATION_FETCH_LIMIT} shown here.
+                </p>
+              )}
+              <div className="flex justify-end border-t pt-4">
+                <Button variant="ghost" onClick={closeDetail}>Close</Button>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -782,6 +782,8 @@ const zh: Messages = {
     healthOutOfStock: '缺货',
     healthLowStock: '库存不足（≤5）',
     healthMissingImages: '缺少图片',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: '商品',
     productsDescription: '管理商品并查看它们的销售表现。',
     scanningCatalogs: '正在扫描商品目录…',

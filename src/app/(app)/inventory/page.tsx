@@ -191,7 +191,8 @@ function InventoryPageContent() {
     searchProducts,
     searchProductsByField,
     fetchMoreProducts,
-    queuedActions
+    queuedActions,
+    isImpersonating
   } = usePOS();
 
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -203,7 +204,7 @@ function InventoryPageContent() {
   const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('all');
-  const [healthFilter, setHealthFilter] = React.useState<'all'|'missing-image'|'out-of-stock'|'low-stock'|'negative'>('all');
+  const [healthFilter, setHealthFilter] = React.useState<'all'|'missing-image'|'out-of-stock'|'low-stock'|'negative'|'missing-cost-price'>('all');
   const [isManualSearching, setIsManualSearching] = React.useState(false);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
@@ -349,13 +350,14 @@ function InventoryPageContent() {
   }, [products, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
 
   const healthMetrics = React.useMemo(() => {
-    if (!products) return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, total: 0, score: 0, availabilityScore: 0, completenessScore: 0, accuracyScore: 0 };
-    let missing = 0, oos = 0, low = 0, neg = 0, total = 0;
+    if (!products) return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, missingCostPrice: 0, total: 0, score: 0, availabilityScore: 0, completenessScore: 0, accuracyScore: 0, costCompletenessScore: 0 };
+    let missing = 0, oos = 0, low = 0, neg = 0, missingCost = 0, total = 0;
     products.forEach(p => {
       let isUnhealthy = false;
       // A missing image is worth flagging on a service too — it still shows on
       // the storefront. The three stock counts below are not: see `isService`.
       if (!p.imageUrl) { missing++; isUnhealthy = true; }
+      if (p.costPrice === undefined || p.costPrice === null || p.costPrice === 0) { missingCost++; isUnhealthy = true; }
       if (!isService(p)) {
         if (p.stock === 0) { oos++; isUnhealthy = true; }
         if (p.stock !== undefined && p.stock > 0 && p.stock <= 5) { low++; isUnhealthy = true; }
@@ -366,17 +368,18 @@ function InventoryPageContent() {
 
     const totalItems = products.length;
     if (totalItems === 0) {
-       return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, total: 0, score: 100, availabilityScore: 100, completenessScore: 100, accuracyScore: 100 };
+       return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, missingCostPrice: 0, total: 0, score: 100, availabilityScore: 100, completenessScore: 100, accuracyScore: 100, costCompletenessScore: 100 };
     }
 
     const availabilityScore = Math.max(0, Math.round(((totalItems - oos) / totalItems) * 100));
     const completenessScore = Math.max(0, Math.round(((totalItems - missing) / totalItems) * 100));
     const accuracyScore = Math.max(0, Math.round(((totalItems - neg) / totalItems) * 100));
+    const costCompletenessScore = Math.max(0, Math.round(((totalItems - missingCost) / totalItems) * 100));
     
     // Overall score is weighted average
-    const score = Math.round((availabilityScore + completenessScore + accuracyScore) / 3);
+    const score = Math.round((availabilityScore + completenessScore + accuracyScore + costCompletenessScore) / 4);
 
-    return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, total, score, availabilityScore, completenessScore, accuracyScore };
+    return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, missingCostPrice: missingCost, total, score, availabilityScore, completenessScore, accuracyScore, costCompletenessScore };
   }, [products]);
 
   const displayedProducts = React.useMemo(() => {
@@ -389,9 +392,11 @@ function InventoryPageContent() {
       if (healthFilter === 'out-of-stock') return !isService(p) && p.stock === 0;
       if (healthFilter === 'low-stock') return !isService(p) && p.stock !== undefined && p.stock > 0 && p.stock <= 5;
       if (healthFilter === 'negative') return !isService(p) && p.stock !== undefined && p.stock < 0;
+      if (healthFilter === 'missing-cost-price') return p.costPrice === undefined || p.costPrice === null || p.costPrice === 0;
 
       // 'all' health issues
       if (!p.imageUrl) return true;
+      if (p.costPrice === undefined || p.costPrice === null || p.costPrice === 0) return true;
       if (isService(p)) return false;
       return p.stock === 0 || (p.stock !== undefined && p.stock > 0 && p.stock <= 5) || (p.stock !== undefined && p.stock < 0);
     });
@@ -866,6 +871,15 @@ function InventoryPageContent() {
                 <span className="text-xs text-orange-600/80 font-medium uppercase tracking-wider">{t('inventory.healthLowStock')}</span>
               </CardContent>
             </Card>
+            <Card 
+              className={cn("flex-1 cursor-pointer transition-all border", healthFilter === 'negative' ? "border-orange-500/50 bg-gradient-to-br from-orange-500/10 via-transparent to-transparent shadow-[inset_0_0_20px_rgba(249,115,22,0.15)]" : "border-transparent hover:bg-red-50/50 dark:hover:bg-red-950/20")}
+              onClick={() => setHealthFilter('negative')}
+            >
+              <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
+                <span className="text-2xl font-bold text-red-500">{healthMetrics.negativeStock}</span>
+                <span className="text-xs text-red-500/80 font-medium uppercase tracking-wider">{t('inventory.healthNegativeStock')}</span>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Middle Column: Overall Score */}
@@ -893,18 +907,22 @@ function InventoryPageContent() {
                   </div>
                 </div>
 
-                <div className="flex w-full justify-between text-[10px] text-muted-foreground uppercase font-medium mt-2 px-2">
-                  <div className="flex flex-col items-center">
+                <div className="flex w-full justify-between text-[9px] text-muted-foreground uppercase font-medium mt-2 px-1 gap-1">
+                  <div className="flex flex-col items-center flex-1">
                     <span>Avail</span>
-                    <span className="text-foreground">{healthMetrics.availabilityScore}%</span>
+                    <span className="text-foreground font-semibold">{healthMetrics.availabilityScore}%</span>
                   </div>
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center flex-1">
                     <span>Complete</span>
-                    <span className="text-foreground">{healthMetrics.completenessScore}%</span>
+                    <span className="text-foreground font-semibold">{healthMetrics.completenessScore}%</span>
                   </div>
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center flex-1">
                     <span>Accur</span>
-                    <span className="text-foreground">{healthMetrics.accuracyScore}%</span>
+                    <span className="text-foreground font-semibold">{healthMetrics.accuracyScore}%</span>
+                  </div>
+                  <div className="flex flex-col items-center flex-1">
+                    <span>Costed</span>
+                    <span className="text-foreground font-semibold">{healthMetrics.costCompletenessScore}%</span>
                   </div>
                 </div>
 
@@ -938,6 +956,15 @@ function InventoryPageContent() {
                 <span className="text-xs text-blue-600/80 font-medium uppercase tracking-wider">{t('inventory.healthMissingImages')}</span>
               </CardContent>
             </Card>
+            <Card 
+              className={cn("flex-1 cursor-pointer transition-all border", healthFilter === 'missing-cost-price' ? "border-orange-500/50 bg-gradient-to-br from-orange-500/10 via-transparent to-transparent shadow-[inset_0_0_20px_rgba(249,115,22,0.15)]" : "border-transparent hover:bg-yellow-50/50 dark:hover:bg-yellow-950/20")}
+              onClick={() => setHealthFilter('missing-cost-price')}
+            >
+              <CardContent className="p-4 flex flex-col justify-center h-full gap-1 text-center">
+                <span className="text-2xl font-bold text-yellow-600">{healthMetrics.missingCostPrice}</span>
+                <span className="text-xs text-yellow-600/80 font-medium uppercase tracking-wider">{t('inventory.healthMissingCostPrice')}</span>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
@@ -948,7 +975,7 @@ function InventoryPageContent() {
           <DialogHeader>
             <DialogTitle>How Your Health Score is Calculated</DialogTitle>
             <DialogDescription>
-              We measure three key retail metrics to determine the health of your inventory. Keep these high to maximize sales and minimize operations issues.
+              We measure four key retail metrics to determine the health of your inventory. Keep these high to maximize sales and minimize operational issues.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -964,9 +991,13 @@ function InventoryPageContent() {
               <h4 className="font-semibold text-sm">3. Accuracy ({healthMetrics.accuracyScore}%)</h4>
               <p className="text-xs text-muted-foreground">Measures how much of your catalog avoids negative stock. Negative stock means you sold items you didn't officially record as received.</p>
             </div>
+            <div className="grid gap-2">
+              <h4 className="font-semibold text-sm">4. Cost Price ({healthMetrics.costCompletenessScore}%)</h4>
+              <p className="text-xs text-muted-foreground">Measures how many products have a cost price set. Cost prices are essential to calculate profit margins and business profit & loss statements.</p>
+            </div>
             <div className="mt-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
               <p className="text-xs text-primary/90 font-medium">
-                <span className="font-bold">Solution:</span> Use the health filters at the top of this page (Out of Stock, Negative Stock, Missing Images) to find and fix these issues!
+                <span className="font-bold">Solution:</span> Use the health filters at the top of this page (Out of Stock, Negative Stock, Missing Images, No Cost Price) to find and fix these issues!
               </p>
             </div>
           </div>
@@ -986,6 +1017,20 @@ function InventoryPageContent() {
           <CardDescription>
             {t('inventory.productsDescription')}
           </CardDescription>
+          {/*
+            Admin-only honesty note. While impersonating, the catalogue sync is
+            capped (see IMPERSONATION_PRODUCT_CAP in pos-context) so viewing an
+            account does not spend the owner's Firestore budget on a full 12,000
+            product pull. Without saying so, 500 rows reads as "this shop has 500
+            products" — a truncation nobody was told about.
+          */}
+          {isImpersonating && products && products.length >= 500 && (
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              Viewing another account: only the first {products.length.toLocaleString()} products were
+              loaded, to avoid a full catalogue sync. Counts and totals on this page cover the loaded
+              items only — every other section (sales, customers, reports) is complete.
+            </p>
+          )}
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-y-auto min-h-0">
           {(isLoading && displayedProducts.length === 0) || products === null ? (

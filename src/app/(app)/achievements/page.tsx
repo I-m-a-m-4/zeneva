@@ -19,29 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { secureStorage } from '@/lib/secure-storage';
-
-const SALES_MILESTONES = [
-    { value: 100000, label: '₦100k in Sales', image: '/badges/sales-pioneer.png' },
-    { value: 500000, label: '₦500k in Sales', image: '/badges/sales-pioneer.png' },
-    { value: 1000000, label: '₦1 Million in Sales', image: '/badges/millionaire-milestone.png' },
-    { value: 5000000, label: '₦5 Million in Sales', image: '/badges/millionaire-milestone.png' },
-    { value: 10000000, label: '₦10 Million in Sales', image: '/badges/five-figure-club.png' },
-    { value: 30000000, label: '₦30 Million in Sales', image: '/badges/five-figure-club.png' },
-    { value: 50000000, label: '₦50 Million in Sales', image: '/badges/high-roller.png' },
-    { value: 100000000, label: '₦100 Million in Sales', image: '/badges/high-roller.png' },
-];
-
-const PRODUCT_MILESTONES = [
-    { value: 100, label: '100 Products Added', image: '/badges/inventory-architect.png' },
-    { value: 500, label: '500 Products Added', image: '/badges/inventory-architect.png' },
-    { value: 1000, label: '1,000 Products Added', image: '/badges/inventory-architect.png' },
-];
-
-const CUSTOMER_MILESTONES = [
-    { value: 50, label: '50 Customers', image: '/badges/community-cultivator.png' },
-    { value: 100, label: '100 Customers', image: '/badges/community-cultivator.png' },
-    { value: 500, label: '500 Customers', image: '/badges/community-cultivator.png' },
-];
+import RatingBadges from '@/components/achievements/rating-badges';
+// Shared with src/lib/notification-rules.ts, so the badge shown here and the
+// notification announcing it can never drift apart.
+import { SALES_MILESTONES, PRODUCT_MILESTONES, CUSTOMER_MILESTONES } from '@/lib/business-milestones';
 
 type GoalMetric = 'totalSales' | 'customerCount';
 interface Goal {
@@ -325,6 +306,10 @@ export default function AchievementsPage() {
     return (
         <div className="space-y-6">
             <PageTitle title="Achievements & Goals" subtitle="Celebrate your milestones and set new targets for your business." />
+
+            {/* Rating badges first: they are the only section here whose progress
+                moves every day, so they are what makes the page worth reopening. */}
+            <RatingBadges />
 
             <Card>
                 <CardHeader>

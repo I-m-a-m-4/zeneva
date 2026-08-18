@@ -134,10 +134,29 @@ third.
 
 ## Quotas
 
-`route.ts` enforces a global daily cap (`platform_stats/ai_usage_global`) and a
-per-business daily cap by plan (starter 20 / pro 100 / business + lifetime 500),
-falling back to `aiBonusCredits`. Usage increments in `onFinish`, so a failed
-turn is not billed.
+Two caps, on **two different periods**, and the doc used to get both wrong:
+
+- **Platform-wide, daily.** `GLOBAL_LIMIT = 1500` turns against
+  `platform_stats/ai_usage_global`, reset by comparing the doc's `date` to today.
+  This one is a spend circuit-breaker, not a per-tenant allowance.
+- **Per business, monthly.** `AI_MONTHLY_LIMITS` in `src/lib/plan.ts` — starter 30,
+  pro 3,000, business 15,000 — resolved through `aiMonthlyLimit(business)` so a
+  lapsed subscription drops back to the free tier. The counter is
+  `aiUsageCount`, and `aiUsageCurrentDate` holds **`YYYY-MM`**, not a day. Read the
+  field name as "the month this count belongs to".
+
+Past the monthly cap the turn falls back to `aiBonusCredits`, a non-expiring
+balance that only an admin can currently grant. Usage increments in `onFinish`, so a
+failed turn is not billed.
+
+**The allowance is stated in four places and only two of them follow the constant.**
+`subscription-section.tsx` imports `AI_MONTHLY_LIMITS`, and `/ai-insights` calls
+`aiMonthlyLimit(businessData)` — both track a change automatically. The pricing page
+does not: its plan bullets are the i18n keys `plans.proF5` and `plans.bizF3`, which
+spell the numbers out in prose (`'Zen AI — 3,000 messages/month'`) **in every locale
+catalog**. Changing an allowance is therefore one constant plus two keys across all
+of `src/lib/i18n/messages/`, or the marketing page quotes a figure the server no
+longer honours.
 
 ## Usage analytics — what is recorded, and what must never be
 
@@ -197,7 +216,7 @@ faithfully writing.
 ## The toolkit lives in `tools.ts`, not `route.ts`
 
 `src/app/api/chat/tools.ts` exports `createZenTools({ db, businessId, currency })`
-and returns all 41 tools. `route.ts` is now only auth, quotas, the system prompt
+and returns all 42 tools. `route.ts` is now only auth, quotas, the system prompt
 and streaming. Add tools there, not in the route.
 
 `route.ts` passes the whole toolkit through with no whitelist, so a tool added to

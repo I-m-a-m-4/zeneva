@@ -825,6 +825,8 @@ const ar: Messages = {
     healthOutOfStock: 'نفد المخزون',
     healthLowStock: 'مخزون منخفض (≤5)',
     healthMissingImages: 'صور ناقصة',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'المنتجات',
     productsDescription: 'أدر منتجاتك واطّلع على أدائها في المبيعات.',
     scanningCatalogs: 'جارٍ فحص قوائم المنتجات…',

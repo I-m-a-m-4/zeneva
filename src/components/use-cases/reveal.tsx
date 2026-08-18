@@ -26,7 +26,12 @@ export function useRevealed<E extends HTMLElement>(threshold = 0.12) {
     }
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        // `top < 0` catches the case the plain intersecting check misses: the
+        // element is already *above* the viewport when the observer attaches, so
+        // it will never enter view and would stay at opacity 0 for good. That is
+        // reachable — a deep link to #flow, a restored scroll position, or the
+        // back button all land mid-page.
+        if (entry.isIntersecting || entry.boundingClientRect.top < 0) {
           setRevealed(true);
           io.disconnect();
         }

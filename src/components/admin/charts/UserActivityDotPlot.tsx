@@ -4,11 +4,12 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserProfile, BusinessInstance } from '@/types';
-import { Grid, Loader } from 'lucide-react';
+import { Grid, Loader, ZoomIn } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useFirestore } from '@/firebase';
-import { getDocs, query, collectionGroup, limit } from 'firebase/firestore';
+import { getDocs, query, collectionGroup, collection, limit, orderBy } from 'firebase/firestore';
 import { withFirestoreRetry } from '@/firebase/retry';
 
 interface UserActivityDotPlotProps {
@@ -20,20 +21,35 @@ export default function UserActivityDotPlot({ users, businesses }: UserActivityD
     const firestore = useFirestore();
     const [journeys, setJourneys] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const rangeDays = 30; // Show the last 30 days on the overview tab
+    const [rangeDays, setRangeDays] = useState(90);
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !users.length) return;
         let cancelled = false;
         setLoading(true);
 
-        withFirestoreRetry(
-            () => getDocs(query(collectionGroup(firestore, 'journey'), limit(2000))),
-            { label: 'Dot Plot journeys' }
-        )
-            .then(snap => {
+        // Fetch recent journeys only for the top 50 most active users to guarantee we get their latest data
+        const topUsers = [...users]
+            .sort((a, b) => (b.totalUsageSeconds || 0) - (a.totalUsageSeconds || 0))
+            .slice(0, 50);
+
+        const fetchPromises = topUsers.map(u => {
+            const q = query(
+                collection(firestore, `users/${u.id}/journey`),
+                orderBy('startedAt', 'desc'),
+                limit(150)
+            );
+            return getDocs(q).then(snap => snap.docs.map(d => ({ 
+                id: d.id, 
+                uid: u.id, 
+                ...(d.data() as any) 
+            })));
+        });
+
+        Promise.all(fetchPromises)
+            .then(results => {
                 if (cancelled) return;
-                setJourneys(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+                setJourneys(results.flat());
             })
             .catch(err => console.error('Failed to load journeys for dot plot', err))
             .finally(() => {
@@ -41,11 +57,11 @@ export default function UserActivityDotPlot({ users, businesses }: UserActivityD
             });
 
         return () => { cancelled = true; };
-    }, [firestore]);
+    }, [firestore, users]);
 
     const { columns, activeUsers, usersByBucket } = useMemo(() => {
         const now = Date.now();
-        const bucketCount = 30;
+        const bucketCount = rangeDays;
         const step = 24 * 60 * 60 * 1000;
         const windowStart = now - rangeDays * 24 * 60 * 60 * 1000;
 
@@ -114,27 +130,61 @@ export default function UserActivityDotPlot({ users, businesses }: UserActivityD
     if (activeUsers.length === 0) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Grid className="h-5 w-5 text-primary" />
-                        Individual User Activity (Dot Plot)
-                    </CardTitle>
-                    <CardDescription>No user activity recorded in the last {rangeDays} days.</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <Grid className="h-5 w-5 text-primary" />
+                            Individual User Activity (Dot Plot)
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                            No user activity recorded in the last {rangeDays} days.
+                        </CardDescription>
+                    </div>
+                    <Select value={rangeDays.toString()} onValueChange={(v) => setRangeDays(parseInt(v))}>
+                        <SelectTrigger className="w-[130px] h-8 text-xs shrink-0">
+                            <SelectValue placeholder="Timeframe" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="7">Last 7 days</SelectItem>
+                            <SelectItem value="14">Last 14 days</SelectItem>
+                            <SelectItem value="30">Last 30 days</SelectItem>
+                            <SelectItem value="60">Last 60 days</SelectItem>
+                            <SelectItem value="90">Last 90 days</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </CardHeader>
             </Card>
         );
     }
 
+    const cellMinWidth = rangeDays > 60 ? 'min-w-[16px]' : rangeDays > 30 ? 'min-w-[24px]' : 'min-w-[32px]';
+    const dotSize = rangeDays > 60 ? 'w-1.5 h-1.5' : rangeDays > 30 ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5';
+    const emptyDotSize = rangeDays > 60 ? 'w-0.5 h-0.5' : rangeDays > 30 ? 'w-1 h-1' : 'w-1.5 h-1.5';
+
     return (
         <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Grid className="h-5 w-5 text-primary" />
-                    Individual User Activity (Dot Plot)
-                </CardTitle>
-                <CardDescription>
-                    Tracks behavior and retention at the individual level. Each row is a user, and a dot represents a value-adding event (app usage/session) on that day. Showing top {activeUsers.length} active users over the last {rangeDays} days.
-                </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between">
+                <div>
+                    <CardTitle className="flex items-center gap-2">
+                        <Grid className="h-5 w-5 text-primary" />
+                        Individual User Activity (Dot Plot)
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                        Tracks behavior and retention at the individual level. Each row is a user, and a dot represents a value-adding event (app usage/session) on that day. Showing top {activeUsers.length} active users over the last {rangeDays} days.
+                    </CardDescription>
+                </div>
+                <Select value={rangeDays.toString()} onValueChange={(v) => setRangeDays(parseInt(v))}>
+                    <SelectTrigger className="w-[130px] h-8 text-xs shrink-0">
+                        <SelectValue placeholder="Timeframe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="7">Last 7 days</SelectItem>
+                        <SelectItem value="14">Last 14 days</SelectItem>
+                        <SelectItem value="30">Last 30 days</SelectItem>
+                        <SelectItem value="60">Last 60 days</SelectItem>
+                        <SelectItem value="90">Last 90 days</SelectItem>
+                    </SelectContent>
+                </Select>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="w-full whitespace-nowrap rounded-md border pb-4">
@@ -146,7 +196,7 @@ export default function UserActivityDotPlot({ users, businesses }: UserActivityD
                             </div>
                             <div className="flex flex-1">
                                 {columns.map(col => (
-                                    <div key={col.key} className="flex-1 min-w-[32px] p-2 text-center flex flex-col justify-end">
+                                    <div key={col.key} className={`flex-1 ${cellMinWidth} p-2 text-center flex flex-col justify-end`}>
                                         <span className="text-[10px] text-muted-foreground -rotate-45 origin-bottom-left block w-full mb-1">
                                             {col.label}
                                         </span>
@@ -171,11 +221,11 @@ export default function UserActivityDotPlot({ users, businesses }: UserActivityD
                                             {columns.map(col => {
                                                 const isActive = usersByBucket.get(col.key)?.has(user.id);
                                                 return (
-                                                    <div key={col.key} className="flex-1 min-w-[32px] flex items-center justify-center p-1 border-r border-dashed border-muted last:border-0">
+                                                    <div key={col.key} className={`flex-1 ${cellMinWidth} flex items-center justify-center p-1 border-r border-dashed border-muted last:border-0`}>
                                                         {isActive ? (
                                                             <Tooltip>
                                                                 <TooltipTrigger asChild>
-                                                                    <div className="w-3.5 h-3.5 rounded-full bg-primary/80 shadow-[0_0_8px_rgba(var(--primary),0.5)] cursor-pointer hover:bg-primary transition-colors hover:scale-125"></div>
+                                                                    <div className={`${dotSize} rounded-full bg-primary/80 shadow-[0_0_8px_rgba(var(--primary),0.5)] cursor-pointer hover:bg-primary transition-colors hover:scale-125`}></div>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>
                                                                     <p className="font-bold text-xs">{displayName}</p>
@@ -183,7 +233,7 @@ export default function UserActivityDotPlot({ users, businesses }: UserActivityD
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                         ) : (
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-muted/20"></div>
+                                                            <div className={`${emptyDotSize} rounded-full bg-muted/20`}></div>
                                                         )}
                                                     </div>
                                                 );

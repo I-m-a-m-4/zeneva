@@ -199,6 +199,7 @@ import {
     type UsageSession,
 } from '@/components/admin/user-detail/usage-insights';
 import ProductIntelligence from '@/components/admin/usage/product-intelligence';
+import NotificationEngagement from '@/components/admin/usage/notification-engagement';
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -1788,6 +1789,13 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
             */}
             <ProductIntelligence users={users} />
 
+            {/*
+                Notification engagement: does the bell earn the interruption.
+                Same deal as above — derived from the `users` and `businesses`
+                arrays this tab already holds, so it costs no extra reads.
+            */}
+            <NotificationEngagement users={users} businesses={businesses} />
+
             <UserUsageDetailDialog
                 user={drillUser}
                 business={businesses.find(b => b.id === drillUser?.businessId)}
@@ -3208,6 +3216,25 @@ function AdminDashboardContent({
                 details: `Admin toggled halt state to: ${newHaltedState ? 'Halted' : 'Active'}.`
             });
 
+            // Tell the owner. A halt stops every till in the shop and the app's own
+            // explanation only appears once they try to use it — until now the only
+            // record of the decision was a `follow_up_logs` document nobody outside
+            // this dashboard can read.
+            await addDoc(collection(firestore, `users/${u.id}/notifications`), {
+                title: newHaltedState ? 'Your account has been suspended' : 'Your account is active again',
+                body: newHaltedState
+                    ? 'Operations for your business have been paused by Zeneva support. Contact us to resolve this and get the till working again.'
+                    : 'Operations for your business have been restored. You can record sales again.',
+                link: '/support',
+                type: 'account',
+                createdAt: serverTimestamp(),
+                read: false,
+            }).catch((notifyErr) => {
+                // The halt itself already committed; failing to announce it must not
+                // report the halt as failed and invite a second attempt.
+                console.warn('Halt notification failed:', notifyErr);
+            });
+
             toast({ 
                 variant: 'success', 
                 title: newHaltedState ? 'Business Halted' : 'Business Resumed', 
@@ -3243,6 +3270,19 @@ function AdminDashboardContent({
                 accessLevel: null, // Ensure plan takes precedence over lifetime
             });
 
+            // An upgrade changes what the app will let them do, so it should not be
+            // something they discover by accident.
+            await addDoc(collection(firestore, `users/${userDoc.id}/notifications`), {
+                title: 'Your plan has been updated',
+                body: `Your business is now on the ${selectedPlan} plan. Any features that plan includes are available immediately.`,
+                link: '/billing',
+                type: 'billing',
+                createdAt: serverTimestamp(),
+                read: false,
+            }).catch((notifyErr) => {
+                console.warn('Plan assignment notification failed:', notifyErr);
+            });
+
             toast({ variant: 'success', title: 'Plan Assigned', description: `${userData.name} is now on the ${selectedPlan} plan.` });
             setPlanUserEmail('');
         } catch (error: any) {
@@ -3276,11 +3316,37 @@ function AdminDashboardContent({
                 link: broadcastLink || null,
             });
 
+            // A `system_broadcasts` document only drives the dismissible banner. It is
+            // read by nothing else — not the bell, and not the document-to-OS bridge —
+            // so a broadcast used to be invisible the moment someone dismissed it, and
+            // never reached a phone at all. The announcement below is the durable
+            // half: it lands in every user's notification centre and raises the native
+            // notification, exactly like an alert sent from /admin-imamshaffy/notifications.
+            let announcementId: string | null = null;
+            try {
+                const announcement = await addDoc(collection(firestore, 'notifications'), {
+                    title: broadcastTitle,
+                    body: broadcastMessage,
+                    link: broadcastLink || null,
+                    targetEmail: null,
+                    sentBy: currentUserProfile?.id || null,
+                    createdAt: serverTimestamp(),
+                    deleted: false,
+                    pushedToPhones: true,
+                });
+                announcementId = announcement.id;
+            } catch (announcementErr) {
+                console.error('Broadcast announcement document failed:', announcementErr);
+            }
+
             // Trigger FCM Native Push Notification to all active users/devices
             try {
                 const { broadcastNotification } = await import('@/actions/notifications');
                 const { idToken } = await import('@/lib/id-token');
-                const pushResult = await broadcastNotification(broadcastTitle, broadcastMessage, broadcastLink || '/', await idToken());
+                // With no explicit link, send the tap to the announcement itself rather
+                // than to `/`, so there is something to read on arrival.
+                const pushLink = broadcastLink || (announcementId ? `/notifications?g=${announcementId}` : '/notifications');
+                const pushResult = await broadcastNotification(broadcastTitle, broadcastMessage, pushLink, await idToken());
                 if (pushResult.success) {
                     toast({ variant: 'success', title: 'Broadcast Sent!', description: `Announcement stored and pushed: ${pushResult.message}` });
                 } else {

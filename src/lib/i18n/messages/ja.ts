@@ -810,6 +810,8 @@ const ja: Messages = {
     healthOutOfStock: '在庫切れ',
     healthLowStock: '在庫わずか（5以下）',
     healthMissingImages: '画像なし',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: '商品',
     productsDescription: '商品を管理し、売れ行きを確認できます。',
     scanningCatalogs: '商品カタログを確認中…',

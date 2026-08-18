@@ -122,6 +122,40 @@ export default {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(200%)' },
         },
+        // ── Business rating ──────────────────────────────────────────────────
+        // The streak flame. Two independent wobbles rather than one, so the body
+        // and the glow drift out of phase and the fire does not pulse like a
+        // heartbeat. Every consumer must gate these on `useReducedMotion` —
+        // a flame that never stops moving is exactly what that setting is for.
+        flicker: {
+          '0%, 100%': { transform: 'scale(1) rotate(-1deg)', opacity: '1' },
+          '25%': { transform: 'scale(1.06) rotate(1.5deg)', opacity: '0.92' },
+          '50%': { transform: 'scale(0.97) rotate(-1.5deg)', opacity: '1' },
+          '75%': { transform: 'scale(1.04) rotate(1deg)', opacity: '0.95' },
+        },
+        emberGlow: {
+          '0%, 100%': { opacity: '0.35', transform: 'scale(1)' },
+          '50%': { opacity: '0.7', transform: 'scale(1.25)' },
+        },
+        // A single spark leaving the flame. Consumers stagger the delay so a
+        // handful of these reads as embers rather than a metronome.
+        ember: {
+          '0%': { opacity: '0', transform: 'translateY(0) scale(0.6)' },
+          '20%': { opacity: '1' },
+          '100%': { opacity: '0', transform: 'translateY(-18px) scale(0.2)' },
+        },
+        /** Ignition — plays once when a streak comes alive, not on a loop. */
+        ignite: {
+          '0%': { transform: 'scale(0.4)', opacity: '0' },
+          '60%': { transform: 'scale(1.25)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        /** Diagonal light crossing a card once on reveal. */
+        sheen: {
+          '0%': { transform: 'translateX(-120%) skewX(-18deg)', opacity: '0' },
+          '40%': { opacity: '0.55' },
+          '100%': { transform: 'translateX(220%) skewX(-18deg)', opacity: '0' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -133,6 +167,11 @@ export default {
         'float': 'float 6s ease-in-out infinite',
         'spin-slow': 'spin 8s linear infinite',
         'shimmer': 'shimmer 1.4s infinite linear',
+        'flicker': 'flicker 2.6s ease-in-out infinite',
+        'ember-glow': 'emberGlow 3.1s ease-in-out infinite',
+        'ember': 'ember 1.9s ease-out infinite',
+        'ignite': 'ignite 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both',
+        'sheen': 'sheen 2.4s cubic-bezier(0.25, 1, 0.5, 1) 0.4s both',
       },
     },
   },

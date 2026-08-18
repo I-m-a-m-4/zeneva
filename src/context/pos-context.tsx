@@ -56,6 +56,89 @@ import { isSubscriptionActive as resolveSubscriptionActive } from '@/lib/plan';
 import { trackFeature } from '@/lib/product-telemetry';
 import { useBranch } from './branch-context';
 
+/*
+ * ── Whose data is in the local cache? ──────────────────────────────────────
+ *
+ * `pos_synced_products` and friends are **single, global keys** — they carry no
+ * businessId, unlike the SQLite mirror which is keyed by one throughout. That is
+ * fine for the ordinary case, where a device only ever holds one business, and
+ * it is why a super-admin impersonating a tenant used to see the *previous*
+ * business's products, customers and receipts: the state initialisers below read
+ * those blobs synchronously at first render, long before anyone knows which
+ * business is now in scope, and the backfills are deliberately gated on "the
+ * cache is empty" to save Firestore reads — so a populated-but-wrong cache is
+ * never corrected, it is trusted.
+ *
+ * Rather than rename the keys (which would orphan every existing install and
+ * trigger a full re-sync for all of them), the owner is recorded alongside and
+ * checked. Two rules:
+ *
+ *   - A marker that disagrees with the current business means the cache is
+ *     someone else's: do not adopt it, and clear it.
+ *   - **A missing marker means a legacy install**, not a mismatch. Those are
+ *     adopted once and stamped, so nobody pays a re-sync for this change.
+ */
+const CACHE_OWNER_KEY = 'pos_cache_owner_business_id';
+
+/** Global-key caches that are only ever valid for one business at a time. */
+const OWNED_CACHE_KEYS = [
+  'pos_synced_products',
+  'pos_synced_customers',
+  'pos_synced_receipts',
+  'pos_synced_users',
+  'pos_synced_audit_logs',
+  'pos_offline_stats',
+  BUSINESS_INSTANCE_KEY,
+];
+
+/**
+ * Products fetched when a super-admin is impersonating rather than trading.
+ *
+ * A full catalogue sync exists so a shop can sell offline. An admin looking at
+ * someone else's account is not going to sell anything, so paging through a
+ * 12,000-product catalogue spends the owner's Firestore budget on nothing. A
+ * slice is enough to see that inventory is present and healthy.
+ *
+ * Everything else — customers, receipts, users, audit log, stats, settings —
+ * still syncs in full: those are what an admin is usually there to look at, they
+ * are far smaller, and a truncated receipt history would make the reports and the
+ * loss-prevention scan silently wrong.
+ */
+const IMPERSONATION_PRODUCT_CAP = 500;
+
+/** Is this page load happening inside an impersonation session? */
+function isImpersonationBoot(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return !!sessionStorage.getItem('zeneva_impersonated_user_id');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Seed a state initialiser from the local cache, unless we are booting into an
+ * impersonation session.
+ *
+ * While impersonating, the impersonated business's id is not knowable
+ * synchronously — sessionStorage holds a *user* id — so there is nothing to
+ * validate the blob against at this point. Seeding empty costs the admin a
+ * moment of skeleton and is the only way to guarantee they are never shown
+ * another tenant's figures. Outside impersonation this behaves exactly as before.
+ */
+function bootCache<T>(key: string): T | null {
+  if (isImpersonationBoot()) return null;
+  return secureStorage.getItem<T>(key);
+}
+
+/** Drop every global-key cache blob, on both storage backends. */
+function purgeOwnedCaches() {
+  for (const key of OWNED_CACHE_KEYS) {
+    secureStorage.removeItem(key);
+    idb.remove(key).catch(() => {});
+  }
+}
+
 interface POSContextType {
   business: BusinessInstance | null;
   products: Product[] | null;
@@ -189,14 +272,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
   const queuedActionsRef = useRef<QueuedAction[]>(queuedActions);
   const [isQueueProcessing, setIsQueueProcessing] = useState(false);
-  const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => secureStorage.getItem<Product[]>('pos_synced_products') || []);
-  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => secureStorage.getItem<Customer[]>('pos_synced_customers') || []);
-  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>(() => secureStorage.getItem<Receipt[]>('pos_synced_receipts') || []);
-  const [syncedUsers, setSyncedUsers] = useState<UserProfile[]>(() => secureStorage.getItem<UserProfile[]>('pos_synced_users') || []);
-  const [syncedAuditLogs, setSyncedAuditLogs] = useState<AuditLog[]>(() => secureStorage.getItem<AuditLog[]>('pos_synced_audit_logs') || []);
+  const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => bootCache<Product[]>('pos_synced_products') || []);
+  const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => bootCache<Customer[]>('pos_synced_customers') || []);
+  const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>(() => bootCache<Receipt[]>('pos_synced_receipts') || []);
+  const [syncedUsers, setSyncedUsers] = useState<UserProfile[]>(() => bootCache<UserProfile[]>('pos_synced_users') || []);
+  const [syncedAuditLogs, setSyncedAuditLogs] = useState<AuditLog[]>(() => bootCache<AuditLog[]>('pos_synced_audit_logs') || []);
   const [offlineProfile, setOfflineProfile] = useState<UserProfile | null>(() => secureStorage.getItem<UserProfile>(USER_PROFILE_KEY));
-  const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => secureStorage.getItem<BusinessInstance>(BUSINESS_INSTANCE_KEY));
-  const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(() => secureStorage.getItem<BusinessStats>('pos_offline_stats'));
+  const [offlineBusiness, setOfflineBusiness] = useState<BusinessInstance | null>(() => bootCache<BusinessInstance>(BUSINESS_INSTANCE_KEY));
+  const [offlineStats, setOfflineStats] = useState<BusinessStats | null>(() => bootCache<BusinessStats>('pos_offline_stats'));
   const [lastSyncedTimestamp, setLastSyncedTimestamp] = useState<number>(() => {
     const stored = secureStorage.getItem<number>('pos_last_synced_timestamp');
     // If no previous sync, default to 24 hours ago to catch recent changes on first load
@@ -380,7 +463,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const userDocRef = useMemoFirebase(() => (user && effectiveUserId && (!isUserLoading || isImpersonating) ? doc(firestore, 'users', effectiveUserId) : null), [user, effectiveUserId, isUserLoading, isImpersonating, firestore, refreshKey]);
   const { data: currentUserProfile } = useDoc<UserProfile>(userDocRef);
   const isProfileReady = !!(user && currentUserProfile && (currentUserProfile.id === user.uid || currentUserProfile.id === impersonatedUserId));
-  const businessId = isProfileReady ? currentUserProfile.businessId : (offlineProfile?.businessId || null);
+  /*
+   * The offline profile is only a valid fallback for the person who actually
+   * signed in.
+   *
+   * `offlineProfile` is the cached profile of the *logged-in* account, so while
+   * impersonating it names the admin's own business. Letting it supply the
+   * businessId meant that reloading the page mid-impersonation resolved to the
+   * admin's business for the first few hundred milliseconds — long enough for the
+   * hydration effect to latch (`hasHydratedRef` never unsets on its own) and load
+   * the admin's own products, which then stayed on screen after the impersonated
+   * profile arrived. Holding at null instead makes hydration wait: the effect
+   * returns early on a null businessId *before* setting that ref, so it re-runs
+   * once the impersonated profile lands.
+   */
+  const businessId = isProfileReady
+    ? currentUserProfile.businessId
+    : (isImpersonating ? null : (offlineProfile?.businessId || null));
 
   const businessDocRef = useMemoFirebase(() => (user && businessId ? doc(firestore, 'businessInstances', businessId) : null), [user, businessId, firestore]);
   const { data: initialBusiness, isLoading: isLoadingBusiness, mutate: mutateBusiness } = useDoc<BusinessInstance>(businessDocRef);
@@ -1030,12 +1129,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchFullProducts = useCallback(async () => {
     const isOnline = isRealOnline;
     if (!user || !businessId || !firestore || isFullSyncingProducts || !isOnline) return;
-    
+
     setIsFullSyncingProducts(true);
     let allFetched: Product[] = [];
     let lastDoc: any = null;
     let hasMore = true;
     const BATCH_SIZE = 2000; // Smaller batch for products due to potential image data/complexity
+    const cap = isImpersonating ? IMPERSONATION_PRODUCT_CAP : Infinity;
 
     try {
       while (hasMore) {
@@ -1043,7 +1143,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
           collection(firestore, "products"),
           where("businessId", "==", businessId),
           orderBy("name", "asc"),
-          limit(BATCH_SIZE)
+          limit(Math.min(BATCH_SIZE, cap - allFetched.length))
         );
         
         if (lastDoc) q = query(q, startAfter(lastDoc));
@@ -1071,9 +1171,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
           lastDoc = snap.docs[snap.docs.length - 1];
           if (snap.docs.length < BATCH_SIZE) hasMore = false;
+          if (allFetched.length >= cap) hasMore = false;
         }
       }
-      
+
+      /*
+       * A capped run must not claim the catalogue is complete.
+       *
+       * `full_products_sync` is what tells this device it may skip the daily
+       * product sync, and it is keyed by business — not by who fetched it. Writing
+       * it after an impersonation slice would leave the *real* owner skipping
+       * their own full sync on this device and trying to sell from 500 of their
+       * 12,000 products. So the stamp, the toast and the completion flag are all
+       * withheld, and the owner's next login syncs as though this never ran.
+       */
+      if (isImpersonating) {
+        setLastSyncMetadata(businessId, 'impersonation_products_peek', Date.now());
+        return;
+      }
+
       setLastSyncMetadata(businessId, 'full_products_sync', Date.now());
       setHasFullSyncedProducts(true);
       
@@ -1092,7 +1208,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setIsFullSyncingProducts(false);
       setHasFullSyncedProducts(true);
     }
-  }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline]);
+  }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline, isImpersonating]);
 
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
@@ -1229,7 +1345,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         if (chunk.length > 1 || (chunk.length === 1 && chunk[0].type === 'complete-sale')) {
           
           const combinedStocks = new Map<string, number>();
-          const consolidatedCust = new Map<string, { totalSpent: number, loyaltyPoints?: number }>();
+          const consolidatedCust = new Map<string, { totalSpent: number, loyaltyPoints?: number, lastPurchaseAt?: Timestamp }>();
           let aggregateSales = 0;
           let aggregateRev = 0;
           let aggregateUnits = 0;
@@ -1276,9 +1392,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
               const cu = action.payload.customerUpdate;
               if (cu && cu.id) {
                 const existing = consolidatedCust.get(cu.id) || { totalSpent: 0 };
+                // `dateVal` is either a real Timestamp (a backdated sale, or one that
+                // sat in the offline queue) or a serverTimestamp sentinel, which
+                // cannot be read or compared client-side. Only the former can be
+                // ordered here; the sentinel case is left undefined and resolved at
+                // flush time. Taking the max matters because several sales to the
+                // same customer consolidate into one write.
+                const saleAt = dateVal instanceof Timestamp ? dateVal : undefined;
                 consolidatedCust.set(cu.id, {
                   totalSpent: existing.totalSpent + (cu.totalSpent || 0),
-                  loyaltyPoints: cu.loyaltyPoints !== undefined ? cu.loyaltyPoints : existing.loyaltyPoints
+                  loyaltyPoints: cu.loyaltyPoints !== undefined ? cu.loyaltyPoints : existing.loyaltyPoints,
+                  lastPurchaseAt:
+                    saleAt && (!existing.lastPurchaseAt || saleAt.toMillis() > existing.lastPurchaseAt.toMillis())
+                      ? saleAt
+                      : existing.lastPurchaseAt,
                 });
               }
             });
@@ -1292,6 +1419,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
               const updatesObj: any = { updatedAt: serverTimestamp() };
               if (data.totalSpent > 0) updatesObj.totalSpent = increment(data.totalSpent);
               if (data.loyaltyPoints !== undefined) updatesObj.loyaltyPoints = data.loyaltyPoints;
+              /**
+               * `lastPurchaseDate` was declared on `Customer` and read in four places
+               * but **never written to Firestore** — the only assignment was inside the
+               * `allCustomers` optimistic memo, which lives in memory and evaporates on
+               * reload. So Zen AI's `getAtRiskCustomers` filtered on a field that was
+               * always undefined and returned zero rows every time, and any "days
+               * since last purchase" feature was dead on arrival.
+               *
+               * Taken from the receipt's own date rather than the clock, so a backdated
+               * or long-queued offline sale records when it actually happened.
+               */
+              updatesObj.lastPurchaseDate = data.lastPurchaseAt ?? serverTimestamp();
               batch.update(doc(firestore, 'customers', cId), updatesObj);
             });
 
@@ -1316,23 +1455,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 hasSecondaryWrites = true;
               }
 
-              chunk.forEach(action => {
-                action.payload.productUpdates.forEach((u: any) => {
-                  const currentProduct = products?.find(p => p.id === u.id);
-                  if (currentProduct && currentProduct.lowStockThreshold && u.newStock <= currentProduct.lowStockThreshold) {
-                    const alertRef = doc(collection(firestore, `users/${effectiveProfile.id}/notifications`));
-                    secondaryBatch.set(alertRef, {
-                      title: "Low Stock Alert",
-                      body: `${currentProduct.name} is running low. Remaining: ${u.newStock}`,
-                      createdAt: serverTimestamp(),
-                      read: false,
-                      type: 'inventory',
-                      productId: currentProduct.id
-                    });
-                    hasSecondaryWrites = true;
-                  }
-                });
-              });
+              // Low-stock alerting used to happen here, with `doc(collection(...))` —
+              // a fresh random id per sale, so the same product raised a brand-new
+              // notification every time anyone sold one of it, and only ever to
+              // whoever was at the till. It now lives in src/lib/notification-rules.ts
+              // behind a deterministic per-product-per-day id, evaluated against the
+              // stock the context already holds, so a repeat is an idempotent
+              // overwrite and the owner is covered too.
 
               if (hasSecondaryWrites) await secondaryBatch.commit();
             } catch (secondaryError) {
@@ -1674,6 +1803,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
     secureStorage.removeItem(BUSINESS_INSTANCE_KEY);
     secureStorage.removeItem('pos_offline_stats');
     secureStorage.removeItem('pos_last_synced_timestamp');
+    // The owner marker is deliberately *left standing*.
+    //
+    // `idb.clear()` above is async and nobody awaits this function, so the
+    // hydration effect can read IndexedDB before the clear lands. Keeping the
+    // outgoing business stamped means the next hydration sees a marker that
+    // disagrees with the new business and refuses the cache outright, instead of
+    // racing an unfinished wipe. A stale marker over an emptied cache is
+    // harmless: empty is exactly what makes the backfills run.
     
     // Clear all sync metadata from localStorage to trigger a fresh full sync on next login
     if (typeof window !== 'undefined') {
@@ -2021,6 +2158,35 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!isMounted || !businessId || hasHydratedRef.current) return;
     hasHydratedRef.current = true;
 
+    /*
+     * Before reading a single row: does the global-key cache belong to *this*
+     * business?
+     *
+     * This is the first point in the lifecycle where the question can be asked —
+     * `businessId` is derived from the (possibly impersonated) profile, which is
+     * not available to the state initialisers above. A blob left behind by
+     * another business must be dropped rather than trusted, because the backfills
+     * below skip whenever the cache looks populated.
+     *
+     * A missing marker is a legacy install, not a mismatch: adopt and stamp it,
+     * so upgrading to this build costs nobody a re-sync.
+     */
+    const cacheOwner = secureStorage.getItem<string>(CACHE_OWNER_KEY);
+    const cacheWasForeign = !!cacheOwner && cacheOwner !== businessId;
+    if (cacheWasForeign) {
+      purgeOwnedCaches();
+      // The initialisers may already have seeded another business's rows into
+      // memory. Clearing storage alone would leave them on screen.
+      setSyncedProducts([]);
+      setSyncedCustomers([]);
+      setSyncedReceipts([]);
+      setSyncedUsers([]);
+      setSyncedAuditLogs([]);
+      setOfflineBusiness(null);
+      setOfflineStats(null);
+    }
+    secureStorage.setItem(CACHE_OWNER_KEY, businessId);
+
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     if (isTauri) {
       // 1. Load Queue
@@ -2071,11 +2237,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
       ]).finally(() => setIsCacheHydrated(true));
     } else {
       // 2. Hydrate POS from IndexedDB for instant startup on Web/PWA (Evades 5MB LocalStorage Cap)
-      Promise.all([
-        idb.get<Product[]>('pos_synced_products').then(p => { if (p && p.length > 0) setSyncedProducts(p); }),
-        idb.get<Customer[]>('pos_synced_customers').then(c => { if (c && c.length > 0) setSyncedCustomers(c); }),
-        idb.get<Receipt[]>('pos_synced_receipts').then(r => { if (r && r.length > 0) setSyncedReceipts(r); }),
-      ]).finally(() => setIsCacheHydrated(true));
+      //
+      // These keys carry no businessId, so a foreign cache must not be read at
+      // all — `purgeOwnedCaches` above is async for IndexedDB and would still be
+      // in flight here. Skipping leaves the state empty, which is what makes the
+      // backfills below run for the business actually in scope.
+      if (cacheWasForeign) {
+        setIsCacheHydrated(true);
+      } else {
+        Promise.all([
+          idb.get<Product[]>('pos_synced_products').then(p => { if (p && p.length > 0) setSyncedProducts(p); }),
+          idb.get<Customer[]>('pos_synced_customers').then(c => { if (c && c.length > 0) setSyncedCustomers(c); }),
+          idb.get<Receipt[]>('pos_synced_receipts').then(r => { if (r && r.length > 0) setSyncedReceipts(r); }),
+        ]).finally(() => setIsCacheHydrated(true));
+      }
     }
   }, [isMounted, businessId, processQueue, isRealOnline, isDesktopApp]);
 
@@ -2142,10 +2317,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user) return;
 
     const checkFullSyncStatus = async () => {
-      const [lastCustSync, lastProdSync, lastReceiptSync] = await Promise.all([
+      const [lastCustSync, lastProdSync, lastReceiptSync, lastProdPeek] = await Promise.all([
         getLastSyncMetadata(businessId, 'full_customers_sync'),
         getLastSyncMetadata(businessId, 'full_products_sync'),
-        getLastSyncMetadata(businessId, 'full_receipts_sync')
+        getLastSyncMetadata(businessId, 'full_receipts_sync'),
+        getLastSyncMetadata(businessId, 'impersonation_products_peek')
       ]);
 
       if (lastProdSync > 0) setHasFullSyncedProducts(true);
@@ -2162,7 +2338,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (now - lastProdSync > dayInterval && !isFullSyncingProducts) {
         fetchFullProducts();
       } else if (lastProdSync <= 0) {
-        fetchFullProducts();
+        /*
+         * While impersonating, a capped run deliberately never writes
+         * `full_products_sync` (see fetchFullProducts), so `lastProdSync` stays 0
+         * and this branch would re-fetch the 500-product slice on every reload.
+         * The peek stamp is the throttle: it is a different key, so it satisfies
+         * nothing for the real owner and cannot make them skip their own sync.
+         */
+        if (isImpersonating && now - lastProdPeek < dayInterval) {
+          // Already peeked at this catalogue today — the cache still has it.
+        } else {
+          fetchFullProducts();
+        }
       }
 
       if (now - lastReceiptSync > dayInterval && !isFullSyncingReceipts) {

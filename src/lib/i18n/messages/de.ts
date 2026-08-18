@@ -833,6 +833,8 @@ const de: Messages = {
     healthOutOfStock: 'Nicht auf Lager',
     healthLowStock: 'Geringer Bestand (≤5)',
     healthMissingImages: 'Fehlende Bilder',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'Produkte',
     productsDescription: 'Verwalte deine Produkte und sieh dir ihre Verkaufszahlen an.',
     scanningCatalogs: 'Katalog wird durchsucht…',

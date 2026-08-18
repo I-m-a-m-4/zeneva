@@ -50,6 +50,8 @@ import {
   collapseDuplicateNotifications,
   NOTIFICATION_FETCH_LIMIT,
 } from '@/lib/lifecycle-notifications';
+import { resolveNotificationLink, isExternalNotificationLink, filterVisibleAnnouncements } from '@/lib/notification-links';
+import { selectDueNotifications } from '@/lib/notification-rules';
 import BusinessHealthIndicator from '@/components/dashboard/business-health-indicator';
 import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -67,6 +69,7 @@ import { logErrorToFirestore } from '@/lib/error-logger';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { UpdateRequiredModal } from '@/components/layout/update-required-modal';
 import { useI18n } from '@/context/i18n-context';
+import { trackFeature } from '@/lib/product-telemetry';
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     width="20"
@@ -188,6 +191,12 @@ export default function AuthenticatedLayout({
     triggerConfetti,
     setIsConfettiActive,
     products,
+    receipts,
+    customers,
+    auditLogs,
+    stats,
+    currencySymbol,
+    isOnline,
     queuedActions,
     isSubscriptionActive,
     onlineOrders,
@@ -258,11 +267,17 @@ export default function AuthenticatedLayout({
         seenIds.push(broadcastData.id);
         localStorage.setItem('zeneva_seen_broadcasts', JSON.stringify(seenIds));
         
-        // Native notification alert
+        // Native notification alert.
+        //
+        // This is the object call shape that used to throw inside `notify` —
+        // `title.toLowerCase()` on an object — with the TypeError swallowed by the
+        // hook's own catch, so this notification had never once appeared. `url` is
+        // explicit now so tapping it opens the chat it is telling them about.
         try {
           notify({
             title: broadcastData.title || "Direct CEO Line",
-            body: broadcastData.message || "Bello Imam is online! Click to chat directly."
+            body: broadcastData.message || "Bello Imam is online! Click to chat directly.",
+            url: '/support',
           });
         } catch (e) {
           console.warn("Failed to show native notification:", e);
@@ -376,16 +391,16 @@ export default function AuthenticatedLayout({
   };
   const fallbackInitials = getInitials(currentUserProfile?.name) || (currentUserProfile?.email || 'U').charAt(0).toUpperCase();
 
-  // Helper: resolve a navigation link for each notification
-  const getNotificationLink = React.useCallback((notif: any): string => {
-    if (notif.link) return notif.link;
-    if (notif.type === 'billing' || notif.body?.toLowerCase().includes('expire') || notif.body?.toLowerCase().includes('subscribe') || notif.title?.toLowerCase().includes('subscription')) return '/billing';
-    if (notif.type === 'inventory' || notif.body?.toLowerCase().includes('stock') || notif.body?.toLowerCase().includes('backorder')) return '/inventory';
-    if (notif.type === 'sale' || notif.body?.toLowerCase().includes('order')) return '/online-orders';
-    if (notif.type === 'sync') return '/audit-log';
-    if (notif.isGlobal) return '/support';
-    return '/';
-  }, []);
+  // Helper: resolve a navigation link for each notification.
+  //
+  // The resolver lives in src/lib/notification-links.ts because this page and
+  // /notifications had two copies of it, and both fell through to `/support` for a
+  // global announcement — so tapping a broadcast opened the support chat instead of
+  // the announcement. It now falls back to the notification's own detail view.
+  const getNotificationLink = React.useCallback(
+    (notif: any): string => resolveNotificationLink(notif),
+    []
+  );
 
   // Both listeners are bounded on the server, not just in the `.slice(0, 20)`
   // below. This layout is persistent, so an unbounded query here re-downloaded
@@ -404,11 +419,19 @@ export default function AuthenticatedLayout({
   );
   const { data: adminNotifications, isLoading: isLoadingAdminNotifications } = useCollection<AdminNotification>(adminNotificationsQuery);
 
+  // Soft-deleted announcements, and announcements addressed to somebody else, are
+  // not this viewer's — see filterVisibleAnnouncements. Shared with the native
+  // bridge below so the bell and the phone always agree on what was sent.
+  const visibleAnnouncements = React.useMemo(
+    () => filterVisibleAnnouncements(adminNotifications as any[], currentUserProfile?.email),
+    [adminNotifications, currentUserProfile?.email]
+  );
+
   const allNotifications = React.useMemo(() => {
     if (isLoadingUserNotifications || isLoadingAdminNotifications) return [];
     const combined = [
       ...(userNotifications || []).map(n => ({ ...n, isGlobal: false })),
-      ...(adminNotifications || []).map(n => ({ ...n, read: true, isGlobal: true }))
+      ...visibleAnnouncements.map(n => ({ ...n, read: true, isGlobal: true }))
     ];
     combined.sort((a, b) => {
       const dateA = safeToDate(a.createdAt);
@@ -419,7 +442,7 @@ export default function AuthenticatedLayout({
     // repeats of the same announcement in Firestore; fold them to the newest
     // copy. Operational alerts are never folded.
     return collapseDuplicateNotifications(combined as any[]).slice(0, 20);
-  }, [userNotifications, adminNotifications, isLoadingUserNotifications, isLoadingAdminNotifications]);
+  }, [userNotifications, visibleAnnouncements, isLoadingUserNotifications, isLoadingAdminNotifications]);
 
   // Counted off the collapsed list so the bell badge matches the list the user
   // opens. Mark-all-read and clear-all still act on every raw document.
@@ -430,6 +453,9 @@ export default function AuthenticatedLayout({
 
   const handleMarkAsRead = React.useCallback(async () => {
     if (!currentUserProfile || unreadCount === 0 || !userNotifications || !firestore) return;
+    // Counted here rather than on the button so a no-op click (nothing unread)
+    // does not read as "wiped the badge" — the guard above has already returned.
+    trackFeature('notif_bell_cleared');
     const batch = writeBatch(firestore);
     userNotifications.forEach(notif => {
       if (!notif.read) {
@@ -469,7 +495,11 @@ export default function AuthenticatedLayout({
 
   const handleNotificationClick = React.useCallback(async (notif: any) => {
     if (!currentUserProfile || !firestore) return;
-    
+
+    // Every tap, read or unread, global or per-user: the question is whether the
+    // bell leads anywhere, not whether this particular row was new.
+    trackFeature('notif_tapped');
+
     // Mark as read if user notification
     if (!notif.isGlobal && !notif.read) {
       try {
@@ -481,30 +511,19 @@ export default function AuthenticatedLayout({
       }
     }
 
-    // Determine navigation link
-    let targetLink = notif.link || notif.url;
-    if (!targetLink) {
-      const titleLower = (notif.title || '').toLowerCase();
-      const bodyLower = (notif.body || '').toLowerCase();
-      if (notif.type === 'ceo_chat' || titleLower.includes('ceo') || titleLower.includes('chat') || bodyLower.includes('bello imam')) {
-        targetLink = '/support';
-      } else if (notif.type === 'order' || titleLower.includes('order')) {
-        targetLink = '/terminal-alerts';
-      } else if (notif.type === 'inventory' || titleLower.includes('stock')) {
-        targetLink = '/inventory';
-      } else {
-        targetLink = '/support';
-      }
-    }
+    // A third copy of the link heuristics used to sit here, and it was the worst of
+    // the three: its final fallback was `/support` for *everything*, so an
+    // announcement, a milestone and an audit alert all opened the support chat.
+    const targetLink = getNotificationLink(notif);
 
-    // See the notifications page: window.open is a no-op in the Tauri webview,
-    // so store links opened from the bell need the shell hand-off too.
-    if (/^https?:\/\//i.test(targetLink)) {
+    // window.open is a no-op in the Tauri webview, so store links opened from the
+    // bell need the shell hand-off too.
+    if (isExternalNotificationLink(targetLink)) {
       await openExternal(targetLink);
     } else {
       router.push(targetLink);
     }
-  }, [currentUserProfile, firestore, router]);
+  }, [currentUserProfile, firestore, router, getNotificationLink]);
 
   const handleConfettiComplete = React.useCallback(() => setIsConfettiActive(false), [setIsConfettiActive]);
 
@@ -614,8 +633,6 @@ export default function AuthenticatedLayout({
 
   // --- End of Hooks ---
   
-  // New Effect: Trigger Push Notifications when new unread notifications arrive
-  const [lastNotifiedId, setLastNotifiedId] = React.useState<string | null>(null);
   const [permissionPopup, setPermissionPopup] = React.useState<{ id: string, title: string, body: string } | null>(null);
 
   const handleClosePermissionPopup = React.useCallback(async () => {
@@ -650,23 +667,52 @@ export default function AuthenticatedLayout({
     }
   }, [userNotifications, permissionPopup]);
 
-  // Native Push Notifications for standard Alerts
+  /**
+   * The bridge from a platform-wide announcement to an operating-system notification.
+   *
+   * This is the half that was broken. An admin broadcast lands in the shared
+   * `notifications` collection, which no other bridge watches — so the announcement
+   * reached the bell and never a phone. The old version of this effect was the only
+   * thing that covered it, and it only ever looked at `allNotifications[0]`: one
+   * newer per-user alert, or two announcements arriving together, and the broadcast
+   * was dropped silently.
+   *
+   * Now every newly-seen announcement is dispatched, tracked by id. The listener it
+   * reads is the one the bell already pays for (`adminNotificationsQuery` above), so
+   * this costs no extra Firestore reads. Per-user documents are bridged separately in
+   * `NativeNotificationListener`; the dispatcher de-duplicates, so the two cannot
+   * double-pop.
+   *
+   * `notifiedAnnouncementsRef` starts populated from the first non-empty render
+   * rather than empty, so opening the app does not replay a backlog. The age check is
+   * the second guard, for a session that has been open across a long offline stretch.
+   */
+  const notifiedAnnouncementsRef = React.useRef<Set<string> | null>(null);
   React.useEffect(() => {
-    if (allNotifications && allNotifications.length > 0) {
-      const latestNotif = allNotifications[0]; // Already ordered by desc createdAt
-      if (latestNotif.id !== lastNotifiedId) {
-        const createdDate = safeToDate(latestNotif.createdAt);
-        const now = new Date();
-        const diffSeconds = (now.getTime() - createdDate.getTime()) / 1000;
+    if (isLoadingAdminNotifications || visibleAnnouncements.length === 0) return;
 
-        // Only notify if the notification is less than 30 seconds old
-        if (diffSeconds < 30) {
-          notify(latestNotif.title, latestNotif.body, getNotificationLink(latestNotif));
-        }
-        setLastNotifiedId(latestNotif.id);
-      }
+    if (notifiedAnnouncementsRef.current === null) {
+      notifiedAnnouncementsRef.current = new Set(visibleAnnouncements.map((n: any) => n.id));
+      return;
     }
-  }, [allNotifications, lastNotifiedId, notify]);
+
+    const seen = notifiedAnnouncementsRef.current;
+    const ANNOUNCEMENT_FRESHNESS_MS = 10 * 60 * 1000;
+
+    visibleAnnouncements.forEach((announcement: any) => {
+      if (seen.has(announcement.id)) return;
+      seen.add(announcement.id);
+
+      const createdAt = announcement.createdAt ? safeToDate(announcement.createdAt).getTime() : Date.now();
+      if (Number.isFinite(createdAt) && Date.now() - createdAt > ANNOUNCEMENT_FRESHNESS_MS) return;
+
+      notify({
+        title: announcement.title,
+        body: announcement.body,
+        url: getNotificationLink({ ...announcement, isGlobal: true }),
+      });
+    });
+  }, [visibleAnnouncements, isLoadingAdminNotifications, notify, getNotificationLink]);
 
   // Support Messages Notifications for User
   React.useEffect(() => {
@@ -836,14 +882,132 @@ export default function AuthenticatedLayout({
 
     batch
       .commit()
-      .then(() => {
-        notify(message.title, message.body, message.link);
-      })
+      // No notify() here on purpose. The batch above writes the notification
+      // document, and NativeNotificationListener raises the popup from that — this
+      // used to fire a second one alongside it.
       .catch((err) => {
         lifecycleWriteInFlight.current = false;
         console.error('Lifecycle notification failed:', err);
       });
-  }, [currentUserProfile, firestore, notify]);
+  }, [currentUserProfile, firestore]);
+
+  // 4. Operational triggers — low stock, milestones, audit risk, close of day.
+  //
+  // The rules live in src/lib/notification-rules.ts and are pure; this effect only
+  // supplies the inputs and performs the write. Everything it reads is already in the
+  // POS context, so the whole feature costs writes and no reads — see the note on
+  // Firestore cost at the top of the notification queries above.
+  //
+  // Two guards that matter:
+  //
+  // - **Never while impersonating.** These write into the tenant's own notification
+  //   feed, and an admin looking around a shop must not leave alerts behind in it.
+  // - **Owner-targeted rules only run for the owner.** Firestore rules do not let a
+  //   staff member write into the owner's notifications, so `selectDueNotifications`
+  //   drops them rather than silently redirecting them to the wrong person.
+  const triggerPassInFlight = React.useRef(false);
+  const triggerSentRef = React.useRef<Set<string> | null>(null);
+  React.useEffect(() => {
+    if (!currentUserProfile || !firestore || !businessInstance || isImpersonating) return;
+    if (triggerPassInFlight.current) return;
+
+    const businessId = businessInstance.id;
+    const storageKey = `zeneva_trg_sent_${businessId}`;
+
+    // Loaded once per business. The deterministic document ids are the durable
+    // backstop — this cache only avoids re-writing the same document on every pass,
+    // and a cleared browser store costs one redundant overwrite, not a duplicate.
+    if (triggerSentRef.current === null) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        triggerSentRef.current = new Set<string>(raw ? JSON.parse(raw) : []);
+      } catch {
+        triggerSentRef.current = new Set<string>();
+      }
+    }
+    const alreadySent = triggerSentRef.current;
+
+    const ownerId = businessInstance.ownerId;
+    const isViewerOwner = ownerId
+      ? currentUserProfile.id === ownerId
+      : currentUserProfile.role === 'admin';
+
+    const expiresAt = isPaidPlan(businessInstance) && (businessInstance as any).trialExpiresAt
+      ? safeToDate((businessInstance as any).trialExpiresAt)
+      : null;
+
+    const due = selectDueNotifications({
+      now: new Date(),
+      currencySymbol: currencySymbol || '₦',
+      isViewerOwner,
+      products,
+      receipts,
+      customers,
+      auditLogs: auditLogs || [],
+      stats,
+      queuedActions: queuedActions || [],
+      isOnline,
+      subscriptionExpiresAt: expiresAt && Number.isFinite(expiresAt.getTime()) ? expiresAt : null,
+      alreadySent,
+    });
+
+    if (due.length === 0) return;
+
+    triggerPassInFlight.current = true;
+
+    // One batch, so the pass either lands or does not. The ids are deterministic, so
+    // a retry after a failure is an overwrite rather than a second copy.
+    const batch = writeBatch(firestore);
+    due.forEach((notification) => {
+      batch.set(
+        doc(firestore, `users/${currentUserProfile.id}/notifications`, notification.id),
+        {
+          title: notification.title,
+          body: notification.body,
+          type: notification.type,
+          link: notification.link || null,
+          createdAt: serverTimestamp(),
+          read: false,
+        }
+      );
+    });
+
+    batch
+      .commit()
+      .then(() => {
+        due.forEach((notification) => alreadySent.add(notification.id));
+        try {
+          // Bounded: a year of daily digests plus a catalogue's worth of per-product
+          // ids would otherwise grow this string without limit.
+          const recent = Array.from(alreadySent).slice(-400);
+          triggerSentRef.current = new Set(recent);
+          localStorage.setItem(storageKey, JSON.stringify(recent));
+        } catch {
+          // Quota or private mode. The document ids still make the write idempotent.
+        }
+      })
+      .catch((err) => {
+        // A staff member without permission for their own feed is not worth a toast;
+        // the sale they were making is what matters.
+        console.warn('Notification triggers could not be written:', err);
+      })
+      .finally(() => {
+        triggerPassInFlight.current = false;
+      });
+  }, [
+    currentUserProfile,
+    firestore,
+    businessInstance,
+    isImpersonating,
+    products,
+    receipts,
+    customers,
+    auditLogs,
+    stats,
+    queuedActions,
+    isOnline,
+    currencySymbol,
+  ]);
 
   if (isLoggingOut) {
     return <AppLoader text="Logging out..." />;
@@ -1327,7 +1491,15 @@ export default function AuthenticatedLayout({
                       <p>Calculator</p>
                     </TooltipContent>
                   </Tooltip>
-                  <DropdownMenu modal={false}>
+                  <DropdownMenu
+                    modal={false}
+                    onOpenChange={(open) => {
+                      // Open transition only. Radix fires this on close too, and
+                      // counting both would double every visit. `forceMount` on the
+                      // content below rules out inferring this from a mount effect.
+                      if (open) trackFeature('notif_bell_opened');
+                    }}
+                  >
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <DropdownMenuTrigger asChild>

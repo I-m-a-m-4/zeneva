@@ -12,38 +12,38 @@ import type { AuditLog } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, History, User, FileText, Package, Bot, Lightbulb, Flame, ShieldAlert, ShieldCheck, Info, CheckCircle, Search } from 'lucide-react';
+import { Loader2, History, User, FileText, Package, ShieldCheck, Radar } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import FeatureGate from '@/components/shared/feature-gate';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { safeToDate } from '@/lib/utils';
 import { createPortal } from 'react-dom';
+import { runForensicScan, DETECTOR_COUNT, type ForensicReport } from '@/lib/forensics';
+import { ForensicReportView } from '@/components/audit/forensic-report';
 
-type SuspiciousActivity = {
-    title: string;
-    description: string;
-    severity: 'High' | 'Medium' | 'Low';
-    relatedLogIds: string[];
-}
+/**
+ * How much audit history one scan reads.
+ *
+ * The page itself pages through 50 at a time, which is nowhere near enough to
+ * find a pattern — a void rate needs weeks of context, not the last afternoon.
+ * 600 covers roughly a quarter of trading for a busy shop and the whole history
+ * of a small one, and it is a single query the owner asked for by pressing the
+ * button. The result is held for the session so a second press costs nothing;
+ * see MEMORY: Firestore cost is a standing constraint.
+ */
+const SCAN_LOG_LIMIT = 600;
 
 const actionIcons: { [key: string]: React.ElementType } = {
     'product': Package,
     'sale': FileText,
     'user': User,
     'customer': User,
-};
-
-const severityIcons: Record<string, React.ReactElement> = {
-    High: <Flame className="h-5 w-5 text-destructive" />,
-    Medium: <ShieldAlert className="h-5 w-5 text-amber-500" />,
-    Low: <Info className="h-5 w-5 text-sky-500" />,
 };
 
 function AuditLogRowSkeleton() {
@@ -65,103 +65,6 @@ function AuditLogRowSkeleton() {
     )
 }
 
-function analyzeLogsLocally(logs: AuditLog[]): { summary: string; suspiciousActivities: SuspiciousActivity[] } {
-    const activities: SuspiciousActivity[] = [];
-    const TEN_MINUTES = 1000 * 60 * 10;
-
-    // 1. Look for rapid sale voids
-    const sales = logs.filter(l => l.action.startsWith('sale.'));
-    const voids = sales.filter(l => l.action === 'sale.void');
-    if (voids.length > 0) {
-        const suspiciousVoidLogIds = new Set<string>();
-        for (const voidLog of voids) {
-            const createLog = sales.find(l =>
-                l.action === 'sale.create' &&
-                l.entityId === voidLog.entityId &&
-                safeToDate(l.createdAt) < safeToDate(voidLog.createdAt)
-            );
-            if (createLog) {
-                const timeDiff = safeToDate(voidLog.createdAt).getTime() - safeToDate(createLog.createdAt).getTime();
-                if (timeDiff < TEN_MINUTES) {
-                    suspiciousVoidLogIds.add(voidLog.id);
-                    suspiciousVoidLogIds.add(createLog.id);
-                }
-            }
-        }
-        if (suspiciousVoidLogIds.size > 0) {
-            activities.push({
-                title: 'Rapid Sale Voids Detected',
-                description: 'One or more sales were created and then voided very quickly. This could be a method to mask cash theft, as stock is returned to inventory but the cash from the customer may not be accounted for.',
-                severity: 'High',
-                relatedLogIds: Array.from(suspiciousVoidLogIds),
-            });
-        }
-    }
-
-    // 2. Look for user deactivations, especially of other admins/managers
-    const userDeactivations = logs.filter(l => l.action === 'user.update_status' && l.details?.newStatus === 'inactive');
-    if (userDeactivations.length > 0) {
-        activities.push({
-            title: 'User Account Deactivations',
-            description: `${userDeactivations.length} user account(s) have been deactivated. Ensure these changes were authorized, especially if any admin or manager accounts were affected, as this could be an attempt to lock others out.`,
-            severity: 'Medium',
-            relatedLogIds: userDeactivations.map(l => l.id),
-        });
-    }
-
-    activities.sort((a, b) => {
-        const severityOrder = { 'High': 0, 'Medium': 1, 'Low': 2 };
-        return severityOrder[a.severity] - severityOrder[b.severity];
-    });
-
-    const summary = activities.length > 0
-        ? `Found ${activities.length} potentially suspicious pattern(s) in the ${logs.length} log entries. Please review the highlighted activities below.`
-        : `Scanned ${logs.length} log entries and found no obvious signs of suspicious activity based on current rules.`;
-
-    return { summary, suspiciousActivities: activities };
-}
-
-
-function AnalysisResults({ analysis }: { analysis: { summary: string, suspiciousActivities: SuspiciousActivity[] } }) {
-    return (
-        <Card className="mt-6 bg-primary/5 border-primary/20">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Bot className="text-primary" /> Automated Audit Summary
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground italic mb-6">"{analysis.summary}"</p>
-
-                {analysis.suspiciousActivities?.length > 0 ? (
-                    <Accordion type="multiple" className="w-full space-y-2">
-                        {analysis.suspiciousActivities.map((activity, index) => (
-                            <AccordionItem key={index} value={`item-${index}`} className="border-b-0 rounded-lg border bg-background/50 px-4">
-                                <AccordionTrigger className="py-3 hover:no-underline">
-                                    <div className="flex items-center gap-3">
-                                        {severityIcons[activity.severity]}
-                                        <span className="font-medium text-base text-left">{activity.title}</span>
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="pb-4 text-muted-foreground prose prose-sm max-w-none">
-                                    <p>{activity.description}</p>
-                                    <p className="text-xs mt-2">Related Log Entries: {activity.relatedLogIds.length}</p>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                ) : (
-                    <div className="text-center text-muted-foreground p-8">
-                        <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
-                        <p className="mt-4 font-medium">No Suspicious Activity Detected</p>
-                        <p className="text-sm">The automated scan found no unusual patterns based on our rules.</p>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    )
-}
-
 function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -171,15 +74,19 @@ function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
                         <ShieldCheck className="text-primary h-5 w-5" /> Upgrade to Business Plan
                     </DialogTitle>
                     <DialogDescription>
-                        The Automated Audit Assistant is a Business Plan feature. It scans your logs for suspicious patterns to help you detect issues like internal theft or operational mistakes.
+                        The forensic scan is a Business Plan feature. It runs {DETECTOR_COUNT} loss-prevention
+                        checks across your sales, stock movements and audit trail to surface the patterns that
+                        internal theft leaves behind.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
-                    <h4 className="font-semibold mb-2">Unlock powerful security features:</h4>
+                    <h4 className="font-semibold mb-2">What the scan looks for:</h4>
                     <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
-                        <li>Automated scan for suspicious activities.</li>
-                        <li>Detailed analysis of user actions.</li>
-                        <li>Proactive alerts for potential security risks.</li>
+                        <li>Sales cancelled by the person who rang them up.</li>
+                        <li>Discounts, price overrides and write-offs out of line with the rest of your team.</li>
+                        <li>Prices cut, used for one sale, then quietly restored.</li>
+                        <li>Trading outside your opening hours, and stock edited overnight.</li>
+                        <li>A per-person risk profile, with the evidence behind every flag.</li>
                     </ul>
                 </div>
                 <DialogFooter>
@@ -194,12 +101,12 @@ function UpgradeModal({ open, onOpenChange }: { open: boolean, onOpenChange: (op
 }
 
 function AuditLogPageContent() {
-    const { business, isLoading: isPosLoading, auditLogs: cachedAuditLogs, isOnline } = usePOS();
+    const { business, isLoading: isPosLoading, auditLogs: cachedAuditLogs, isOnline, receipts, products, customers, users, currencySymbol } = usePOS();
     const { activeBranchId } = useBranch();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [isAnalyzing, startTransition] = React.useTransition();
-    const [analysis, setAnalysis] = React.useState<{ summary: string; suspiciousActivities: SuspiciousActivity[] } | null>(null);
+    const [isScanning, setIsScanning] = React.useState(false);
+    const [report, setReport] = React.useState<ForensicReport | null>(null);
     const [selectedLog, setSelectedLog] = React.useState<AuditLog | null>(null);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = React.useState(false);
     const [searchTerm, setSearchTerm] = React.useState('');
@@ -207,6 +114,12 @@ function AuditLogPageContent() {
     const [isFetchingMore, setIsFetchingMore] = React.useState(false);
     const [hasMore, setHasMore] = React.useState(true);
     const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>(() => cachedAuditLogs && cachedAuditLogs.length > 0 ? cachedAuditLogs : []);
+
+    // Deep history pulled for the scan, kept for the session so pressing the
+    // button twice costs one read, not two. Also the lookup table behind the
+    // report's evidence links - those reference logs outside the 50 on screen.
+    const scanLogsRef = React.useRef<AuditLog[] | null>(null);
+    const reportRef = React.useRef<HTMLDivElement | null>(null);
 
     // The initialiser above only sees the cache as it stood on first render, and
     // the SQLite hydration behind cachedAuditLogs resolves a tick later - so
@@ -261,17 +174,25 @@ function AuditLogPageContent() {
         }
     };
 
-    const filteredLogs = React.useMemo(() => {
-        let result = auditLogs;
-
-        if (activeBranchId && activeBranchId !== 'all') {
-            result = result.filter(log => {
-                if (activeBranchId === business?.id) {
-                    return !log.branchId || log.branchId === business?.id || log.branchId === 'all' || log.details?.branchId === business?.id;
-                }
-                return log.branchId === activeBranchId || log.details?.branchId === activeBranchId;
-            });
+    /**
+     * The branch scope, as one predicate.
+     *
+     * Shared with the scan on purpose. `receipts`, `products` and `customers` come
+     * out of the POS context already filtered to `activeBranchId`, so scanning
+     * against unfiltered audit logs would compare one branch's sales against every
+     * branch's voids and write-offs — inflating every rate and pinning them on
+     * staff whose own sales had been excluded.
+     */
+    const inActiveBranch = React.useCallback((log: AuditLog) => {
+        if (!activeBranchId || activeBranchId === 'all') return true;
+        if (activeBranchId === business?.id) {
+            return !log.branchId || log.branchId === business?.id || log.branchId === 'all' || log.details?.branchId === business?.id;
         }
+        return log.branchId === activeBranchId || log.details?.branchId === activeBranchId;
+    }, [activeBranchId, business?.id]);
+
+    const filteredLogs = React.useMemo(() => {
+        let result = auditLogs.filter(inActiveBranch);
 
         if (actionFilter !== 'all') {
             result = result.filter(log => log.action.startsWith(`${actionFilter}.`));
@@ -286,31 +207,111 @@ function AuditLogPageContent() {
             );
         }
         return result;
-    }, [auditLogs, actionFilter, searchTerm, activeBranchId, business?.id]);
+    }, [auditLogs, actionFilter, searchTerm, inActiveBranch]);
 
-    const handleAnalyze = () => {
-        const isBusinessPlan = hasBusinessFeatures(business);
-        if (!isBusinessPlan) {
+    /**
+     * Gather the evidence and run the detectors.
+     *
+     * Everything except the deep audit history comes from the POS cache, which is
+     * already in memory — products, receipts, customers and the staff directory
+     * cost nothing to re-read here. Only the audit log needs a real query, and
+     * only the first time, because the page holds 50 rows and no pattern is
+     * visible in 50. See MEMORY: Firestore cost is a standing constraint.
+     *
+     * The detection itself is synchronous arithmetic in `src/lib/forensics.ts` —
+     * no model, no network. That is deliberate: the report names people, so it has
+     * to give the same answer twice.
+     */
+    const handleScan = async () => {
+        if (!hasBusinessFeatures(business)) {
             setIsUpgradeModalOpen(true);
             return;
         }
+        if (isScanning) return;
 
-        if (!auditLogs || auditLogs.length === 0) {
-            toast({ variant: 'destructive', title: 'No Data', description: 'There are no audit logs to analyze.' });
-            return;
-        }
-        startTransition(() => {
-            toast({ title: 'Analysis Started', description: 'Scanning your audit logs for patterns...' });
-            try {
-                const result = analyzeLogsLocally(auditLogs);
-                setAnalysis(result);
-                toast({ variant: 'success', title: 'Analysis Complete', description: 'Automated audit summary is ready.' });
-            } catch (e: any) {
-                console.error("Local audit analysis failed", e);
-                toast({ variant: 'destructive', title: 'Analysis Failed', description: e.message || 'The scan could not be completed.' });
+        setIsScanning(true);
+        try {
+            let logsForScan = scanLogsRef.current;
+
+            if (!logsForScan) {
+                if (isOnline && business?.id && firestore) {
+                    try {
+                        const deepQuery = query(
+                            collection(firestore, 'businessInstances', business.id, 'auditLogs'),
+                            orderBy('createdAt', 'desc'),
+                            limit(SCAN_LOG_LIMIT)
+                        );
+                        const snap = await getDocs(deepQuery);
+                        logsForScan = snap.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data({ serverTimestamps: 'estimate' }),
+                        } as AuditLog));
+                        scanLogsRef.current = logsForScan;
+                    } catch (e) {
+                        // A failed deep read is not a failed scan — fall back to
+                        // what is on screen and let the coverage panel account for
+                        // the shorter window.
+                        console.warn('Deep audit history unavailable, scanning loaded logs only', e);
+                    }
+                }
+                if (!logsForScan) logsForScan = auditLogs;
             }
-        });
-    }
+
+            if ((!logsForScan || logsForScan.length === 0) && (!receipts || receipts.length === 0)) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Nothing to scan yet',
+                    description: 'There are no sales or audit records for this business.',
+                });
+                return;
+            }
+
+            const result = runForensicScan({
+                receipts: receipts ?? [],
+                // Branch-scoped to match the receipts above. See inActiveBranch.
+                auditLogs: (logsForScan ?? []).filter(inActiveBranch),
+                products: products ?? [],
+                users: users ?? [],
+                customers: customers ?? [],
+                settings: business?.settings ?? null,
+                currency: currencySymbol,
+                ownerId: business?.ownerId ?? null,
+            });
+
+            setReport(result);
+            // Scroll after paint, or the node the ref points at has not rendered.
+            requestAnimationFrame(() => reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+
+            toast({
+                variant: result.findings.length === 0 ? 'success' : 'default',
+                title: result.findings.length === 0 ? 'Scan clean' : `${result.findings.length} finding(s)`,
+                description:
+                    result.findings.length === 0
+                        ? `${result.checksRun} checks ran and nothing matched a loss pattern.`
+                        : result.level.label === 'CRITICAL' || result.level.label === 'HIGH RISK'
+                            ? 'Some of this needs looking at today.'
+                            : 'Report ready below.',
+            });
+        } catch (e: any) {
+            console.error('Forensic scan failed', e);
+            toast({
+                variant: 'destructive',
+                title: 'Scan failed',
+                description: e?.message || 'The scan could not be completed.',
+            });
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    /** Evidence links point at logs that may sit outside the 50 rows on screen. */
+    const openLogById = React.useCallback((logId: string) => {
+        const found =
+            (scanLogsRef.current ?? []).find(l => l.id === logId) ??
+            auditLogs.find(l => l.id === logId);
+        if (found) setSelectedLog(found);
+        else toast({ title: 'Log entry not loaded', description: 'Use Load More Events to reach it.' });
+    }, [auditLogs, toast]);
 
     // An empty log list only means "still loading" while we are online and can
     // still fetch. Offline it is the final answer - either the cache is empty or
@@ -319,19 +320,34 @@ function AuditLogPageContent() {
 
     return (
         <>
-            {analysis && <AnalysisResults analysis={analysis} />}
+            <div ref={reportRef} className="scroll-mt-4">
+                {report && (
+                    <div className="mb-6">
+                        <ForensicReportView
+                            report={report}
+                            onOpenLog={openLogById}
+                            onDismiss={() => setReport(null)}
+                        />
+                    </div>
+                )}
+            </div>
             <Card>
                 <CardHeader>
                     <div className="flex flex-col gap-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                             <div>
                                 <CardTitle className="flex items-center gap-2 text-2xl font-bold"><History className="text-primary" /> Audit Log</CardTitle>
                                 <CardDescription>A chronological log of important events that have occurred in your business.</CardDescription>
                             </div>
-                            <Button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full sm:w-auto shadow-sm">
-                                {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
-                                {isAnalyzing ? 'Analyzing...' : 'Scan for Issues'}
-                            </Button>
+                            <div className="sm:text-right">
+                                <Button onClick={handleScan} disabled={isScanning} className="w-full sm:w-auto shadow-sm">
+                                    {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
+                                    {isScanning ? 'Scanning…' : report ? 'Re-run forensic scan' : 'Run forensic scan'}
+                                </Button>
+                                <p className="mt-1.5 hidden text-[11px] text-muted-foreground sm:block">
+                                    {DETECTOR_COUNT} loss-prevention checks across sales, stock and staff
+                                </p>
+                            </div>
                         </div>
                         
                         <div className="flex flex-col md:flex-row gap-4">

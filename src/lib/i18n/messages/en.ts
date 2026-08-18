@@ -824,6 +824,8 @@ const en = {
     healthOutOfStock: 'Out of Stock',
     healthLowStock: 'Low Stock (≤5)',
     healthMissingImages: 'Missing Images',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'Products',
     productsDescription: 'Manage your products and view their sales performance.',
     scanningCatalogs: 'Scanning inventory catalogs...',

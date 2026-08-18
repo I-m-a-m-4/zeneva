@@ -1587,26 +1587,43 @@ const detectImpossibleCadence: Detector = {
       if (s.saleTimes.length < 5) continue;
       let burst = 0;
       const examples: number[] = [];
+      const days = new Set<string>();
       for (let i = 1; i < s.saleTimes.length; i++) {
         const gap = s.saleTimes[i] - s.saleTimes[i - 1];
-        if (gap >= 0 && gap < 5000) {
+        // `gap > 0` is load-bearing, not defensive. Several receipts committed in
+        // one batch — an offline queue flushing after an outage — all carry the
+        // *same* server timestamp, so they sit at a gap of exactly zero. Counting
+        // those made every cashier who had ever worked offline look like they
+        // were generating sales, which is the one thing this check must not do.
+        if (gap > 0 && gap < 5000) {
           burst++;
+          days.add(dayKey(s.saleTimes[i]));
           if (examples.length < 5) examples.push(s.saleTimes[i]);
         }
       }
       if (burst < 4) continue;
 
+      // Confined to one day it is almost always a sync artefact; spread across
+      // several it is a habit, and a habit is a person.
+      const oneDay = days.size <= 1;
+
       out.push({
         id: `t5-${s.id}`,
         code: 'T5',
         group: 'integrity',
-        severity: 'medium',
-        confidence: 'strong',
+        severity: oneDay ? 'low' : 'medium',
+        confidence: oneDay ? 'signal' : 'strong',
         title: `${s.name} recorded sales faster than they could be served`,
-        what: `${burst} sale(s) landed less than five seconds after the previous one on the same account.`,
+        what: `${burst} sale(s) landed less than five seconds after the previous one on the same account, across ${days.size} day(s).${
+          oneDay
+            ? ' All on a single day, which is what a batch of offline sales looks like when it finally syncs.'
+            : ' Spread across several days, so a one-off sync after an outage does not explain it.'
+        }`,
         why:
-          'Nobody serves a customer, takes payment and starts again inside five seconds. Either sales are being generated rather than made — padding a commission or a target — or a queued batch synced with the same timestamps after an outage. The second is harmless and shows up as one cluster on one date.',
-        action: 'Check whether these fall on a single day. A scatter across many days is not a sync artefact.',
+          'Nobody serves a customer, takes payment and starts again inside five seconds. Sales appearing at that rate are either being generated rather than made — padding a commission, a target or a takings figure — or they are a queue of offline sales landing at once, which is harmless and shows up on one date only.',
+        action: oneDay
+          ? 'Check whether this device was offline that day. If it was, nothing to do.'
+          : 'These are not a sync artefact. Compare the count of sales against what was physically sold on those days.',
         exposure: 0,
         suspects: [who(s)],
         evidence: examples.map((at) => ({
@@ -2584,7 +2601,12 @@ function headlineFor(findings: Finding[], watchlist: StaffRisk[], exposure: numb
   const named = watchlist.filter((w) => w.band === 'critical' || w.band === 'elevated');
 
   const parts: string[] = [];
-  if (critical > 0) parts.push(`${critical} finding${critical === 1 ? '' : 's'} that needs attention today`);
+  if (critical > 0)
+    parts.push(
+      `${critical} of ${findings.length} finding${findings.length === 1 ? '' : 's'} need${
+        critical === 1 ? 's' : ''
+      } attention today`,
+    );
   else if (high > 0) parts.push(`${high} serious finding${high === 1 ? '' : 's'}`);
   else parts.push(`${findings.length} thing${findings.length === 1 ? '' : 's'} worth a look`);
 

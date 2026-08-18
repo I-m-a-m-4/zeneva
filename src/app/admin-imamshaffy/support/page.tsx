@@ -1389,7 +1389,7 @@ export default function AdminSupportPage() {
                                     <div className="flex-1 bg-stone-100 p-2 md:p-6 overflow-hidden relative">
                                         {/* Injecting the rendered email HTML into an iframe for accurate rendering isolation */}
                                         <iframe 
-                                            srcDoc={selectedEmailLog.html || `<p>No content preview available</p>`}
+                                            srcDoc={selectedEmailLog.html ? selectedEmailLog.html.replace(/<img[^>]*src=["'][^"']*api\/track[^"']*["'][^>]*>/gi, '') : `<p>No content preview available</p>`}
                                             className="w-full h-full border border-stone-200 rounded-xl shadow-sm bg-white"
                                             sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
                                             title="Email Preview"

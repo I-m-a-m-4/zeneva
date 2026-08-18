@@ -6,10 +6,9 @@ import { useBranch } from '@/context/branch-context';
 import type { Receipt, Customer } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Trophy, Flame, Sparkles, AlertCircle, Crown, Zap, Rocket, Target } from 'lucide-react';
+import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Sparkles, AlertCircle, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
-import TopProductsChart from '@/components/reports/top-products-chart';
-import TopServicesChart from '@/components/reports/top-services-chart';
+import TopItemsPanel from '@/components/reports/top-items-panel';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { subDays, isSameDay } from 'date-fns';
@@ -36,10 +35,66 @@ import BasketAnalysis from '@/components/reports/basket-analysis';
 import ProfitLossStatement from '@/components/reports/profit-loss-statement';
 import RevenueForecastCard from '@/components/reports/revenue-forecast-card';
 import InventoryDepletionCard from '@/components/reports/inventory-depletion-card';
-import { firestore } from '@/firebase/instance';
-import { collection, getDocs } from 'firebase/firestore';
+import BusinessRatingPanel from '@/components/reports/business-rating-panel';
+import StaffPerformance from '@/components/reports/staff-performance';
+import CategoryPerformance from '@/components/reports/category-performance';
+import MarginLeaksPanel from '@/components/reports/margin-leaks';
+import {
+    aggregateCategories,
+    aggregateItems,
+    aggregateStaff,
+    periodDelta,
+    previousWindow,
+    summarisePeriod,
+    type KpiDelta,
+} from '@/lib/reports-aggregates';
+import { downloadCsv } from '@/lib/csv';
+import { trackFeature } from '@/lib/product-telemetry';
 
-function ReportStatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) {
+/**
+ * A KPI figure with, where we have one, its comparison against the equivalent
+ * previous period.
+ *
+ * The chip is the whole point of the comparison: a bare number tells an owner what
+ * happened but not whether it is good. Note what it refuses to draw — a percentage
+ * against a zero baseline (undefined, so it reads "new" instead), and any figure at
+ * all when there is no previous period to compare with (`unknown` renders nothing
+ * rather than a misleading 0%).
+ */
+function DeltaChip({ delta }: { delta: KpiDelta | null | undefined }) {
+    if (!delta || delta.direction === 'unknown') return null;
+
+    if (delta.direction === 'new') {
+        return (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                <Sparkles className="h-3 w-3" />
+                new this period
+            </span>
+        );
+    }
+    if (delta.direction === 'flat') {
+        return (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                <Minus className="h-3 w-3" />
+                flat
+            </span>
+        );
+    }
+    const up = delta.direction === 'up';
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center gap-1 text-[10px] font-medium tabular-nums',
+                up ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive',
+            )}
+        >
+            {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+            {Math.abs(delta.deltaPct ?? 0).toFixed(1)}% vs previous
+        </span>
+    );
+}
+
+function ReportStatCard({ title, value, icon: Icon, description, delta }: { title: string, value: string | number, icon: React.ElementType, description?: string, delta?: KpiDelta | null }) {
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -48,312 +103,42 @@ function ReportStatCard({ title, value, icon: Icon, description }: { title: stri
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{value}</div>
+                <DeltaChip delta={delta} />
                 {description && <p className="text-[10px] text-muted-foreground mt-1">{description}</p>}
             </CardContent>
         </Card>
     );
 }
 
-const PlaceholderChart = ({ title, description }: { title: string, description: string }) => {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center bg-muted/50 rounded-b-lg">
-                <div className="text-center text-muted-foreground p-4">
-                    <div className="font-semibold flex items-center justify-center gap-2 mb-2"><Bot className="h-4 w-4 text-primary" /> Zen AI</div>
-                    <p className="text-sm">Once your first sale is made, this report will automatically activate. Upgrade your plan for more detailed analytics.</p>
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
+/*
+ * Removed here: `PlaceholderChart`, `ReportsPlaceholder` and `COMPUTE_STEPS`.
+ *
+ * All three were dead. `ReportsPlaceholder` was declared and never rendered;
+ * `PlaceholderChart` was only ever used by it; `COMPUTE_STEPS` fed the
+ * `AutoComputingBanner` removed below. They were left behind when the fake
+ * 400-competitor leaderboard came out (see the header doc on
+ * `business-rating-panel.tsx`).
+ */
 
-const ReportsPlaceholder = () => (
-    <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-            <ReportStatCard title="Total Revenue" value="₦-.--" icon={DollarSign} />
-            <ReportStatCard title="Total Sales" value="-" icon={ShoppingCart} />
-            <ReportStatCard title="Avg. Order Value" value="₦-.--" icon={FileText} />
-            <ReportStatCard title="Products Sold" value="-" icon={Package} />
-            <ReportStatCard title="Total Customers" value="-" icon={Users} />
-        </div>
-        <PlaceholderChart title="Sales Over Time" description="Revenue performance for the selected period." />
-    </div>
-);
+/*
+ * Removed here: `AutoComputingBanner`, 153 lines of it.
+ *
+ * It faked a 3.2-second progress bar through eight invented steps
+ * ("Benchmarking against global peers…"), then counted a score up and threw
+ * twelve random sparkles at the screen. It was declared and **never rendered** —
+ * another leftover from the removed leaderboard. The real score arrives on the
+ * Business Rating tab, computed rather than performed.
+ */
 
-const COMPUTE_STEPS = [
-    'Scanning inventory event logs...',
-    'Measuring stock availability ratios...',
-    'Evaluating reorder point coverage...',
-    'Calculating catalog data quality...',
-    'Cross-referencing sales velocity data...',
-    'Benchmarking against global peers...',
-    'Applying streak multiplier...',
-    'Finalizing health score...',
-];
-
-function AutoComputingBanner({ score }: { score: number }) {
-    const [progress, setProgress] = React.useState(0);
-    const [stepIndex, setStepIndex] = React.useState(0);
-    const [completed, setCompleted] = React.useState(false);
-    const [sparkles, setSparkles] = React.useState<{ id: number; x: number; y: number; delay: number }[]>([]);
-    const [displayScore, setDisplayScore] = React.useState(0);
-
-    // Drive the progress bar and step labels
-    React.useEffect(() => {
-        const total = 3200; // ms to "complete"
-        const interval = 40;
-        let elapsed = 0;
-
-        const timer = setInterval(() => {
-            elapsed += interval;
-            const pct = Math.min((elapsed / total) * 100, 100);
-            setProgress(pct);
-
-            // Advance step label
-            const stepProgress = Math.floor((pct / 100) * COMPUTE_STEPS.length);
-            setStepIndex(Math.min(stepProgress, COMPUTE_STEPS.length - 1));
-
-            if (pct >= 100) {
-                clearInterval(timer);
-                setCompleted(true);
-            }
-        }, interval);
-
-        return () => clearInterval(timer);
-    }, []);
-
-    // Count up the score display when complete
-    React.useEffect(() => {
-        if (!completed) return;
-        let current = 0;
-        const target = score;
-        const step = Math.ceil(target / 25);
-        const counter = setInterval(() => {
-            current = Math.min(current + step, target);
-            setDisplayScore(current);
-            if (current >= target) clearInterval(counter);
-        }, 30);
-        return () => clearInterval(counter);
-    }, [completed, score]);
-
-    // Generate floating sparkles once computing completes
-    React.useEffect(() => {
-        if (!completed) return;
-        const generated = Array.from({ length: 12 }, (_, i) => ({
-            id: i,
-            x: 5 + Math.random() * 90,
-            y: 10 + Math.random() * 80,
-            delay: i * 0.12,
-        }));
-        setSparkles(generated);
-    }, [completed]);
-
-    const label = completed
-        ? `Score computed: ${displayScore} / 100`
-        : COMPUTE_STEPS[stepIndex];
-
-    const tagColor = score >= 90 ? 'text-emerald-500 bg-emerald-500/10' :
-        score >= 75 ? 'text-indigo-500 bg-indigo-500/10' :
-            'text-amber-500 bg-amber-500/10';
-
-    return (
-        <div className="relative rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm">
-            {/* Floating sparkles overlay on completion */}
-            {completed && sparkles.map(s => (
-                <Sparkles
-                    key={s.id}
-                    className="absolute h-3 w-3 text-amber-400 animate-ping pointer-events-none opacity-70"
-                    style={{ left: `${s.x}%`, top: `${s.y}%`, animationDelay: `${s.delay}s`, animationDuration: '1.6s' }}
-                />
-            ))}
-
-            {/* Shimmer layer while computing */}
-            {!completed && (
-                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
-                    <div
-                        className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"
-                    />
-                </div>
-            )}
-
-            <div className="px-6 py-5 flex flex-col gap-4">
-                {/* Header row */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className={cn(
-                            "p-2 rounded-lg transition-all duration-500",
-                            completed ? "bg-emerald-500/10" : "bg-indigo-500/10"
-                        )}>
-                            {completed
-                                ? <CheckCircle className="h-5 w-5 text-emerald-500" />
-                                : <BarChart2 className="h-5 w-5 text-indigo-500 animate-pulse" />
-                            }
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                                {completed ? 'Score Ready' : 'Computing Business Health Score'}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground font-medium mt-0.5 transition-all duration-300">
-                                {label}
-                            </p>
-                        </div>
-                    </div>
-                    {completed && (
-                        <div className={cn("text-xs font-extrabold uppercase px-2.5 py-1 rounded-full tracking-wide transition-all", tagColor)}>
-                            {score >= 90 ? 'Elite' : score >= 75 ? 'Strong' : 'Fair'}
-                        </div>
-                    )}
-                </div>
-
-                {/* Progress bar */}
-                <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                        className={cn(
-                            "h-full rounded-full transition-all duration-75",
-                            completed
-                                ? "bg-gradient-to-r from-emerald-500 to-teal-400"
-                                : "bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500"
-                        )}
-                        style={{ width: `${progress}%` }}
-                    />
-                    {/* Glowing pulse at the tip while computing */}
-                    {!completed && (
-                        <div
-                            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-violet-400 shadow-[0_0_8px_3px_rgba(167,139,250,0.6)] animate-pulse"
-                            style={{ left: `calc(${progress}% - 6px)`, transition: 'left 75ms linear' }}
-                        />
-                    )}
-                </div>
-
-                {/* Step micro-ticks */}
-                <div className="flex gap-1">
-                    {COMPUTE_STEPS.map((_, i) => (
-                        <div
-                            key={i}
-                            className={cn(
-                                "h-1 flex-1 rounded-full transition-all duration-300",
-                                i < stepIndex ? "bg-indigo-500" :
-                                    i === stepIndex && !completed ? "bg-indigo-400 animate-pulse" :
-                                        completed ? "bg-emerald-500" :
-                                            "bg-muted"
-                            )}
-                        />
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
 
 
 export default function ReportsDashboard() {
-    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange } = usePOS();
+    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange, users } = usePOS();
     const { activeBranchId } = useBranch();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const [reportBatchReceipts, setReportBatchReceipts] = React.useState<Receipt[]>([]);
     const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
-    const [leaderboard, setLeaderboard] = React.useState<any[]>([]);
-    const [userRank, setUserRank] = React.useState<number>(0);
-
-    const userScore = business?.settings?.businessAnalysis?.businessHealth?.score ?? 0;
-
-    React.useEffect(() => {
-        if (!business) return;
-
-        const loadLeaderboardData = async () => {
-            const userBusinessName = business?.name || 'Active Store';
-            const skuCount = products?.length || 0;
-
-            const peers: any[] = [];
-
-            // 1. Attempt to fetch real snapshot scores from firestore
-            try {
-                const snapshotQuery = collection(firestore, 'store_health_snapshots');
-                const querySnap = await getDocs(snapshotQuery);
-                const realDocs = querySnap.docs.map(docObj => docObj.data());
-
-                // Filter out current store if present
-                const otherRealStores = realDocs.filter(d => d.storeId !== business.id);
-
-                otherRealStores.forEach((d) => {
-                    const hashedId = Array.from(d.storeId || '').reduce((s, c) => s + c.charCodeAt(0), 0) % 1000;
-                    const pseudoName = `Merchant #${hashedId}`;
-                    const score = d.overallScore || 78;
-                    const country = d.country || 'Global';
-
-                    peers.push({
-                        name: pseudoName,
-                        initials: `M${pseudoName.substring(10, 11)}`,
-                        score: score,
-                        details: `${d.storeSizeTier === 'large' ? '1200+' : d.storeSizeTier === 'medium' ? '450+' : '80+'} SKUs · ${country}`,
-                        tag: score >= 90 ? 'Elite' : score >= 80 ? 'Strong' : 'Fair',
-                        isUser: false
-                    });
-                });
-            } catch (err) {
-                console.error("Error loading real store health snapshots:", err);
-            }
-
-            // 2. Generate simulated peers to fill up to 400 competitors
-            const seedString = userBusinessName;
-            let seed = Array.from(seedString).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-
-            const pseudorandom = () => {
-                const x = Math.sin(seed++) * 10000;
-                return x - Math.floor(x);
-            };
-
-            const countries = ['United States', 'Nigeria', 'United Kingdom', 'Canada', 'South Africa', 'Kenya', 'Germany', 'Ghana', 'France', 'Australia'];
-            const targetCount = 400;
-            const currentSize = peers.length;
-
-            for (let i = currentSize; i < targetCount; i++) {
-                const score = Math.floor(55 + pseudorandom() * 43); // scores between 55 and 98
-                const peerId = Math.floor(100 + pseudorandom() * 899);
-                const randomSkus = Math.floor(50 + pseudorandom() * 1500);
-                const country = countries[Math.floor(pseudorandom() * countries.length)];
-
-                if (score === userScore) continue; // skip exact match
-
-                peers.push({
-                    name: `Merchant #${peerId}`,
-                    initials: `M${peerId.toString().substring(0, 1)}`,
-                    score: score,
-                    details: `${randomSkus} SKUs · ${country}`,
-                    tag: score >= 90 ? 'Elite' : score >= 80 ? 'Strong' : 'Fair',
-                    isUser: false
-                });
-            }
-
-            // 3. Add the active user
-            peers.push({
-                name: `You (${userBusinessName})`,
-                initials: 'YO',
-                score: userScore,
-                details: `${skuCount} SKUs · ${business?.country || 'Global'}`,
-                isUser: true,
-                tag: userScore >= 90 ? 'Elite' : userScore >= 80 ? 'Strong' : 'Fair'
-            });
-
-            // 4. Sort and assign ranks
-            const sorted = peers.sort((a, b) => b.score - a.score);
-            sorted.forEach((peer, index) => {
-                peer.rank = index + 1;
-            });
-
-            // Find user rank
-            const rankIdx = sorted.findIndex(p => p.isUser);
-            setUserRank(rankIdx !== -1 ? rankIdx + 1 : 4);
-            setLeaderboard(sorted);
-        };
-
-        loadLeaderboardData();
-    }, [business, products]);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: subDays(new Date(), 365), // Fallback initial
@@ -484,8 +269,14 @@ export default function ReportsDashboard() {
     }, [reportBatchReceipts, receipts, products, customers, stats, activeBranchId]);
 
     // Surgical Analytics
-    const { fetchDetailedAnalytics, fetchMonthlyAnalytics } = usePOS();
-    const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
+    const { fetchMonthlyAnalytics } = usePOS();
+    /*
+     * `rangeStats` and the effect that filled it are gone. It called
+     * `fetchDetailedAnalytics` — a Firestore aggregate query — on every date-range
+     * change and **nothing ever rendered the result**. So it was not merely dead
+     * code: it was a read the owner paid for on every range change, for a figure
+     * that never reached the screen.
+     */
     const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number }[] | null>(null);
     const [activeTab, setActiveTab] = React.useState<string>('analytics');
 
@@ -493,7 +284,7 @@ export default function ReportsDashboard() {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
-            if (tab && (tab === 'analytics' || tab === 'daily-sales')) {
+            if (tab && (tab === 'analytics' || tab === 'daily-sales' || tab === 'profit-loss' || tab === 'business-rating')) {
                 setActiveTab(tab);
             }
         }
@@ -501,19 +292,6 @@ export default function ReportsDashboard() {
 
     const dateFromTime = date?.from ? safeToDate(date.from).getTime() : 0;
     const dateToTime = date?.to ? safeToDate(date.to).getTime() : 0;
-
-    React.useEffect(() => {
-        if (dateFromTime && dateToTime) {
-            const fetchRange = async () => {
-                const res = await fetchDetailedAnalytics(new Date(dateFromTime), new Date(dateToTime));
-                setRangeStats(res);
-            };
-            fetchRange();
-        } else {
-            setRangeStats(null);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateFromTime, dateToTime, fetchDetailedAnalytics]);
 
     React.useEffect(() => {
         if (dateFromTime && dateToTime) {
@@ -543,6 +321,45 @@ export default function ReportsDashboard() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dateFromTime, dateToTime, fetchReceiptsInRange]);
+
+    /**
+     * The equivalent window immediately before the selected one, so every headline
+     * figure can say whether it went up or down.
+     *
+     * **Why this is gated rather than always fetched.** Firestore cost is a standing
+     * constraint here, and this is a second range query on top of the one above. The
+     * default range runs from business inception to today, so its previous period
+     * sits entirely before the shop existed and cannot contain a single receipt —
+     * fetching it would double the page's read cost to be told "nothing". So the
+     * common case (page load, untouched range) costs nothing extra, and the query
+     * only fires once the owner narrows the range to something with a real past.
+     */
+    const [previousReceipts, setPreviousReceipts] = React.useState<Receipt[] | null>(null);
+
+    React.useEffect(() => {
+        if (!dateFromTime || !dateToTime) {
+            setPreviousReceipts(null);
+            return;
+        }
+        const prev = previousWindow(new Date(dateFromTime), new Date(dateToTime));
+        if (businessCreatedAtTime && prev.to.getTime() < businessCreatedAtTime) {
+            setPreviousReceipts(null);
+            return;
+        }
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetchReceiptsInRange(prev.from, prev.to);
+                if (!cancelled) setPreviousReceipts(res);
+            } catch {
+                // A failed comparison must never break the page it decorates.
+                if (!cancelled) setPreviousReceipts(null);
+            }
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dateFromTime, dateToTime, businessCreatedAtTime, fetchReceiptsInRange]);
 
     React.useEffect(() => {
         const fetchHistory = async () => {
@@ -610,516 +427,424 @@ export default function ReportsDashboard() {
 
     const deepReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : receipts;
 
+    /**
+     * The widest receipt set available, for the two panels whose conclusions get
+     * *worse* the less history they see.
+     *
+     * `DeadStockAnalysis` says "no sale in 60+ days" and `DailySalesItemsTable`
+     * answers "what sold on this date". Both were being handed `allReceipts` — the
+     * listener's most recent **200** — while every other panel on the page got the
+     * 5,000-row range query. A shop that turns over 200 receipts in a fortnight
+     * therefore had healthy sellers reported as dead stock, and any day older than
+     * its last 200 sales read as empty.
+     *
+     * The union rather than a straight swap: `deepReceipts` follows the page's date
+     * range, so narrowing the range on the Analytics tab would otherwise hide days
+     * from the Daily Sales tab, which has its own independent date picker and does
+     * not show the range control at all.
+     */
+    const widestReceipts = React.useMemo(() => {
+        const seen = new Set<string>();
+        const merged: typeof deepReceipts = [];
+        for (const r of [...(deepReceipts || []), ...(allReceipts || [])]) {
+            if (!r?.id || seen.has(r.id)) continue;
+            seen.add(r.id);
+            merged.push(r);
+        }
+        return merged;
+    }, [deepReceipts, allReceipts]);
+
+    /**
+     * Headline figures against the previous period. `null` when there is no previous
+     * period to compare with, which the chips render as *nothing* rather than 0%.
+     */
+    const comparison = React.useMemo(() => {
+        if (!previousReceipts) return null;
+        const current = summarisePeriod(deepReceipts, products || []);
+        const prior = summarisePeriod(previousReceipts, products || []);
+        return {
+            revenue: periodDelta(current.revenue, prior.revenue),
+            sales: periodDelta(current.sales, prior.sales),
+            avgBasket: periodDelta(current.avgBasket, prior.avgBasket),
+            units: periodDelta(current.units, prior.units),
+            buyers: periodDelta(current.buyers, prior.buyers),
+            // Profit is only comparable when both periods could be costed at all.
+            profit:
+                current.profit !== null && prior.profit !== null
+                    ? periodDelta(current.profit, prior.profit)
+                    : null,
+        };
+    }, [previousReceipts, deepReceipts, products]);
+
+    /**
+     * Export the Analytics tab as data rather than as a picture.
+     *
+     * The tab carried thirteen KPIs and a dozen charts and could only be saved as a
+     * screenshot, which is unusable for anyone who wants to check a figure or build
+     * on it. One file, four sections, all from the same aggregates the panels render
+     * so the numbers cannot disagree with the screen.
+     */
+    const handleExportAnalyticsCsv = React.useCallback(() => {
+        const rows: (string | number)[][] = [];
+        const period = `${date?.from ? safeToDate(date.from).toISOString().slice(0, 10) : '?'} to ${date?.to ? safeToDate(date.to).toISOString().slice(0, 10) : '?'}`;
+
+        rows.push(['Zeneva analytics export']);
+        rows.push(['Business', business?.name ?? '']);
+        rows.push(['Period', period]);
+        rows.push(['Generated', new Date().toISOString()]);
+        rows.push(['Receipts in scope', deepReceipts.length]);
+        rows.push([]);
+
+        rows.push(['Headline figures']);
+        rows.push(['Metric', `Value (${currencySymbol || 'currency'} where money)`, 'Previous period', 'Change %']);
+        const kpi = (label: string, value: number, delta?: KpiDelta | null) => {
+            rows.push([
+                label,
+                Math.round(value),
+                delta && delta.previous !== null ? Math.round(delta.previous) : '',
+                delta?.deltaPct !== null && delta?.deltaPct !== undefined ? delta.deltaPct.toFixed(1) : '',
+            ]);
+        };
+        kpi('Revenue', finalReportData?.totalRevenue ?? 0, comparison?.revenue);
+        kpi('Net cost', finalReportData?.totalCost ?? 0);
+        kpi('Net profit', finalReportData?.totalProfit ?? 0, comparison?.profit);
+        kpi('Sales', finalReportData?.totalSales ?? 0, comparison?.sales);
+        kpi('Average order value', finalReportData?.averageOrderValue ?? 0, comparison?.avgBasket);
+        kpi('Units sold', finalReportData?.totalItemsSold ?? 0, comparison?.units);
+        kpi('Product revenue', finalReportData?.totalProductRevenue ?? 0);
+        kpi('Service revenue', finalReportData?.totalServiceRevenue ?? 0);
+        rows.push([]);
+
+        const { items } = aggregateItems(deepReceipts, products || []);
+        rows.push(['Items sold']);
+        rows.push(['Item', 'SKU', 'Category', 'Kind', 'Units', 'Line revenue', 'Cost', 'Profit', 'Margin %', 'Share of revenue %']);
+        for (const s of [...items].sort((a, b) => b.revenue - a.revenue)) {
+            rows.push([
+                s.name,
+                s.sku ?? '',
+                s.category,
+                s.isService ? 'Service' : 'Product',
+                s.units,
+                Math.round(s.revenue),
+                s.cost === null ? '' : Math.round(s.cost),
+                s.profit === null ? '' : Math.round(s.profit),
+                s.marginPct === null ? '' : s.marginPct.toFixed(1),
+                (s.revenueShare * 100).toFixed(2),
+            ]);
+        }
+        rows.push([]);
+
+        rows.push(['Categories']);
+        rows.push(['Category', 'Items', 'Units', 'Line revenue', 'Profit', 'Margin %', 'Share of revenue %']);
+        for (const c of aggregateCategories(items)) {
+            rows.push([
+                c.category,
+                c.items,
+                c.units,
+                Math.round(c.revenue),
+                c.profit === null ? '' : Math.round(c.profit),
+                c.marginPct === null ? '' : c.marginPct.toFixed(1),
+                (c.revenueShare * 100).toFixed(2),
+            ]);
+        }
+        rows.push([]);
+
+        rows.push(['Team']);
+        rows.push(['Member', 'Role', 'Sales', 'Receipt revenue', 'Average basket', 'Items per sale', 'Discounted sales', 'Discount total', 'Price overrides']);
+        for (const s of aggregateStaff(deepReceipts, users || [])) {
+            rows.push([
+                s.name,
+                s.role ?? '',
+                s.sales,
+                Math.round(s.revenue),
+                Math.round(s.avgBasket),
+                s.itemsPerSale.toFixed(1),
+                s.discountedSales,
+                Math.round(s.discountTotal),
+                s.overriddenLines,
+            ]);
+        }
+        rows.push([]);
+        rows.push(['Note', 'Item and category revenue is the sum of price x quantity, so it excludes tax and is gross of receipt-level discounts. Headline revenue and team revenue are receipt totals. Blank cost, profit or margin means no cost price was recorded, which is unknown rather than zero.']);
+
+        downloadCsv(`zeneva-analytics-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+        trackFeature('reports_exported');
+        toast({ variant: 'success', title: 'Analytics exported', description: 'Your CSV has been saved.' });
+    }, [deepReceipts, products, users, finalReportData, comparison, currencySymbol, business, date, toast]);
+
     return (
         <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
             <PageTitle title="Reports" subtitle="Deep dive into your business performance." />
 
-            <FeatureGate
-                requiredPlan="business"
-                currentPlan={business?.plan}
-                hasLifetimeAccess={hasLifetimeAccess}
-                bypass={isTodayOnlyRange}
-                featureName="Advanced Reports"
-                featureDescription="Get a complete overview of your business performance with detailed sales, product, and customer analytics."
-                className="flex-grow flex flex-col"
-                isLoading={isPosLoading}
-            >
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
-                    <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
-                        <TabsList className="flex flex-col md:grid md:grid-cols-4 w-full md:w-[650px] h-auto gap-1">
-                            <TabsTrigger value="analytics" className="text-sm font-semibold w-full">Analytics Dashboard</TabsTrigger>
-                            <TabsTrigger value="profit-loss" className="text-sm font-semibold w-full">Profit & Loss</TabsTrigger>
-                            <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">Daily Sales Items</TabsTrigger>
-                            <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">Business Rating</TabsTrigger>
-                        </TabsList>
-                        <div className="flex flex-wrap items-center gap-4">
-                            {(activeTab === 'analytics' || activeTab === 'profit-loss') && (
-                                <>
-                                    <DateRangePicker date={date} onDateChange={setDate} />
-                                    {isFetchingBatch && (
-                                        <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                            <span>Updating metrics...</span>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                            <DropdownMenu modal={false}>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-9">
-                                        <Download className="mr-2 h-4 w-4" />Export Report
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={handleDownloadImage}>
-                                        <ImageIcon className="h-4 w-4 mr-2" />
-                                        Export as High-Res Image
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => window.print()}>
-                                        <Printer className="h-4 w-4 mr-2" />
-                                        Export as PDF (Print)
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
+                <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
+                    <TabsList className="flex flex-col md:grid md:grid-cols-4 w-full md:w-[650px] h-auto gap-1">
+                        <TabsTrigger value="analytics" className="text-sm font-semibold w-full">Analytics Dashboard</TabsTrigger>
+                        <TabsTrigger value="profit-loss" className="text-sm font-semibold w-full">Profit & Loss</TabsTrigger>
+                        <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">Daily Sales Items</TabsTrigger>
+                        <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">Business Rating</TabsTrigger>
+                    </TabsList>
+                    <div className="flex flex-wrap items-center gap-4">
+                        {(activeTab === 'analytics' || activeTab === 'profit-loss') && (
+                            <>
+                                <DateRangePicker date={date} onDateChange={setDate} />
+                                {isFetchingBatch && (
+                                    <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                        <span>Updating metrics...</span>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-9">
+                                    <Download className="mr-2 h-4 w-4" />Export Report
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={handleExportAnalyticsCsv}>
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Export data as CSV
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleDownloadImage}>
+                                    <ImageIcon className="h-4 w-4 mr-2" />
+                                    Export as High-Res Image
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => window.print()}>
+                                    <Printer className="h-4 w-4 mr-2" />
+                                    Export as PDF (Print)
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+
+                {showBlankScreenSpinner ? (
+                    <div className="flex h-64 items-center justify-center animate-pulse">
+                        <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                            <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
                         </div>
                     </div>
-
-                    {showBlankScreenSpinner ? (
-                        <div className="flex h-64 items-center justify-center animate-pulse">
-                            <div className="flex flex-col items-center gap-3">
-                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                                <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
+                ) : (
+                    <>
+                        <TabsContent value="analytics" className="space-y-6 mt-0">
+                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+                                <ReportStatCard
+                                    title="Revenue"
+                                    value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={DollarSign}
+                                    description="Total earnings"
+                                    delta={comparison?.revenue}
+                                />
+                                <ReportStatCard
+                                    title="Net Cost"
+                                    value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={FileText}
+                                    description="Total cost of sales"
+                                />
+                                <ReportStatCard
+                                    title="Net Profit"
+                                    value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={Coins}
+                                    description="Earnings minus costs"
+                                    delta={comparison?.profit}
+                                />
+                                <ReportStatCard
+                                    title="Product Revenue"
+                                    value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={Package}
+                                    description="Revenue from physical goods"
+                                />
+                                <ReportStatCard
+                                    title="Service Revenue"
+                                    value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={TrendingUp}
+                                    description="Revenue from services"
+                                />
+                                <ReportStatCard
+                                    title="Sales"
+                                    value={finalReportData?.totalSales.toLocaleString() || '0'}
+                                    icon={ShoppingCart}
+                                    description="Total transactions"
+                                    delta={comparison?.sales}
+                                />
+                                <ReportStatCard
+                                    title="Unique Products"
+                                    value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
+                                    icon={Package}
+                                    description="Different products sold"
+                                />
+                                <ReportStatCard
+                                    title="Units Sold"
+                                    value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
+                                    icon={Layers}
+                                    description="Total pieces moved"
+                                    delta={comparison?.units}
+                                />
+                                <ReportStatCard
+                                    title="Daily Velocity"
+                                    value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
+                                    icon={TrendingUp}
+                                    description="Sales per day"
+                                />
+                                <ReportStatCard
+                                    title="Daily Revenue"
+                                    value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={DollarSign}
+                                    description="Average revenue per day"
+                                />
+                                <ReportStatCard
+                                    title="Catalog Size"
+                                    value={finalReportData?.catalogSize?.toLocaleString() || '0'}
+                                    icon={Package}
+                                    description="Total unique products in inventory"
+                                />
+                                <ReportStatCard
+                                    title="Avg Order"
+                                    value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={FileText}
+                                    description="Revenue per sale"
+                                    delta={comparison?.avgBasket}
+                                />
+                                <ReportStatCard
+                                    title="Customers"
+                                    value={finalReportData?.totalCustomers.toLocaleString() || '0'}
+                                    icon={Users}
+                                    description="Total unique buyers"
+                                />
                             </div>
-                        </div>
-                    ) : (
-                        <>
-                            <TabsContent value="analytics" className="space-y-6 mt-0">
-                                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-                                    <ReportStatCard
-                                        title="Revenue"
-                                        value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                        icon={DollarSign}
-                                        description="Total earnings"
+                            <FeatureGate
+                                requiredPlan="pro"
+                                currentPlan={business?.plan}
+                                hasLifetimeAccess={hasLifetimeAccess}
+                                bypass={isTodayOnlyRange}
+                                featureName="Advanced Visual Analytics"
+                                featureDescription="Unlock deep dive visual charts, sales trends, and profit margins to truly understand your business."
+                            >
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                    <RevenueForecastCard receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                    <InventoryDepletionCard receipts={deepReceipts} products={products || []} />
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                    <div className="lg:col-span-5">
+                                        <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                    <TopItemsPanel receipts={deepReceipts} products={products || []} kind="product" currencySymbol={currencySymbol} />
+                                    <TopItemsPanel receipts={deepReceipts} products={products || []} kind="service" currencySymbol={currencySymbol} />
+                                </div>
+
+                                {/*
+                                    Where the money comes from and where it leaks out.
+                                    Category money and per-person till activity had no home
+                                    on this page at all; margin leaks is the only panel that
+                                    reads receipt-line `priceOverridden`/`listPrice`, which is
+                                    captured at the moment of sale and cannot be recomputed
+                                    from a product's current price.
+                                */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                    <CategoryPerformance
+                                        receipts={deepReceipts}
+                                        previousReceipts={previousReceipts}
+                                        products={products || []}
+                                        currencySymbol={currencySymbol}
                                     />
-                                    <ReportStatCard
-                                        title="Net Cost"
-                                        value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                        icon={FileText}
-                                        description="Total cost of sales"
-                                    />
-                                    <ReportStatCard
-                                        title="Net Profit"
-                                        value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                        icon={Coins}
-                                        description="Earnings minus costs"
-                                    />
-                                    <ReportStatCard
-                                        title="Product Revenue"
-                                        value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                        icon={Package}
-                                        description="Revenue from physical goods"
-                                    />
-                                    <ReportStatCard
-                                        title="Service Revenue"
-                                        value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                        icon={TrendingUp}
-                                        description="Revenue from services"
-                                    />
-                                    <ReportStatCard
-                                        title="Sales"
-                                        value={finalReportData?.totalSales.toLocaleString() || '0'}
-                                        icon={ShoppingCart}
-                                        description="Total transactions"
-                                    />
-                                    <ReportStatCard
-                                        title="Unique Products"
-                                        value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
-                                        icon={Package}
-                                        description="Different products sold"
-                                    />
-                                    <ReportStatCard
-                                        title="Units Sold"
-                                        value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
-                                        icon={Layers}
-                                        description="Total pieces moved"
-                                    />
-                                    <ReportStatCard
-                                        title="Daily Velocity"
-                                        value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
-                                        icon={TrendingUp}
-                                        description="Sales per day"
-                                    />
-                                    <ReportStatCard
-                                        title="Daily Revenue"
-                                        value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                        icon={DollarSign}
-                                        description="Average revenue per day"
-                                    />
-                                    <ReportStatCard
-                                        title="Catalog Size"
-                                        value={finalReportData?.catalogSize?.toLocaleString() || '0'}
-                                        icon={Package}
-                                        description="Total unique products in inventory"
-                                    />
-                                    <ReportStatCard
-                                        title="Avg Order"
-                                        value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                        icon={FileText}
-                                        description="Revenue per sale"
-                                    />
-                                    <ReportStatCard
-                                        title="Customers"
-                                        value={finalReportData?.totalCustomers.toLocaleString() || '0'}
-                                        icon={Users}
-                                        description="Total unique buyers"
+                                    <MarginLeaksPanel
+                                        receipts={deepReceipts}
+                                        products={products || []}
+                                        currencySymbol={currencySymbol}
                                     />
                                 </div>
 
+                                <div className="mt-6">
+                                    <StaffPerformance
+                                        receipts={deepReceipts}
+                                        users={users || []}
+                                        currencySymbol={currencySymbol}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                    <div className="lg:col-span-3">
+                                        <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
+                                    </div>
+                                    <div className="lg:col-span-2">
+                                        <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+                                    <div className="lg:col-span-3">
+                                        <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                    </div>
+                                    <div className="lg:col-span-2">
+                                        <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-6 mt-6">
+                                    <DeadStockAnalysis products={products || []} receipts={widestReceipts} currencySymbol={currencySymbol} />
+                                    <HourlySalesHeatmap receipts={deepReceipts} />
+                                    <BasketAnalysis receipts={deepReceipts} />
+                                </div>
                                 <FeatureGate
                                     requiredPlan="business"
                                     currentPlan={business?.plan}
                                     hasLifetimeAccess={hasLifetimeAccess}
-                                    featureName="Advanced Visual Analytics"
-                                    featureDescription="Unlock deep dive visual charts, sales trends, and profit margins to truly understand your business."
+                                    featureName="Customer Intelligence & Inventory Velocity"
+                                    featureDescription="Unlock advanced CRM analytics, customer lifetime value, and optimize stock levels with data-driven ABC analysis."
                                 >
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                                        <RevenueForecastCard receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                        <InventoryDepletionCard receipts={deepReceipts} products={products || []} />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-                                        <div className="lg:col-span-5">
-                                            <OverviewChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                                        <TopProductsChart receipts={deepReceipts} />
-                                        <TopServicesChart receipts={deepReceipts} />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-                                        <div className="lg:col-span-3">
-                                            <SalesOverTimeChart receipts={deepReceipts} currencySymbol={currencySymbol} data={monthlyStats || undefined} />
-                                        </div>
-                                        <div className="lg:col-span-2">
-                                            <ProfitLossChart receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-                                        <div className="lg:col-span-3">
-                                            <PaymentMethodDistribution receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                        </div>
-                                        <div className="lg:col-span-2">
-                                            <TopCustomersList receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                        </div>
-                                    </div>
-
                                     <div className="grid grid-cols-1 gap-6 mt-6">
-                                        <DeadStockAnalysis products={products || []} receipts={allReceipts || []} currencySymbol={currencySymbol} />
-                                        <HourlySalesHeatmap receipts={deepReceipts} />
-                                        <BasketAnalysis receipts={deepReceipts} />
+                                        <CustomerAnalytics
+                                            customers={customers || []}
+                                            receipts={deepReceipts}
+                                            currencySymbol={currencySymbol}
+                                            totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers}
+                                        />
+                                        <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
                                     </div>
-                                    <FeatureGate
-                                        requiredPlan="business"
-                                        currentPlan={business?.plan}
-                                        hasLifetimeAccess={hasLifetimeAccess}
-                                        featureName="Customer Intelligence & Inventory Velocity"
-                                        featureDescription="Unlock advanced CRM analytics, customer lifetime value, and optimize stock levels with data-driven ABC analysis."
-                                    >
-                                        <div className="grid grid-cols-1 gap-6 mt-6">
-                                            <CustomerAnalytics
-                                                customers={customers || []}
-                                                receipts={deepReceipts}
-                                                currencySymbol={currencySymbol}
-                                                totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers}
-                                            />
-                                            <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
-                                        </div>
-                                    </FeatureGate>
                                 </FeatureGate>
-                            </TabsContent>
-                            <TabsContent value="profit-loss" className="mt-0">
+                            </FeatureGate>
+                        </TabsContent>
+                        <TabsContent value="profit-loss" className="mt-0">
+                            <FeatureGate
+                                requiredPlan="business"
+                                currentPlan={business?.plan}
+                                hasLifetimeAccess={hasLifetimeAccess}
+                                bypass={isTodayOnlyRange}
+                                featureName="Profit & Loss Statement"
+                                featureDescription="Unlock detailed profit & loss statements to analyze your store's margins."
+                            >
                                 <ProfitLossStatement 
                                     receipts={deepReceipts} 
                                     products={products || []} 
                                     currencySymbol={currencySymbol} 
                                 />
-                            </TabsContent>
-                            <TabsContent value="daily-sales" className="mt-0">
-                                <DailySalesItemsTable receipts={allReceipts || []} products={products || []} currencySymbol={currencySymbol} />
-                            </TabsContent>
-                            <TabsContent value="business-rating" className="mt-0 space-y-6">
-                                {/* Gamification Level & Streak Header */}
-                                <div className="grid gap-4 md:grid-cols-3">
-                                    {/* Store Tier Rank Card */}
-                                    <Card className="border border-border/60 bg-card">
-                                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                            <CardTitle className="text-sm font-semibold text-muted-foreground">Store Tier Rank</CardTitle>
-                                            <Trophy className="h-4 w-4 text-muted-foreground" />
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="text-xl font-black text-foreground">
-                                                {userScore === 0 ? "Unranked" : userScore >= 90 ? "Level 6: Dominator" : userScore >= 80 ? "Level 5: Elite" : userScore >= 60 ? "Level 4: Commander" : "Level 1: Vendor"}
-                                            </div>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {userScore === 0 ? "Start logging to rank up" : `Top ${Math.max(1, 100 - userScore)}% of peer merchants`}
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* Consistency Streak Card */}
-                                    <Card className="border border-border/60 bg-card">
-                                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                            <CardTitle className="text-sm font-semibold text-muted-foreground">Consistency Streak</CardTitle>
-                                            <Flame className="h-4 w-4 text-muted-foreground" />
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="text-xl font-black text-foreground">
-                                                {userScore === 0 ? "No Streak Yet" : "7-Day Log Integrity"}
-                                            </div>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {userScore === 0 ? "Consistency is key" : "1.2x multiplier active"}
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* Next Tier Goal Card */}
-                                    <Card className="border border-border/60 bg-card">
-                                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                            <CardTitle className="text-sm font-semibold text-muted-foreground">Next Tier Goal</CardTitle>
-                                            <Target className="h-4 w-4 text-muted-foreground" />
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="text-xl font-black text-foreground">
-                                                {userScore >= 90 ? 'Platinum Tier' : userScore >= 80 ? 'Elite Tier' : userScore >= 60 ? 'Gold Tier' : 'Silver Tier'}
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-2 w-full">
-                                                <div className="h-2 bg-muted rounded-full flex-1 overflow-hidden">
-                                                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, userScore + 15)}%` }} />
-                                                </div>
-                                                <span className="text-[11px] font-bold text-muted-foreground">{Math.min(100, userScore + 15)}%</span>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-
-                                {/* Core Health Matrix & Performance Pillars */}
-                                <Card className="p-8 border border-border/50 bg-card shadow-sm rounded-xl">
-                                    <div className="mx-auto flex flex-col lg:flex-row items-center justify-between gap-12 py-4">
-                                        {/* Left side circular score display */}
-                                        <div className="flex flex-col items-center text-center shrink-0 w-full lg:w-72">
-                                            <div className="relative w-48 h-48 flex items-center justify-center rounded-full border-[10px] border-emerald-500/20 bg-emerald-500/5">
-                                                {/* Circular border track matching image */}
-                                                <div className="absolute inset-0 rounded-full border-[6px] border-emerald-500 border-t-transparent animate-spin-slow opacity-85" style={{ transform: 'rotate(45deg)' }} />
-                                                <div className="flex flex-col items-center leading-none">
-                                                    <span className="text-6xl font-black tracking-tight text-foreground">
-                                                        {userScore}
-                                                    </span>
-                                                    <span className="text-[10px] font-extrabold tracking-widest text-emerald-500 uppercase mt-2">Score</span>
-                                                </div>
-                                            </div>
-                                            <h3 className="text-2xl font-black text-emerald-500 mt-6 leading-none">
-                                                {userScore >= 90 ? 'Elite' : userScore >= 75 ? 'Strong' : userScore >= 50 ? 'Fair' : 'Needs Attention'}
-                                            </h3>
-                                            <p className="text-xs text-muted-foreground mt-2 font-medium">
-                                                {userScore === 0 ? "You have not added any products yet." : `Your inventory setup is superior to ${Math.max(10, Math.floor(userScore * 0.8))}% of grocery retailers globally.`}
-                                            </p>
-                                        </div>
-
-                                        {/* Right side metrics list */}
-                                        <div className="flex-1 w-full space-y-6">
-                                            {/* Metric 1 */}
-                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                                <div className="flex justify-between items-center text-sm font-semibold">
-                                                    <span className="text-foreground flex items-center gap-1.5">
-                                                        Availability <span className="text-xs text-muted-foreground font-normal">· 35% Weight</span>
-                                                    </span>
-                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0} / 100</span>
-                                                </div>
-                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                    <div
-                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.availability ?? 0}%` }}
-                                                    />
-                                                </div>
-                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                    {userScore === 0 ? "No inventory data available." : "Reorder points are set correctly. Only a few items currently out of stock."}
-                                                </p>
-                                            </div>
-
-                                            {/* Metric 2 */}
-                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                                <div className="flex justify-between items-center text-sm font-semibold">
-                                                    <span className="text-foreground flex items-center gap-1.5">
-                                                        Efficiency <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
-                                                    </span>
-                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0} / 100</span>
-                                                </div>
-                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                    <div
-                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.efficiency ?? 0}%` }}
-                                                    />
-                                                </div>
-                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                    {userScore === 0 ? "No sales velocity data." : "Turnover velocity is moderate. Some dead stock items identified."}
-                                                </p>
-                                            </div>
-
-                                            {/* Metric 3 */}
-                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                                <div className="flex justify-between items-center text-sm font-semibold">
-                                                    <span className="text-foreground flex items-center gap-1.5">
-                                                        Data Quality <span className="text-xs text-muted-foreground font-normal">· 25% Weight</span>
-                                                    </span>
-                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0} / 100</span>
-                                                </div>
-                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                    <div
-                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.dataQuality ?? 0}%` }}
-                                                    />
-                                                </div>
-                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                    {userScore === 0 ? "Missing SKU, Image, or Category data." : "Key fields are reasonably complete for most products."}
-                                                </p>
-                                            </div>
-
-                                            {/* Metric 4 */}
-                                            <div className="p-4 rounded-lg bg-muted/20 border border-border/10 space-y-2">
-                                                <div className="flex justify-between items-center text-sm font-semibold">
-                                                    <span className="text-foreground flex items-center gap-1.5">
-                                                        Integrity <span className="text-xs text-muted-foreground font-normal">· 15% Weight</span>
-                                                    </span>
-                                                    <span className="font-extrabold text-foreground">{(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0} / 100</span>
-                                                </div>
-                                                <div className="relative h-2 bg-gradient-to-r from-red-600/30 via-amber-500/30 to-emerald-500/30 rounded-full overflow-visible">
-                                                    <div
-                                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border border-stone-800 rounded-sm shadow-sm transition-all duration-500"
-                                                        style={{ left: `${(business?.settings?.businessAnalysis?.businessHealth as any)?.integrity ?? 0}%` }}
-                                                    />
-                                                </div>
-                                                <p className="text-[10px] text-muted-foreground leading-normal mt-1 font-medium">
-                                                    {userScore === 0 ? "No transaction logs." : "Logs are extremely consistent. Few manual corrections made."}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
-
-                                {/* Peer Leaderboard & Competition Panel */}
-                                <div className="grid gap-6 md:grid-cols-3">
-                                    {/* Left/Main Leaderboard Card */}
-                                    <Card className="p-6 border border-border/50 bg-card shadow-sm rounded-xl md:col-span-2 space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Trophy className="h-5 w-5 text-amber-500" />
-                                                <h4 className="text-sm font-black tracking-tight uppercase text-foreground">Peer Leaderboard (Grocery Segment)</h4>
-                                            </div>
-                                            <span className="text-[10px] bg-muted border text-muted-foreground px-2 py-0.5 rounded-full font-bold">Global</span>
-                                        </div>
-                                        <div className="divide-y divide-border/40">
-                                            {/* Top 3 Global Competitors */}
-                                            {leaderboard.slice(0, 3).map((peer) => (
-                                                <div key={peer.rank} className="flex items-center justify-between py-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-sm font-black text-muted-foreground w-6 text-center">
-                                                            {peer.rank === 1 ? '🥇' : peer.rank === 2 ? '🥈' : '🥉'}
-                                                        </span>
-                                                        <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-xs font-black text-amber-600">
-                                                            {peer.initials}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-bold text-foreground">{peer.name}</p>
-                                                            <p className="text-[10px] text-muted-foreground">{peer.details}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-extrabold text-foreground">{peer.score}</span>
-                                                        <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">
-                                                            {peer.tag}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
-
-                                            {/* Ellipsis separator if user is lower rank */}
-                                            {userRank > 5 && (
-                                                <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
-                                                    ... {userRank - 4} other global competitors ...
-                                                </div>
-                                            )}
-
-                                            {/* User context slice (immediate competitors directly above & below) */}
-                                            {leaderboard.filter(p => p.rank >= userRank - 1 && p.rank <= userRank + 1 && p.rank > 3).map((peer) => (
-                                                <div
-                                                    key={peer.rank}
-                                                    className={cn(
-                                                        "flex items-center justify-between py-3 px-2 -mx-2 my-0.5 transition-all duration-300",
-                                                        peer.isUser ? "bg-primary/5 border border-primary/20 rounded-lg my-1 animate-pulse" : "opacity-75"
-                                                    )}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className={cn("text-sm w-6 text-center font-bold", peer.isUser ? "text-primary font-black animate-bounce" : "text-muted-foreground")}>
-                                                            {peer.rank}
-                                                        </span>
-                                                        <div className={cn(
-                                                            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
-                                                            peer.isUser ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                                                        )}>
-                                                            {peer.initials}
-                                                        </div>
-                                                        <div>
-                                                            <p className={cn("text-sm font-bold", peer.isUser ? "text-foreground font-extrabold" : "text-foreground")}>
-                                                                {peer.name}
-                                                            </p>
-                                                            <p className={cn("text-[10px]", peer.isUser ? "text-primary font-bold" : "text-muted-foreground")}>
-                                                                {peer.details}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={cn("text-sm font-extrabold", peer.isUser ? "text-primary font-black" : "text-foreground")}>
-                                                            {peer.score}
-                                                        </span>
-                                                        <span className={cn(
-                                                            "text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded",
-                                                            peer.isUser ? "bg-emerald-500/15 text-emerald-600" : "bg-emerald-500/10 text-emerald-500"
-                                                        )}>
-                                                            {peer.tag}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
-
-                                            {/* Bottom ellipsis separator if there are more below */}
-                                            {userRank < 398 && (
-                                                <div className="flex justify-center py-2 text-[10px] text-muted-foreground font-semibold border-t border-b border-border/10 bg-muted/10">
-                                                    ... {400 - userRank - 1} other global competitors ...
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Card>
-
-                                    {/* Competition Rules / Gamification Explainer */}
-                                    <Card className="p-6 border border-border/50 bg-gradient-to-br from-amber-500/5 to-transparent rounded-xl flex flex-col justify-between">
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 text-amber-500">
-                                                <Sparkles className="h-5 w-5 animate-spin-slow" />
-                                                <span className="text-sm font-black tracking-tight uppercase">Leaderboard Mechanics</span>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                                Competition ranking is computed daily. Merchants gain points by improving reorder point coverage, reducing dead stock capital, and maintaining clean catalog descriptions.
-                                            </p>
-                                            <div className="space-y-2">
-                                                <div className="flex items-center justify-between text-[11px] font-bold">
-                                                    <span className="text-muted-foreground">Log Accuracy</span>
-                                                    <span className="text-emerald-500">+15 pts</span>
-                                                </div>
-                                                <div className="flex items-center justify-between text-[11px] font-bold">
-                                                    <span className="text-muted-foreground">Dead Stock below 10%</span>
-                                                    <span className="text-emerald-500">+25 pts</span>
-                                                </div>
-                                                <div className="flex items-center justify-between text-[11px] font-bold">
-                                                    <span className="text-muted-foreground">Perfect Catalog Details</span>
-                                                    <span className="text-emerald-500">+20 pts</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="pt-4 border-t border-border mt-4 text-[10px] text-muted-foreground">
-                                            Ranks reset at the end of the month. Keep logs consistent to retain your commander badge!
-                                        </div>
-                                    </Card>
-                                </div>
-
-
-                            </TabsContent>
-                        </>
-                    )}
-                </Tabs>
-            </FeatureGate>
+                            </FeatureGate>
+                        </TabsContent>
+                        <TabsContent value="daily-sales" className="mt-0">
+                            <FeatureGate
+                                requiredPlan="pro"
+                                currentPlan={business?.plan}
+                                hasLifetimeAccess={hasLifetimeAccess}
+                                bypass={isTodayOnlyRange}
+                                featureName="Daily Sales Items"
+                                featureDescription="Unlock daily item sales tracking and inventory audit logs."
+                            >
+                                <DailySalesItemsTable receipts={widestReceipts} products={products || []} currencySymbol={currencySymbol} />
+                            </FeatureGate>
+                        </TabsContent>
+                        <TabsContent value="business-rating" className="mt-0">
+                            <BusinessRatingPanel />
+                        </TabsContent>
+                    </>
+                )}
+            </Tabs>
         </div>
     );
 }

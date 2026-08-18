@@ -844,6 +844,8 @@ const pt: Messages = {
     healthOutOfStock: 'Sem estoque',
     healthLowStock: 'Estoque baixo (≤5)',
     healthMissingImages: 'Sem imagem',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'Produtos',
     productsDescription: 'Gerencie seus produtos e acompanhe o desempenho de vendas.',
     scanningCatalogs: 'Analisando o catálogo…',

@@ -806,6 +806,8 @@ const ko: Messages = {
     healthOutOfStock: '품절',
     healthLowStock: '재고 부족(5개 이하)',
     healthMissingImages: '이미지 없음',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: '상품',
     productsDescription: '상품을 관리하고 판매 실적을 확인하세요.',
     scanningCatalogs: '상품 목록을 확인하는 중…',

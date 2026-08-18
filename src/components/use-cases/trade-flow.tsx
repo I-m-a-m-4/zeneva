@@ -114,10 +114,37 @@ function hCurve(a: Pt, b: Pt): string {
   return `M ${r1(a.x)} ${r1(a.y)} C ${r1(a.x + dx)} ${r1(a.y)}, ${r1(b.x - dx)} ${r1(b.y)}, ${r1(b.x)} ${r1(b.y)}`;
 }
 
-/** Leaves vertically, arrives horizontally — the stacked layout's fan. */
+/** Leaves vertically, arrives horizontally — the source-to-hub drop when stacked. */
 function fanCurve(a: Pt, b: Pt): string {
   const dy = Math.max(36, Math.abs(b.y - a.y) * 0.48);
   return `M ${r1(a.x)} ${r1(a.y)} C ${r1(a.x)} ${r1(a.y + dy)}, ${r1(b.x)} ${r1(b.y - dy)}, ${r1(b.x)} ${r1(b.y)}`;
+}
+
+/**
+ * The stacked layout's hub-to-node edge: down out of the hub, into a private
+ * vertical channel to the left of the cards, then a turn right into the port.
+ *
+ * A single cubic straight from hub to port — which is what this was — draws a
+ * diagonal across every card between the two. The SVG sits *under* the HTML nodes,
+ * so the wire is hidden wherever a card covers it and all the reader gets is a
+ * disconnected diagonal stub in each gap between rows. Routing round the outside
+ * keeps each wire visible end to end.
+ *
+ * `busX` is assigned right-to-left as the node index grows, and that is what makes
+ * the diagram cross-free rather than merely tidy: a channel stops at its own row,
+ * so a horizontal tap only ever passes channels belonging to *lower* nodes — and
+ * those sit further left, behind the tap rather than across it.
+ */
+function busPath(a: Pt, busX: number, cornerY: number, b: Pt): string {
+  const c = Math.min(cornerY, b.y - 20); // never corner below the port
+  const turn = Math.min(16, Math.max(6, (b.x - busX) / 2));
+  const ease = (c - a.y) * 0.55;
+  return [
+    `M ${r1(a.x)} ${r1(a.y)}`,
+    `C ${r1(a.x)} ${r1(a.y + ease)}, ${r1(busX)} ${r1(c - ease)}, ${r1(busX)} ${r1(c)}`,
+    `L ${r1(busX)} ${r1(b.y - turn)}`,
+    `C ${r1(busX)} ${r1(b.y)}, ${r1(busX + turn)} ${r1(b.y)}, ${r1(b.x)} ${r1(b.y)}`,
+  ].join(' ');
 }
 
 function computeLayout(w: number, count: number): Layout {
@@ -149,15 +176,22 @@ function computeLayout(w: number, count: number): Layout {
     };
   }
 
-  const nodeW = Math.max(180, w - GUTTER * 2);
-  const rowTop = 264;
+  /* Stacked. The cards are inset from the left to leave room for the wiring
+     channels; see `busPath` for why the wires go round rather than across. */
+  const portX = 48;
+  const nodeW = Math.max(160, w - GUTTER - portX);
+  const rowTop = 276;
   const rowStep = NODE_H + 18;
   const h = rowTop + rowStep * (count - 1) + NODE_H / 2 + 12;
   const cx = Math.round(w / 2);
   const source: Pt = { x: cx, y: 12 + SRC_H / 2 };
   const hub: Pt = { x: cx, y: 164 };
-  const nodes = Array.from({ length: count }, (_, i) => ({ x: cx, y: rowTop + rowStep * i }));
-  const ports = nodes.map((p) => ({ x: GUTTER, y: p.y }));
+  const nodes = Array.from({ length: count }, (_, i) => ({
+    x: portX + nodeW / 2,
+    y: rowTop + rowStep * i,
+  }));
+  const ports = nodes.map((p) => ({ x: portX, y: p.y }));
+  const hubOut: Pt = { x: hub.x, y: hub.y + HUB / 2 };
   return {
     mode: 'stacked',
     w,
@@ -169,7 +203,11 @@ function computeLayout(w: number, count: number): Layout {
     nodes,
     ports,
     spine: fanCurve({ x: source.x, y: source.y + SRC_H / 2 }, { x: hub.x, y: hub.y - HUB / 2 }),
-    edges: ports.map((p) => fanCurve({ x: hub.x, y: hub.y + HUB / 2 }, p)),
+    /* Channel x falls and the corner deepens as the index grows, so the four
+       swings out of the hub nest inside one another instead of crossing. */
+    edges: ports.map((p, i) =>
+      busPath(hubOut, Math.max(8, 28 - i * 6), hubOut.y + 24 + i * 9, p),
+    ),
   };
 }
 

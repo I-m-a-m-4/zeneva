@@ -860,7 +860,7 @@ export default function AdminAIUsage() {
           <ReferenceNote
             lines={[
               'Roster: TOOL_LINES in src/components/ai-insights/zen-status.tsx, which is the same list the chat status line renders from.',
-              'Definitions: the 41 tools themselves live in src/app/api/chat/tools.ts.',
+              `Definitions: the ${ZEN_TOOL_COUNT} tools themselves live in src/app/api/chat/tools.ts.`,
               'Windowed counts come from the day documents; lifetime counts from each tenant\'s aiToolUsageCounts, which predates the rollups and cannot be filtered by date.',
             ]}
           />

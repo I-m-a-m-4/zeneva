@@ -845,6 +845,8 @@ const es: Messages = {
     healthOutOfStock: 'Sin stock',
     healthLowStock: 'Stock bajo (≤5)',
     healthMissingImages: 'Sin imagen',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'Productos',
     productsDescription: 'Gestiona tus productos y consulta su rendimiento de ventas.',
     scanningCatalogs: 'Revisando el catálogo…',

@@ -823,6 +823,8 @@ const hi: Messages = {
     healthOutOfStock: 'स्टॉक ख़त्म',
     healthLowStock: 'कम स्टॉक (≤5)',
     healthMissingImages: 'तस्वीरें ग़ायब',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'उत्पाद',
     productsDescription: 'अपने उत्पाद प्रबंधित करें और उनकी बिक्री देखें।',
     scanningCatalogs: 'उत्पाद सूची जाँची जा रही है…',

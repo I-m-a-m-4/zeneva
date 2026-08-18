@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { ScrollArea } from '../ui/scroll-area';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
+import { useBranch } from '@/context/branch-context';
 
 interface ImportCustomersDialogProps {
   isOpen: boolean;
@@ -36,6 +37,13 @@ const HEADER_MAPPINGS: { [key: string]: string[] } = {
 export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess, businessId, existingCustomers }: ImportCustomersDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
+  /**
+   * Imported rows carried no `branchId`, unlike every customer created through
+   * `addToQueue` (which injects the active branch on `add-customer`). In a
+   * multi-branch shop that meant an imported customer belonged to no branch and so
+   * appeared under none of them once the list is branch-filtered.
+   */
+  const { activeBranchId } = useBranch();
 
   const [file, setFile] = React.useState<File | null>(null);
   const [parsedData, setParsedData] = React.useState<ParsedCustomerWithEmail[]>([]);
@@ -177,6 +185,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
             phone: customerData.phone || '',
             code: customerData.code || '',
             businessId,
+            ...(activeBranchId ? { branchId: activeBranchId } : {}),
             loyaltyPoints: 0,
             totalSpent: 0, // CRITICAL: Required for query ordering
             createdAt: serverTimestamp(),

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil, ChevronDown } from "lucide-react";
+import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil, ChevronDown, Download, Tag as TagIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,6 @@ import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { useFirestore } from '@/firebase';
-import { doc, writeBatch } from 'firebase/firestore';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +50,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { downloadCsv } from '@/lib/csv';
+import {
+  computeCustomerSegments,
+  FILTERABLE_SEGMENTS,
+  SEGMENT_HINTS,
+  SEGMENT_LABELS,
+  type SegmentKey,
+} from '@/lib/customer-segments';
 
 function CustomerRowSkeleton() {
   return (
@@ -87,6 +96,28 @@ function CustomerRowSkeleton() {
 const CUSTOMERS_PER_PAGE_WEB = 500;
 const CUSTOMERS_PER_PAGE_NATIVE = 100000;
 
+/**
+ * Rows rendered at once.
+ *
+ * `CUSTOMERS_PER_PAGE_WEB` / `_NATIVE` above and the `itemsPerPage` derived from
+ * them were dead — computed and never referenced, with `ChevronLeft` imported and
+ * never rendered — so every matched customer was rendered on one page. Customers
+ * sync in full and uncapped, so a 3,000-customer shop was mounting 3,000 rows.
+ * This is the page size that is actually applied.
+ */
+const PAGE_SIZE = 50;
+
+/** Visual treatment per segment. Owing and lapsed are the ones that cost money. */
+const SEGMENT_STYLE: Record<SegmentKey, string> = {
+  owing: 'border-destructive/40 text-destructive',
+  lapsed: 'border-amber-500/40 text-amber-600 dark:text-amber-400',
+  'at-risk': 'border-amber-500/30 text-amber-600 dark:text-amber-400',
+  vip: 'border-primary/40 text-primary',
+  loyal: 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400',
+  new: 'border-sky-500/40 text-sky-600 dark:text-sky-400',
+  'never-seen': 'border-muted-foreground/30 text-muted-foreground',
+};
+
 export default function CustomersPage() {
   const [mounted, setMounted] = React.useState(false);
   const [isNative, setIsNative] = React.useState(false);
@@ -105,7 +136,8 @@ export default function CustomersPage() {
     currentUserProfile: currentUser, 
     triggerRefresh, 
     isFullSyncingCustomers,
-    searchCustomers
+    searchCustomers,
+    addToQueue
   } = usePOS();
   const { toast } = useToast();
   const router = useRouter();
@@ -122,6 +154,25 @@ export default function CustomersPage() {
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
   const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
   const [isSearching, setIsSearching] = React.useState(false);
+  const [segmentFilter, setSegmentFilter] = React.useState<SegmentKey | 'all'>('all');
+  const [tagFilter, setTagFilter] = React.useState<string>('all');
+  const [page, setPage] = React.useState(0);
+
+  /**
+   * The clock, held in state and re-armed at local midnight.
+   *
+   * Every segment here is a statement about *days since* something. A till that
+   * stays open for days would otherwise keep classifying against the day it was
+   * opened, so "at risk" would silently stop advancing — the same trap
+   * `docs/business-rating.md` records for its `today`.
+   */
+  const [now, setNow] = React.useState(() => new Date());
+  React.useEffect(() => {
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 30);
+    const timer = setTimeout(() => setNow(new Date()), midnight.getTime() - Date.now());
+    return () => clearTimeout(timer);
+  }, [now]);
 
   // Customers are fetched and branch-filtered by pos-context (via `customers`).
   // We do NOT run a separate Firestore query here as it would bypass branch filtering.
@@ -167,6 +218,35 @@ export default function CustomersPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, searchCustomers]);
 
+  /**
+   * Segments and per-customer money, computed once for the whole list.
+   *
+   * The Debt column used to filter the entire receipt array *inside* the row
+   * `.map()` — O(customers × receipts) on every single render. This does the same
+   * work once and looks the answer up per row.
+   *
+   * Note the Debt column now counts **unpaid and pending**, matching the "Owing"
+   * segment, the invoices page and the overdue-credit notification rule. It
+   * previously counted `unpaid` only, which meant a row could show no debt while
+   * being tagged as owing.
+   */
+  const segmentData = React.useMemo(
+    () => computeCustomerSegments({ customers: displayCustomers, receipts, now }),
+    [displayCustomers, receipts, now],
+  );
+
+  /** Every tag in use, for the filter. Sorted so the control is stable. */
+  const allTags = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const c of displayCustomers || []) {
+      for (const tag of c.tags || []) {
+        const trimmed = String(tag).trim();
+        if (trimmed) set.add(trimmed);
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [displayCustomers]);
+
   const filtered = React.useMemo(() => {
     const receiptTotals: Record<string, number> = {};
     if (receipts) {
@@ -184,7 +264,7 @@ export default function CustomersPage() {
         computedTotalSpent: Math.max(Number(c.totalSpent) || 0, fromReceipts)
       };
     });
-    
+
     // Combine with remote search results
     if (searchedCustomers && searchedCustomers.length > 0) {
       searchedCustomers.forEach(rc => {
@@ -198,14 +278,24 @@ export default function CustomersPage() {
       });
     }
 
-    let filtered = searchTerm.trim() 
-      ? base.filter(c => 
-          c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    let filtered = searchTerm.trim()
+      ? base.filter(c =>
+          c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           c.phone?.includes(searchTerm) ||
           c.code?.toLowerCase().includes(searchTerm.toLowerCase())
         )
       : base;
+
+    if (segmentFilter !== 'all') {
+      filtered = filtered.filter(c =>
+        segmentData.byCustomerId.get(c.id)?.segments.includes(segmentFilter),
+      );
+    }
+
+    if (tagFilter !== 'all') {
+      filtered = filtered.filter(c => (c.tags || []).some(tg => String(tg).trim() === tagFilter));
+    }
 
     // Apply sorting
     filtered.sort((a, b) => {
@@ -225,18 +315,39 @@ export default function CustomersPage() {
     });
 
     return filtered;
-  }, [searchTerm, displayCustomers, sortBy, searchedCustomers, receipts]);
+  }, [searchTerm, displayCustomers, sortBy, searchedCustomers, receipts, segmentFilter, tagFilter, segmentData]);
+
+  // Any change to what is being filtered has to reset the page, or a narrowed
+  // result set leaves the reader stranded on a page that no longer exists.
+  React.useEffect(() => {
+    setPage(0);
+  }, [searchTerm, segmentFilter, tagFilter, sortBy]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const visible = React.useMemo(
+    () => filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filtered, safePage],
+  );
 
   const currencySymbol = React.useMemo(() => {
     const code = business?.settings?.currency || 'NGN';
     return CURRENCY_SYMBOLS[code] || '₦';
   }, [business]);
 
+  /**
+   * Select-all is scoped to the visible page, not the whole filtered set.
+   *
+   * The only bulk action here is delete. With the list paginated, a control that
+   * ticks 3,000 unseen rows from a header above 50 visible ones is a way to lose a
+   * customer book by accident.
+   */
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
-      setSelectedCustomerIds(filtered.map(c => c.id));
+      setSelectedCustomerIds(prev => [...new Set([...prev, ...visible.map(c => c.id)])]);
     } else {
-      setSelectedCustomerIds([]);
+      const onPage = new Set(visible.map(c => c.id));
+      setSelectedCustomerIds(prev => prev.filter(id => !onPage.has(id)));
     }
   };
 
@@ -248,37 +359,114 @@ export default function CustomersPage() {
     );
   };
 
+  /**
+   * Export what is on screen — the current filter and sort, not the whole book.
+   *
+   * Exporting everything regardless of the active filter is the more surprising
+   * behaviour: someone who has just filtered to "lapsed" wants the lapsed list.
+   * The header row says which filter produced the file.
+   */
+  const handleExportCsv = () => {
+    const rows: (string | number)[][] = [
+      [
+        'Name',
+        'Email',
+        'Phone',
+        'Code',
+        'Segments',
+        'Tags',
+        'Orders (observed)',
+        `Total spent (${currencySymbol})`,
+        `Outstanding (${currencySymbol})`,
+        'Loyalty points',
+        'Last purchase',
+        'Days since last purchase',
+        'Notes',
+      ],
+    ];
+
+    for (const c of filtered) {
+      const m = segmentData.byCustomerId.get(c.id);
+      rows.push([
+        c.name || '',
+        c.email || '',
+        c.phone || '',
+        c.code || '',
+        (m?.segments || []).map(s => SEGMENT_LABELS[s]).join('; '),
+        (c.tags || []).join('; '),
+        m?.orders ?? 0,
+        Math.round(Number((c as any).computedTotalSpent) || 0),
+        Math.round(m?.outstanding ?? 0),
+        c.loyaltyPoints ?? 0,
+        m?.lastSeen ? m.lastSeen.toISOString().slice(0, 10) : '',
+        m?.daysSinceLastPurchase ?? '',
+        c.notes || '',
+      ]);
+    }
+
+    rows.push([]);
+    rows.push([
+      'Filter',
+      segmentFilter === 'all' ? 'All customers' : SEGMENT_LABELS[segmentFilter],
+      'Tag',
+      tagFilter === 'all' ? 'All tags' : tagFilter,
+      'Search',
+      searchTerm || '(none)',
+    ]);
+    rows.push([
+      'Note',
+      `Orders and outstanding are counted from the ${segmentData.summary.receiptCount} sales held on this device, covering ${segmentData.summary.coveredDays} days. Outstanding is a floor, not a total.`,
+    ]);
+
+    downloadCsv(`zeneva-customers-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    toast({ variant: 'success', title: 'Customers exported', description: `${filtered.length} rows saved.` });
+  };
+
+  /**
+   * Bulk delete, routed through the offline queue.
+   *
+   * This used to `writeBatch` straight to Firestore, which skipped every guarantee
+   * `addToQueue` provides: the RBAC check, branch scoping, surviving an offline
+   * moment, the SQLite mirror update, and the `stats.totalCustomers` decrement that
+   * the `delete-customer` handler already performs. That handler existed and was
+   * fully implemented — nothing in the UI had ever called it.
+   */
   const handleBulkDelete = async () => {
-    if (!firestore || selectedCustomerIds.length === 0 || !business || !currentUser) {
+    if (selectedCustomerIds.length === 0 || !business || !currentUser) {
       toast({ title: t('toast.error'), description: t('customers.deleteFailedSession'), variant: 'destructive' });
       return;
     }
 
-    const batch = writeBatch(firestore);
-    const auditPromises: Promise<void>[] = [];
-
-    selectedCustomerIds.forEach(id => {
-      const docRef = doc(firestore, 'customers', id);
-      batch.delete(docRef);
-
-      const deletedCustomer = displayCustomers?.find(p => p.id === id);
-      if (deletedCustomer) {
-        auditPromises.push(logAuditEvent(firestore, business.id, currentUser, {
-          action: 'customer.delete',
-          entity: { type: 'Customer', id: id, name: deletedCustomer.name },
-          details: { customerName: deletedCustomer.name, customerEmail: deletedCustomer.email }
-        }));
-      }
-    });
+    const targets = selectedCustomerIds
+      .map(id => displayCustomers?.find(c => c.id === id))
+      .filter((c): c is Customer => !!c);
 
     try {
-      await batch.commit();
-      await Promise.all(auditPromises);
+      for (const customer of targets) {
+        await addToQueue({
+          type: 'delete-customer',
+          payload: { id: customer.id, name: customer.name, email: customer.email },
+        } as any);
+      }
+
+      // Audit stays a direct write: it is append-only, has its own rule, and a
+      // failed log must not roll back a delete the owner already confirmed.
+      if (firestore) {
+        await Promise.all(
+          targets.map(customer =>
+            logAuditEvent(firestore, business.id, currentUser, {
+              action: 'customer.delete',
+              entity: { type: 'Customer', id: customer.id, name: customer.name },
+              details: { customerName: customer.name, customerEmail: customer.email }
+            }).catch(() => undefined)
+          )
+        );
+      }
 
       toast({
         variant: 'success',
         title: t('customers.deletedTitle'),
-        description: t('customers.deletedDescription', { count: selectedCustomerIds.length }),
+        description: t('customers.deletedDescription', { count: targets.length }),
       });
       setSelectedCustomerIds([]);
       triggerRefresh();
@@ -337,7 +525,57 @@ export default function CustomersPage() {
                     <DropdownMenuItem onClick={() => setSortBy('recent')}>{t('customers.sortMostRecent')}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                <Select value={segmentFilter} onValueChange={v => setSegmentFilter(v as SegmentKey | 'all')}>
+                  <SelectTrigger className="w-[190px] bg-background font-normal">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All customers</SelectItem>
+                    {FILTERABLE_SEGMENTS.map(key => (
+                      <SelectItem key={key} value={key}>
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span>{SEGMENT_LABELS[key]}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {segmentData.summary.counts[key]}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {allTags.length > 0 && (
+                  <Select value={tagFilter} onValueChange={setTagFilter}>
+                    <SelectTrigger className="w-[160px] bg-background font-normal">
+                      <SelectValue placeholder="All tags" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All tags</SelectItem>
+                      {allTags.map(tg => (
+                        <SelectItem key={tg} value={tg}>{tg}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
+
+              {segmentFilter !== 'all' && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {SEGMENT_HINTS[segmentFilter]}
+                  {(segmentFilter === 'never-seen' || segmentFilter === 'lapsed') &&
+                    !segmentData.summary.reliable && (
+                      <>
+                        {' '}
+                        <span className="text-amber-600 dark:text-amber-400">
+                          Based on the {segmentData.summary.receiptCount} most recent sales, which
+                          cover only {segmentData.summary.coveredDays} days — someone here may
+                          simply have bought longer ago than that.
+                        </span>
+                      </>
+                    )}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {(() => {
@@ -352,6 +590,12 @@ export default function CustomersPage() {
                 );
               })()}
 
+              <Button size="sm" variant="outline" className="h-8 gap-1" onClick={handleExportCsv} disabled={filtered.length === 0}>
+                <Download className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Export
+                </span>
+              </Button>
               <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" />
                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
@@ -414,7 +658,13 @@ export default function CustomersPage() {
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={filtered.length > 0 && selectedCustomerIds.length === filtered.length ? true : selectedCustomerIds.length > 0 ? "indeterminate" : false}
+                      checked={
+                        visible.length > 0 && visible.every(c => selectedCustomerIds.includes(c.id))
+                          ? true
+                          : visible.some(c => selectedCustomerIds.includes(c.id))
+                            ? "indeterminate"
+                            : false
+                      }
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -433,10 +683,12 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((customer) => {
+                {visible.map((customer) => {
                   const totalSpent = (customer as any).computedTotalSpent ?? customer.totalSpent ?? 0;
-                  const customerReceipts = (receipts || []).filter(r => r.customer?.id === customer.id && r.status === 'unpaid');
-                  const debt = customerReceipts.reduce((sum, r) => sum + r.total, 0);
+                  const metrics = segmentData.byCustomerId.get(customer.id);
+                  const debt = metrics?.outstanding ?? 0;
+                  const badge = metrics?.primarySegment ?? null;
+                  const tags = customer.tags || [];
                   return (
                     <TableRow 
                       key={customer.id} 
@@ -454,10 +706,36 @@ export default function CustomersPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">
-                          {customer.name}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{customer.name}</span>
+                          {badge && badge !== 'never-seen' && (
+                            <Badge
+                              variant="outline"
+                              className={cn('px-1.5 py-0 text-[10px] font-medium', SEGMENT_STYLE[badge])}
+                            >
+                              {SEGMENT_LABELS[badge]}
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-sm text-muted-foreground">{customer.email}</div>
+                        {tags.length > 0 && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <TagIcon className="h-3 w-3 text-muted-foreground" />
+                            {tags.slice(0, 3).map(tg => (
+                              <span
+                                key={tg}
+                                className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                              >
+                                {tg}
+                              </span>
+                            ))}
+                            {tags.length > 3 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                +{tags.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         {customer.code ? (
@@ -508,12 +786,55 @@ export default function CustomersPage() {
             <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span>{t('customers.matched', { count: filtered.length })}</span>
+                {pageCount > 1 && (
+                  <span>
+                    · showing {safePage * PAGE_SIZE + 1}–
+                    {Math.min(filtered.length, (safePage + 1) * PAGE_SIZE)}
+                  </span>
+                )}
               </div>
-              {searchTerm && (
-                <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setSearchTerm('')}>
-                  {t('customers.clearFilters')}
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {(searchTerm || segmentFilter !== 'all' || tagFilter !== 'all') && (
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSegmentFilter('all');
+                      setTagFilter('all');
+                    }}
+                  >
+                    {t('customers.clearFilters')}
+                  </Button>
+                )}
+                {pageCount > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={safePage === 0}
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="px-1 tabular-nums">
+                      {safePage + 1} / {pageCount}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={safePage >= pageCount - 1}
+                      onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
+                      aria-label="Next page"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Background Sync & Deep Retrieval Bridge */}

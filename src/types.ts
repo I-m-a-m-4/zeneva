@@ -184,6 +184,24 @@ export interface Customer {
     lowercaseEmail?: string;
     aiInsights?: CustomerInsightsOutput;
     branchId?: string;
+    /**
+     * Free-form labels the shop applies itself — "wholesale", "pays late",
+     * "Ikeja branch". Deliberately uncontrolled: a fixed taxonomy cannot cover
+     * what a corner shop and a salon both need.
+     *
+     * Stored on the customer document rather than in a subcollection. A tag is
+     * read on every list render, and Firestore cost is a standing constraint
+     * here — a subcollection would mean one query per customer.
+     */
+    tags?: string[];
+    /**
+     * The shop's own note about this person. One field, overwritten in place.
+     *
+     * Not an append-only activity log, on purpose: a log needs a subcollection,
+     * which costs a read per customer on every open and a write per entry. If a
+     * timeline is ever wanted, it needs its own design and its own budget.
+     */
+    notes?: string;
 }
 
 export interface Receipt {
@@ -452,6 +470,41 @@ export interface BusinessInstance {
     accessLevel?: 'lifetime';
     status?: 'active' | 'deleted';
     deletedAt?: any;
+
+    /**
+     * ── AI metering. Document root, not `settings` ──────────────────────────
+     *
+     * These lived under `settings` in this interface for a long time while every
+     * reader and writer in the codebase used them at the root — `src/app/api/chat/route.ts`
+     * reads `businessData.aiUsageCount` and writes `aiBonusCredits` at the top level, and
+     * `entitlementFieldsLocked()` in `firestore.rules` locks them there by name. The type
+     * was simply wrong, and the cost of that is silent: a field declared at the wrong
+     * depth reads `undefined` for ever, so a quota check passes and a credit grant
+     * evaporates without an error anywhere.
+     *
+     * All of these are **owner-locked in the rules** — a tenant cannot write them, only
+     * the Admin SDK can. That is what makes them safe to bill against.
+     */
+
+    /** Month the counter belongs to, as `YYYY-MM`. Not a day — the cap is monthly. */
+    aiUsageCurrentDate?: string;
+    /** Turns used inside `aiUsageCurrentDate`. Reset by comparing the month, never cleared. */
+    aiUsageCount?: number;
+    /**
+     * Purchased and granted credit balance, spent once the monthly allowance runs out.
+     * Non-expiring and never reset. The name is historic — it predates credits being
+     * something you can buy, and renaming it would mean migrating every live balance,
+     * the rules entry and the admin board for no user-visible gain.
+     */
+    aiBonusCredits?: number;
+    /** Lifetime per-tool call counts, keyed by tool name. Predates the daily rollups. */
+    aiToolUsageCounts?: Record<string, number>;
+
+    /** Set by the subscription grant. Locked in the rules alongside `plan`. */
+    subscriptionReference?: string;
+    isVerified?: boolean;
+    featureOverrides?: Record<string, boolean>;
+
     settings?: {
         phone?: string;
         email?: string;
@@ -475,11 +528,22 @@ export interface BusinessInstance {
         loyaltyRewardDiscountPercentage?: number;
         productCategories?: string[];
         multiBranchEnabled?: boolean;
+
+        /**
+         * Whether the owner has opted in to the business rating.
+         *
+         * **Three states, and the difference matters.** `undefined` means they have never
+         * been asked, and only that state shows the invitation card in Reports. `false`
+         * means they were asked and said no, so nothing about the rating may appear
+         * anywhere again — re-offering it is the exact thing the opt-in exists to prevent.
+         * `true` means every surface behaves as it always did.
+         *
+         * Distinct from `score === null`, which means "not enough data to score yet".
+         * Collapsing the two makes "why is my score blank" unanswerable.
+         */
+        ratingEnabled?: boolean;
         aiTroubleshootSuggestions?: AISuggestions;
         businessAnalysis?: BusinessAnalysisOutput;
-        aiUsageCurrentDate?: string; // YYYY-MM-DD
-        aiUsageCount?: number;
-        aiBonusCredits?: number;
         publicStore?: {
             enabled?: boolean;
             headline?: string;

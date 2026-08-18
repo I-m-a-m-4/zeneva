@@ -8,7 +8,14 @@ import type { Customer, Receipt, Product, CustomerInsightsOutput } from '@/types
 export function generateLocalCustomerIntelligence(
     customer: Customer,
     receipts: Receipt[],
-    allProducts: Product[]
+    allProducts: Product[],
+    /**
+     * The shop's own currency symbol. Defaults to the naira so existing callers
+     * keep working, but every money figure below used to be hardcoded to `₦` —
+     * which quietly mislabelled the summary for every shop trading in anything
+     * else, and the summary is prose the owner reads and trusts.
+     */
+    currencySymbol: string = '₦'
 ): CustomerInsightsOutput {
     const totalSpent = receipts.reduce((sum, r) => sum + r.total, 0);
     const orderCount = receipts.length;
@@ -56,7 +63,7 @@ export function generateLocalCustomerIntelligence(
 
     // 1. Generate Summary
     let summary = `**Customer Segment: ${segment}**\n\n`;
-    summary += `${customer.name} is a **${segment.toLowerCase()}** who has shopped with you **${orderCount} times**, contributing a lifetime value of **₦${totalSpent.toLocaleString()}**. `;
+    summary += `${customer.name} is a **${segment.toLowerCase()}** who has shopped with you **${orderCount} times**, contributing a lifetime value of **${currencySymbol}${totalSpent.toLocaleString()}**. `;
     
     if (topItems.length > 0) {
         summary += `Their most frequently purchased products are **${topItems.join(', ')}**. `;
@@ -66,8 +73,12 @@ export function generateLocalCustomerIntelligence(
         summary += `They show a strong preference for items in the **${topCategory}** category. `;
     }
 
-    if (avgOrderValue > 25000) {
-        summary += `With an average order value of **₦${avgOrderValue.toLocaleString()}**, they are among your higher-spending clientele. `;
+    if (orderCount > 0) {
+        // Stated as a fact, not as a judgement. This used to read "they are among
+        // your higher-spending clientele" above a hardcoded ₦25,000 — a threshold
+        // that cannot be currency-neutral, and this function has no shop-wide
+        // figures to compare against, so the claim could not be supported.
+        summary += `Their average order is **${currencySymbol}${avgOrderValue.toLocaleString()}**. `;
     }
 
     // 2. Product Suggestions

@@ -2,13 +2,12 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, AlertTriangle, ArrowRight, Bell } from 'lucide-react';
+import { Package, AlertTriangle, ArrowRight } from 'lucide-react';
 import type { Receipt, Product } from '@/types';
 import { safeToDate } from '@/lib/utils';
+import { isService } from '@/lib/product-kind';
 import { subDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 
 interface InventoryDepletionCardProps {
     receipts: Receipt[];
@@ -16,24 +15,11 @@ interface InventoryDepletionCardProps {
 }
 
 export default function InventoryDepletionCard({ receipts, products }: InventoryDepletionCardProps) {
-    const { toast } = useToast();
-    const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
-
-    React.useEffect(() => {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-            setNotificationsEnabled(Notification.permission === 'granted');
-        }
-    }, []);
-
-    const requestNotificationPermission = async () => {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-            const permission = await Notification.requestPermission();
-            setNotificationsEnabled(permission === 'granted');
-            if (permission === 'granted') {
-                toast({ title: 'Notifications Enabled', description: 'You will now receive native alerts for critical low stock.' });
-            }
-        }
-    };
+    // An "Enable Native Alerts" button used to sit in this header. It asked for
+    // *browser* notification permission, which nothing reads any more — see
+    // docs/notifications.md — and the alert it promised was the `new Notification`
+    // call removed below. The Tauri permission is requested once at sign-in by
+    // NativeNotificationListener, so there was nothing for anyone to enable here.
 
     const depletionAlerts = React.useMemo(() => {
         if (!receipts || !products) return [];
@@ -52,49 +38,46 @@ export default function InventoryDepletionCard({ receipts, products }: Inventory
         });
 
         const alerts: { product: Product, daysRemaining: number, velocity: string, currentStock: number }[] = [];
-        let hasTriggeredNotification = false;
-
         products.forEach(p => {
-            if (p.manageStock && typeof p.stockLevel === 'number') {
+            // This used to gate on `p.manageStock && typeof p.stockLevel === 'number'`.
+            // Neither field exists on `Product` — the stock field is `stock` (see
+            // src/types.ts) — so the condition was never true, `depletionAlerts` was
+            // always empty, and the `return null` below fired on every render. This
+            // card had never appeared once. Services are skipped instead: they carry
+            // stock 0 because the field is shared, not because they ran out.
+            if (!isService(p)) {
+                const stock = Number(p.stock) || 0;
                 const soldIn30Days = productVelocity[p.id] || 0;
                 const dailyVelocity = soldIn30Days / 30;
 
                 if (dailyVelocity > 0) {
-                    const daysRemaining = p.stockLevel / dailyVelocity;
+                    const daysRemaining = stock / dailyVelocity;
 
                     // Alert if running out in 14 days or less
                     if (daysRemaining <= 14) {
                         alerts.push({
                             product: p,
-                            daysRemaining: Math.floor(daysRemaining),
+                            daysRemaining: Math.max(0, Math.floor(daysRemaining)),
                             velocity: dailyVelocity.toFixed(1),
-                            currentStock: p.stockLevel
+                            currentStock: stock
                         });
 
-                        // Trigger native notification if highly urgent (<= 3 days)
-                        // We use a strict check to avoid spamming. In a real app this might be tracked in localStorage to fire only once per session/day.
-                        if (daysRemaining <= 3 && !hasTriggeredNotification && typeof window !== 'undefined') {
-                            const lastFired = localStorage.getItem(`low_stock_alert_${p.id}`);
-                            const todayStr = new Date().toDateString();
-                            
-                            if (lastFired !== todayStr) {
-                                if ('Notification' in window && Notification.permission === 'granted') {
-                                    new Notification('Critical Stock Alert 🚨', {
-                                        body: `${p.name} will run out in approx. ${Math.floor(daysRemaining)} days based on current sales velocity!`,
-                                    });
-                                    localStorage.setItem(`low_stock_alert_${p.id}`, todayStr);
-                                    hasTriggeredNotification = true;
-                                }
-                            }
-                        }
+                        // A `new Notification(...)` used to fire from inside this memo
+                        // for anything depleting within 3 days. It was removed for two
+                        // reasons: notifications are native-shell only now (the browser
+                        // API is not reliable enough across the PWA, the TWA and plain
+                        // tabs), and it was a third independent copy of low-stock
+                        // alerting that wrote no Firestore document — so it appeared in
+                        // nobody's bell and could not be read on another device.
+                        // src/lib/notification-rules.ts owns this now.
                     }
-                } else if (p.stockLevel <= 0) {
+                } else if (stock <= 0) {
                     // It's already out of stock
                     alerts.push({
                         product: p,
                         daysRemaining: 0,
                         velocity: '0.0',
-                        currentStock: p.stockLevel
+                        currentStock: stock
                     });
                 }
             }
@@ -109,20 +92,13 @@ export default function InventoryDepletionCard({ receipts, products }: Inventory
 
     return (
         <Card className="border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-950/10">
-            <CardHeader className="pb-3 flex flex-row items-start justify-between">
-                <div>
-                    <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
-                        <AlertTriangle className="h-5 w-5" /> Inventory Depletion Warning
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                        Predictive alerts for products likely to run out soon based on their 30-day sales velocity.
-                    </CardDescription>
-                </div>
-                {!notificationsEnabled && (
-                    <Button variant="outline" size="sm" onClick={requestNotificationPermission} className="text-xs h-8">
-                        <Bell className="h-3.5 w-3.5 mr-1.5" /> Enable Native Alerts
-                    </Button>
-                )}
+            <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                    <AlertTriangle className="h-5 w-5" /> Inventory Depletion Warning
+                </CardTitle>
+                <CardDescription className="mt-1">
+                    Predictive alerts for products likely to run out soon based on their 30-day sales velocity.
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">

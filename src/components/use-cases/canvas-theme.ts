@@ -170,8 +170,13 @@ export const CANVAS_CSS = `
 }
 /* Declared rather than leaning on Tailwind's own "spin": that keyframe is only
    emitted when an animate-spin utility is generated somewhere in the project,
-   which makes it an invisible dependency on unrelated code. */
-@keyframes uc-rim-spin { to { transform: rotate(360deg); } }
+   which makes it an invisible dependency on unrelated code. The translate is
+   repeated in both stops because a keyframe replaces the whole transform list —
+   animating just the rotate would drop the centring. */
+@keyframes uc-rim-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
 /* Two sines at unrelated periods, so the bloom never visibly loops. Amplitudes
    are deliberately below the threshold where the movement can be named — the
    effect wanted is "this surface is alive", not "something is sliding". */
@@ -209,15 +214,42 @@ export const CANVAS_CSS = `
   background: radial-gradient(circle, rgba(238, 79, 39, 0.3), transparent 70%);
   animation: uc-halo-breathe 5.5s ease-in-out infinite;
 }
-/* The hub's rotating rim. A conic gradient masked to a 1px inset ring, so what
-   travels is a highlight around the border and not a spinning square. */
+/*
+ * The rotating rim highlight, on the hub and on the featured plan.
+ *
+ * Two elements, and which one moves is the whole trick. The span is static: it is
+ * masked to a 1px inset ring and clips its own overflow. The wedge lives on
+ * \`::before\` — an oversized square, centred, and the only thing that rotates. So
+ * what travels is a highlight around the border.
+ *
+ * Rotating the *span* instead, which is what this did first, works only on a
+ * square. Turn a 325x210 card and its corners swing ~90px past its own bottom
+ * edge; the masked ring follows them and draws a chevron hanging below the card.
+ * The hub got away with it because it is 108x108.
+ *
+ * \`padding-bottom\` is a percentage of the *width*, which is how the child stays
+ * square without knowing either dimension. 200% covers the box for any aspect
+ * ratio up to about 1:1.7 — true of both uses, and the reason \`overflow: hidden\`
+ * is here as well as the mask: if a future box is taller than that, or an engine
+ * drops the mask, the fallback is a clipped wedge and not one sprayed across the
+ * page.
+ */
 .uc-root .uc-rim {
-  background: conic-gradient(from 0deg, transparent 0deg, rgba(238, 79, 39, 0.9) 40deg, transparent 110deg);
+  overflow: hidden;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   padding: 1px;
+}
+.uc-root .uc-rim::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  padding-bottom: 200%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(238, 79, 39, 0.9) 40deg, transparent 110deg);
   animation: uc-rim-spin 6s linear infinite;
 }
 .uc-root .uc-eq { animation: uc-eq-bounce 1.2s ease-in-out infinite; }
@@ -261,13 +293,15 @@ export const CANVAS_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .uc-root .uc-track,
   .uc-root .uc-halo,
-  .uc-root .uc-rim,
   .uc-root .uc-eq,
   .uc-root .uc-blink,
   .uc-root .uc-grid,
   .uc-root .uc-bloom-a,
   .uc-root .uc-bloom-b { animation: none; }
   .uc-root .uc-blink { opacity: 1; }
+  /* Stopped, but still centred: without the transform the wedge's own top-left
+     lands on the box centre and a quarter of it shows in one corner. */
+  .uc-root .uc-rim::before { animation: none; transform: translate(-50%, -50%); }
   .uc-root .uc-beam { animation: none; stroke-dashoffset: 0; }
   .uc-root .uc-progress { animation: none; transform: scaleX(1); }
   .uc-root .uc-swap,

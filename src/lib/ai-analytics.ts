@@ -201,8 +201,8 @@ export const TOOL_GROUP_LABELS: Record<string, string> = Object.fromEntries(
 /**
  * Which part of the business a tool touches.
  *
- * Matched on the tool name rather than kept as a 41-row table, so a tool added
- * to `tools.ts` lands in the right group without anyone remembering to come
+ * Matched on the tool name rather than kept as a row-per-tool table, so a tool
+ * added to `tools.ts` lands in the right group without anyone remembering to come
  * back here. A genuinely new area falls to `inventory` — visible in the chart
  * as a group that grew for no reason, which is the cue to add a rule.
  */
@@ -210,9 +210,12 @@ export function groupForTool(name: string): string {
   if (/^propose/.test(name)) return 'writes';
   if (/Customer|Loyalty|Unpaid|Invoice/i.test(name)) return 'customers';
   if (/forecast|Growth|Trend|Compare/i.test(name)) return 'forecast';
-  if (/Branch|Staff|Audit|Overview/i.test(name)) return 'operations';
-  if (/linkToPage|explainHowTo/.test(name)) return 'navigation';
-  if (/Sales|Daily|Transactions|Peak|Selling|Margin/i.test(name)) return 'sales';
+  // `LossPrevention` and `Unanswered` are named here rather than left to the
+  // fallback: neither has an inventory word in it, so both used to be filed under
+  // Inventory — a loss sweep is operational, and a logged miss is a help gap.
+  if (/Branch|Staff|Audit|Overview|LossPrevention/i.test(name)) return 'operations';
+  if (/linkToPage|explainHowTo|Unanswered/i.test(name)) return 'navigation';
+  if (/Sales|Daily|Transactions|Peak|Selling|Margin|Rating/i.test(name)) return 'sales';
   return 'inventory';
 }
 

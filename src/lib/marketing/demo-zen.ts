@@ -588,7 +588,7 @@ export const zenDemo: Demo = {
       prog(frame, T.titleHold, T.titleOut, wipeOut),
       frame,
     );
-    endCard(ctx, '41 tools. Reads everything. Writes nothing without you.',
+    endCard(ctx, '42 tools. Reads everything. Writes nothing without you.',
       'Try Zen AI', prog(frame, T.endIn, T.endIn + s(0.6)), frame);
   },
 };

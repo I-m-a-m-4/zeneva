@@ -42,7 +42,7 @@ import { increment } from 'firebase/firestore';
  * The event registry
  * ------------------------------------------------------------------ */
 
-export type FeatureCategory = 'pos' | 'inventory' | 'ai' | 'reports';
+export type FeatureCategory = 'pos' | 'inventory' | 'ai' | 'reports' | 'engagement';
 
 /**
  * Which users even had the chance to use a feature.
@@ -200,6 +200,38 @@ export const FEATURE_EVENTS: FeatureEventDef[] = [
     category: 'reports',
     question: 'Do merchants take data out of Zeneva, or only read it on screen?',
     where: 'reports daily-sales table, inventory export',
+    opportunity: 'all',
+  },
+
+  // ── The bell ──
+  //
+  // These three only mean something as a set. Opens alone cannot separate "reads
+  // the alerts" from "clears the badge because the red dot is annoying", and those
+  // two answers point at opposite decisions about whether notifications are worth
+  // the interruption. So: did they open it, did they act on anything, or did they
+  // just wipe it.
+  {
+    key: 'notif_bell_opened',
+    label: 'Notification bell opened',
+    category: 'engagement',
+    question: 'Do people open the bell at all, or ignore it?',
+    where: 'app top bar, bell dropdown open transition',
+    opportunity: 'all',
+  },
+  {
+    key: 'notif_tapped',
+    label: 'Notification tapped through',
+    category: 'engagement',
+    question: 'Having opened the bell, do they act on anything in it?',
+    where: 'app top bar, handleNotificationClick',
+    opportunity: 'all',
+  },
+  {
+    key: 'notif_bell_cleared',
+    label: 'Notifications marked all read',
+    category: 'engagement',
+    question: 'Or do they just wipe the badge without reading anything?',
+    where: 'app top bar, Mark all read',
     opportunity: 'all',
   },
 ];

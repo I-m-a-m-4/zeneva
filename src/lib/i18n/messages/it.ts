@@ -830,6 +830,8 @@ const it: Messages = {
     healthOutOfStock: 'Esaurito',
     healthLowStock: 'Scorte basse (≤5)',
     healthMissingImages: 'Immagini mancanti',
+    healthNegativeStock: 'Negative Stock',
+    healthMissingCostPrice: 'No Cost Price',
     productsTitle: 'Prodotti',
     productsDescription: 'Gestisci i tuoi prodotti e osserva il loro andamento di vendita.',
     scanningCatalogs: 'Scansione del catalogo…',

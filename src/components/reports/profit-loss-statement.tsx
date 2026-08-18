@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, FileText, TrendingUp, TrendingDown, Coins, PieChart, Percent, ArrowUpRight, ArrowDownRight, Layers, Download } from 'lucide-react';
 import type { Receipt, Product } from '@/types';
 import ProfitLossChart from './profit-loss-chart';
-import TopProductsChart from './top-products-chart';
+import TopItemsPanel from './top-items-panel';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -246,7 +246,18 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     <ProfitLossChart receipts={receipts} currencySymbol={currencySymbol} />
                 </div>
                 <div className="lg:col-span-2">
-                    <TopProductsChart receipts={receipts} />
+                    {/*
+                        Swapped from the old `TopProductsChart`, which capped at five,
+                        keyed its aggregation on the display name (merging two products
+                        that share a name) and could only rank by units. On a Profit &
+                        Loss tab, ranking by profit is the whole point.
+                    */}
+                    <TopItemsPanel
+                        receipts={receipts}
+                        products={products}
+                        kind="product"
+                        currencySymbol={currencySymbol}
+                    />
                 </div>
             </div>
 

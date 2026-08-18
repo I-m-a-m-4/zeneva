@@ -2,6 +2,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { Firestore } from 'firebase-admin/firestore';
+import { runForensicScan, summariseReport } from '@/lib/forensics';
+import { computeBusinessRating, RATING_WINDOW_DAYS } from '@/lib/business-rating';
 
 /**
  * Zen AI's toolkit.
@@ -333,7 +335,17 @@ function productCards(entries: Array<{ p?: any; name?: string; stats: Stat[] }>)
   );
 }
 
-type Ctx = { db: Firestore; businessId: string; currency: string };
+type Ctx = {
+  db: Firestore;
+  businessId: string;
+  currency: string;
+  /**
+   * Whether the shop has opted in to the business rating
+   * (`settings.ratingEnabled`). False means `getBusinessRating` refuses rather
+   * than scores — see the note on that tool.
+   */
+  ratingEnabled: boolean;
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
@@ -517,7 +529,7 @@ const WORKFLOWS: Record<string, { title: string; intro: string; steps: string[];
   },
 };
 
-export function createZenTools({ db, businessId, currency }: Ctx) {
+export function createZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
   // Per-request caches. A single turn can call six tools that all need the
   // same receipts; without this that is six identical Firestore reads.
   let productCache: any[] | null = null;
@@ -1189,6 +1201,136 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
     }),
 
     /**
+     * The rating the owner already sees in the top bar and on Reports → Business
+     * Rating, answered in chat.
+     *
+     * Calls the same pure scorer as those two surfaces
+     * (`src/lib/business-rating.ts`) over the same 60-day window, so Zen cannot
+     * quote a different number from the one on the page — one rating with three
+     * mouths is the whole reason that module is pure and takes `now` as an input.
+     *
+     * Two deliberate differences from the client, and both make this reading the
+     * better one rather than an approximation:
+     *
+     * - `receiptsSince` is a real 60-day query, so there is no 200-receipt listener
+     *   cap here and `facts.truncated` comes back false.
+     * - `customers: null` — the customer list is not fetched. It feeds only the
+     *   count of people on file who have not bought, and thousands of document
+     *   reads to fill in one clause of a chat answer is not a trade worth making.
+     *   `null` records that it was skipped instead of letting it read as zero.
+     *
+     * Receipts are deliberately NOT filtered through `isPaid`, matching the client:
+     * the rating counts every surviving receipt because a void deletes the document
+     * outright, so anything still present was a sale.
+     *
+     * ── Opted out ─────────────────────────────────────────────────────────────
+     *
+     * The rating is opt-in, and this tool refuses when it is off rather than being
+     * removed from the tool set: a model that has been told not to raise the subject
+     * can still call the tool it was told about, and a refusal is a cheap, unambiguous
+     * answer where a missing tool is an SDK error. It returns **no score of any kind**
+     * — not the pillars, not the tier, not a "would have been" figure — because the
+     * one thing an owner who declined must not get is their number anyway.
+     *
+     * The refusal does no reads at all, so an ignored instruction costs a step and
+     * nothing else.
+     */
+    getBusinessRating: tool({
+      description:
+        "The shop's business rating out of 100 — the same score shown in the top bar and on Reports → Business Rating. Returns the four pillars that multiply revenue (margin, basket, repeat, momentum), how many points each one has available, the action that moves each, and the largest money opportunities. Use when the user asks how their business is doing overall, what their rating or score is, how to improve it, what to work on next, or where they are leaving money on the table. For a single period's takings use getSalesMetrics instead.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!ratingEnabled) {
+          // Untagged on purpose: `ToolResult`'s default branch renders nothing and
+          // leaves the model to say it in prose, which is what `reportUnanswered`
+          // does too. A card here would be a rating card, which is the one thing
+          // this branch exists to avoid drawing.
+          return {
+            unavailable: true,
+            fallbackText:
+              'Business rating is switched off for this shop, so there is no score, grade or pillar breakdown to report. It can be turned on in Settings → General.',
+          };
+        }
+        try {
+          const [products, receipts] = await Promise.all([
+            allProducts(),
+            receiptsSince(RATING_WINDOW_DAYS),
+          ]);
+
+          const rating = computeBusinessRating({
+            products: products as any,
+            receipts: receipts as any,
+            customers: null,
+            now: new Date(),
+          });
+          const f = rating.facts;
+
+          if (rating.score === null) {
+            return {
+              type: 'METRICS',
+              title: 'Business rating',
+              tiles: [count('Rating', 0, 'Not rated yet')],
+              caveat:
+                'There are no sales in the last 60 days to score. The rating appears once the shop records its first sale.',
+              currency,
+            };
+          }
+
+          const gains = rating.opportunities.filter((o) => o.kind === 'gain');
+          const onTheTable = round2(gains.reduce((s, o) => s + o.money, 0));
+
+          // Unmeasured pillars are named rather than passed off as zero — a shop
+          // with no cost prices has an unknown margin, not a bad one, and the model
+          // must not narrate it as bad.
+          const unmeasured = rating.pillars.filter((p) => !p.measured);
+
+          return {
+            type: 'METRICS',
+            title: `Business rating — ${rating.tier.name} (level ${rating.tier.index})`,
+            tiles: [
+              count('Rating', rating.score, `Grade ${rating.grade} · ${rating.tier.name}`),
+              ...rating.pillars.map((p) =>
+                count(
+                  p.label,
+                  p.measured ? p.score : 0,
+                  p.measured ? `${p.hint}${p.headroom >= 1 ? ` · +${p.headroom} available` : ''}` : p.hint,
+                ),
+              ),
+              money('On the table', onTheTable, `${gains.length} opportunit${gains.length === 1 ? 'y' : 'ies'}`),
+            ],
+            flags: unmeasured.map((p) => `${p.label} cannot be scored yet — ${p.hint.toLowerCase()}.`),
+            caveat: `Scored on ${f.sales} sales over the last ${f.coveredDays} days.${
+              rating.tier.next ? ` ${rating.tier.next.floor - rating.score} points to ${rating.tier.next.name}.` : ''
+            }`,
+            currency,
+
+            // Narration material. Not rendered by MetricTiles — the model reads
+            // these to say what to actually do about the number.
+            grade: rating.grade,
+            tier: rating.tier,
+            pillars: rating.pillars.map((p) => ({
+              name: p.label,
+              score: p.measured ? p.score : null,
+              detail: p.hint,
+              pointsAvailable: p.headroom,
+              nextAction: p.fix.label,
+              where: p.fix.href,
+            })),
+            opportunities: rating.opportunities.map((o) => ({
+              what: o.label,
+              basis: o.detail,
+              worth: round2(o.money),
+              measurable: o.kind === 'gain',
+              where: o.href,
+            })),
+            note:
+              'The customer list was not read for this answer, so any count of customers who have stopped buying is omitted rather than reported as zero.',
+          };
+        } catch (e: any) { return fail('Failed to compute the business rating', e); }
+      },
+    }),
+
+    /**
      * Deep-link the owner into the app instead of narrating a page that exists.
      * The model should offer this after an answer ("open Inventory", "show me
      * the reports page").
@@ -1786,12 +1928,22 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
       }),
       execute: async ({ limit, action }) => {
         try {
-          // No (businessId, createdAt) composite index exists for auditLogs —
-          // only single-field overrides — so this must not orderBy in the
-          // query. Sort in memory instead. See the header note.
-          const snap = await db.collection('auditLogs')
-            .where('businessId', '==', businessId)
-            .limit(400).get();
+          // Audit logs live in the **subcollection**
+          // `businessInstances/{businessId}/auditLogs` — that is where every
+          // writer puts them (`logAuditEvent`, and the `add-audit-log` queue
+          // action in pos-context). This used to read a top-level `auditLogs`
+          // collection with a `businessId` filter, which nothing has ever
+          // written to, so the tool silently answered every "who changed this"
+          // and every suspicious-activity question with zero rows.
+          //
+          // No orderBy in the query: only single-field overrides exist for
+          // auditLogs.createdAt, so sort in memory. See the header note.
+          const snap = await db
+            .collection('businessInstances')
+            .doc(businessId)
+            .collection('auditLogs')
+            .limit(400)
+            .get();
           let rows = snap.docs
             .map((d) => d.data() as any)
             .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
@@ -1851,6 +2003,89 @@ export function createZenTools({ db, businessId, currency }: Ctx) {
             totalProducts: products.length,
           };
         } catch (e: any) { return fail('Failed to build overview', e); }
+      },
+    }),
+
+    /**
+     * The full loss-prevention sweep — the same engine as the audit log page's
+     * "Run forensic scan" button.
+     *
+     * Every judgement in the result was made by deterministic code in
+     * `src/lib/forensics.ts`, not by the model. That matters here more than
+     * anywhere else in this file: the output names members of staff and says
+     * their numbers look like theft. A model asked to eyeball receipts would
+     * reach a different conclusion on a re-run, and an owner cannot confront an
+     * employee with something that changes its mind. The model's only job is to
+     * relay `summary` and let the card render.
+     */
+    runLossPreventionScan: tool({
+      description:
+        'Run the full theft and shrinkage sweep over this business: cancelled sales, discount and price-override abuse, price-swaps, stock write-offs, out-of-hours trading, receipt integrity and staff risk profiles. Use for "is anyone stealing from me", "check for fraud", "why is my stock short", "review my staff", "run an audit". Returns a finished report — relay its summary, do not re-derive or second-guess its findings.',
+      inputSchema: z.object({
+        days: z
+          .number()
+          .min(7)
+          .max(180)
+          .default(90)
+          .describe('How much trading history to examine. Patterns need weeks; 90 is the sensible default.'),
+      }),
+      execute: async ({ days }) => {
+        try {
+          const window = days ?? 90;
+          const [receipts, products, userSnap, customerSnap, auditSnap, bizSnap] = await Promise.all([
+            receiptsSince(window),
+            allProducts(),
+            db.collection('users').where('businessId', '==', businessId).get(),
+            // Only needed to put a name to a customer in the sweethearting
+            // check; capped because a large book would dominate the read cost of
+            // the whole scan and the check degrades gracefully to an id.
+            db.collection('customers').where('businessId', '==', businessId).limit(1000).get(),
+            // Subcollection, not a top-level collection — see getAuditTrail.
+            db
+              .collection('businessInstances')
+              .doc(businessId)
+              .collection('auditLogs')
+              .limit(1000)
+              .get(),
+            db.collection('businessInstances').doc(businessId).get(),
+          ]);
+
+          const business = bizSnap.data() as any | undefined;
+          const cutoff = Date.now() - window * DAY_MS;
+
+          const report = runForensicScan({
+            receipts,
+            // Trim to the requested window in memory: no composite index covers
+            // this subcollection by date, so the query cannot do it.
+            auditLogs: auditSnap.docs
+              .map((d) => ({ id: d.id, ...(d.data() as any) }))
+              .filter((l) => toMillis(l.createdAt) >= cutoff),
+            products,
+            users: userSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })),
+            customers: customerSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })),
+            settings: business?.settings ?? null,
+            currency,
+            ownerId: business?.ownerId ?? null,
+            windowDays: window,
+          });
+
+          return {
+            type: 'LOSS_SCAN',
+            title: 'Loss-prevention scan',
+            // Prose for the model to read out. Already contains every
+            // conclusion, so there is nothing left for it to work out.
+            summary: summariseReport(report),
+            // Trimmed for the card. The engine already caps evidence per
+            // finding; this bounds the total so a badly-run shop does not
+            // stream a hundred cards into the chat.
+            report: {
+              ...report,
+              findings: report.findings.slice(0, 15),
+              watchlist: report.watchlist.slice(0, 8),
+            },
+            truncated: report.findings.length > 15 ? report.findings.length - 15 : 0,
+          };
+        } catch (e: any) { return fail('Failed to run the loss-prevention scan', e); }
       },
     }),
 

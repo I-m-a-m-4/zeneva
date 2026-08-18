@@ -1,4 +1,31 @@
-import { 
+/**
+ * Peer-benchmark pipeline — **not wired up. Nothing in the app calls this.**
+ *
+ * Two things already do the scoring this module was written for. Inventory
+ * condition is scored on the Inventory page's Health tab
+ * (`src/app/(app)/inventory/page.tsx`, availability / completeness / accuracy),
+ * and sales performance is scored by `src/lib/business-rating.ts`. Both work off
+ * rows the client already holds. What neither does — and what this module is the
+ * unfinished half of — is compare a shop against *other* shops.
+ *
+ * Before it does anything it needs, at minimum:
+ *
+ * - a scheduler to call `runNightlyAggregation` then `runPercentileComputation`
+ *   (it reads *all* of `businessInstances`, so it cannot run from a client);
+ * - the four `track*` helpers called from the POS write paths — nothing writes
+ *   `sale_completed_events`, `stock_adjusted_events`, `product_snapshot_events`
+ *   or `reorder_point_events` today, so `calculateInventoryHealthScore` below
+ *   would currently see every product as dead stock with no reorder point;
+ * - `firestore.rules` entries for those four collections plus
+ *   `store_health_snapshots` and `benchmark_percentiles`, none of which exist.
+ *
+ * Until then it must not be read from the UI. The Reports tab used to fetch
+ * `store_health_snapshots` on every mount and, finding it empty, fabricate 400
+ * competitors to fill the gap. `runPercentileComputation` already has the right
+ * instinct — it refuses to publish percentiles below a 30-store sample.
+ */
+
+import {
   collection, 
   addDoc, 
   setDoc,

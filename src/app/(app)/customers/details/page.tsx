@@ -40,6 +40,12 @@ import { logAuditEvent } from '@/lib/audit';
 import Image from 'next/image';
 import Link from 'next/link';
 import { safeToDate, cn } from '@/lib/utils';
+import CustomerCrmPanel from '@/components/customers/customer-crm-panel';
+import {
+    computeCustomerSegments,
+    SEGMENT_LABELS,
+    type SegmentKey,
+} from '@/lib/customer-segments';
 
 /**
  * The AI summary is generated from customer records, and a customer name is a
@@ -276,32 +282,32 @@ function CustomerDetailContent() {
             const result = generateLocalCustomerIntelligence(
                 customer,
                 receipts,
-                allProducts || []
+                allProducts || [],
+                currencySymbol
             );
 
             const insightsWithTimestamp = { ...result, createdAt: new Date() };
 
-            // 1. Queue the update for Firestore (Offline-ready)
-            
-            // Actually, let's just use the direct update but wrap it in a try-catch 
-            // AND also update the local SQLite if on Desktop.
-            
-            const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-            
-            if (isTauri) {
-                try {
-                    await syncCustomersToOffline(currentUserProfile.businessId, [{ ...displayCustomer, aiInsights: insightsWithTimestamp }]);
-                    console.log("Insights saved to local SQLite.");
-                } catch (e) {
-                    console.error("Failed to save insights to SQLite:", e);
-                }
-            }
-
+            /**
+             * Routed through the offline queue rather than a direct `updateDoc`.
+             *
+             * The stranded comment that used to sit here ("let's just use the direct
+             * update…") is why `addToQueue` was destructured on this page and never
+             * called. The queue is the only path that enforces RBAC, scopes to the
+             * active branch, survives an offline moment and updates the SQLite mirror
+             * — so the hand-rolled `syncCustomersToOffline` call that followed the
+             * direct write is no longer needed either.
+             */
             try {
-                const customerRef = doc(firestore, 'customers', customerId);
-                await updateDoc(customerRef, { aiInsights: { ...result, createdAt: serverTimestamp() } });
+                await addToQueue({
+                    type: 'update-customer',
+                    payload: {
+                        id: customerId,
+                        values: { aiInsights: insightsWithTimestamp },
+                    },
+                } as any);
             } catch (e) {
-                console.warn("Firestore update failed (likely offline). Insights will be available locally this session.");
+                console.warn('Queueing insights failed; they remain available locally this session.');
             }
 
             // Optimistically update local state to avoid re-fetch
@@ -321,6 +327,34 @@ function CustomerDetailContent() {
         const fromReceipts = receipts?.reduce((sum, r) => sum + r.total, 0) || 0;
         return Math.max(displayCustomer?.totalSpent || 0, fromReceipts);
     }, [displayCustomer, receipts]);
+
+    /**
+     * The segment badges under the name.
+     *
+     * These replaced a hardcoded `totalSpent > 100000 ? 'VIP' : 'Regular'`. A fixed
+     * money threshold cannot mean the same thing in a corner shop and a wholesaler,
+     * and it does not survive a currency change at all — `computeCustomerSegments`
+     * sets the VIP floor from the shop's own top decile instead.
+     *
+     * Computed against the shop-wide receipt set because a segment is inherently
+     * relative to the other customers. The money on this page keeps using the
+     * page's own unbounded per-customer query, which is the more accurate figure.
+     */
+    const segmentBadges = React.useMemo(() => {
+        if (!displayCustomer) return [] as SegmentKey[];
+        const result = computeCustomerSegments({
+            customers: customers || null,
+            receipts: allReceipts,
+            now: new Date(),
+        });
+        const own = result.byCustomerId.get(displayCustomer.id);
+        const segments = own?.segments ?? [];
+        // The page shows outstanding debt in its own right, from a better query, so
+        // "Owing" is added from that rather than from the capped receipt window.
+        const withDebt = totalDebt > 0 ? ['owing' as SegmentKey, ...segments.filter(s => s !== 'owing')] : segments;
+        // "No purchases on record" is misleading beside a purchase history table.
+        return withDebt.filter(s => s !== 'never-seen').slice(0, 3);
+    }, [displayCustomer, customers, allReceipts, totalDebt]);
 
     const isLoading = isPosLoading || isFetchingReceipts || isFetchingCustomer || !firestore;
     const canDelete = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager';
@@ -368,17 +402,29 @@ function CustomerDetailContent() {
                         {displayCustomer.phone && <CardDescription>{displayCustomer.phone}</CardDescription>}
                     </CardHeader>
                     <CardContent className="text-center flex-grow pt-4">
-                        <div className="flex items-center justify-center gap-2 mb-6">
-                            <span className={cn(
-                                "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                                totalSpent > 100000 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-primary/10 text-primary"
-                            )}>
-                                {totalSpent > 100000 ? 'VIP Customer' : 'Regular'}
-                            </span>
-                            {totalDebt > 0 && (
-                                <span className="bg-destructive/10 text-destructive px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                                    Owing
+                        <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+                            {segmentBadges.length === 0 ? (
+                                <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                    Regular
                                 </span>
+                            ) : (
+                                segmentBadges.map(key => (
+                                    <span
+                                        key={key}
+                                        className={cn(
+                                            "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                            key === 'owing'
+                                                ? "bg-destructive/10 text-destructive"
+                                                : key === 'vip'
+                                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                                    : key === 'lapsed' || key === 'at-risk'
+                                                        ? "bg-amber-100/70 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+                                                        : "bg-primary/10 text-primary"
+                                        )}
+                                    >
+                                        {SEGMENT_LABELS[key]}
+                                    </span>
+                                ))
                             )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -424,6 +470,20 @@ function CustomerDetailContent() {
                         )}
                     </CardFooter>
                 </Card>
+
+                {/*
+                    Tags, a note and the contact deep links. In the same column as the
+                    profile so the "who is this person" material stays together.
+                    `outstanding` is the page's own unbounded per-customer figure, not
+                    the segment module's capped one.
+                */}
+                <div className="md:col-span-1 md:col-start-1">
+                    <CustomerCrmPanel
+                        customer={displayCustomer}
+                        outstanding={totalDebt}
+                        currencySymbol={currencySymbol}
+                    />
+                </div>
 
                 <Card className="md:col-span-2 bg-card border-border/60 shadow-sm">
                     <CardHeader>
@@ -632,8 +692,19 @@ function CustomerDetailContent() {
 
                                 setIsDeleting(true);
                                 try {
-                                    const customerRef = doc(firestore, 'customers', customerToDelete.id);
-                                    await deleteDoc(customerRef);
+                                    // Through the queue, not a raw `deleteDoc`: the
+                                    // `delete-customer` handler also decrements
+                                    // `stats.totalCustomers`, which the direct delete
+                                    // silently skipped — so the shop's customer count
+                                    // drifted up by one on every deletion.
+                                    await addToQueue({
+                                        type: 'delete-customer',
+                                        payload: {
+                                            id: customerToDelete.id,
+                                            name: customerToDelete.name,
+                                            email: customerToDelete.email,
+                                        },
+                                    } as any);
 
                                     await logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
                                         action: 'customer.delete',
