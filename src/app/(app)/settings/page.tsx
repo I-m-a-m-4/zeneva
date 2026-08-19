@@ -197,6 +197,7 @@ function SettingsPageContent() {
     const [logoFile, setLogoFile] = React.useState<File | null>(null);
     const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
     const [isTauri, setIsTauri] = React.useState(false);
+    const [isMobile, setIsMobile] = React.useState(false);
     const [currentVersion, setCurrentVersion] = React.useState<string>('0.3.5');
     const [isCheckingUpdates, setIsCheckingUpdates] = React.useState(false);
     const isNative = isTauri; // Derived from isTauri state
@@ -204,6 +205,7 @@ function SettingsPageContent() {
     React.useEffect(() => {
         const checkTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
         setIsTauri(!!checkTauri);
+        setIsMobile(!!checkTauri && /android|iphone|ipad|ipod/i.test(navigator.userAgent));
 
         if (checkTauri) {
             import('@tauri-apps/api/app').then(app => {
@@ -1026,12 +1028,12 @@ function SettingsPageContent() {
                     </CardHeader>
                     <CardContent>
                         <a 
-                            href={isTauri ? "ms-windows-store://review/?ProductId=9nvn0f8njwmj" : "market://details?id=com.zeneva.app"}
+                            href={(isTauri && !isMobile) ? "ms-windows-store://review/?ProductId=9nvn0f8njwmj" : "market://details?id=com.zeneva.app"}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-primary text-primary bg-background hover:bg-primary hover:text-white h-10 py-2 px-4 w-full"
                             onClick={(e) => {
-                                if (isTauri) {
+                                if (isTauri && !isMobile) {
                                     e.preventDefault();
                                     window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
                                 } else {
@@ -1041,7 +1043,7 @@ function SettingsPageContent() {
                             }}
                         >
                             <Star className="me-2 h-4 w-4" />
-                            {isTauri ? "Rate Zeneva on Microsoft Store" : "Rate Zeneva on Playstore"}
+                            {(isTauri && !isMobile) ? "Rate Zeneva on Microsoft Store" : "Rate Zeneva on Playstore"}
                         </a>
                     </CardContent>
                 </Card>
