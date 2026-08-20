@@ -269,6 +269,7 @@ export async function triggerNativeNotification(request: NativeNotificationReque
     sendNotification({
       title: request.title,
       body: request.body || '',
+      largeBody: request.body || '',
       // Read back by the onAction handler above. Without it a tap has nowhere to go.
       extra: request.url ? { url: request.url } : {},
     });

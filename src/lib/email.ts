@@ -72,8 +72,10 @@ export const sendReceiptEmail = async (params: ReceiptEmailParams) => {
     try {
         const response = await emailjs.send(serviceId, templateId, params as any, publicKey);
         return response;
-    } catch (error) {
-        console.error('[EmailJS] Failed to send receipt email:', error);
+    } catch (error: any) {
+        // emailjs errors sometimes are objects that don't stringify well, or network errors (TypeError)
+        const errorMessage = error?.text || error?.message || (typeof error === 'object' ? JSON.stringify(error) : error);
+        console.error('[EmailJS] Failed to send receipt email:', errorMessage);
         throw error;
     }
 };

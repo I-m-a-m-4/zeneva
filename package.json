@@ -1,6 +1,6 @@
 {
   "name": "nextn",
-  "version": "3.2.6",
+  "version": "3.2.7",
   "private": true,
   "scripts": {
     "predev": "node scripts/clean-sw.mjs",
@@ -16,6 +16,7 @@
     "version-up": "node scripts/update-version.js",
     "test:import": "tsx scripts/test-import.ts",
     "test:achievements": "tsx scripts/check-achievements.ts",
+    "test:zen-cost": "tsx scripts/check-zen-cost.ts",
     "announce-release": "node scripts/announce-release.mjs",
     "record": "node scripts/record/record.mjs",
     "record:audio": "node scripts/record/add-audio.mjs"

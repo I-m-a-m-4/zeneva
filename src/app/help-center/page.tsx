@@ -338,7 +338,7 @@ const ARTICLES: Article[] = [
     q: 'What are the plan limits?',
     a: 'Plans differ by scale, not by capability — the features are the same on all three. Starter is free forever, with no trial and no card required.',
     bullets: [
-      'Starter — free: 50 products, 1 staff account, 15 Zen AI credits a month',
+      'Starter — free: 50 products, 1 staff account, 3 Zen AI credits a month',
       'Pro — NGN 10,000 or $10 a month: 1,500 products, 5 staff accounts, 150 Zen AI credits a month',
       'Business — NGN 30,000 or $30 a month: unlimited products, unlimited staff, 600 Zen AI credits a month',
     ],

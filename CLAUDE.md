@@ -384,12 +384,56 @@ The short version:
   inside a transaction, settle in `onFinish`, release on error — with a
   `creditsResolved` latch, because nothing promises only one of those fires.
   **`aiUsageCount` counts credits, not messages**, and `AI_MONTHLY_LIMITS` is now
-  15/400/1,500 — so every surface that renders it must say "credits". The
+  **3/150/600** — so every surface that renders it must say "credits". The
   allowance is hand-typed in four places besides the constant (both `plans.proF5`
   / `plans.bizF3` across all eleven catalogs, `use-cases/page.tsx`,
-  `help-center/page.tsx`). No new **top-level** field was added on purpose:
+  `help-center/page.tsx`), and **three of them said 15 for Starter against a real
+  3** until 20 August 2026 — a free-tier user was promised five times what the
+  server grants. Grep the number, not the key: there is no catalog key for the
+  Starter allowance, so the eleven-catalog habit does not cover it. No new
+  **top-level** field was added on purpose:
   `fieldsUnchanged()` is a deny-list, so the reservation moves the two fields
   already in `entitlementFieldsLocked()`. `docs/zen-ai.md` has the rest.
+- **Input is 98% of the tokens and 85% of the bill, so shortening replies saves
+  nothing.** Reconciled against a real invoice on 20 August 2026: ~12,400 tokens in
+  against ~260 out per turn, of which ~8,100 is fixed overhead resent every turn
+  (tool schemas ~4,500 + system prompt ~3,600). Two consequences that keep being
+  got wrong. **`ai-cost.ts` used to claim real spend is "always downward" from the
+  ceiling — it is not**: the account came in ~6% *above* the board, because the
+  board measures chat tokens while the five Genkit flows bill the same key and are
+  priced in `FLOW_CREDITS` floors, not tokens. And **context caching is a net loss
+  here** — explicit cache storage is ~$1.00/1M tokens/hour, so holding the prefix a
+  day costs ~$0.19 against a $0.13 *month*; implicit caching is free but needs
+  traffic dense enough to stay warm, and at ~2 turns/day it never is. The prefix is
+  already stable per shop; density is the obstacle, not prompt design.
+- **What actually cut it: send less in, and never let a tool forget.**
+  `slimForModel` in `tools.ts` strips `imageUrl` (a ~300-char URL the model cannot
+  see), null keys, `PRODUCT_TABLE`'s duplicate `columns`/`rows`, and
+  `LOSS_SCAN.report` — **74% off tool payloads**. `slimHistory` re-applies it to
+  history and digests results older than the newest 8, because a result is charged
+  again on every later step *and* every later turn — **64% short, 84% at 40 turns**,
+  bounded rather than linear. `createZenTools` also drops `getBusinessRating` for a
+  shop that never opted in. Three rules: **`slimForModel` may only ever remove** —
+  never rewrite, reorder or round, because the full payload still goes to the card
+  and a rewrite makes the model quote a figure the owner cannot see on screen; both
+  structural removals are **guarded** (an empty `PRODUCT_TABLE` keeps `rows`, a
+  summary-less `LOSS_SCAN` keeps `report`); and `toModelOutput` is attached
+  **set-wide in one loop**, because one hook per tool is one chance per tool to
+  forget and forgetting is invisible — it costs money and breaks nothing. History is
+  slimmed separately on purpose: `route.ts` converts messages *before* the credit
+  reservation so a bad-history turn reserves nothing, which is exactly why the tool
+  set is not available to `convertToModelMessages`. `npm run test:zen-cost` is 52
+  checks over all of it, savings floors included. Two rejections with numbers, so
+  they are not re-proposed: rewriting the system prompt (~8% of input, but all
+  fourteen sections carry live behavioural rules against a 0% error rate) and
+  `activeTools`-gating the eight `propose*` tools (a measured 1,062 tokens, but a
+  missed write-intent makes the model say "I can't" instead of asking for a
+  rephrase). `zenevaSupportChat` and `productTroubleshoot` do override the model to
+  `gemini-2.5-flash-lite`; `visualCount` and `businessAnalysis` deliberately do not.
+- **Never hardcode the tool count.** It lives in `TOOL_LINES` in `zen-status.tsx`
+  (which derives `ZEN_TOOL_COUNT`) and nowhere else. Five docs spelled a number out
+  and every one of them had drifted — 41, 41, 42, 44 against a real 46. The harness
+  now asserts `TOOL_LINES` matches the real set in both directions.
 - **Credits are purchasable, and the client never writes the balance.** Prices live in
   `src/lib/credit-packs.ts` (250/1,000/5,000; ₦2,500/₦8,000/₦35,000, $2.50/$8/$35) and
   **both servers re-derive the price from the `packId`** — `metadata` is not a price

@@ -82,6 +82,20 @@ const addProductTool = ai.defineTool({
 
 const prompt = ai.definePrompt({
   name: 'zenevaSupportPrompt',
+  /*
+   * Flash-lite, not the `googleai/gemini-2.5-flash` default from `src/ai/genkit.ts`.
+   *
+   * Input is a third of the price ($0.10 vs $0.30 per million) and this flow is the
+   * best-suited call in the app for the cheaper model: it answers "how do I do X in
+   * Zeneva" out of the fixed feature list pasted below it. There is no arithmetic to get
+   * wrong and no customer data to reason over — the hard part is scope discipline, which
+   * the guardrails handle, not model capability.
+   *
+   * Deliberately not applied to `businessAnalysis` (long structured output over real
+   * figures) or `visualCount` (counts stock off a photo, where vision precision is the
+   * whole product).
+   */
+  model: 'googleai/gemini-2.5-flash-lite',
   input: {schema: ZenevaSupportChatInputSchema},
   output: {schema: ZenevaSupportChatOutputSchema},
   system: `You are Zen AI, a highly advanced, extremely intelligent, and friendly AI strategist built specifically for the Zeneva high-performance business suite. Zeneva is an enterprise-ready, offline-first application that handles inventory, sales, and complex business analytics.

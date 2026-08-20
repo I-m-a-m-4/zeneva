@@ -213,6 +213,14 @@ interface POSContextType {
    * failed and its retries are spent.
    */
   productSyncError: null | 'network' | 'permission' | 'cache';
+  /**
+   * True when there are no products *and* the emptiness cannot be trusted —
+   * either a sync failure was recorded, or the device is offline with nothing
+   * cached, where an empty shop and a catalogue that never arrived are
+   * indistinguishable. Surfaces must show a reason and a Retry on this rather
+   * than an empty-shop state; `productSyncError` says which reason.
+   */
+  isCatalogUnverified: boolean;
   /** Re-runs the full product sync from a failed state. */
   retryProductSync: () => void;
   processQueue: () => Promise<void>;
@@ -259,6 +267,16 @@ const ONLINE_ORDERS_LISTENER_LIMIT = 200;
  */
 const PRODUCT_SYNC_MAX_RETRIES = 3;
 const PRODUCT_SYNC_RETRY_BASE_MS = 4000;
+
+/*
+ * How often connectivity is probed while the OS insists there is no network.
+ *
+ * `verifyConnectivity` no longer takes `navigator.onLine === false` as final in
+ * the native shells (see the comment there), so the probes have to run even when
+ * the OS says not to bother. This keeps that from costing a genuinely offline
+ * phone three 8.5-second timeouts every 16 seconds all day.
+ */
+const OFFLINE_PROBE_INTERVAL_MS = 60_000;
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
@@ -316,7 +334,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const productSyncAttemptsRef = useRef(0);
   const productRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Holds the latest `fetchFullProducts` so the retry can re-enter it. */
-  const fetchFullProductsRef = useRef<(() => Promise<void>) | null>(null);
+  const fetchFullProductsRef = useRef<((options?: { force?: boolean }) => Promise<void>) | null>(null);
   /** Set once per session when a forced re-sync has already been spent on a stamp/store disagreement. */
   const forcedProductResyncRef = useRef(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
@@ -369,15 +387,52 @@ export function POSProvider({ children }: { children: ReactNode }) {
   });
 
   const consecutiveFailuresRef = useRef<number>(0);
+  /** When the probes last ran while the OS claimed there was no network. */
+  const lastOfflineProbeRef = useRef<number>(0);
 
-  const verifyConnectivity = useCallback(async () => {
+  /**
+   * Resolves whether there is really a network.
+   *
+   * `options.force` is for an explicit user action ("Try again"): it bypasses both
+   * the web-only OS veto and the slow-cadence throttle below, because somebody
+   * pressing a retry button is asking for a probe *now* and would otherwise be
+   * handed a cached "no" — which is the dead button this was meant to fix.
+   */
+  const verifyConnectivity = useCallback(async (options?: { force?: boolean }) => {
     if (typeof window === 'undefined') return;
-    
-    // 1. Native Disconnect is absolute and immediate
-    if (!navigator.onLine) {
+
+    /*
+     * 1. The OS connectivity flag is a hint here, not a verdict.
+     *
+     * This used to force `consecutiveFailuresRef` to the ceiling, declare the app
+     * offline and return *before running any of the probes below*. In a browser
+     * that is correct and saves three pointless requests. In the Tauri shells it
+     * is the bug that emptied paying users' tills: WebView2 and Android WebView
+     * derive this flag from OS connectivity state and report `false` on a machine
+     * whose Firestore listeners are streaming happily — business doc loaded,
+     * notifications arriving, top bar saying OFFLINE. And because the probes were
+     * skipped there was nothing left that could ever flip it back, so it was a
+     * permanent pin rather than a transient state: `fetchFullProducts` declines
+     * to run (it requires `isRealOnline`), the SQLite mirror stays empty, and
+     * every surface that lists products reports an empty shop.
+     *
+     * So a native shell distrusts the flag and lets the three-endpoint race below
+     * decide. On the web it keeps its authority — the value is reliable there.
+     */
+    const osSaysOffline = !navigator.onLine;
+    if (osSaysOffline && !isNativeApp() && !options?.force) {
       consecutiveFailuresRef.current = 2; // Force threshold ceiling
       setIsRealOnline(false);
       return false;
+    }
+
+    /*
+     * Cost control for what the veto used to cover for free: probe on a slower
+     * cadence while the OS claims there is no network, rather than not at all.
+     */
+    if (osSaysOffline && !options?.force) {
+      if (Date.now() - lastOfflineProbeRef.current < OFFLINE_PROBE_INTERVAL_MS) return false;
+      lastOfflineProbeRef.current = Date.now();
     }
 
     // Channel 1: Micro-fetch sensor (Routed through whitelisted CSP endpoint)
@@ -452,16 +507,41 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
 
     if (hasConnection) {
+      /*
+       * The OS said there was no network and the network disagreed. Worth exactly
+       * one document: this is the condition that stopped the shells syncing, it
+       * throws nothing so no crash log would ever carry it, and `reportAnomaly`
+       * already throttles to one per code per device per day. `userId` and
+       * `businessId` are deliberately omitted so this callback can keep empty
+       * deps — re-creating it would tear down and re-arm the probe interval.
+       */
+      if (osSaysOffline) {
+        reportAnomaly(
+          'false_offline_signal',
+          'navigator.onLine reported no network but a live WAN probe succeeded, so connectivity was resolved from the probes instead. The OS flag is unreliable in this shell; obeying it would have blocked the product sync and shown the shop an empty catalogue.',
+          { details: { platform: isNativeApp() ? 'native' : 'web', userAgent: navigator.userAgent } }
+        );
+      }
       // SUCCESS: Instantly restore connection and reset fails!
       consecutiveFailuresRef.current = 0;
       setIsRealOnline(true);
     } else {
       // PROBE FAILURE: Log it, but BUFFER the decision!
       consecutiveFailuresRef.current += 1;
-      
-      // Only declare offline in UI if BOTH probes in CONSECUTIVE runs fail entirely!
-      // This flawlessly prevents flickering on high-latency or weak connections.
-      if (consecutiveFailuresRef.current >= 2) {
+
+      /*
+       * Two signals agreeing needs no buffering.
+       *
+       * The 2-strike buffer exists for the *opposite* case — the OS reports a
+       * network but a probe failed — which is where flicker on weak or
+       * high-latency links comes from. When the OS and all three probes agree
+       * there is nothing there, waiting for a second run just delays the truth:
+       * because the probes now run on the slow cadence while the OS says offline,
+       * buffering here would have left up to a minute between a real disconnect
+       * and the app noticing. This cannot re-create the old pin — a single
+       * successful probe still flips straight back to online above.
+       */
+      if (osSaysOffline || consecutiveFailuresRef.current >= 2) {
         setIsRealOnline(false);
       }
     }
@@ -477,6 +557,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setTimeout(verifyConnectivity, 500);
     };
     const handleOfflineEvent = () => {
+      /*
+       * Same distrust as in `verifyConnectivity`: in a native shell this event is
+       * raised from the same unreliable OS signal, so re-verify instead of taking
+       * its word. Setting the flag directly here would re-pin the app offline the
+       * moment the probes had cleared it, which is the loop that made the bug
+       * survive every relaunch.
+       */
+      if (isNativeApp()) {
+        verifyConnectivity();
+        return;
+      }
       setIsRealOnline(false);
     };
 
@@ -683,10 +774,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
    * going offline (where whatever is cached is all there will be).
    */
   const isProductCatalogPending = useMemo(() => {
-    if (!businessId || !isRealOnline) return false;
+    if (!businessId) return false;
     if (syncedProducts.length > 0) return false;
     if (initialProducts && initialProducts.length > 0) return false;
+    /*
+     * The local mirror has not been read yet, so nothing can be concluded about
+     * the catalogue either way. This has to sit *above* the offline check: with
+     * the two the other way round, every offline launch resolved to "terminal"
+     * before hydration had returned a single row, so `allProducts` handed out
+     * `[]` instead of `null` and the whole hydration window became an empty-shop
+     * claim. Offline with an unread mirror is "still coming", not "there are
+     * none".
+     */
     if (!isCacheHydrated) return true;
+    // Offline with a hydrated mirror: whatever is cached is all there will be.
+    if (!isRealOnline) return false;
     if (isFullSyncingProducts || isProductRetryScheduled) return true;
     if (productSyncError) return false; // terminal — the page shows the reason and a retry
     return !hasFullSyncedProducts;
@@ -694,6 +796,36 @@ export function POSProvider({ children }: { children: ReactNode }) {
     businessId, isRealOnline, syncedProducts, initialProducts, isCacheHydrated,
     isFullSyncingProducts, isProductRetryScheduled, productSyncError, hasFullSyncedProducts,
   ]);
+
+  /**
+   * True when there is nothing to show and we cannot honestly say the shop has
+   * nothing.
+   *
+   * `products.length === 0` carries two completely different meanings, and
+   * conflating them is what put "Empty Inventory" in front of a shop with a full
+   * catalogue. `isProductCatalogPending` answers "still coming?"; this answers
+   * the other half — hydration has finished, nothing came back, and there is a
+   * reason to doubt that this is the truth.
+   *
+   * Being offline is such a reason. An offline device cannot tell a shop with no
+   * products from a catalogue that never reached this machine, and the two ways
+   * of being wrong do not cost the same: telling a stocked shop it is empty sends
+   * the owner to Add Product while their till cannot sell, whereas telling a
+   * genuinely empty shop we could not load it costs one puzzled look at a Retry
+   * button. So where it cannot be known, do not assert empty.
+   *
+   * `hasFullSyncedProducts` deliberately does not appear here as an "it really is
+   * empty" witness: the effect that sets it from the `full_products_sync` stamp
+   * is itself gated on `isRealOnline`, so it is always false offline — and per
+   * CLAUDE.md that stamp can outlive the rows it certifies anyway.
+   */
+  const isCatalogUnverified = useMemo(() => {
+    if (!businessId || !isCacheHydrated) return false;
+    if (syncedProducts.length > 0) return false;
+    if (initialProducts && initialProducts.length > 0) return false;
+    if (productSyncError) return true;
+    return !isRealOnline;
+  }, [businessId, isCacheHydrated, syncedProducts, initialProducts, productSyncError, isRealOnline]);
 
   const allProducts = useMemo(() => {
     if (initialProducts === null && syncedProducts.length === 0 && isProductCatalogPending) return null;
@@ -1202,9 +1334,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [businessId, firestore, isFullSyncingCustomers, toast, user, isRealOnline]);
 
-  const fetchFullProducts = useCallback(async () => {
-    const isOnline = isRealOnline;
-    if (!user || !businessId || !firestore || isFullSyncingProducts || !isOnline) return;
+  const fetchFullProducts = useCallback(async (options?: { force?: boolean }) => {
+    if (!user || !businessId || !firestore || isFullSyncingProducts) return;
+    /*
+     * `force` exists for the manual retry, which has just re-verified
+     * connectivity itself. `isRealOnline` read here is still the stale
+     * pre-verification value — `setIsRealOnline` does not apply synchronously and
+     * this callback is captured per render — so without the bypass "Try again"
+     * would be a dead button on exactly the shells that need it.
+     */
+    if (!isRealOnline && !options?.force) return;
 
     setIsFullSyncingProducts(true);
     let allFetched: Product[] = [];
@@ -1372,7 +1511,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Manual retry for the POS's "couldn't load your products" state. */
-  const retryProductSync = useCallback(() => {
+  const retryProductSync = useCallback(async () => {
     productSyncAttemptsRef.current = 0;
     setProductSyncError(null);
     setIsProductRetryScheduled(false);
@@ -1380,8 +1519,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
       clearTimeout(productRetryTimerRef.current);
       productRetryTimerRef.current = null;
     }
-    fetchFullProductsRef.current?.();
-  }, []);
+
+    /*
+     * Re-verify before re-fetching. Pressing "Try again" is the user asserting the
+     * connection is back, and the shells can be pinned offline by a bad OS flag
+     * (see `verifyConnectivity`) — while `fetchFullProducts` refuses to run at all
+     * without `isRealOnline`. So a retry that skipped this would silently do
+     * nothing on the one platform where the button matters.
+     */
+    const online = await verifyConnectivity({ force: true });
+    if (online === false) {
+      // Genuinely unreachable. Put the reason back rather than leaving the
+      // surface to fall through to an empty-shop state on a cleared error.
+      setProductSyncError('network');
+      return;
+    }
+    fetchFullProductsRef.current?.({ force: true });
+  }, [verifyConnectivity]);
 
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
@@ -3000,7 +3154,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => {}, updateQueuedAction: () => {}, addProductWithImage, removeFromQueue: () => {},
     mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, optimisticProducts: [],
-    isProductCatalogPending, productSyncError, retryProductSync,
+    isProductCatalogPending, productSyncError, isCatalogUnverified, retryProductSync,
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
     searchCustomers, searchCustomersByField, searchReceipts: async () => [],
@@ -3015,7 +3169,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     stats, 
     isSubscriptionActive: resolveSubscriptionActive(business)
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, isProductCatalogPending, productSyncError, retryProductSync, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, isProductCatalogPending, productSyncError, isCatalogUnverified, retryProductSync, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

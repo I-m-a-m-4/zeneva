@@ -250,6 +250,7 @@ export default function SelectProductsPage() {
         isFullSyncingProducts,
         isProductCatalogPending,
         productSyncError,
+        isCatalogUnverified,
         retryProductSync,
         currentUserProfile,
         heldSales,
@@ -296,8 +297,17 @@ export default function SelectProductsPage() {
             ? (isPosLoading && (!products || products.length === 0))
             : (isPosLoading || (isFullSyncingProducts && (!products || products.length === 0))));
 
-    /** The grid is empty because the catalogue could not be loaded, not because the shop has nothing. */
-    const isCatalogUnavailable = !isLoading && !!productSyncError && (!products || products.length === 0);
+    /**
+     * The grid is empty because the catalogue could not be loaded, not because the
+     * shop has nothing.
+     *
+     * This tested `!!productSyncError`, which misses the case that actually reached
+     * users: a shell pinned offline by a bad OS connectivity flag has no *recorded*
+     * error — it simply never got to sync — so the till fell through to "No products
+     * found" with a cashier standing at it. `isCatalogUnverified` covers both, and
+     * `productSyncError` still selects the wording below.
+     */
+    const isCatalogUnavailable = !isLoading && isCatalogUnverified && (!products || products.length === 0);
 
     /** A search or a category is narrowing the grid, so "nothing here" is about the filter. */
     const isFiltered = !!searchTerm || categoryFilter !== 'all';

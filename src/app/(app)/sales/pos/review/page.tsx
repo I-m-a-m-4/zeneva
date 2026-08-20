@@ -382,7 +382,7 @@ function ReviewPageContent() {
                     total: money(secureTotal),
                     payment_method: paymentMethod,
                     date: formatDateTime(receiptData.createdAt, locale)
-                }).catch(e => console.error("Email failed:", e));
+                }).catch(e => console.error("Email failed:", e?.text || e?.message || e));
             }
         }
 

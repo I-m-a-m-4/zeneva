@@ -55,6 +55,18 @@ export async function productTroubleshoot(input: ProductTroubleshootInput, idTok
 
 const prompt = ai.definePrompt({
   name: 'productTroubleshootPrompt',
+  /*
+   * Flash-lite, not the `googleai/gemini-2.5-flash` default from `src/ai/genkit.ts`.
+   * Input is a third of the price ($0.10 vs $0.30 per million), and input is what this
+   * flow spends: the prompt carries the whole product list, so a 400-product catalogue
+   * is a few thousand tokens in for three sentences out.
+   *
+   * Suited to the cheaper model because the judgement is shallow by design — spot a
+   * missing price, a one-word description, a category that disagrees with its
+   * neighbours. There is no arithmetic and no money figure in the output, so the
+   * failure mode of a weaker model is a duller suggestion, not a wrong number.
+   */
+  model: 'googleai/gemini-2.5-flash-lite',
   input: {schema: ProductTroubleshootInputSchema},
   output: {schema: ProductTroubleshootOutputSchema},
   // NEW: Updated prompt for more concise, structured, and budget-friendly output

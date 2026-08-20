@@ -29,6 +29,9 @@ import {
   Activity,
   ChevronDown,
   Coins,
+  CloudOff,
+  Lock,
+  RefreshCw,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +146,18 @@ function ProductRowSkeleton({ canManageStock = true }: { canManageStock?: boolea
 const PRODUCTS_PER_PAGE = 60;
 
 /**
+ * The sort the page opens on.
+ *
+ * Named because `activeFilterCount` has to compare against it. It used to count
+ * `sortBy !== 'name'`, so a page nobody had touched reported "Filter 1", and
+ * "Clear filters" — which resets to exactly this value — could never clear the
+ * badge. Beside an empty product list that reads as "a filter is hiding your
+ * stock", which is the wrong thing to be looking at when a catalogue has failed
+ * to load.
+ */
+const DEFAULT_SORT_BY = 'newest' as const;
+
+/**
  * A service has no stock to run out of.
  *
  * Services sit in the same collection as products and carry `stock: 0` because
@@ -191,7 +206,10 @@ function InventoryPageContent() {
     searchProductsByField,
     fetchMoreProducts,
     queuedActions,
-    isImpersonating
+    isImpersonating,
+    productSyncError,
+    isCatalogUnverified,
+    retryProductSync
   } = usePOS();
 
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -256,10 +274,25 @@ function InventoryPageContent() {
 
   const [stockFilter, setStockFilter] = React.useState('all');
   const [categoryFilter, setCategoryFilter] = React.useState('all');
-  const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc' | 'newest'>((searchParams.get('sortBy') as any) || 'newest');
+  const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc' | 'newest'>((searchParams.get('sortBy') as any) || DEFAULT_SORT_BY);
 
   const isLoading = isPosLoading;
   const isPageLoading = isLoading;
+
+  /*
+   * The list is empty because the catalogue could not be loaded, not because the
+   * shop has nothing in it.
+   *
+   * This page had no such branch at all — it went straight from its skeleton to
+   * "Empty Inventory · Start adding products to your shop", which is a confident
+   * claim about someone's business that it had no basis to make. A desktop shell
+   * pinned offline by a bad OS flag, or an unreadable `zeneva.db`, both landed
+   * there, so the owner of a 12,000-product shop was invited to add their first
+   * product. `isCatalogUnverified` is the context's answer to "can this emptiness
+   * be trusted?" and `productSyncError` says why not. Same treatment the POS grid
+   * already gives it.
+   */
+  const isCatalogUnavailable = !isPageLoading && isCatalogUnverified && (products?.length ?? 0) === 0;
 
   // Manual search button helper
   const performSearch = React.useCallback(async (term: string) => {
@@ -534,7 +567,7 @@ function InventoryPageContent() {
     }
   };
 
-  const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== 'name' ? 1 : 0);
+  const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== DEFAULT_SORT_BY ? 1 : 0);
   return (
     <div className="flex flex-col flex-1 w-full pb-16 md:pb-0">
       <div className="flex items-center sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3.5 gap-4 z-10 border-b mb-4">
@@ -639,7 +672,7 @@ function InventoryPageContent() {
                 {activeFilterCount > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy('newest'); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy(DEFAULT_SORT_BY); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                       {t('inventory.clearFilters')}
                     </DropdownMenuItem>
                   </>
@@ -1250,6 +1283,38 @@ function InventoryPageContent() {
                 })}
                 </TableBody>
               </Table>
+            ) : isCatalogUnavailable ? (
+              /*
+               * A load that failed is not a shop with no stock.
+               *
+               * Ordered before the search and health empty states on purpose: a
+               * search run against a catalogue that never arrived must not report
+               * "no product found", which sends the owner to check their spelling
+               * instead of their connection. The Add Product / Import CSV pair in
+               * the branch below is withheld here for the same reason — offering
+               * "add your first product" to a shop whose catalogue merely failed
+               * to download is what made this bug so hard to recognise.
+               */
+              <div className="flex flex-col items-center justify-center h-full text-center p-12 min-h-[400px] m-4 border-2 border-dashed border-destructive/30 bg-destructive/5 rounded-lg">
+                {productSyncError === 'permission'
+                  ? <Lock className="h-16 w-16 text-destructive/40 mb-4" />
+                  : <CloudOff className="h-16 w-16 text-destructive/40 mb-4" />}
+                <h3 className="text-xl font-semibold">{t('pos.catalogUnavailableTitle')}</h3>
+                <p className="text-muted-foreground mt-2 mb-6 max-w-sm mx-auto">
+                  {productSyncError === 'permission'
+                    ? t('pos.catalogUnavailablePermission')
+                    : productSyncError === 'cache'
+                      ? t('pos.catalogUnavailableCache')
+                      : t('pos.catalogUnavailableNetwork')}
+                </p>
+                {/* A rules refusal is not something a retry fixes — only the owner
+                    granting access does, so don't offer a dead button. */}
+                {productSyncError !== 'permission' && (
+                  <Button size="sm" onClick={retryProductSync}>
+                    <RefreshCw className="h-4 w-4 me-2" /> {t('pos.retryLoadingProducts')}
+                  </Button>
+                )}
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-12 min-h-[400px]">
                 <PackageOpen className="h-24 w-24 text-muted-foreground/30 mb-4" />

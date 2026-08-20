@@ -40,7 +40,7 @@ internet does not. That pushes everything about the architecture:
                               │
               ┌───────────────┼───────────────────┐
               │  Zen AI route  │  server actions   │  all gated by
-              │   (41 tools)   │  (RBAC-checked)   │  ID-token auth
+              │  (typed tools) │  (RBAC-checked)   │  ID-token auth
               └───────────────┴───────────────────┘
 ```
 
@@ -127,10 +127,12 @@ facts are:
   `@ai-sdk/google`; Genkit (`genkit` + `@genkit-ai/google-genai`) powers the
   deterministic analysis side (sales velocity, trapped cash in slow-moving
   stock, replenishment suggestions).
-- **41 tools in `src/app/api/chat/tools.ts`** — not in the route. Each is a
+- **The tools live in `src/app/api/chat/tools.ts`** — not in the route. Each is a
   typed capability (look up a product, analyse a trend, draft a reply). Two of
   their query shapes deliberately have **no Firestore composite index** and
   filter in memory, because a "proper" indexed query would throw at call time.
+  The count is not written down anywhere but `TOOL_LINES` in `zen-status.tsx`,
+  which derives `ZEN_TOOL_COUNT`; every doc that hardcoded it had drifted.
 - **The route is a security boundary first.** `src/app/api/chat/route.ts`
   opens with a prompt-injection/jailbreak filter, and the docs are candid that
   the filter has to survive a Nigerian product catalogue (a keyword like "DAN"
@@ -300,12 +302,17 @@ the surrounding docs while being written:
   tree; the colour table is computed from the actual HSL tokens.
 
 What the same pass checked and found **correct**, so it does not need
-re-auditing: every count in `docs/zen-ai.md` (41 tools, 41 `TOOL_LINES`, 10
-`WORKFLOWS`, 29 `APP_ROUTES`, 13 injection patterns — all still in sync);
-`docs/android-signing.md`'s fingerprints against `release.yml`'s `EXPECTED` and
-`assetlinks.json`, and `generate-keystore.yml` still disabled; and
-`radix_layout_gap_fix.md`'s 57 `modal={false}` sites, portal backdrop and
-`globals.css` safeguards.
+re-auditing: the counts in `docs/zen-ai.md` for 10 `WORKFLOWS`, 29 `APP_ROUTES`
+and 13 injection patterns; `docs/android-signing.md`'s fingerprints against
+`release.yml`'s `EXPECTED` and `assetlinks.json`, and `generate-keystore.yml`
+still disabled; and `radix_layout_gap_fix.md`'s 57 `modal={false}` sites, portal
+backdrop and `globals.css` safeguards.
+
+The tool count was in that list and has since been removed from it: tools were
+added, every doc that spelled the number out drifted, and the figure now lives in
+exactly one place (`ZEN_TOOL_COUNT`, derived from `TOOL_LINES`) with
+`npm run test:zen-cost` asserting it matches the real set. A number worth
+auditing repeatedly is a number that should not have been copied.
 
 Related docs: `docs/zen-ai.md` (the chat in depth), `docs/android-signing.md`
 (signing/Play), `docs/blueprint.md` (product blueprint),

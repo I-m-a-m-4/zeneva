@@ -1,4 +1,4 @@
-import { tool } from 'ai';
+import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { Firestore } from 'firebase-admin/firestore';
@@ -535,7 +535,7 @@ const WORKFLOWS: Record<string, { title: string; intro: string; steps: string[];
   },
 };
 
-export function createZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
+function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
   // Per-request caches. A single turn can call six tools that all need the
   // same receipts; without this that is six identical Firestore reads.
   let productCache: any[] | null = null;
@@ -2748,4 +2748,215 @@ export function createZenTools({ db, businessId, currency, ratingEnabled }: Ctx)
       },
     }),
   };
+}
+
+/**
+ * Fields a tool result carries for the chat card and for nothing else.
+ *
+ * `imageUrl` is the whole reason this exists. It is a Firebase Storage URL, ~300
+ * characters of signed path, the model cannot see the image behind it, and a
+ * twelve-product `queryProducts` result therefore spent roughly 900 input tokens on
+ * nothing — then spent them again on every later turn, because the result stays in
+ * the history.
+ */
+const CARD_ONLY_KEYS = new Set(['imageUrl']);
+
+/**
+ * Strip a tool result down to what the model actually reads.
+ *
+ * Input is 98% of the tokens Zen AI sends and 85% of the Gemini bill, and a tool
+ * result is charged more than once: when the step loop feeds it back, again on every
+ * later step of the same turn, and again on every subsequent turn for as long as it
+ * sits in the history. A field the model never reads is therefore not paid for once.
+ *
+ * This only ever *removes*. Nothing here rewrites a value, reorders a list or rounds
+ * a figure — the card the owner sees and the JSON the model reads must never be able
+ * to disagree about what the shop's numbers are.
+ */
+export function slimForModel(value: any): any {
+  if (Array.isArray(value)) return value.map(slimForModel);
+  if (value === null || typeof value !== 'object') return value;
+
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (CARD_ONLY_KEYS.has(k)) continue;
+    // An absent key and a null one read identically to a model, and most shops leave
+    // costPrice, baseUnit and expiryDate unset — so across a sparse catalogue the
+    // nulls alone are a real share of the payload.
+    if (v === null || v === undefined) continue;
+    out[k] = slimForModel(v);
+  }
+
+  /*
+   * `PRODUCT_TABLE` deliberately carries the same figures twice — `products` for the
+   * card view and `columns`/`rows` for the table view, so the reader can pick (see
+   * `productCards`). The model has no view to pick, and `products` is the half that
+   * keeps the product ids it needs to chain into a proposal, so the table half goes.
+   * Guarded on `products` actually being populated: the fallback must be the payload
+   * that already worked, never no payload at all.
+   */
+  if (out.type === 'PRODUCT_TABLE' && Array.isArray(out.products) && out.products.length) {
+    delete out.columns;
+    delete out.rows;
+  }
+
+  /*
+   * `LOSS_SCAN.summary` already holds every conclusion the scan reached —
+   * `src/lib/forensics.ts` is arithmetic, not a model, and the prompt's only
+   * instruction is to relay the summary. `report` is the card's copy: up to 15
+   * findings with their evidence plus an eight-name watchlist. Sending it bought the
+   * model nothing and made the most expensive turn in the product — a scan can run
+   * the full 24 steps, each one resending it — more expensive still.
+   */
+  if (out.type === 'LOSS_SCAN' && out.summary) delete out.report;
+
+  return out;
+}
+
+/**
+ * The Zen AI toolkit, with the model's copy of every result slimmed.
+ *
+ * `toModelOutput` is the SDK's split between the two audiences: the full result
+ * still streams to the client and draws the card, while the model is handed
+ * `slimForModel`'s return. It fires inside the multi-step loop during a turn.
+ *
+ * It does **not** cover results replayed out of the chat history: that path runs
+ * through `convertToModelMessages`, which only applies `toModelOutput` if the tool set
+ * is passed to it as well — and in `route.ts` the conversion deliberately happens
+ * *before* the credit reservation, so the tool set (which needs the business document)
+ * does not exist yet. History is slimmed explicitly there instead, by `slimHistory`,
+ * which calls the exported `slimForModel` so the two paths cannot drift.
+ *
+ * Applied here, over the whole set, rather than tool by tool: 46 hand-written
+ * `toModelOutput`s is 46 chances to forget one, and forgetting is invisible — it
+ * costs money silently and breaks nothing.
+ */
+export function createZenTools(ctx: Ctx): ToolSet {
+  const built: Record<string, any> = buildZenTools(ctx);
+
+  /*
+   * With the rating off, `getBusinessRating` exists only to say so — and
+   * `RATING_SECTION_OFF` in the prompt already says it, at more length, and tells the
+   * model to answer with real figures instead. Sending the schema anyway cost ~157
+   * input tokens on every turn of every opted-out shop, which is most of them while
+   * the opt-in is new.
+   */
+  if (!ctx.ratingEnabled) delete built.getBusinessRating;
+
+  const out: ToolSet = {};
+  for (const [name, t] of Object.entries(built)) {
+    out[name] = {
+      ...t,
+      toModelOutput: ({ output }: { output: any }) =>
+        typeof output === 'string'
+          ? ({ type: 'text', value: output } as const)
+          : ({ type: 'json', value: slimForModel(output) } as const),
+    };
+  }
+  return out;
+}
+
+/**
+ * How many of the most recent tool results in a chat history keep their full payload.
+ *
+ * Everything older is replaced by a one-line stand-in. Zen averages ~1.5 tool calls per
+ * turn, so eight covers roughly the last five exchanges intact — beyond which the model
+ * has already said what it made of those figures, and its own prose saying so is still
+ * in the history.
+ *
+ * The bound is the point. Every past tool result is resent on every subsequent turn, so
+ * without one the cost of a conversation grows with its length even when each new
+ * question is trivial: the twentieth question pays for the previous nineteen answers,
+ * and one `queryProducts` result can be a few thousand tokens. Eight is deliberately
+ * generous — this is protection against the runaway case, not a squeeze on ordinary
+ * chats.
+ */
+const HISTORY_FULL_TOOL_RESULTS = 8;
+
+/**
+ * Below this, an old payload is left alone.
+ *
+ * Digesting a `LINK` or a two-figure `METRICS` card saves nothing and discards
+ * something the model might want, so the trade only makes sense above a size where
+ * re-fetching would genuinely have been cheaper than carrying it.
+ */
+const HISTORY_DIGEST_MIN_CHARS = 400;
+
+/** UI message parts that carry a tool result — static (`tool-<name>`) or dynamic. */
+function isToolPart(part: any): boolean {
+  return (
+    part != null &&
+    typeof part.type === 'string' &&
+    (part.type.startsWith('tool-') || part.type === 'dynamic-tool')
+  );
+}
+
+/**
+ * Cut a chat history down to what the model needs to read out of it.
+ *
+ * Input is ~98% of the tokens a Zen turn sends and ~85% of the Gemini bill, and the
+ * history is the part that grows without limit. Two passes, both subtractive:
+ *
+ * 1. **Every** tool result goes through `slimForModel` — the same function
+ *    `toModelOutput` applies to results produced *within* a turn. History cannot use
+ *    that path: `convertToModelMessages` only honours `toModelOutput` when the tool set
+ *    is handed to it, and in `route.ts` the conversion deliberately runs before the
+ *    credit reservation that reads the business document the tool set is built from.
+ *    Calling the same function here is what keeps one definition of "what the model
+ *    reads" across both paths.
+ * 2. Results older than `HISTORY_FULL_TOOL_RESULTS` and bigger than
+ *    `HISTORY_DIGEST_MIN_CHARS` are replaced by their `type` and `title` plus a note
+ *    saying the tool can be called again.
+ *
+ * It never touches text, never drops a message and never reorders anything, so the
+ * transcript the owner is reading stays the transcript the model sees. The client's own
+ * copy is untouched regardless — this builds a server-side view for one request.
+ */
+export function slimHistory(messages: any[]): any[] {
+  const toolParts: string[] = [];
+  messages.forEach((m, mi) => {
+    if (!Array.isArray(m?.parts)) return;
+    m.parts.forEach((part: any, pi: number) => {
+      if (isToolPart(part) && 'output' in part) toolParts.push(`${mi}:${pi}`);
+    });
+  });
+  if (!toolParts.length) return messages;
+
+  // Newest last, so the tail is what survives in full.
+  const stale = new Set(
+    toolParts.slice(0, Math.max(0, toolParts.length - HISTORY_FULL_TOOL_RESULTS)),
+  );
+
+  return messages.map((m, mi) => {
+    if (!Array.isArray(m?.parts)) return m;
+    return {
+      ...m,
+      parts: m.parts.map((part: any, pi: number) => {
+        if (!isToolPart(part) || !('output' in part)) return part;
+
+        const slim = slimForModel(part.output);
+        if (!stale.has(`${mi}:${pi}`)) return { ...part, output: slim };
+
+        let size = 0;
+        try {
+          size = JSON.stringify(slim ?? null).length;
+        } catch {
+          // A result that will not serialise cannot be measured, so leave it alone
+          // rather than guess — `convertToModelMessages` is the right place for that to
+          // fail loudly.
+          return { ...part, output: slim };
+        }
+        if (size < HISTORY_DIGEST_MIN_CHARS) return { ...part, output: slim };
+
+        const digest: Record<string, any> = {
+          note: 'Earlier result, omitted to keep this conversation cheap. Call the tool again if you need these figures.',
+        };
+        if (slim && typeof slim === 'object') {
+          if (typeof slim.type === 'string') digest.type = slim.type;
+          if (typeof slim.title === 'string') digest.title = slim.title;
+        }
+        return { ...part, output: digest };
+      }),
+    };
+  });
 }

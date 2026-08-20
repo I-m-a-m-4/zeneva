@@ -191,7 +191,7 @@ const USE_CASES: UseCase[] = [
     icon: Store,
     pain: 'One person runs the whole shop, the power and the data are both unreliable, and there is no software budget.',
     solves: [
-      { label: 'Free forever on Starter', detail: 'Up to 50 products, one staff account and 15 Zen AI credits a month at no cost. No trial, no card.' },
+      { label: 'Free forever on Starter', detail: 'Up to 50 products, one staff account and 3 Zen AI credits a month at no cost. No trial, no card.' },
       { label: 'Runs on what you own', detail: 'Windows and macOS desktop, Android, iOS, or just the browser.' },
       { label: 'A lapsed plan never locks the till', detail: 'If a paid plan expires you drop back to Starter. The register does not stop mid-sale.' },
     ],
@@ -236,7 +236,7 @@ const PLATFORMS: { icon: IconType; label: string; detail: string }[] = [
  * approximation of them, so change both together or neither.
  */
 const PLANS = [
-  { name: 'Starter', price: 'Free', products: '50 products', staff: '1 staff account', ai: '15 Zen AI credits a month' },
+  { name: 'Starter', price: 'Free', products: '50 products', staff: '1 staff account', ai: '3 Zen AI credits a month' },
   { name: 'Pro', price: 'NGN 10,000 / $10 a month', products: '1,500 products', staff: '5 staff accounts', ai: '150 Zen AI credits a month', featured: true },
   { name: 'Business', price: 'NGN 30,000 / $30 a month', products: 'Unlimited products', staff: 'Unlimited staff', ai: '600 Zen AI credits a month' },
 ];

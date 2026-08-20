@@ -2,7 +2,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { adminAuth, adminFirestore } from '@/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { createZenTools } from './tools';
+import { createZenTools, slimHistory } from './tools';
 import {
   reserveCredits,
   settleCredits,
@@ -508,7 +508,7 @@ export async function POST(req: Request) {
 
   let modelMessages;
   try {
-    modelMessages = await convertToModelMessages(normalised as UIMessage[]);
+    modelMessages = await convertToModelMessages(slimHistory(normalised) as UIMessage[]);
   } catch (e: any) {
     console.error('Failed to convert chat history:', e);
     recordBlocked(db, 'bad_history', todayStr);

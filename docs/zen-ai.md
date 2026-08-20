@@ -139,11 +139,19 @@ Two caps, on **two different periods**, and the doc used to get both wrong:
 - **Platform-wide, daily.** `GLOBAL_LIMIT = 1500` turns against
   `platform_stats/ai_usage_global`, reset by comparing the doc's `date` to today.
   This one is a spend circuit-breaker, not a per-tenant allowance.
-- **Per business, monthly.** `AI_MONTHLY_LIMITS` in `src/lib/plan.ts` — starter 15,
-  pro 400, business 1,500 — resolved through `aiMonthlyLimit(business)` so a
+- **Per business, monthly.** `AI_MONTHLY_LIMITS` in `src/lib/plan.ts` — starter 3,
+  pro 150, business 600 — resolved through `aiMonthlyLimit(business)` so a
   lapsed subscription drops back to the free tier. The counter is
   `aiUsageCount`, and `aiUsageCurrentDate` holds **`YYYY-MM`**, not a day. Read the
   field name as "the month this count belongs to".
+
+  **Do not restate these numbers in prose without checking the constant.** They have
+  been revised twice while this doc was being written, and the trap is not the eleven
+  i18n catalogs (which carry only the pro and business figures, under `plans.proF5`
+  and `plans.bizF3`) — it is the **Starter** number, which has no catalog key at all
+  and so escapes the usual parity grep. It sat at 15 in `use-cases/page.tsx` and
+  `help-center/page.tsx` against a real 3 until 20 August 2026: a free-tier user was
+  promised five times what the server would grant, on the public pricing table.
 
 **`aiUsageCount` counts credits, not turns.** It kept its name because renaming means
 migrating every live document plus the `entitlementFieldsLocked()` entry plus the admin
@@ -207,9 +215,105 @@ Three things about that pair worth keeping:
   shows an em-dash there, because "cost us nothing" and "was never measured" are
   different answers and only one of them is safe to price against.
 
-Every money figure is a **ceiling**: list price, no context-caching discount, no
-free-tier allowance. That is the useful direction for a bill you are trying not to be
-surprised by, and `ai-cost.ts` explains why the board labels it that way.
+Every money figure is a **ceiling for the chat route**, and that qualifier is not
+pedantry. It is list price with no context-caching discount and no free-tier allowance,
+which is the useful direction for a bill you are trying not to be surprised by — but it
+covers only what the route measures. The five Genkit flows bill the same Gemini key and
+are priced in **credits from `FLOW_CREDITS` floors**, not in tokens, because Genkit
+surfaces no usage object; their spend therefore appears nowhere in this column. On the
+first invoice checked against it (20 August 2026) the account came in about **6% above**
+the board's ceiling, and that is the whole of the gap. If it ever widens further, look
+for a Gemini call site that does not go through `src/lib/server/ai-credits.ts` at all —
+that one would be invisible to both the column and the credit balance.
+
+### Where the money actually goes — input, not output
+
+Reconciled against a real invoice on 20 August 2026, over 28 turns and 14 days:
+
+| | Per turn | Share of tokens | Share of cost |
+|---|---|---|---|
+| Input | ~12,400 | 98% | **85%** |
+| Output | ~260 | 2% | 15% |
+
+Output is priced 8× higher per token and still barely registers, because there is 48×
+less of it. **So shortening replies saves nothing.** Anyone sent to cut this bill by
+telling the model to be terser is optimising the 15%.
+
+Of that input, roughly **8,100 tokens is fixed overhead resent verbatim on every single
+turn** — the tool schemas (~4,500) plus the system prompt (~3,600). That is about 65% of
+input before the shop has asked anything.
+
+**Caching does not rescue this at Zeneva's volume.** Implicit caching is free but needs
+traffic dense enough to keep a prefix warm; at roughly two turns a day the prefix is
+cold every time, which is why actual spend landed *on* the ceiling rather than under it.
+Explicit caching is worse than useless here — storage runs about $1.00 per 1M tokens per
+hour, so holding an 8k-token prefix for a day costs around $0.19 against a whole-month
+bill of $0.13, roughly 22× the thing it is meant to reduce. Revisit only if turns-per-day
+rises by orders of magnitude. The prefix itself is already stable per shop (only a short
+`## Active Session Context` block is appended), so the obstacle is traffic density, not
+prompt design.
+
+#### What was done instead: send less in
+
+Three changes in `src/app/api/chat/tools.ts`, measured by `npm run test:zen-cost`:
+
+- **`slimForModel`** strips what the model cannot use from every tool result: `imageUrl`
+  (a ~300-character Firebase Storage URL it cannot see), every `null`/`undefined` key,
+  the duplicate `columns`/`rows` half of a `PRODUCT_TABLE` when `products` is populated,
+  and `LOSS_SCAN.report` when `summary` is present — the summary already states every
+  conclusion, and `src/lib/forensics.ts` is arithmetic, so there is nothing left for the
+  model to work out from the raw findings. Measured: **74% off tool payloads overall**,
+  98% off a loss scan.
+- **`slimHistory`** applies the same function to historical tool results and then digests
+  anything older than the newest 8 results down to `{note, type, title}`. A result is
+  charged *again* on every later step of the same turn and again on every later turn, so
+  the twentieth question was paying for the previous nineteen answers. Measured: **64% off
+  a short conversation, 84% off a 40-turn one** — growth is now bounded rather than linear.
+- **`createZenTools` drops `getBusinessRating`** when the shop never opted into the
+  rating (~157 tokens of schema, on most shops, every turn).
+
+Two properties of `slimForModel` are load-bearing and the harness asserts both:
+
+1. **It only ever removes.** Never rewrites, reorders or rounds. The *full* payload still
+   streams to the UI card, so any rewrite here means the card and the model disagree about
+   the shop's own numbers — the model reading out a figure the owner cannot find on screen.
+2. **The two structural removals are guarded.** An empty `PRODUCT_TABLE` keeps `rows` (or
+   the model gets a card with nothing in it) and a summary-less `LOSS_SCAN` keeps `report`.
+
+**`toModelOutput` is attached set-wide, not per tool.** One hand-written hook per tool
+would be one chance per tool to forget, and forgetting is invisible — it costs money
+silently and breaks nothing. `createZenTools` wraps the whole set in one loop, and check
+3a in the harness proves the wrapper reached every tool.
+
+**History is slimmed separately, and that is deliberate.** `toModelOutput` fires inside the
+SDK's multi-step loop and inside `convertToModelMessages` — but only if the tool set is
+passed to the conversion, and `route.ts` converts *before* the credit reservation on
+purpose: a turn rejected for unreadable history must not reserve anything, and does not
+need the business document. Rather than reorder that, `slimHistory` runs on the messages
+and calls the same exported `slimForModel`, so there is one definition of "what the model
+reads".
+
+#### Two optimisations measured and rejected
+
+Both are recorded because the numbers are the argument, and someone will propose them again:
+
+- **Rewriting the system prompt.** Worth ~800–1,200 tokens (6–10% of input, ~5–8% of the
+  bill). Rejected: all fourteen sections carry live behavioural guidance — proposal-vs-relay
+  rules, projection rules, the money-figure contradiction rules, the staff-accusation relay
+  rules — against a board showing a 0% refusal and error rate. Trading that for 8% of input
+  is a worse deal than what was already banked at zero risk.
+- **`activeTools` gating of the eight `propose*` tools.** Worth a measured **1,062 tokens
+  (8.5% of input)**, and the board showed zero proposal turns in fourteen days. Rejected: a
+  missed write-intent signal makes the model answer "I can't do that" instead of prompting a
+  rephrase, which is a real capability regression in a paid product for a saving smaller than
+  the one already taken.
+
+Two flows do run cheaper: `zenevaSupportChat` and `productTroubleshoot` override the model
+to **`gemini-2.5-flash-lite`** ($0.10/1M input against $0.30). Both answer shallow questions
+over pasted context with no arithmetic in the output, so a weaker model yields a duller
+suggestion rather than a wrong number. `visualCount` stays on Flash because vision precision
+*is* the product, and `businessAnalysis` stays because it emits long structured output over
+real figures.
 
 ### Credits — the unit, and the rule that every Gemini call meters
 
@@ -229,7 +333,7 @@ The derivation, in three constants:
   from `ZEN_MODEL` would silently reprice balances already sold the day Google changes
   a rate. When `ZEN_MODEL` changes, check this in the same commit.
 - `credits = max(1, ceil(weighted / TOKENS_PER_CREDIT))`, with
-  **`TOKENS_PER_CREDIT = 20_000`** — set so an ordinary turn (a system prompt, 44 tool
+  **`TOKENS_PER_CREDIT = 20_000`** — set so an ordinary turn (a system prompt, the tool
   schemas, a short history, a short answer ≈ 15k weighted) costs exactly 1, with
   headroom so a long history does not push a normal question to 2. Never zero: an empty
   or errored-but-completed response has to cost something.
@@ -463,9 +567,15 @@ faithfully writing.
 
 ## The toolkit lives in `tools.ts`, not `route.ts`
 
-`src/app/api/chat/tools.ts` exports `createZenTools({ db, businessId, currency })`
-and returns all 42 tools. `route.ts` is now only auth, quotas, the system prompt
+`src/app/api/chat/tools.ts` exports `createZenTools({ db, businessId, currency, ratingEnabled })`
+and returns the whole toolkit. `route.ts` is now only auth, quotas, the system prompt
 and streaming. Add tools there, not in the route.
+
+The count is deliberately not written down here. It is derived from `TOOL_LINES` in
+`zen-status.tsx` (`ZEN_TOOL_COUNT`), which is the one list that *has* to stay in sync
+because the status line renders raw camelCase without an entry — every number this doc
+used to carry had gone stale by one or two. `npm run test:zen-cost` asserts the two
+lists match in both directions.
 
 `route.ts` passes the whole toolkit through with no whitelist, so a tool added to
 `tools.ts` is live on the next request. The three places that still need a manual
