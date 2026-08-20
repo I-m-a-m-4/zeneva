@@ -11,6 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { requireUser } from '@/actions/admin-guard';
+import { withUserCredits } from '@/lib/server/ai-credits';
 
 const ProductSchema = z.object({
   id: z.string(),
@@ -48,8 +49,8 @@ export type ProductTroubleshootOutput = z.infer<typeof ProductTroubleshootOutput
 // call on the platform's API key. Token stays out of the input schema so it is
 // never forwarded to the model.
 export async function productTroubleshoot(input: ProductTroubleshootInput, idToken?: string): Promise<ProductTroubleshootOutput> {
-  await requireUser(idToken);
-  return productTroubleshootFlow(input);
+  const uid = await requireUser(idToken);
+  return withUserCredits(uid, 'productTroubleshoot', () => productTroubleshootFlow(input));
 }
 
 const prompt = ai.definePrompt({

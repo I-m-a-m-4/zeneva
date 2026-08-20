@@ -1,6 +1,6 @@
 {
   "name": "nextn",
-  "version": "3.2.5",
+  "version": "3.2.6",
   "private": true,
   "scripts": {
     "predev": "node scripts/clean-sw.mjs",
@@ -14,6 +14,8 @@
     "postinstall": "patch-package",
     "tauri": "tauri",
     "version-up": "node scripts/update-version.js",
+    "test:import": "tsx scripts/test-import.ts",
+    "test:achievements": "tsx scripts/check-achievements.ts",
     "announce-release": "node scripts/announce-release.mjs",
     "record": "node scripts/record/record.mjs",
     "record:audio": "node scripts/record/add-audio.mjs"
@@ -68,6 +70,7 @@
     "dotenv": "^16.5.0",
     "driver.js": "^1.8.0",
     "embla-carousel-react": "^8.6.0",
+    "fflate": "^0.8.2",
     "firebase": "^11.9.1",
     "firebase-admin": "^13.6.1",
     "framer-motion": "^12.34.0",

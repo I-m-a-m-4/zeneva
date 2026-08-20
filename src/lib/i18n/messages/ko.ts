@@ -325,7 +325,7 @@ const ko: Messages = {
     proF2: '직원 계정 5개',
     proF3: '바코드 스캔을 지원하는 고급 POS',
     proF4: '청구서 발행과 미수금 관리',
-    proF5: 'Zen AI — 하루 100건',
+    proF5: 'Zen AI — 월 150 크레딧',
     proF6: '똑똑한 재고 대량 가져오기',
     proF7: '공유 가능한 영수증 링크 (WhatsApp/문자)',
     proF8: '주문 판매와 날짜 소급 입력',
@@ -337,7 +337,7 @@ const ko: Messages = {
     bizDesc: '가장 강력한 AI 기능과 우선 지원이 필요한 자리 잡은 매장을 위한 요금제입니다.',
     bizF1: '상품과 직원 계정 무제한',
     bizF2: 'Pro의 모든 기능 포함',
-    bizF3: 'Zen AI — 하루 500건',
+    bizF3: 'Zen AI — 월 600 크레딧',
     bizF4: 'AI 경영 성과 대시보드',
     bizF5: '고급 고객 분석 (CRM+)',
     bizF6: '재고 회전율 리포트 (ABC 분석)',
@@ -735,6 +735,16 @@ const ko: Messages = {
     noProductsFound: '상품을 찾을 수 없습니다',
     noProductsSearchHint: '동기화된 카탈로그에서 ‘{term}’과 일치하는 상품이 없습니다.',
     categoryEmpty: '이 카테고리는 현재 비어 있습니다.',
+    catalogUnavailableTitle: '상품을 불러올 수 없습니다',
+    catalogUnavailableNetwork:
+      '상품 목록은 서버에 안전하게 있습니다. 이 기기에서 가져오지 못했을 뿐입니다. 연결을 확인한 뒤 다시 시도해 주세요.',
+    catalogUnavailablePermission:
+      '이 계정은 상품 목록을 볼 권한이 없습니다. 사업주에게 재고 접근 권한을 요청하세요.',
+    catalogUnavailableCache:
+      '카탈로그의 오프라인 사본을 열 수 없어 다시 내려받고 있습니다.',
+    retryLoadingProducts: '다시 시도',
+    noProductsStaffHint:
+      '이 매장에 등록된 상품이 아직 없습니다. 사업주나 관리자에게 등록을 요청하세요.',
     clearSearch: '검색 지우기',
     nextCustomer: '다음: 고객',
     viewCart: '장바구니 보기({n})',

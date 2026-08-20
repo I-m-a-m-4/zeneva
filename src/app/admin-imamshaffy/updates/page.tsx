@@ -130,16 +130,20 @@ export default function AdminAppUpdates() {
           <div className="space-y-4 pt-4 border-t border-slate-200">
             <h3 className="text-sm font-semibold text-slate-900">Targeted Updates</h3>
             <p className="text-sm text-slate-500 mb-4">If the global toggle above is OFF, you can target specific users or categories.</p>
-            
+
             <div className="grid gap-2">
-              <Label htmlFor="targetUsers">Target User IDs (comma-separated)</Label>
+              <Label htmlFor="targetUsers">Target users — email or user ID (comma-separated)</Label>
               <Input
                 id="targetUsers"
-                placeholder="uid1, uid2, ..."
+                placeholder="owner@shop.com, another@shop.com"
                 value={targetUsersStr}
                 onChange={(e) => setTargetUsersStr(e.target.value)}
               />
-              <p className="text-xs text-slate-500">Only these users will see the update prompt.</p>
+              <p className="text-xs text-slate-500">
+                Only these users will see the update prompt. Email is matched
+                case-insensitively; a user ID must be exact. This field used to accept
+                user IDs only, so an email entered here silently matched nobody.
+              </p>
             </div>
 
             <div className="grid gap-2 mt-4">
@@ -150,8 +154,17 @@ export default function AdminAppUpdates() {
                 value={targetCategoriesStr}
                 onChange={(e) => setTargetCategoriesStr(e.target.value)}
               />
-              <p className="text-xs text-slate-500">Users in these business categories will see the update prompt.</p>
+              <p className="text-xs text-slate-500">
+                Matched case-insensitively against the business&apos;s Industry setting.
+              </p>
             </div>
+
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              The prompt only appears in the <strong>installed desktop and mobile
+              apps</strong> — never in a browser, because a web user always has the
+              latest version already. Testing this in a browser tab will show nothing
+              no matter what is configured here.
+            </p>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-slate-200">

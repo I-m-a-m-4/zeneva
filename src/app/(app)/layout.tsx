@@ -68,6 +68,7 @@ import { useSessionTracker } from '@/hooks/use-session-tracker';
 import { logErrorToFirestore } from '@/lib/error-logger';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { UpdateRequiredModal } from '@/components/layout/update-required-modal';
+import AchievementCelebration from '@/components/achievements/achievement-celebration';
 import { useI18n } from '@/context/i18n-context';
 import { trackFeature } from '@/lib/product-telemetry';
 const AiInsightsIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -1826,6 +1827,10 @@ export default function AuthenticatedLayout({
         </DialogContent>
       </Dialog>
       <UpdateRequiredModal />
+      {/* Owner-only milestone card. Mounted here, not on /achievements, because the
+          moment worth celebrating is the sale that crosses the line — and one mount
+          is what keeps it from firing twice. All guards are in `useAchievements`. */}
+      <AchievementCelebration />
     </>
     </ErrorBoundary>
   );

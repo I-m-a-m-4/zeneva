@@ -266,9 +266,9 @@ const ARTICLES: Article[] = [
   {
     id: 'zen-ai-limits',
     category: 'ai-reports',
-    q: 'How many Zen AI messages do I get?',
-    a: 'A monthly allowance that depends on your plan: 30 a month on Starter, 3,000 on Pro, and 15,000 on Business. The allowance resets each month.',
-    keywords: ['ai', 'limit', 'quota', 'messages', 'monthly', 'allowance'],
+    q: 'How many Zen AI credits do I get?',
+    a: 'A monthly credit allowance that depends on your plan: 3 a month on Starter, 150 on Pro, and 600 on Business. Credits, not messages — a quick question costs one, while a deep report that reads your whole sales history costs several. The allowance resets each month, and you can buy top-up credits that never expire.',
+    keywords: ['ai', 'limit', 'quota', 'credits', 'messages', 'monthly', 'allowance', 'top up'],
   },
   {
     id: 'reports',
@@ -338,9 +338,9 @@ const ARTICLES: Article[] = [
     q: 'What are the plan limits?',
     a: 'Plans differ by scale, not by capability — the features are the same on all three. Starter is free forever, with no trial and no card required.',
     bullets: [
-      'Starter — free: 50 products, 1 staff account, 20 Zen AI messages a day',
-      'Pro — NGN 10,000 or $10 a month: 1,500 products, 5 staff accounts, 100 Zen AI messages a day',
-      'Business — NGN 30,000 or $30 a month: unlimited products, unlimited staff, 500 Zen AI messages a day',
+      'Starter — free: 50 products, 1 staff account, 15 Zen AI credits a month',
+      'Pro — NGN 10,000 or $10 a month: 1,500 products, 5 staff accounts, 150 Zen AI credits a month',
+      'Business — NGN 30,000 or $30 a month: unlimited products, unlimited staff, 600 Zen AI credits a month',
     ],
     link: { href: '/pricing', label: 'See full pricing' },
     keywords: ['plan', 'price', 'limit', 'products', 'staff', 'cost', 'free', 'starter', 'pro'],

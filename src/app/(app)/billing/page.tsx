@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate } from '@/lib/utils';
 import RefreshButton from '@/components/shared/refresh-button';
 import { usePOS } from '@/context/pos-context';
+import { BillingBodySkeleton } from './skeleton';
 
 const SubscriptionSection = dynamic(
     () => import('@/components/settings/subscription-section'),
@@ -33,37 +34,39 @@ const SubscriptionSection = dynamic(
     }
 );
 
-function BillingPageSkeleton() {
-    return (
-        <div className="flex flex-col gap-6">
-            <div className="space-y-2">
-                <Skeleton className="h-8 w-64" />
-                <Skeleton className="h-4 w-80" />
-            </div>
+/*
+ * Mounted beside the plans, not inside them.
+ *
+ * `SubscriptionSection` early-returns a "Lifetime Access Active" card for
+ * `accessLevel === 'lifetime'`, so anything nested in it disappears for those
+ * accounts — and a lifetime shop still spends Zen AI credits. `ssr: false` for the
+ * same reason as the plans: it loads the Paystack and Dodo scripts.
+ */
+const AiCreditsSection = dynamic(
+    () => import('@/components/settings/ai-credits-section'),
+    {
+        ssr: false,
+        loading: () => (
             <Card>
                 <CardHeader>
-                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-6 w-40" />
                     <Skeleton className="h-4 w-72" />
                 </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-20 w-full" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
-                        <Skeleton className="h-96" />
-                        <Skeleton className="h-96" />
+                <CardContent className="space-y-6">
+                    <Skeleton className="h-24 w-full" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Skeleton className="h-52" />
+                        <Skeleton className="h-52" />
+                        <Skeleton className="h-52" />
                     </div>
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-6 w-48" />
-                    <Skeleton className="h-4 w-64" />
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-40 w-full" />
-                </CardContent>
-            </Card>
-        </div>
-    )
+        ),
+    }
+);
+
+function BillingPageSkeleton() {
+    return <BillingBodySkeleton />;
 }
 
 const LifetimeAccessStatus = () => (
@@ -138,7 +141,9 @@ function BillingPage() {
             <SubscriptionSection userProfile={userProfile} businessInstance={currentBusiness} />
         </CardContent>
       </Card>
-      
+
+      <AiCreditsSection userProfile={userProfile} businessInstance={currentBusiness} />
+
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" />Subscription History</CardTitle>
@@ -159,7 +164,17 @@ function BillingPage() {
                             subscriptionHistory.map(item => (
                                 <TableRow key={item.id}>
                                     <TableCell className="font-medium">{item.action}</TableCell>
-                                    <TableCell>₦{item.amount.toLocaleString()}</TableCell>
+                                    {/*
+                                      * The row's own currency, not a hardcoded ₦.
+                                      *
+                                      * Every writer into `subscription_history` records a
+                                      * `currency`, and two of them write USD — the Dodo
+                                      * subscription webhook and the Dodo credit-pack
+                                      * branch beside it. Printing ₦ against all of them
+                                      * showed an $8 credit pack as "₦8", which reads as a
+                                      * mis-charge of a factor of 1,500.
+                                      */}
+                                    <TableCell>{item.currency === 'USD' ? '$' : '₦'}{item.amount.toLocaleString()}</TableCell>
                                     <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(safeToDate(item.timestamp), 'PPp') : 'N/A'}</TableCell>
                                 </TableRow>
                             ))

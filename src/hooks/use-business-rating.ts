@@ -137,6 +137,10 @@ export interface BusinessRatingView extends BusinessRating {
    * that may pitch the feature to them. Once they have declined, `enabled` is false
    * and this is false too, and the rating must stay out of their way — re-offering it
    * on every visit to Reports is the exact thing the opt-in exists to prevent.
+   *
+   * False while the business doc is still loading, because an absent field and an
+   * unloaded document both read as `undefined` and only one of them means "never
+   * asked".
    */
   neverAsked: boolean;
   /** Points gained or lost since the previous recorded day. Null on day one. */
@@ -187,9 +191,14 @@ export function useBusinessRating(): BusinessRatingView {
   // `undefined` (never asked), `false` (asked, declined), `true` (opted in). Only
   // the first may show the invitation. Read straight off the business doc, which
   // `usePOS()` already holds — no extra Firestore read.
+  //
+  // `neverAsked` additionally requires the doc to have arrived: an absent field and
+  // an unloaded document are the same `undefined`, so without that clause a shop
+  // that opted in months ago gets the invitation flashed at it on every cold open
+  // of Reports — the one state this feature exists to keep out of their way.
   const preference = business?.settings?.ratingEnabled;
   const enabled = preference === true;
-  const neverAsked = preference === undefined;
+  const neverAsked = !!business && preference === undefined;
 
   // A date, not a timestamp: the rating only needs day resolution, and a fresh
   // `new Date()` on every render would recompute the memo forever.

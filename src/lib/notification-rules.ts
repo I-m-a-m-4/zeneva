@@ -625,8 +625,15 @@ function dailySummary(input: NotificationRuleInput): TriggeredNotification[] {
  * {@link highestMilestoneReached} for why firing the whole ladder at once reads as a
  * glitch. The figure is lifetime revenue from the `stats/overall` counter, which is
  * the only total that is authoritative on a device whose receipt cache is capped.
- * The badges on /achievements are scoped to the current year; both are true, they
- * just answer different questions.
+ *
+ * `/achievements` reads the same lifetime figure through `src/lib/achievements.ts`,
+ * so the badge and this notification can never disagree. That used to be false: the
+ * page summed the held receipts and filtered them to the current year, so a shop
+ * could be told it had crossed ₦1 million and find no badge for it.
+ *
+ * This rule and {@link useAchievements} are separate on purpose — one is a
+ * notification document, the other an owner-facing card — but they must stay on the
+ * same ladder tables (`src/lib/business-milestones.ts`) and the same figure.
  */
 function milestones(input: NotificationRuleInput): TriggeredNotification[] {
   const out: TriggeredNotification[] = [];

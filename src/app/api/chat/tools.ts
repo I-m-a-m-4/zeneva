@@ -4,6 +4,12 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Firestore } from 'firebase-admin/firestore';
 import { runForensicScan, summariseReport } from '@/lib/forensics';
 import { computeBusinessRating, RATING_WINDOW_DAYS } from '@/lib/business-rating';
+// Deterministic product matching and bulk arithmetic, shared with the importer. The
+// model supplies names and percentages; these decide which product and what number, so
+// a paraphrase can never resolve to the wrong row and no value is model-authored.
+import { buildProductIndex } from '@/lib/import/match';
+import { resolveOne } from '@/lib/import/cost-prices';
+import { describeBulkOp, previewBulkOp } from '@/lib/import/bulk-ops';
 
 /**
  * Zen AI's toolkit.
@@ -2092,6 +2098,189 @@ export function createZenTools({ db, businessId, currency, ratingEnabled }: Ctx)
     // ═══════════════════════════════════════════════════════════════════════
     // WRITES — proposals only. Nothing here touches the database.
     // ═══════════════════════════════════════════════════════════════════════
+
+    /*
+     * Cost prices for many products at once, from what the owner typed.
+     *
+     * The important part of this tool is what it does **not** ask the model for: product
+     * ids. A shop owner writes "coke 380, indomie 190" and the model's job is to
+     * transcribe that into pairs — nothing more. Resolving "coke" to
+     * `Coca-Cola Original 500ml` happens here, in code, through the same deterministic
+     * matcher the importer uses (SKU, then normalised name, then size-aware similarity
+     * that knows 50cl is 500ml).
+     *
+     * That split is the whole design. A model asked to emit ids will emit plausible ones,
+     * and a hallucinated id writes a cost price onto an unrelated product — silently, and
+     * in a field that then quietly poisons every margin figure the shop reads. Names are
+     * cheap for a model and matching is cheap for code, so each does the half it cannot
+     * get wrong.
+     *
+     * Anything ambiguous comes back as a question in the card rather than a guess.
+     */
+    proposeCostPrices: tool({
+      description:
+        'Propose cost prices for several products from a list the owner gave, e.g. "coke 380, indomie 190". Pass the names exactly as they said them — Zeneva matches them to real products itself. Streams an approval card and does NOT write to the database.',
+      inputSchema: z.object({
+        entries: z
+          .array(
+            z.object({
+              name: z.string().describe('The product name as the owner wrote it. Do not correct or expand it.'),
+              cost: z.number().min(0).describe('What they paid, as a plain number.'),
+            }),
+          )
+          .min(1)
+          .max(200)
+          .describe('One entry per product they named.'),
+      }),
+      execute: async (p) => {
+        const products = await allProducts();
+        if (products.length === 0) return { error: 'This business has no products yet.' };
+
+        const index = buildProductIndex(products as any);
+        const byId = new Map(products.map((product: any) => [product.id, product]));
+        const claimed = new Set<string>();
+
+        const matched: any[] = [];
+        const ambiguous: any[] = [];
+        const unmatched: string[] = [];
+
+        for (const entry of p.entries) {
+          const name = String(entry.name ?? '').trim();
+          if (!name) continue;
+
+          const verdict = resolveOne(name, index, claimed);
+
+          if (verdict.kind === 'certain') {
+            claimed.add(verdict.match.productId);
+            const product: any = byId.get(verdict.match.productId);
+            const price = Number(product?.price) || 0;
+            matched.push({
+              productId: verdict.match.productId,
+              productName: verdict.match.productName,
+              wrote: name,
+              currentCost: Number(product?.costPrice) || 0,
+              currentIsEstimate: !!product?.costPriceEstimated,
+              newCost: entry.cost,
+              price,
+              // Flagged, not blocked: clearance stock is real, but far more often it means
+              // the owner read out selling prices by mistake.
+              notBelowPrice: price > 0 && entry.cost >= price,
+            });
+            continue;
+          }
+
+          if (verdict.kind === 'possible') {
+            ambiguous.push({
+              wrote: name,
+              cost: entry.cost,
+              candidates: verdict.candidates.slice(0, 3).map((c) => ({
+                productId: c.productId,
+                productName: c.productName,
+                why: c.explanation,
+              })),
+            });
+            continue;
+          }
+
+          unmatched.push(name);
+        }
+
+        if (matched.length === 0 && ambiguous.length === 0) {
+          return {
+            error: `None of those names matched a product in this shop: ${unmatched.slice(0, 8).join(', ')}. Ask them to check the spelling, or to use the Cost prices screen on the Inventory page.`,
+          };
+        }
+
+        return {
+          type: 'PROPOSAL',
+          action: 'COST_PRICES',
+          // Stable across identical proposals so the client can dedupe a repeated turn.
+          proposalId: `prop_costs_${matched.length}_${matched.reduce((sum, m) => sum + m.newCost, 0)}`,
+          matched,
+          ambiguous,
+          unmatched,
+          status: 'PENDING_APPROVAL',
+          currency,
+        };
+      },
+    }),
+
+    /*
+     * The zero-typing path, as a proposal.
+     *
+     * "I make about 25% on drinks" fills every drink's cost from its selling price. What
+     * it returns is a **rule plus a full preview**, not a list of values the model chose —
+     * the arithmetic is `previewBulkOp`, and every value the owner approves was computed
+     * by the same function that will write it.
+     *
+     * Everything it produces is an estimate and is stamped `costPriceEstimated`, and
+     * products that already hold a real cost price are skipped rather than overwritten.
+     * Both of those are enforced in `bulk-ops.ts`, not here, so they hold no matter which
+     * surface asks.
+     */
+    proposeCostEstimate: tool({
+      description:
+        'Propose estimating cost prices from selling prices and a margin the owner states, e.g. "I make about 25% on drinks". Fills gaps only — never overwrites a real cost price. Streams an approval card and does NOT write to the database.',
+      inputSchema: z.object({
+        percent: z.number().min(1).max(95).describe('The percentage they said.'),
+        basis: z
+          .enum(['margin', 'markup'])
+          .describe(
+            'margin = share of the selling price ("I make 25% on it"); markup = added on top of cost ("I add 25%"). If genuinely unclear, use markup — it is the smaller change.',
+          ),
+        category: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Limit to one category if they named one. Omit for the whole catalogue.'),
+      }),
+      execute: async (p) => {
+        const products = await allProducts();
+        if (products.length === 0) return { error: 'This business has no products yet.' };
+
+        const op = {
+          field: 'costPrice' as const,
+          mode:
+            p.basis === 'margin'
+              ? { kind: 'cost-from-margin' as const, percent: p.percent }
+              : { kind: 'cost-from-markup' as const, percent: p.percent },
+          filter: p.category ? { categories: [p.category] } : {},
+        };
+
+        const preview = previewBulkOp(products as any, op);
+
+        if (preview.changes.length === 0) {
+          const reason = preview.skipped[0]?.reason;
+          return {
+            error: p.category
+              ? `Nothing to estimate in "${p.category}".${reason ? ` ${reason}` : ''} Check the category name, or they may already have real cost prices.`
+              : `Nothing to estimate.${reason ? ` ${reason}` : ''}`,
+          };
+        }
+
+        return {
+          type: 'PROPOSAL',
+          action: 'COST_ESTIMATE',
+          proposalId: `prop_costest_${p.basis}_${p.percent}_${p.category ?? 'all'}`,
+          rule: describeBulkOp(op, ''),
+          basis: p.basis,
+          percent: p.percent,
+          category: p.category ?? null,
+          count: preview.changes.length,
+          skipped: preview.skipped.length,
+          skippedReason: preview.skipped[0]?.reason ?? null,
+          // Capped for the card. The approved write recomputes from the rule, so the
+          // sample is illustrative and the total is what gets applied.
+          sample: preview.changes.slice(0, 12).map((change) => ({
+            productName: change.productName,
+            newCost: change.after,
+          })),
+          estimated: true,
+          status: 'PENDING_APPROVAL',
+          currency,
+        };
+      },
+    }),
 
     proposeStockAdjustment: tool({
       description: 'Propose a stock quantity change. Streams an approval card. Does NOT write to the database.',

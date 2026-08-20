@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { adminFirestore } from '@/firebase/admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { notifyAdminsOfSubscription } from '@/lib/server/notifications';
+import { creditPack } from '@/lib/credit-packs';
+import { AI_CREDIT_LEDGER_COLLECTION } from '@/lib/ai-credit-ledger';
 
 /**
  * POST /api/webhooks/dodo — Dodo Payments Standard Webhooks receiver.
  *
- * This is the only thing that grants a plan after a USD payment: the client
- * never writes `plan`/`trialExpiresAt` (they are rule-locked to the platform
- * owner), so if this endpoint is not reachable the customer is charged and
- * never upgraded.
+ * This is the only thing that grants anything after a USD payment: the client
+ * never writes `plan`/`trialExpiresAt`/`aiBonusCredits` (they are rule-locked to
+ * the platform owner), so if this endpoint is not reachable the customer is
+ * charged and gets nothing. Two kinds of purchase arrive here, told apart by
+ * `metadata.kind` — a subscription, and a one-off Zen AI credit pack.
  *
  * It sat as `route.ts.bak` alongside the checkout route, which meant Next.js
  * never registered it and Dodo's deliveries hit the HTML 404 page. Restoring
@@ -111,10 +115,144 @@ export async function POST(req: Request) {
         console.log('Processing Payment Success:', pData?.payment_id, 'Amount:', pData?.total_amount);
         
         const metadata = pData?.metadata || {};
-        const { businessId, planId, cycleMonths } = metadata;
+        const { businessId, planId, cycleMonths, packId } = metadata;
 
         if (!adminFirestore) {
           console.error('Firestore admin failed to initialize, cannot process payment event.');
+          break;
+        }
+
+        /*
+         * Credit packs, checked BEFORE the plan gate below.
+         *
+         * A pack has no `planId`, so `if (businessId && planId)` skips it — the
+         * customer would be charged, the webhook would log "without valid
+         * metadata", and nothing would be granted. `metadata.kind` is set by
+         * `api/dodo/checkout`; `packId` alone is accepted too so a session created
+         * before `kind` existed still works.
+         *
+         * The credit figure is re-derived from `CREDIT_PACKS` rather than read out
+         * of `metadata.credits`. Metadata is not a price list, and a webhook that
+         * grants whatever number it is handed is one forged request away from
+         * unlimited credits.
+         */
+        if (metadata.kind === 'credits' || packId) {
+          if (!businessId) {
+            console.error('[dodo-webhook] Credit purchase with no businessId in metadata. Cannot grant.');
+            break;
+          }
+
+          const pack = creditPack(packId);
+          if (!pack) {
+            console.error(`[dodo-webhook] Credit purchase names an unknown pack: ${packId}. Cannot grant.`);
+            break;
+          }
+
+          try {
+            // Same two-layer idempotency as the plan grant: cheap early return so
+            // a retry stops retrying, plus a `create()` of the same marker inside
+            // the grant batch so two concurrent deliveries cannot both add credits.
+            const processedRef = adminFirestore.collection('processed_webhooks').doc(webhookId);
+            const alreadyProcessed = await processedRef.get();
+            if (alreadyProcessed.exists) {
+              console.log(`[dodo-webhook] Duplicate credit delivery ignored: ${webhookId}`);
+              return NextResponse.json({ success: true, duplicate: true });
+            }
+
+            const businessRef = adminFirestore.collection('businessInstances').doc(businessId);
+            const businessDoc = await businessRef.get();
+            if (!businessDoc.exists) {
+              console.error(`Business record NOT FOUND in Firestore: ${businessId}`);
+              break;
+            }
+
+            const bData = businessDoc.data() || {};
+            const paidMajor = (pData.total_amount || 0) / 100;
+            const currency = pData.currency || 'USD';
+            const reference = pData.payment_id || 'dodo_' + Date.now();
+            const previousBalance = Math.max(0, Number(bData.aiBonusCredits) || 0);
+
+            const batch = adminFirestore.batch();
+
+            // `increment`, never a computed total — a turn in flight is debiting
+            // this same field and a read-then-write would refund it.
+            batch.update(businessRef, {
+              aiBonusCredits: FieldValue.increment(pack.credits),
+              updatedAt: new Date(),
+            });
+
+            // `kind: 'credits'` is what keeps a one-off pack out of MRR. The admin
+            // board derives the run rate from each business's *latest* purchase, so
+            // an unmarked $8 pack would replace a $30 subscription and report the
+            // shop as paying $8 a month. See `src/lib/platform-revenue.ts`.
+            batch.set(adminFirestore.collection('purchases').doc(), {
+              businessId: businessId,
+              kind: 'credits',
+              packId: pack.id,
+              credits: pack.credits,
+              // The revenue helpers key off `plan`; give them something readable
+              // rather than `undefined` in a table cell.
+              plan: `${pack.credits} AI credits`,
+              amount: paidMajor,
+              currency,
+              timestamp: new Date(),
+              reference,
+              gateway: 'dodopayments',
+            });
+
+            batch.set(adminFirestore.collection(AI_CREDIT_LEDGER_COLLECTION).doc(), {
+              businessId: businessId,
+              businessName: bData.name || null,
+              kind: 'purchase',
+              source: 'dodo',
+              credits: pack.credits,
+              packId: pack.id,
+              amount: paidMajor,
+              currency,
+              reference,
+              // No uid: this request is authenticated by signature, not by a user.
+              actorId: null,
+              balanceBefore: previousBalance,
+              balanceAfter: previousBalance + pack.credits,
+              timestamp: new Date(),
+            });
+
+            batch.set(businessRef.collection('subscription_history').doc(), {
+              action: `Bought ${pack.credits.toLocaleString()} Zen AI credits via Dodo`,
+              amount: paidMajor,
+              currency,
+              timestamp: new Date(),
+              dodo_payment_id: pData.payment_id,
+            });
+
+            batch.create(processedRef, {
+              type: event.type,
+              businessId: businessId,
+              kind: 'credits',
+              packId: pack.id,
+              paymentId: pData.payment_id || null,
+              processedAt: new Date(),
+            });
+
+            await batch.commit();
+            console.log(`[dodo-webhook] Granted ${pack.credits} AI credits to business: ${businessId}`);
+
+            notifyAdminsOfSubscription({
+              businessName: bData.name || 'Another Business',
+              planId: `${pack.credits.toLocaleString()} Zen AI credits`,
+              amount: paidMajor,
+              currency,
+              kind: 'credits',
+            }).catch(err => {
+              console.error('[dodo-webhook] Failed to send admin credit-purchase notification:', err);
+            });
+          } catch (dbError: any) {
+            console.error('Failed to grant AI credits in Dodo Webhook:', dbError.message);
+            // 500 so Dodo retries. The early return above makes the retry cheap
+            // once the grant has actually landed.
+            throw dbError;
+          }
+
           break;
         }
 

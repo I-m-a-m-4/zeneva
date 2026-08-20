@@ -463,7 +463,7 @@ function RatingOptInCard({
 }
 
 export default function BusinessRatingPanel() {
-  const { currencySymbol, triggerConfetti } = usePOS();
+  const { currencySymbol, triggerConfetti, business } = usePOS();
   const rating = useBusinessRating();
   const benchmark = useRatingBenchmark(rating.enabled);
   const { setRatingEnabled, isSaving } = useRatingOptIn();
@@ -533,6 +533,10 @@ export default function BusinessRatingPanel() {
   // This tab is the only rating surface that shows anything at all when the
   // feature is off, because it is where turning it on happens.
   if (!enabled) {
+    // Until the business doc lands, neither card is honest — `enabled` is false
+    // and `neverAsked` is false, which is the truth (nothing is known yet) and
+    // not a state with a card. One blank beat beats flashing the wrong one.
+    if (!business) return null;
     return (
       <RatingOptInCard
         neverAsked={neverAsked}

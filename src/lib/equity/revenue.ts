@@ -38,6 +38,16 @@ export interface PurchaseLike {
   plan?: string;
   businessId?: string;
   timestamp?: any;
+  /**
+   * `'credits'` for a one-off Zen AI top-up; missing or `'subscription'` otherwise.
+   *
+   * Deliberately **not** filtered out of the lifetime and trailing-twelve-month
+   * figures below: a pack sale is money Zeneva received, and those are revenue
+   * totals rather than rates. The one place it would do damage — MRR — never
+   * touches this list, because `subscriptionRunRate` reads live plans instead, and
+   * `billingCurrencyByBusiness` already skips packs itself.
+   */
+  kind?: string | null;
 }
 
 /**

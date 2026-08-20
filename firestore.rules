@@ -155,6 +155,11 @@ service cloud.firestore {
       return fieldsUnchanged([
         'plan', 'accessLevel', 'trialExpiresAt', 'status', 'ownerId',
         'aiBonusCredits', 'aiUsageCount', 'aiUsageCurrentDate',
+        // The AI burst limiter's sliding window, written by reserveCredits inside its
+        // transaction. This list is a DENY-list, so a field left off it is one a client
+        // may write to its own business document — and a client that can clear this
+        // array can turn its own rate limit off. Same reasoning as aiUsageCount.
+        'aiCallTimestamps',
         'subscriptionReference', 'isVerified', 'featureOverrides'
       ].toSet());
     }
@@ -554,6 +559,27 @@ service cloud.firestore {
     match /platform_stats/ai_usage_global/daily/{dateId} {
       allow read: if isSuperAdmin();
       allow write: if false;
+    }
+
+    // Force-update settings, written by /admin-imamshaffy/updates and read by the
+    // modal in src/components/layout/update-required-modal.tsx.
+    //
+    // There was **no rule for this collection at all**, so the only thing granting
+    // access was the `isSuperAdmin` catch-all at the top. The modal runs as an
+    // ordinary user, so its snapshot was permission-denied for every real merchant
+    // — and with no error callback on the listener it failed silently, leaving
+    // `settings` null forever. That is why the whole feature only ever worked for
+    // the platform owner's own account.
+    //
+    // The consequence to respect: everything written here is visible to every
+    // tenant. `targetUsers` holds the addresses of the people being asked to
+    // update, which is the same trade the platform-wide `notifications` collection
+    // already makes for `targetEmail` (see docs/notifications.md — scoped on read,
+    // not by rules, because a globally-readable doc cannot be narrowed). Do not put
+    // anything here that is more sensitive than that.
+    match /platform_settings/{docId} {
+      allow read: if isUserAuthenticated();
+      allow write: if isSuperAdmin();
     }
 
     match /admin_config/{docId} {

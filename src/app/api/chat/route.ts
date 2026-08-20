@@ -3,7 +3,12 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 
 import { adminAuth, adminFirestore } from '@/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createZenTools } from './tools';
-import { aiMonthlyLimit, effectivePlan } from '@/lib/plan';
+import {
+  reserveCredits,
+  settleCredits,
+  releaseCredits,
+  type SettleResult,
+} from '@/lib/server/ai-credits';
 import {
   AI_DAILY_COLLECTION,
   aiDailyDocId,
@@ -130,6 +135,30 @@ When the user names a product and you are not certain which item they mean, call
 **findSimilarProducts first**. It returns a picker the user can click. Do NOT guess
 between similar names, and never propose a change against a guessed product.
 If it resolves to exactly one confident match, proceed with that.
+
+## Cost prices — the exception to resolving one at a time
+Filling in cost prices is the one job where the user hands you **many products at once**,
+and \`findSimilarProducts\` per name would take forty turns. Two tools cover it, and both
+resolve the names themselves:
+
+- **\`proposeCostPrices\`** when they give you figures: "coke 380, indomie 190",
+  "peak milk cost me 3600". Pass each name **exactly as they wrote it** and the number
+  they gave. Do not tidy the name, do not expand an abbreviation, do not guess a product
+  id — Zeneva matches the names against the real catalogue itself and tells you which ones
+  were ambiguous. Correcting "coke" to what you think it is called is how the wrong
+  product gets a cost price.
+- **\`proposeCostEstimate\`** when they give you a percentage instead of figures:
+  "I make about 25% on drinks", "everything is cost plus 30". This fills gaps from the
+  selling price. It never overwrites a cost price they already entered, and everything it
+  writes is marked an estimate — say so, in those words, because they will make pricing
+  decisions on it.
+
+If they clearly want to work through it themselves, or a lot of names came back
+unmatched, point them at **Inventory → Cost prices**, which has a ranked list of the gaps
+that matter most.
+
+Never ask them to read out 1,200 cost prices. If they have a lot missing, offer the
+percentage route first — it is one sentence and covers the whole catalogue.
 
 **Never call \`findSimilarProducts\` twice for the same name.** Once the user has
 answered the picker — by tapping a card or naming the item exactly ("I mean
@@ -345,8 +374,7 @@ on their own.
 Only if they ask about the rating *itself* — "what's my rating", "why is my score
 gone" — say plainly that business rating is switched off for this shop and that it
 can be turned on in Settings → General, then stop. One sentence, no pitch, and no
-second mention later in the conversation.`;`;
-
+second mention later in the conversation.`;
 
 export async function POST(req: Request) {
   const json = await req.json();
@@ -436,11 +464,27 @@ export async function POST(req: Request) {
   const globalRef = db.collection('platform_stats').doc('ai_usage_global');
   const globalDoc = await globalRef.get();
   let globalCount = 0;
-  if (globalDoc.exists) {
-    const data = globalDoc.data();
-    if (data?.date === todayStr) {
-      globalCount = data.count || 0;
-    }
+  /*
+   * Whether the stored counter belongs to today.
+   *
+   * Load-bearing, and it used not to exist. `count` is written with
+   * `FieldValue.increment(1)` and was never reset, so the only thing making the
+   * daily limit *look* daily was this date comparison zeroing `globalCount` on
+   * read. The write then stamped `date: todayStr` while still incrementing the
+   * running total — so the first turn of a new day passed the check and republished
+   * yesterday's total under today's date, and every turn after it read a count
+   * already past 1,500 and got a 429. The platform-wide limit locked everybody out
+   * from the second request of each day onwards.
+   *
+   * Carried down to the write below, which now resets to 1 on a day boundary
+   * instead of incrementing. Read-then-write rather than a transaction is
+   * deliberate: this is a coarse circuit breaker on Gemini spend, a lost increment
+   * under concurrency costs nothing, and wrapping every turn in a transaction to
+   * protect an approximate counter is not worth the contention.
+   */
+  const globalDateIsToday = globalDoc.exists && globalDoc.data()?.date === todayStr;
+  if (globalDateIsToday) {
+    globalCount = globalDoc.data()?.count || 0;
   }
 
   if (globalCount >= GLOBAL_LIMIT) {
@@ -450,51 +494,12 @@ export async function POST(req: Request) {
     });
   }
 
-  // 2. Business Check
-  const businessRef = db.collection('businessInstances').doc(businessId);
-  const businessDoc = await businessRef.get();
-  if (!businessDoc.exists) {
-    return new Response(JSON.stringify({ error: 'Business not found.' }), {
-      status: 404, headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  const businessData = businessDoc.data();
-  const plan = effectivePlan(businessData);
-  // Tool results carry the currency so cards render the right symbol.
-  const currency = businessData?.settings?.currency || 'NGN';
-
-  // The business rating is opt-in, and Zen is one of its surfaces. Strictly
-  // `=== true`: `undefined` means the owner has never been asked, which is not
-  // consent. Free — this doc is already in hand for the quota check above.
-  const ratingEnabled = businessData?.settings?.ratingEnabled === true;
-  
-  // Allowance follows the plan actually in force, so a lapsed Pro/Business
-  // subscription drops back to the free tier's monthly cap.
-  const monthlyLimit = aiMonthlyLimit(businessData);
-
-  let businessCount = 0;
-  const currentMonthStr = todayStr.substring(0, 7); // YYYY-MM
-  if (businessData?.aiUsageCurrentDate === currentMonthStr) {
-    businessCount = businessData?.aiUsageCount || 0;
-  }
-  
-  let bonusCredits = businessData?.aiBonusCredits || 0;
-  let useBonusCredit = false;
-
-  if (businessCount >= monthlyLimit) {
-    if (bonusCredits > 0) {
-      useBonusCredit = true;
-    } else {
-      recordBlocked(db, 'plan_limit', todayStr);
-      return new Response(JSON.stringify({ error: `Monthly AI limit of ${monthlyLimit} reached for your ${plan} plan. Please upgrade your plan or wait until next month.` }), {
-        status: 429, headers: { 'Content-Type': 'application/json' },
-      });
-    }
-  }
-
   // Sessions saved by pre-v5 builds stored `content` strings; convertToModelMessages
   // only understands `parts`, so normalise before handing the history over.
+  //
+  // Ahead of the credit reservation on purpose: a turn rejected for an unreadable
+  // history never reaches the model, so it must not reserve anything, and it does
+  // not need the business document either.
   const normalised = messages.map((m: any) =>
     Array.isArray(m?.parts)
       ? m
@@ -511,6 +516,95 @@ export async function POST(req: Request) {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // 2. Business check, and take payment up front.
+  //
+  // `reserveCredits` reads the business document inside a transaction and debits a
+  // nominal credit before the model is called; `settleCredits` in `onFinish`
+  // corrects that to what the turn really cost. The old code read the cap here and
+  // wrote the increment in `onFinish` with nothing joining the two, so two turns
+  // sent together could both pass a check with one credit left. Tolerable while
+  // credits were free; not now they are money.
+  //
+  // Allowance first, then the purchased balance — the precedence the old code had,
+  // and still right: an allowance that expires at month end has to be spent first
+  // or a shop burns credits it paid for while free ones go to waste.
+  //
+  // It hands back the document it read, so this is the same one read the plain
+  // `get()` used to cost. See `src/lib/server/ai-credits.ts`.
+  const businessRef = db.collection('businessInstances').doc(businessId);
+  const reserved = await reserveCredits(db, businessId);
+
+  if (!reserved.ok) {
+    if (reserved.reason === 'not_found') {
+      return new Response(JSON.stringify({ error: 'Business not found.' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    /*
+     * Calling too fast is not the same as being out of credits.
+     *
+     * Answered before the exhausted branch and with its own `code`, because the shop may
+     * still have hundreds of credits — showing them a Top up button here would be both
+     * wrong and unactionable. `Retry-After` is set so a client can back off properly
+     * instead of hammering.
+     */
+    if (reserved.reason === 'rate_limited') {
+      recordBlocked(db, 'rate_limited', todayStr);
+      return new Response(
+        JSON.stringify({
+          error: `Too many requests at once. Try again in ${Math.ceil(reserved.retryAfterMs / 1000)} seconds.`,
+          code: 'rate_limited',
+          retryAfterMs: reserved.retryAfterMs,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil(reserved.retryAfterMs / 1000)),
+          },
+        },
+      );
+    }
+    recordBlocked(db, 'plan_limit', todayStr);
+    // `code` is the point of this body. Prose alone left the owner at a dead end
+    // they could not act on; a machine-readable code lets the chat UI put a Top up
+    // button under the message. Keep it stable — the client matches on the string.
+    return new Response(
+      JSON.stringify({
+        error:
+          `You are out of AI credits. The ${reserved.quote.plan} plan includes ` +
+          `${reserved.quote.monthlyLimit.toLocaleString()} credits a month, and your ` +
+          `top-up balance is empty. Top up, or upgrade for a larger monthly allowance.`,
+        code: 'credits_exhausted',
+        remaining: 0,
+        plan: reserved.quote.plan,
+        monthlyLimit: reserved.quote.monthlyLimit,
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const businessData = reserved.business;
+  const plan = reserved.quote.plan;
+  // Tool results carry the currency so cards render the right symbol.
+  const currency = businessData?.settings?.currency || 'NGN';
+
+  // The business rating is opt-in, and Zen is one of its surfaces. Strictly
+  // `=== true`: `undefined` means the owner has never been asked, which is not
+  // consent. Free — the reservation already had this document in hand.
+  const ratingEnabled = businessData?.settings?.ratingEnabled === true;
+
+  /*
+   * A turn is billed exactly once.
+   *
+   * `onFinish` and the stream's `onError` are separate callbacks and nothing in the
+   * SDK promises only one of them fires. Settling and releasing the same reservation
+   * would either charge twice or hand back a credit that was spent, so whichever
+   * callback arrives first owns it. A plain boolean is enough: both run on the same
+   * single-threaded event loop.
+   */
+  let creditsResolved = false;
 
   // Latency is measured around the whole stream, so it is what the owner
   // actually waited for rather than time-to-first-token.
@@ -531,10 +625,52 @@ export async function POST(req: Request) {
     // a runaway loop.
     stopWhen: stepCountIs(24),
     onFinish: async ({ toolCalls, usage }) => {
+      // `usage` is undefined on some provider errors; a missing token count should
+      // leave the running total alone rather than add NaN to it.
+      const inTok = (usage as any)?.inputTokens ?? (usage as any)?.promptTokens;
+      const outTok = (usage as any)?.outputTokens ?? (usage as any)?.completionTokens;
+      const measured = Number.isFinite(inTok) || Number.isFinite(outTok);
+
+      /*
+       * Settle the reservation against what the turn actually cost.
+       *
+       * Its own transaction rather than part of the batch below, because the balance
+       * is money and two turns finishing together must not both read the same
+       * pre-debit figure. It writes nothing at all when the reservation was already
+       * right — which is most turns — so the ordinary case still costs one write.
+       *
+       * With no usage reported there is nothing to settle against, so the
+       * reservation stands. Undercharging a turn we could not measure beats guessing
+       * high at the owner's expense.
+       */
+      let settled: SettleResult = { charged: reserved.reservation.credits, delta: 0, unbilled: 0 };
+      if (!creditsResolved) {
+        creditsResolved = true;
+        try {
+          settled = measured
+            ? await settleCredits(
+                db,
+                reserved.reservation,
+                Number.isFinite(inTok) ? inTok : 0,
+                Number.isFinite(outTok) ? outTok : 0,
+              )
+            : await settleCredits(db, reserved.reservation);
+        } catch (err) {
+          console.error('Failed to settle AI credits', err);
+        }
+      }
+
       // Increment usage atomically
       try {
         const batch = db.batch();
-        batch.set(globalRef, { date: todayStr, count: FieldValue.increment(1) }, { merge: true });
+        // Reset rather than increment when the stored date is not today's — see
+        // `globalDateIsToday`. Incrementing across a day boundary is what made the
+        // daily limit block every turn after the first one each day.
+        batch.set(
+          globalRef,
+          { date: todayStr, count: globalDateIsToday ? FieldValue.increment(1) : 1 },
+          { merge: true },
+        );
 
         const updates: any = {};
 
@@ -556,19 +692,11 @@ export async function POST(req: Request) {
         for (const [name, n] of Object.entries(toolCounts)) {
           updates[`aiToolUsageCounts.${name}`] = FieldValue.increment(n);
         }
-        const currentMonthStr = todayStr.substring(0, 7); // YYYY-MM
-        if (businessData?.aiUsageCurrentDate !== currentMonthStr) {
-          updates.aiUsageCurrentDate = currentMonthStr;
-          updates.aiUsageCount = 1;
-        } else {
-          updates.aiUsageCount = FieldValue.increment(1);
-        }
 
-        if (useBonusCredit) {
-          updates.aiBonusCredits = FieldValue.increment(-1);
-        }
-
-        batch.update(businessRef, updates);
+        // `aiUsageCount` and `aiBonusCredits` are deliberately absent here. Both are
+        // moved by `reserveCredits`/`settleCredits` inside a transaction, and a
+        // second increment from this batch would charge the turn twice.
+        if (Object.keys(updates).length) batch.update(businessRef, updates);
 
         /*
          * Platform-wide day rollup for the admin AI board.
@@ -604,24 +732,58 @@ export async function POST(req: Request) {
           hours: { [String(new Date().getUTCHours())]: FieldValue.increment(1) },
           plans: { [/^[A-Za-z_-]+$/.test(plan) ? plan : 'unknown']: FieldValue.increment(1) },
           latencyMsTotal: FieldValue.increment(Date.now() - startedAt),
+          // What the turn was billed, which `count` cannot say: one turn is one
+          // credit or twenty depending on the work it did. The gap between these two
+          // series is how you tell whether `TOKENS_PER_CREDIT` is calibrated.
+          credits: FieldValue.increment(settled.charged),
         };
+
+        // Credits spent that no bucket could cover — the platform eating the
+        // difference on a turn already answered. Only written when it happens, so a
+        // zero here means genuinely nothing was written off.
+        if (settled.unbilled > 0) {
+          daily.unbilledCredits = FieldValue.increment(settled.unbilled);
+        }
 
         // Doc ids are opaque; keep the ones that look like ids out of caution
         // so a stray character cannot produce an unreadable map key.
-        if (/^[A-Za-z0-9_-]{1,128}$/.test(businessId)) {
+        const safeBusinessKey = /^[A-Za-z0-9_-]{1,128}$/.test(businessId);
+        if (safeBusinessKey) {
           daily.businesses = { [businessId]: FieldValue.increment(1) };
+          daily.businessCredits = { [businessId]: FieldValue.increment(settled.charged) };
         }
         if (Object.keys(toolMap).length) daily.tools = toolMap;
         if (Object.keys(keywordMap).length) daily.keywords = keywordMap;
         if (Object.keys(toolCounts).some((n) => n.startsWith('propose'))) {
           daily.proposalTurns = FieldValue.increment(1);
         }
-        // `usage` is undefined on some provider errors; a missing token count
-        // should leave the running total alone rather than add NaN to it.
-        const inTok = (usage as any)?.inputTokens ?? (usage as any)?.promptTokens;
-        const outTok = (usage as any)?.outputTokens ?? (usage as any)?.completionTokens;
         if (Number.isFinite(inTok)) daily.tokensIn = FieldValue.increment(inTok);
         if (Number.isFinite(outTok)) daily.tokensOut = FieldValue.increment(outTok);
+
+        /*
+         * The same tokens again, attributed to the tenant that spent them.
+         *
+         * "What is this business costing us" had no answer before this: the
+         * platform totals above are one number for everybody, and the
+         * `businesses` map holds a bare turn count — which prices nothing, since
+         * `stopWhen: stepCountIs(24)` means one turn can be one round-trip or
+         * twenty-four. Every credit price depends on knowing the difference.
+         *
+         * Two PARALLEL maps rather than turning `businesses` into a map of
+         * objects. `businesses` is what distinct-actives-per-day is counted from
+         * and `mergeCountMaps` only sums values that are already numbers, so
+         * nesting them would have quietly zeroed the existing charts instead of
+         * breaking them loudly. Parallel maps also merge and rank with the same
+         * two helpers the board already uses, with no reader migration.
+         */
+        if (safeBusinessKey) {
+          if (Number.isFinite(inTok)) {
+            daily.businessTokensIn = { [businessId]: FieldValue.increment(inTok) };
+          }
+          if (Number.isFinite(outTok)) {
+            daily.businessTokensOut = { [businessId]: FieldValue.increment(outTok) };
+          }
+        }
 
         batch.set(db.collection(AI_DAILY_COLLECTION).doc(aiDailyDocId(todayStr)), daily, { merge: true });
 
@@ -643,6 +805,16 @@ export async function POST(req: Request) {
     // useless when a tool blows up on the owner's own data.
     onError: (error) => {
       console.error('Zen AI stream error:', error);
+
+      // Give the credit back. A turn that failed is not billed — the guarantee the
+      // old code had for free, since it only incremented on success. Now that
+      // payment is taken before the model is called it has to be handed back
+      // deliberately. `creditsResolved` keeps this and `onFinish` from both acting.
+      if (!creditsResolved) {
+        creditsResolved = true;
+        releaseCredits(db, reserved.reservation).catch(() => {});
+      }
+
       // A turn that failed mid-stream still consumed quota and still cost the
       // owner money, so the board needs it — otherwise a broken tool reads as
       // a quiet day.

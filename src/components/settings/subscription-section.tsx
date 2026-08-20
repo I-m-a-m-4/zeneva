@@ -29,8 +29,11 @@ const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
  * A shop reads the homepage before it reaches this screen, so a feature listed
  * there and missing here reads as a downgrade at the moment of payment.
  *
- * Zen AI allowances are pulled from `AI_DAILY_LIMITS` rather than typed out, so
- * changing a limit in one place cannot leave this list quietly overselling.
+ * Zen AI allowances are pulled from `AI_MONTHLY_LIMITS` rather than typed out, so
+ * changing a limit in one place cannot leave this list quietly overselling. They
+ * are **credits**, not messages: a turn costs one credit or twenty depending on the
+ * work it does, so wording this as "messages" oversells the allowance to exactly
+ * the heavy user who is about to pay for it.
  */
 const plans = [
     {
@@ -41,7 +44,7 @@ const plans = [
             'Up to 1,500 products & 5 staff accounts',
             'Advanced Point of Sale (POS) with barcode scanning',
             'Invoicing & Debt Management',
-            `Zen AI — ${AI_MONTHLY_LIMITS.pro.toLocaleString()} messages/month`,
+            `Zen AI — ${AI_MONTHLY_LIMITS.pro.toLocaleString()} credits/month`,
             'Smart Bulk Inventory Import',
             'Shareable Receipt Links (WhatsApp/SMS)',
             'Backorders & Backdating',
@@ -61,7 +64,7 @@ const plans = [
             'Unlimited products & staff accounts',
             'Multi-Branch Management',
             'Integrated Zeneva Terminal (Anti-Theft)',
-            `Zen AI — ${AI_MONTHLY_LIMITS.business.toLocaleString()} messages/month`,
+            `Zen AI — ${AI_MONTHLY_LIMITS.business.toLocaleString()} credits/month`,
             'AI Business Performance Dashboard',
             'Advanced Customer Intelligence (CRM+)',
             'Inventory Velocity Reports (ABC Analysis)',

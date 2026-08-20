@@ -2,15 +2,20 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, doc, getDoc, getDocs, updateDoc, query, where, increment, documentId, orderBy, limit } from 'firebase/firestore';
+import {
+  collection, doc, getDoc, getDocs, query, where, increment, documentId, orderBy, limit,
+  runTransaction, serverTimestamp,
+} from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
   Zap, TrendingUp, AlertTriangle, Search, PlusCircle, CheckCircle2, Wrench, Users,
   ShieldAlert, Timer, Coins, MessageSquare, RefreshCw, ShieldCheck, Gauge, Activity,
+  ScrollText, Gift, CreditCard,
 } from 'lucide-react';
 import {
   ZEN_TOOL_COUNT, ZEN_TOOL_NAMES, ZEN_READ_TOOL_NAMES, ZEN_WRITE_TOOL_NAMES, labelForTool,
@@ -20,6 +25,9 @@ import {
   groupForTool, mergeCountMaps, topEntries, recentDates,
   type AiDailyStats,
 } from '@/lib/ai-analytics';
+import {
+  AI_CREDIT_LEDGER_COLLECTION, describeLedgerEntry, type AiCreditLedgerEntry,
+} from '@/lib/ai-credit-ledger';
 import {
   ZEN_MODEL, estimateCostUsd, formatUsd, formatTokens,
 } from '@/lib/ai-cost';
@@ -77,6 +85,26 @@ type DayPoint = {
 function shortDate(iso: string): string {
   const [, m, d] = iso.split('-');
   return `${d}/${m}`;
+}
+
+/**
+ * A credit-ledger row's time, tolerating the row that has no time yet.
+ *
+ * `serverTimestamp()` is a sentinel, not a value: the local echo of a freshly
+ * written row carries `null` there until the server acknowledges it. "Just now" is
+ * the honest reading of that — the movement happened, only the server's clock has
+ * not come back — and it beats an empty cell, which reads as data loss on the one
+ * table that exists to prove nothing was lost.
+ */
+function ledgerTime(ts: any): string {
+  const at = ts?.toDate ? ts.toDate() : ts instanceof Date ? ts : null;
+  if (!at || Number.isNaN(at.getTime())) return 'Just now';
+  return at.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /**
@@ -143,9 +171,19 @@ export default function AdminAIUsage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [grantAmount, setGrantAmount] = useState(100);
+  /**
+   * Why the credits were given, carried onto the ledger row.
+   *
+   * Optional, because refusing a grant over a blank text box would be worse than
+   * an unexplained one — but the whole reason the ledger exists is that
+   * "who gave this shop 10,000 credits, and why" had no answer, and the amount
+   * alone only answers half of it.
+   */
+  const [grantNote, setGrantNote] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<any | null>(null);
   const [isGranting, setIsGranting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [ledger, setLedger] = useState<AiCreditLedgerEntry[]>([]);
 
   const [unansweredQueries, setUnansweredQueries] = useState<any[]>([]);
   const todayStr = new Date().toISOString().split('T')[0];
@@ -185,7 +223,7 @@ export default function AdminAIUsage() {
       const priorChunks: string[][] = [];
       for (let i = 0; i < prior.length; i += 10) priorChunks.push(prior.slice(i, i + 10));
 
-      const [globalDoc, dailySnaps, priorSnaps, bSnap, unansweredSnap] = await Promise.all([
+      const [globalDoc, dailySnaps, priorSnaps, bSnap, unansweredSnap, ledgerSnap] = await Promise.all([
         getDoc(doc(firestore, 'platform_stats', 'ai_usage_global')),
         Promise.all(
           chunks.map((ids) =>
@@ -199,6 +237,21 @@ export default function AdminAIUsage() {
         ),
         getDocs(query(collection(firestore, 'businessInstances'), where('status', '==', 'active'))),
         getDocs(query(collection(firestore, 'ai_unanswered_queries'), orderBy('createdAt', 'desc'), limit(50))),
+        /*
+         * Credit movements, newest first.
+         *
+         * Ordering on one field needs no composite index — Firestore indexes
+         * single fields automatically — so this collection needed no index and no
+         * rules entry (see the header of `src/lib/ai-credit-ledger.ts`). 40 rows
+         * is 40 document reads on a super-admin-only page that refetches on an
+         * explicit Refresh, and it is the only record of where a balance came
+         * from. Tolerated failing on its own: the ledger is new, so an
+         * older deployment or a rules mismatch should cost the page its ledger
+         * card, not every chart on it.
+         */
+        getDocs(
+          query(collection(firestore, AI_CREDIT_LEDGER_COLLECTION), orderBy('timestamp', 'desc'), limit(40)),
+        ).catch(() => null),
       ]);
 
       if (globalDoc.exists()) {
@@ -226,6 +279,11 @@ export default function AdminAIUsage() {
 
       setBusinesses(bData);
       setUnansweredQueries(unansweredSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLedger(
+        ledgerSnap
+          ? ledgerSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as AiCreditLedgerEntry)
+          : [],
+      );
     } catch (error) {
       console.error('Failed to load AI usage:', error);
       toast({ variant: 'destructive', title: 'Could not load AI analytics', description: 'Check the console for details.' });
@@ -234,17 +292,93 @@ export default function AdminAIUsage() {
     }
   };
 
+  /**
+   * Grant credits, and record that it happened.
+   *
+   * This used to be one bare `updateDoc(bRef, { aiBonusCredits: increment(n) })`
+   * with no trail of any kind, which was survivable while a grant was a favour
+   * and nothing else could move that number. Now a purchase moves it too, so an
+   * unexplained jump in a balance has two possible causes and no way to tell them
+   * apart — hence a ledger row alongside every movement.
+   *
+   * Three things about the shape:
+   *
+   * - **A transaction, not a plain update.** `balanceBefore`/`balanceAfter` are the
+   *   point of the row, and reading the balance outside the write would record a
+   *   figure that a chat turn could already have moved. The transaction serialises
+   *   on the business document, so what it read is what the increment applied to.
+   * - **`increment`, still, inside the transaction.** Writing `before + amount` as
+   *   a computed total would be safe here *because* of the transaction, but the
+   *   rule across every credit writer is the same — never a computed total — and
+   *   this being the one exception is how the rule stops being followed.
+   * - **Validated before either write.** `Number(e.target.value)` on an empty box
+   *   is `NaN`, and Firestore rejects `increment(NaN)` at the SDK boundary with a
+   *   message about unsupported field values that says nothing about credits. Zero
+   *   and negatives are worse: they commit, and write a ledger row asserting a
+   *   movement that did not happen.
+   */
   const handleGrantCredits = async () => {
     if (!selectedBusiness || !firestore) return;
+
+    const amount = Math.floor(Number(grantAmount));
+    if (!Number.isFinite(amount) || amount < 1) {
+      toast({ variant: 'destructive', title: 'Enter a whole number of credits', description: 'The amount must be at least 1.' });
+      return;
+    }
+    // Not a security boundary — the platform owner can grant whatever they like
+    // by clicking twice. It is a typo guard: 100000 instead of 1000 is one held
+    // key, and there is no way to take credits back.
+    if (amount > 50000) {
+      toast({ variant: 'destructive', title: 'That is a lot of credits', description: 'Grants are capped at 50,000 at a time. Grant twice if you meant it.' });
+      return;
+    }
+
     setIsGranting(true);
     try {
       const bRef = doc(firestore, 'businessInstances', selectedBusiness.id);
-      await updateDoc(bRef, { aiBonusCredits: increment(grantAmount) });
-      toast({ title: 'Credits Granted', description: `Successfully granted ${grantAmount} bonus credits to ${selectedBusiness.name}.` });
+      const note = grantNote.trim();
+
+      const balanceAfter = await runTransaction(firestore, async (tx) => {
+        const snap = await tx.get(bRef);
+        if (!snap.exists()) throw new Error('That business no longer exists.');
+        const before = Math.max(0, Number(snap.data()?.aiBonusCredits) || 0);
+
+        tx.update(bRef, { aiBonusCredits: increment(amount) });
+
+        // `doc(collection(...))` allocates the id client-side without touching the
+        // network, which is what lets a brand-new document be written inside a
+        // transaction at all — there is no server round trip to await here.
+        const ledgerRef = doc(collection(firestore, AI_CREDIT_LEDGER_COLLECTION));
+        tx.set(ledgerRef, {
+          businessId: selectedBusiness.id,
+          businessName: selectedBusiness.name ?? null,
+          kind: 'grant',
+          source: 'admin',
+          credits: amount,
+          actorId: user?.uid ?? null,
+          actorLabel: user?.email ?? null,
+          balanceBefore: before,
+          balanceAfter: before + amount,
+          note: note || null,
+          timestamp: serverTimestamp(),
+        });
+
+        return before + amount;
+      });
+
+      toast({
+        title: 'Credits granted',
+        description: `${amount.toLocaleString()} credits added to ${selectedBusiness.name}. Their balance is now ${balanceAfter.toLocaleString()}.`,
+      });
       setIsDialogOpen(false);
+      setGrantNote('');
       loadData();
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to grant credits.' });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Nothing was granted',
+        description: error?.message || 'The grant failed and no credits were added.',
+      });
     } finally {
       setIsGranting(false);
     }
@@ -473,6 +607,8 @@ export default function AdminAIUsage() {
   /** Per-tenant totals for the table, windowed where the data allows. */
   const businessRows = useMemo(() => {
     const windowed = mergeCountMaps(days.map((d) => d.businesses));
+    const windowedIn = mergeCountMaps(days.map((d) => d.businessTokensIn));
+    const windowedOut = mergeCountMaps(days.map((d) => d.businessTokensOut));
     return businesses.map((b) => {
       const lifetime = Object.values(b.aiToolUsageCounts || {}).reduce(
         (s: number, n: any) => s + (typeof n === 'number' ? n : 0),
@@ -480,10 +616,19 @@ export default function AdminAIUsage() {
       ) as number;
       const favourite = topEntries(b.aiToolUsageCounts || {}, 1)[0];
       const currentMonthStr = todayStr.substring(0, 7);
+      // Per-tenant spend over the charted window. Zero-with-turns is old data:
+      // the route only began attributing tokens per business in August 2026, so
+      // the column reads "—" rather than "$0.00" in that case — a tenant who
+      // cost nothing and a tenant we did not measure are different answers.
+      const tokIn = windowedIn[b.id] ?? 0;
+      const tokOut = windowedOut[b.id] ?? 0;
       return {
         ...b,
         todayUsage: b.aiUsageCurrentDate === currentMonthStr ? b.aiUsageCount || 0 : 0,
         windowTurns: windowed[b.id] ?? 0,
+        windowTokens: tokIn + tokOut,
+        windowCost: estimateCostUsd(tokIn, tokOut),
+        costMeasured: tokIn + tokOut > 0,
         lifetimeCalls: lifetime,
         favouriteTool: favourite ? labelForTool(favourite.key) : null,
         favouriteCount: favourite?.value ?? 0,
@@ -1617,8 +1762,12 @@ export default function AdminAIUsage() {
             <div>
               <CardTitle>Top AI Users</CardTitle>
               <CardDescription>
-                Sorted by today's usage, then by lifetime tool calls. "Favourite tool" is what each
-                business reaches for most — the fastest read on what they actually bought Zeneva for.
+                Sorted by this month's credit spend, then by lifetime tool calls. "Favourite tool"
+                is what each business reaches for most — the fastest read on what they actually
+                bought Zeneva for. "Cost ceiling" is that tenant's own tokens over {rangeLabel} at
+                list price, so it is the most this one business could have cost — the figure any
+                credit price has to clear. Credits are weighted by tokens, so a tenant's credit
+                spend and its call count no longer move together.
               </CardDescription>
             </div>
             <div className="relative w-full sm:w-72">
@@ -1639,11 +1788,12 @@ export default function AdminAIUsage() {
                 <tr>
                   <th className="px-6 py-4 font-medium">Business Name</th>
                   <th className="px-6 py-4 font-medium">Plan</th>
-                  <th className="px-6 py-4 font-medium text-center">This Month</th>
+                  <th className="px-6 py-4 font-medium text-center">Credits (month)</th>
                   <th className="px-6 py-4 font-medium text-center">{rangeLabel}</th>
+                  <th className="px-6 py-4 font-medium text-center">Cost ceiling</th>
                   <th className="px-6 py-4 font-medium">Favourite Tool</th>
                   <th className="px-6 py-4 font-medium text-center">Lifetime Calls</th>
-                  <th className="px-6 py-4 font-medium text-center">Bonus Credits</th>
+                  <th className="px-6 py-4 font-medium text-center">Credit Balance</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
@@ -1659,6 +1809,22 @@ export default function AdminAIUsage() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       {b.windowTurns > 0 ? b.windowTurns.toLocaleString() : <span className="text-slate-300">—</span>}
+                    </td>
+                    {/* Ceiling, not an invoice — see the header note in
+                        `src/lib/ai-cost.ts`. An em-dash where turns exist means
+                        the day documents predate per-tenant token attribution,
+                        which is not the same as a tenant that cost nothing. */}
+                    <td className="px-6 py-4 text-center">
+                      {b.costMeasured ? (
+                        <span className="font-medium text-slate-700">
+                          {formatUsd(b.windowCost)}
+                          <span className="block text-[11px] font-normal text-slate-400">
+                            {formatTokens(b.windowTokens)} tok
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {b.favouriteTool ? (
@@ -1693,26 +1859,46 @@ export default function AdminAIUsage() {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Grant Bonus AI Credits</DialogTitle>
+                            <DialogTitle>Grant Zen AI credits</DialogTitle>
                             <DialogDescription>
-                              Add bonus AI queries to {b.name}. These credits do not expire and will be used if the monthly tier limit is reached.
+                              Credits for {b.name}. They never expire, and they are spent only after
+                              the monthly plan allowance runs out — the same balance a purchased pack
+                              tops up. This grant is recorded in the credit ledger below with your
+                              name against it.
                             </DialogDescription>
                           </DialogHeader>
-                          <div className="py-4">
-                            <label className="text-sm font-medium text-slate-700 mb-2 block">Amount of Credits to Grant</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={grantAmount}
-                              onChange={(e) => setGrantAmount(Number(e.target.value))}
-                              className="text-lg"
-                            />
+                          <div className="py-4 space-y-4">
+                            <div>
+                              <label className="text-sm font-medium text-slate-700 mb-2 block">Credits to grant</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={50000}
+                                value={grantAmount}
+                                onChange={(e) => setGrantAmount(Number(e.target.value))}
+                                className="text-lg"
+                              />
+                              <p className="text-xs text-slate-500 mt-1.5">
+                                Current balance: {(Number(b.aiBonusCredits) || 0).toLocaleString()} credits.
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                                Reason <span className="font-normal text-slate-400">(optional, but it is the only record)</span>
+                              </label>
+                              <Textarea
+                                value={grantNote}
+                                onChange={(e) => setGrantNote(e.target.value)}
+                                placeholder="Goodwill after the sync outage / paid by transfer, ref 4821 / beta tester"
+                                className="min-h-[64px] text-sm"
+                              />
+                            </div>
                           </div>
                           <div className="flex justify-end gap-3">
                             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                             <Button onClick={handleGrantCredits} disabled={isGranting} className="bg-orange-500 hover:bg-orange-600 text-white gap-2">
                               {isGranting ? <Zap className="w-4 h-4 animate-bounce" /> : <CheckCircle2 className="w-4 h-4" />}
-                              Grant Credits
+                              Grant credits
                             </Button>
                           </div>
                         </DialogContent>
@@ -1722,7 +1908,7 @@ export default function AdminAIUsage() {
                 ))}
                 {filteredBusinesses.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                       No AI usage data found.
                     </td>
                   </tr>
@@ -1730,6 +1916,99 @@ export default function AdminAIUsage() {
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Credit ledger ── */}
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="border-b border-slate-100 pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <ScrollText className="w-4 h-4 text-slate-400" />
+            Credit ledger
+          </CardTitle>
+          <CardDescription>
+            Every movement <em>into</em> a credit balance, newest first — the three writers are a
+            Paystack purchase, a Dodo purchase and a grant from the table above. Spending is not
+            here: it is metered per day in the charts, and mixing the two would stop this column
+            summing to "credits ever given to this shop". A purchase row carries what was paid,
+            which is what makes "they say they paid and have no credits" answerable.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {ledger.length === 0 ? (
+            <div className="px-6 py-12 text-center text-sm text-slate-500">
+              No credit movements recorded yet.
+              <span className="block text-xs text-slate-400 mt-1">
+                Rows appear from the first purchase or grant made after this ledger shipped —
+                balances granted before it have no row, and that is missing history rather than a
+                balance of zero.
+              </span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-slate-600">
+                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4 font-medium">When</th>
+                    <th className="px-6 py-4 font-medium">Business</th>
+                    <th className="px-6 py-4 font-medium">Source</th>
+                    <th className="px-6 py-4 font-medium text-center">Credits</th>
+                    <th className="px-6 py-4 font-medium text-center">Paid</th>
+                    <th className="px-6 py-4 font-medium text-center">Balance after</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {ledger.map((row) => (
+                    <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-slate-500">{ledgerTime(row.timestamp)}</td>
+                      <td className="px-6 py-4 font-medium text-slate-900">
+                        {row.businessName || <span className="font-mono text-xs text-slate-400">{row.businessId}</span>}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 text-xs">
+                          {row.kind === 'grant'
+                            ? <Gift className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                            : <CreditCard className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                          <span className="text-slate-600">{describeLedgerEntry(row)}</span>
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <Badge
+                          variant="secondary"
+                          className={row.kind === 'grant'
+                            ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}
+                        >
+                          +{(Number(row.credits) || 0).toLocaleString()}
+                        </Badge>
+                      </td>
+                      {/*
+                        * A grant is deliberately blank rather than "₦0" — nobody
+                        * paid nothing for it, no money changed hands at all, and a
+                        * zero in a money column reads as a free purchase.
+                        */}
+                      <td className="px-6 py-4 text-center">
+                        {typeof row.amount === 'number' && row.amount > 0 ? (
+                          <span className="font-medium text-slate-700">
+                            {(row.currency || 'NGN').toUpperCase() === 'USD'
+                              ? `$${row.amount.toLocaleString()}`
+                              : `₦${row.amount.toLocaleString()}`}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center text-slate-500">
+                        {typeof row.balanceAfter === 'number'
+                          ? row.balanceAfter.toLocaleString()
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

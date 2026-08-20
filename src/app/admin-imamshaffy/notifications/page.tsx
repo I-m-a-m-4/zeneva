@@ -213,17 +213,29 @@ export default function AdminNotificationsPage() {
                 // The in-app document is already saved at this point. A failed push
                 // therefore has to be reported as a partial success, not as a failure —
                 // telling the owner "send failed" would invite a duplicate alert.
-                const result = await pushAlertToPhones({
-                    title: values.title,
-                    body: values.body,
-                    // With no explicit link, the push points at the announcement's own
-                    // detail view rather than at `/notifications` generally, so a tap
-                    // opens the thing that was sent. The document id only exists after
-                    // the write above, which is why this cannot be baked into the form.
-                    link: values.link?.trim() || notificationDetailLink({ id: created.id, isGlobal: true }),
-                    targetEmail: values.targetEmail || null,
-                    idToken: await idToken(),
-                });
+                //
+                // The inner try/catch is what makes that true for *every* way the push
+                // can fail, not just the ones `pushAlertToPhones` returns. It threw
+                // synchronously in native builds — the stub in scripts/prepare-tauri.mjs
+                // was missing this export, so the call was `undefined(...)` — and that
+                // TypeError sailed past the check below into the outer catch, which
+                // toasted "Send Failed" over an alert that had already been delivered.
+                let result: { success: boolean; message?: string; error?: string };
+                try {
+                    result = await pushAlertToPhones({
+                        title: values.title,
+                        body: values.body,
+                        // With no explicit link, the push points at the announcement's own
+                        // detail view rather than at `/notifications` generally, so a tap
+                        // opens the thing that was sent. The document id only exists after
+                        // the write above, which is why this cannot be baked into the form.
+                        link: values.link?.trim() || notificationDetailLink({ id: created.id, isGlobal: true }),
+                        targetEmail: values.targetEmail || null,
+                        idToken: await idToken(),
+                    });
+                } catch (pushError: any) {
+                    result = { success: false, error: pushError?.message || 'The push could not be sent.' };
+                }
 
                 if (result.success) {
                     toast({ variant: 'success', title: 'Notification sent and pushed', description: result.message || audience });

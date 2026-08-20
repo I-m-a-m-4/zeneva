@@ -40,11 +40,53 @@ export const STAFF_LIMITS: Record<PlanId, number> = {
   business: 1000000,
 };
 
-/** Monthly Zen AI message allowance per plan. */
+/**
+ * Monthly Zen AI **credit** allowance per plan.
+ *
+ * Credits, not messages. A turn costs one credit or twenty depending on the work it
+ * does — see `src/lib/server/ai-credits.ts` for the token→credit derivation. Every
+ * surface that renders these numbers must say "credits", because a shop promised 400
+ * messages and cut off after 90 heavy ones has been lied to.
+ *
+ * ## Why these are small
+ *
+ * A credit costs the platform about **$0.006** of Gemini (see `src/lib/credit-packs.ts`
+ * for the derivation). The allowance is given away, so it is pure cost with no revenue
+ * against it, and it has to be costed against the plan price rather than waved through:
+ *
+ * | Plan     | Credits | Gemini cost | Plan price   | AI as % of revenue |
+ * |----------|---------|-------------|--------------|--------------------|
+ * | starter  | 3       | $0.018      | free         | pure cost          |
+ * | pro      | 150     | $0.90       | ₦10,000 ≈ $6.67 | 13%             |
+ * | business | 600     | $3.60       | ₦30,000 ≈ $20   | 18%             |
+ *
+ * These fell from 15/400/1,500, where Pro was 36% of revenue and Business 45% — before
+ * Firestore, hosting or support. That is not a margin, and the shops that used the full
+ * allowance were the ones costing the most while paying the same.
+ *
+ * `TOKENS_PER_CREDIT` was deliberately **not** touched to achieve this. Lowering it would
+ * have made every credit buy less work, including credits people had already **bought** —
+ * a shop that paid for 1,000 would find them worth less than when they paid. The
+ * allowance is a gift and can be resized; a purchased balance is a promise and cannot.
+ *
+ * Overflow is bought through `aiBonusCredits` rather than by upgrading a tier, which is
+ * the point: AI cost scales with usage and a tier does not. Smaller allowances are what
+ * make the packs in `credit-packs.ts` a real product rather than decoration.
+ *
+ * **Starter is 3, and that is intentional.** It is enough to watch Zen answer a question
+ * or read one photograph — enough to want it — and nowhere near enough to run a shop on.
+ * A free plan that cannot try Zen at all cannot sell Zen; a free plan that can run a
+ * business on it will never sell anything.
+ *
+ * Changing any of these means changing the four places they are hand-typed: `plans.proF5`
+ * and `plans.bizF3` across all eleven catalogs in `src/lib/i18n/messages/`,
+ * `use-cases/page.tsx`, and `help-center/page.tsx`. A stale marketing number is a promise
+ * the product then breaks.
+ */
 export const AI_MONTHLY_LIMITS: Record<PlanId, number> = {
-  starter: 30,
-  pro: 3000,
-  business: 15000,
+  starter: 3,
+  pro: 150,
+  business: 600,
 };
 
 /**

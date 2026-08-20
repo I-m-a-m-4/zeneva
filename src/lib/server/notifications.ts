@@ -278,6 +278,15 @@ export async function notifyAdminsOfSubscription(payload: {
     planId: string;
     amount: number;
     currency: string;
+    /**
+     * What was bought. Defaults to a subscription, which is all this ever sent
+     * before AI credit packs existed.
+     *
+     * A pack is not a subscription and must not read as one — "subscribed to 1,000
+     * AI credits" would put a one-off sale in the same sentence as recurring
+     * revenue, and the platform owner reads these to know the run rate.
+     */
+    kind?: 'subscription' | 'credits';
 }) {
     try {
         const querySnapshot = await adminFirestore
@@ -290,9 +299,12 @@ export async function notifyAdminsOfSubscription(payload: {
             return;
         }
 
+        const isCredits = payload.kind === 'credits';
         const formattedAmount = `${payload.currency === 'USD' ? '$' : '₦'}${payload.amount.toLocaleString()}`;
-        const title = '🎉 New Subscription!';
-        const body = `"${payload.businessName}" subscribed to ${payload.planId} for ${formattedAmount}.`;
+        const title = isCredits ? '⚡ Zen AI credits sold' : '🎉 New Subscription!';
+        const body = isCredits
+            ? `"${payload.businessName}" bought ${payload.planId} for ${formattedAmount}.`
+            : `"${payload.businessName}" subscribed to ${payload.planId} for ${formattedAmount}.`;
 
         const notificationPromises = querySnapshot.docs.flatMap((doc: any) => {
             // Write to in-app notification feed

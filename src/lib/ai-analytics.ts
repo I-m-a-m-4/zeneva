@@ -48,10 +48,85 @@ export type AiDailyStats = {
   businesses?: Record<string, number>;
   tokensIn?: number;
   tokensOut?: number;
+  /**
+   * The same tokens as `tokensIn`/`tokensOut`, split by businessId.
+   *
+   * Parallel to `businesses` rather than nested inside it, because that map is
+   * `Record<string, number>` by contract — it is what distinct-actives is counted
+   * from, and `mergeCountMaps` skips any value that is not already a number. So
+   * these are the only per-tenant cost figures that exist, and the only input to
+   * "what is this business costing us": a turn count cannot price anything when one
+   * turn is anywhere between one model round-trip and twenty-four.
+   *
+   * Absent for days before August 2026, when the route started writing them. A
+   * business with turns and no tokens is old data, not a free tenant.
+   */
+  businessTokensIn?: Record<string, number>;
+  businessTokensOut?: Record<string, number>;
+  /**
+   * Credits actually debited, platform-wide and per business.
+   *
+   * Not derivable from `count`: a turn costs one credit or twenty depending on how
+   * much work it did, which is the entire reason `src/lib/server/ai-credits.ts`
+   * exists. `count` stays the turn counter — the two answer different questions, and
+   * the gap between them is what says whether the pricing is calibrated.
+   */
+  credits?: number;
+  businessCredits?: Record<string, number>;
+  /**
+   * Credits that were spent but could not be collected.
+   *
+   * A turn already answered cannot be un-answered, so when the true cost overruns an
+   * empty balance the difference is written off rather than pushing a shop negative.
+   * This is that write-off: money the platform ate. Persistently non-zero means
+   * `RESERVATION_CREDITS` reserves too little for the work being asked for, or that
+   * `TOKENS_PER_CREDIT` is set too high.
+   */
+  unbilledCredits?: number;
   /** Summed, not averaged — divide by `count` at read time. */
   latencyMsTotal?: number;
   /** Turns where at least one propose* card was drawn. */
   proposalTurns?: number;
+
+  /**
+   * Smart importer AI usage, kept in its own series rather than folded into the
+   * chat figures above.
+   *
+   * `count`, `credits`, `tokensIn`/`Out` and every per-business map above describe
+   * **chat turns**, and several charts read meaning into the ratios between them —
+   * credits ÷ count is how `TOKENS_PER_CREDIT` gets calibrated, and latency ÷ count
+   * is the response-time series. Adding importer work to those would not break a
+   * chart loudly; it would silently change what each one means, which is worse.
+   *
+   * So the importer writes here instead. Nothing existing shifts, and a board panel
+   * can read these alongside the chat series without either having to be migrated.
+   * Absent for days before the importer shipped, which is old data rather than a
+   * quiet day.
+   */
+  importer?: Record<string, number>;
+  /**
+   * Flat count of importer AI calls that day, which the route's own rate limit
+   * reads on every request.
+   *
+   * Redundant against summing `importer` and deliberately so: summing a map means
+   * reading and parsing the whole map to answer one comparison, and this is
+   * checked before every call. It is also why the importer's ceiling lives on this
+   * per-day document rather than on `platform_stats/ai_usage_global` — that
+   * document's `count` is only ever incremented and relies on a shared `date`
+   * stamp to *appear* to reset, so a second feature stamping that date would make
+   * the chat route read yesterday's total as today's.
+   */
+  importerCalls?: number;
+  importerCredits?: number;
+  importerTokensIn?: number;
+  importerTokensOut?: number;
+  /** Keyed by businessId — distinct shops that imported with AI that day. */
+  importerBusinesses?: Record<string, number>;
+  importerBusinessCredits?: Record<string, number>;
+  /** Importer calls refused before the model, keyed by reason. */
+  importerBlocked?: Record<string, number>;
+  /** Importer calls that reached the model and then threw. */
+  importerErrors?: number;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

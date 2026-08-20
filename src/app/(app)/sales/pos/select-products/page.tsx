@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock } from "lucide-react";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock, CloudOff, Lock, RefreshCw } from "lucide-react";
 import { CachedImage } from "@/components/shared/cached-image";
 import Link from "next/link";
 import *as React from "react";
@@ -248,6 +248,10 @@ export default function SelectProductsPage() {
         fetchMoreProducts,
         isSyncing,
         isFullSyncingProducts,
+        isProductCatalogPending,
+        productSyncError,
+        retryProductSync,
+        currentUserProfile,
         heldSales,
         resumeHeldSale,
         deleteHeldSale,
@@ -272,14 +276,39 @@ export default function SelectProductsPage() {
     const [hasMore, setHasMore] = React.useState(products ? products.length >= 50 : true);
 
     const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    // On native, one cached product is enough to render — the rest streams in.
-    // On web there is no cache on a first login, and `isPosLoading` goes false
-    // as soon as the listener attaches, which is before any document arrives.
-    // Without the sync guard the grid falls straight through to "No products
-    // found" while the catalogue is still downloading.
-    const isLoading = isNative
-        ? (isPosLoading && (!products || products.length === 0))
-        : (isPosLoading || (isFullSyncingProducts && (!products || products.length === 0)));
+    /*
+     * The grid keeps its skeleton until the catalogue is genuinely resolved.
+     *
+     * `isProductCatalogPending` is the context's single answer to "still coming?"
+     * — it stays true through the local-mirror hydration, the full sync and the
+     * gap before a scheduled retry, and it goes false only on a completed sync, a
+     * recorded failure, or going offline. The old rule inferred loading from
+     * `isPosLoading`, which resolved as soon as a sync *finished in any way*
+     * including a failure, so a shop with a full catalogue dropped straight
+     * through to "No products found".
+     *
+     * `products.length === 0` deliberately does not appear here on its own: it
+     * cannot tell an empty shop from a catalogue that never arrived, and that
+     * conflation is the bug.
+     */
+    const isLoading = isProductCatalogPending ||
+        (isNative
+            ? (isPosLoading && (!products || products.length === 0))
+            : (isPosLoading || (isFullSyncingProducts && (!products || products.length === 0))));
+
+    /** The grid is empty because the catalogue could not be loaded, not because the shop has nothing. */
+    const isCatalogUnavailable = !isLoading && !!productSyncError && (!products || products.length === 0);
+
+    /** A search or a category is narrowing the grid, so "nothing here" is about the filter. */
+    const isFiltered = !!searchTerm || categoryFilter !== 'all';
+
+    /*
+     * Same fallback as the Inventory page: an explicit permission wins, otherwise
+     * the role decides. A cashier without it must not be shown "Add Product" —
+     * `/inventory/add` redirects them straight back out again.
+     */
+    const canManageStock = currentUserProfile?.permissions?.manage_inventory
+        ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'manager');
 
     const performManualSearch = () => {
         if (!searchTerm.trim()) return;
@@ -465,24 +494,71 @@ export default function SelectProductsPage() {
                                         ))}
                                     </div>
                                 </div>
+                            ) : isCatalogUnavailable ? (
+                                /*
+                                 * A load that failed is not a shop with no stock.
+                                 *
+                                 * This branch used to fall through to "No products found /
+                                 * This category is currently empty", which told a cashier
+                                 * standing at a till that their employer's catalogue was
+                                 * empty and offered them an Add Product button they may not
+                                 * even have permission to use. Name the actual reason and
+                                 * give them the one action that helps.
+                                 */
+                                <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-destructive/30 bg-destructive/5 rounded-lg min-h-[400px]">
+                                    {productSyncError === 'permission'
+                                        ? <Lock className="h-16 w-16 text-destructive/40 mb-4" />
+                                        : <CloudOff className="h-16 w-16 text-destructive/40 mb-4" />}
+                                    <h3 className="text-xl font-semibold">{t('pos.catalogUnavailableTitle')}</h3>
+                                    <p className="text-muted-foreground mt-2 mb-6 max-w-[320px] mx-auto">
+                                        {productSyncError === 'permission'
+                                            ? t('pos.catalogUnavailablePermission')
+                                            : productSyncError === 'cache'
+                                                ? t('pos.catalogUnavailableCache')
+                                                : t('pos.catalogUnavailableNetwork')}
+                                    </p>
+                                    {/* A rules refusal is not something a retry fixes — only the
+                                        owner granting access does, so don't offer a dead button. */}
+                                    {productSyncError !== 'permission' && (
+                                        <Button size="sm" onClick={retryProductSync}>
+                                            <RefreshCw className="h-4 w-4 me-2" /> {t('pos.retryLoadingProducts')}
+                                        </Button>
+                                    )}
+                                </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-lg min-h-[400px]">
                                     <Package className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />
-                                    <h3 className="text-xl font-semibold">{t('pos.noProductsFound')}</h3>
-                                    <p className="text-muted-foreground mt-2 mb-6 max-w-[250px] mx-auto">
-                                        {searchTerm ? t('pos.noProductsSearchHint', { term: searchTerm }) : t('pos.categoryEmpty')}
+                                    <h3 className="text-xl font-semibold">
+                                        {isFiltered ? t('pos.noProductsFound') : t('inventory.noProducts')}
+                                    </h3>
+                                    <p className="text-muted-foreground mt-2 mb-6 max-w-[280px] mx-auto">
+                                        {/* `categoryEmpty` only applies when a category is actually
+                                            selected. It used to be the fallback for *every* empty
+                                            grid, so a shop with no products at all was told one of
+                                            its categories was empty. */}
+                                        {searchTerm
+                                            ? t('pos.noProductsSearchHint', { term: searchTerm })
+                                            : categoryFilter !== 'all'
+                                                ? t('pos.categoryEmpty')
+                                                : canManageStock
+                                                    ? t('inventory.noProductsHint')
+                                                    : t('pos.noProductsStaffHint')}
                                     </p>
                                     {searchTerm ? (
                                         <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); }}>
                                             {t('pos.clearSearch')}
                                         </Button>
-                                    ) : (
+                                    ) : categoryFilter !== 'all' ? (
+                                        <Button variant="outline" size="sm" onClick={() => setCategoryFilter('all')}>
+                                            {t('inventory.allCategories')}
+                                        </Button>
+                                    ) : canManageStock ? (
                                         <Button size="sm" asChild>
                                             <Link href="/inventory/add">
                                                 <PlusCircle className="h-4 w-4 me-2" /> {t('inventory.addProduct')}
                                             </Link>
                                         </Button>
-                                    )}
+                                    ) : null}
                                 </div>
                             )}
 

@@ -65,7 +65,7 @@ import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { usePOS } from '@/context/pos-context';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SettingsBodySkeleton } from './skeleton';
 import { ThemeSwitcher } from '@/components/settings/theme-switcher';
 import { LanguageSwitcher } from '@/components/settings/language-switcher';
 import { useI18n } from '@/context/i18n-context';
@@ -132,37 +132,7 @@ const GLOBAL_COUNTRIES = [
 ];
 
 function SettingsPageSkeleton() {
-    return (
-        <div className="space-y-6">
-            <div className="space-y-2">
-                <Skeleton className="h-8 w-48" />
-                <Skeleton className="h-4 w-72" />
-            </div>
-            <div className="space-y-6">
-                <Card>
-                    <CardHeader>
-                        <Skeleton className="h-6 w-48" />
-                        <Skeleton className="h-4 w-80" />
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="md:col-span-2 space-y-6">
-                                <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                                <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-20 w-full" /></div>
-                            </div>
-                            <div className="space-y-2">
-                                <Skeleton className="h-4 w-24" />
-                                <Skeleton className="aspect-square w-full" />
-                            </div>
-                        </div>
-                    </CardContent>
-                    <CardFooter>
-                        <Skeleton className="h-10 w-32" />
-                    </CardFooter>
-                </Card>
-            </div>
-        </div>
-    )
+    return <SettingsBodySkeleton />;
 }
 
 import { useFCM } from '@/hooks/use-fcm';

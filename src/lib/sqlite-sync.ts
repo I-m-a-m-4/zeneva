@@ -163,17 +163,33 @@ export async function syncBusinessToOffline(business: any) {
   }
 }
 
-export async function syncProductsToOffline(businessId: string, products: any[]) {
+/**
+ * Returns whether the rows actually reached disk.
+ *
+ * The caller writes a `full_products_sync` stamp once the catalogue is
+ * persisted, and that stamp is what lets the device skip the daily sync for 24
+ * hours. This used to swallow its error and return `undefined`, so a failed
+ * write still got stamped as persisted — a device that then lost its in-memory
+ * state showed an empty catalogue and refused to re-fetch it. Report the
+ * failure so the stamp can be withheld.
+ *
+ * `false` here means "not on disk"; `true` on a non-Tauri caller means "there is
+ * no SQLite mirror on this platform", which is not a failure.
+ */
+export async function syncProductsToOffline(businessId: string, products: any[]): Promise<boolean> {
   const db = await getOfflineDb();
-  if (!db || products.length === 0) return;
+  if (!db) return typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__;
+  if (products.length === 0) return true;
 
   try {
     const rows = products
       .filter(p => p?.id)
       .map(p => [p.id, businessId, JSON.stringify(p)]);
     await upsertRows(db, 'products', ['id', 'business_id', 'data'], rows);
+    return true;
   } catch (err) {
     console.error('SQLite Sync Error (Products):', err);
+    return false;
   }
 }
 
@@ -215,17 +231,48 @@ export async function deleteMultipleProductsFromOffline(productIds: string[]) {
   }
 }
 
-export async function getCachedProducts(businessId: string) {
+/**
+ * Reads the cached catalogue and says whether the *store* answered.
+ *
+ * On desktop this table is the only place products live — the localStorage blob
+ * is reclaimed after the first successful hydration and never rewritten — while
+ * `getLastSyncMetadata` falls back to localStorage when SQLite is unavailable.
+ * So a locked, missing or recreated database used to return `[]` here and a
+ * fresh timestamp there, and the app concluded the shop had no products and had
+ * no reason to re-fetch them.
+ *
+ * `ok: false` means the store could not be read at all, which is a different
+ * fact from a shop with nothing in it, and the only one worth re-syncing over.
+ */
+export async function getCachedProductsResult(
+  businessId: string
+): Promise<{ ok: boolean; rows: any[] }> {
   const db = await getOfflineDb();
-  if (!db) return [];
-  
+  if (!db) {
+    // No SQLite on this platform is normal; a failed Database.load is not.
+    const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+    return { ok: !isTauri, rows: [] };
+  }
+
   try {
     const result: any[] = await db.select('SELECT data FROM products WHERE business_id = $1', [businessId]);
-    return result.map(r => JSON.parse(r.data));
+    const rows: any[] = [];
+    for (const r of result) {
+      try {
+        rows.push(JSON.parse(r.data));
+      } catch {
+        // One corrupt row must not lose the rest of the catalogue.
+      }
+    }
+    return { ok: true, rows };
   } catch (err) {
     console.error('SQLite Retrieval Error (Products):', err);
-    return [];
+    return { ok: false, rows: [] };
   }
+}
+
+export async function getCachedProducts(businessId: string) {
+  return (await getCachedProductsResult(businessId)).rows;
 }
 
 export async function setLastSyncMetadata(businessId: string, type: string, timestamp: number) {

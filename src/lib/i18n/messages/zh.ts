@@ -315,7 +315,7 @@ const zh: Messages = {
     proF2: '5 个员工账号',
     proF3: '进阶收银台，支持条码扫描',
     proF4: '开票与欠款管理',
-    proF5: 'Zen AI —— 每天 100 条消息',
+    proF5: 'Zen AI —— 每月 150 点数',
     proF6: '智能批量导入库存',
     proF7: '可分享的收据链接（WhatsApp／短信）',
     proF8: '缺货预订与补录日期',
@@ -327,7 +327,7 @@ const zh: Messages = {
     bizDesc: '适合需要我们最强 AI 工具与优先支持的成熟生意。',
     bizF1: '商品与员工账号均不限量',
     bizF2: '包含 Pro 的全部功能',
-    bizF3: 'Zen AI —— 每天 500 条消息',
+    bizF3: 'Zen AI —— 每月 600 点数',
     bizF4: 'AI 经营表现看板',
     bizF5: '进阶客户洞察（CRM+）',
     bizF6: '库存周转报表（ABC 分析）',
@@ -711,6 +711,16 @@ const zh: Messages = {
     noProductsFound: '未找到商品',
     noProductsSearchHint: '在已同步的商品目录中找不到与“{term}”匹配的结果。',
     categoryEmpty: '此分类暂时没有商品。',
+    catalogUnavailableTitle: '无法加载您的商品',
+    catalogUnavailableNetwork:
+      '您的商品目录在服务器上完好无损，只是此设备未能取回。请检查网络连接后重试。',
+    catalogUnavailablePermission:
+      '此账号无权查看商品列表。请向企业所有者申请库存访问权限。',
+    catalogUnavailableCache:
+      '无法打开商品目录的离线副本，正在重新下载。',
+    retryLoadingProducts: '重试',
+    noProductsStaffHint:
+      '此店铺尚未添加任何商品。请让店主或经理添加。',
     clearSearch: '清除搜索',
     nextCustomer: '下一步：客户',
     viewCart: '查看购物车（{n}）',

@@ -174,6 +174,8 @@ export default function MarketingFooter() {
                   <li><Link href="/blog" className="transition text-neutral-300 hover:text-white">{t('footer.linkBlog')}</Link></li>
                   <li><a href="#faq" className="transition text-neutral-300 hover:text-white">{t('footer.linkFaq')}</a></li>
                   <li><Link href="/help-center" className="transition text-neutral-300 hover:text-white">{t('footer.linkHelpCenter')}</Link></li>
+                  <li><Link href="/blog/zeneva-vs-square" className="transition text-neutral-300 hover:text-white">Zeneva vs Square</Link></li>
+                  <li><Link href="/blog/zeneva-vs-clover" className="transition text-neutral-300 hover:text-white">Zeneva vs Clover</Link></li>
                 </ul>
               </div>
               <div className="mt-6">

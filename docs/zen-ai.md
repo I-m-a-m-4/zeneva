@@ -139,34 +139,282 @@ Two caps, on **two different periods**, and the doc used to get both wrong:
 - **Platform-wide, daily.** `GLOBAL_LIMIT = 1500` turns against
   `platform_stats/ai_usage_global`, reset by comparing the doc's `date` to today.
   This one is a spend circuit-breaker, not a per-tenant allowance.
-- **Per business, monthly.** `AI_MONTHLY_LIMITS` in `src/lib/plan.ts` — starter 30,
-  pro 3,000, business 15,000 — resolved through `aiMonthlyLimit(business)` so a
+- **Per business, monthly.** `AI_MONTHLY_LIMITS` in `src/lib/plan.ts` — starter 15,
+  pro 400, business 1,500 — resolved through `aiMonthlyLimit(business)` so a
   lapsed subscription drops back to the free tier. The counter is
   `aiUsageCount`, and `aiUsageCurrentDate` holds **`YYYY-MM`**, not a day. Read the
   field name as "the month this count belongs to".
 
-Past the monthly cap the turn falls back to `aiBonusCredits`, a non-expiring
-balance that only an admin can currently grant. Usage increments in `onFinish`, so a
-failed turn is not billed.
+**`aiUsageCount` counts credits, not turns.** It kept its name because renaming means
+migrating every live document plus the `entitlementFieldsLocked()` entry plus the admin
+board, for no user-visible gain — the same reasoning that keeps `trialExpiresAt` its
+historic name in `plan.ts`. `aiBonusCredits` is historic in the same way: "bonus" now
+means *purchased or granted*.
 
-**The allowance is stated in four places and only two of them follow the constant.**
+Past the monthly allowance the turn falls back to `aiBonusCredits`, a non-expiring
+balance. Allowance first, then balance, and **one turn can straddle both** — see
+`Reservation.fromAllowance` / `fromBalance`.
+
+**The allowance is stated in six places and only two of them follow the constant.**
 `subscription-section.tsx` imports `AI_MONTHLY_LIMITS`, and `/ai-insights` calls
-`aiMonthlyLimit(businessData)` — both track a change automatically. The pricing page
-does not: its plan bullets are the i18n keys `plans.proF5` and `plans.bizF3`, which
-spell the numbers out in prose (`'Zen AI — 3,000 messages/month'`) **in every locale
-catalog**. Changing an allowance is therefore one constant plus two keys across all
-of `src/lib/i18n/messages/`, or the marketing page quotes a figure the server no
-longer honours.
+`aiMonthlyLimit(businessData)` — both track a change automatically. Four do not:
+the i18n keys `plans.proF5` and `plans.bizF3` spell the numbers out in prose
+(`'Zen AI — 400 credits/month'`) **in every locale catalog**, and `src/app/use-cases/page.tsx`
+(`PLANS`) and `src/app/help-center/page.tsx` (the `zen-ai-limits` and `plan-limits`
+entries) each carry their own hand-typed copy. Changing an allowance is therefore one
+constant, two keys across all eleven catalogs in `src/lib/i18n/messages/`, and those two
+pages — or a marketing surface quotes a figure the server no longer honours. It has
+already happened once: both of those pages advertised a **daily** allowance of 20/100/500
+that no code path ever implemented.
+
+There is a **seventh** copy, and it is the reason to grep rather than work from this list:
+`src/app/home-client.tsx` carries its own hand-written plan cards and still said
+"Zen AI — 3,000 messages/month". Nothing imports that file — the live homepage renders
+`src/components/home/pricing-plans.tsx`, which is i18n-driven — so the figure was invisible
+rather than wrong on screen. It was corrected anyway, because a dead file is one restore
+away from being a live one and it is a price claim. Grep for the *number* when you change an
+allowance; a file nobody imports will not show up any other way.
+
+**Say "credits", never "messages".** A shop promised 400 messages and cut off after 90
+heavy ones has been lied to, and the wording is the only thing standing between the
+weighted debit and a support ticket that is entirely our fault.
+
+### A turn is not a unit of cost
+
+`stopWhen: stepCountIs(24)` means one turn is anywhere between one model round-trip
+and twenty-four, and a `runLossPreventionScan` turn drives a 119 KB forensics engine
+over the shop's whole audit log. So **the turn counter above prices nothing** — it is
+a rate limit that happens to be denominated in the wrong unit for the bill.
+
+What makes the real figure answerable is per-tenant token attribution in `onFinish`:
+`businessTokensIn` and `businessTokensOut` on each day document
+(`AiDailyStats` in `src/lib/ai-analytics.ts`), keyed by businessId, priced through
+`estimateCostUsd` in `src/lib/ai-cost.ts` and shown as the **Cost ceiling** column on
+`/admin-imamshaffy/ai-usage`.
+
+Three things about that pair worth keeping:
+
+- **They are parallel maps, not fields inside `businesses`.** That map is
+  `Record<string, number>` by contract — it is the only source of distinct-actives per
+  day, and `mergeCountMaps` skips any value that is not already a number, so nesting
+  tokens inside it would have zeroed the existing charts silently rather than failing.
+- **They live on the day document, not the business doc.** A new *top-level* field on
+  `businessInstances` is writable by the owner unless it is added to
+  `entitlementFieldsLocked()` — `fieldsUnchanged()` denies only what it lists — and a
+  tenant who can edit their own cost record is worse than no record. The day documents
+  are Admin-SDK-only, so this needed no rules change.
+- **Absent is not zero.** Days before August 2026 have turns and no tokens. The column
+  shows an em-dash there, because "cost us nothing" and "was never measured" are
+  different answers and only one of them is safe to price against.
+
+Every money figure is a **ceiling**: list price, no context-caching discount, no
+free-tier allowance. That is the useful direction for a bill you are trying not to be
+surprised by, and `ai-cost.ts` explains why the board labels it that way.
+
+### Credits — the unit, and the rule that every Gemini call meters
+
+`src/lib/server/ai-credits.ts` is the only place that prices AI work or moves a
+balance. **If a new Gemini call site does not call `reserveCredits`, it is free** — and
+free is the entire problem this module exists to close. Before this landed, the five
+`src/ai/flows/*` server actions read no quota field at all, so `visualCount` billed an
+unbounded multimodal call on the platform key for anyone who replayed the action id out
+of the client bundle.
+
+The derivation, in three constants:
+
+- `weighted = tokensIn + tokensOut × OUTPUT_TOKEN_WEIGHT`, with
+  **`OUTPUT_TOKEN_WEIGHT = 8`**. Gemini 2.5 Flash bills output at $2.50/1M against
+  input at $0.30/1M — a ratio near 8.3, rounded **down** so the weighting can never
+  charge more than the cost ratio justifies. It is a literal on purpose: deriving it
+  from `ZEN_MODEL` would silently reprice balances already sold the day Google changes
+  a rate. When `ZEN_MODEL` changes, check this in the same commit.
+- `credits = max(1, ceil(weighted / TOKENS_PER_CREDIT))`, with
+  **`TOKENS_PER_CREDIT = 20_000`** — set so an ordinary turn (a system prompt, 44 tool
+  schemas, a short history, a short answer ≈ 15k weighted) costs exactly 1, with
+  headroom so a long history does not push a normal question to 2. Never zero: an empty
+  or errored-but-completed response has to cost something.
+- **`FLOW_CREDITS`** is the one unavoidable hand-maintained table. The Genkit flows
+  surface no usage object, so they are priced as floors — `visualCount` 8,
+  `businessAnalysis` 4, `getCustomerInsights` 3, `productTroubleshoot` 2,
+  `zenevaSupportChat` 1. If a flow is ever moved onto the AI SDK and reports usage,
+  delete its entry and settle on real tokens instead.
+
+**`TOKENS_PER_CREDIT` is a labelled estimate, not a measurement.** The Cost ceiling
+column only started collecting per-tenant tokens in August 2026. Calibrate against the
+board before repricing anything, and treat every pack price as provisional until then.
+
+#### Reserve, then settle
+
+`reserveCredits` takes `RESERVATION_CREDITS` inside `runTransaction` **before** the
+model is called; `settleCredits` adjusts to the true cost in `onFinish`;
+`releaseCredits` refunds on error. Five things about that are load-bearing:
+
+- **The transaction is the point.** The old code read the cap before streaming and
+  incremented in `onFinish` with nothing joining them, so two concurrent turns could
+  both pass a check with one credit left.
+- **`onFinish` and the stream's `onError` are separate callbacks and nothing promises
+  only one fires.** A `creditsResolved` boolean latch in `route.ts` gives the
+  reservation to whichever arrives first — settling *and* releasing the same
+  reservation would either double-charge or hand back a spent credit. A plain boolean
+  is enough: both run on the same single-threaded event loop.
+- **History normalisation sits ahead of the reservation** in `route.ts`, so a turn
+  rejected for an unreadable history reserves nothing and does not even read the
+  business document.
+- **`reserveCredits` returns the business document** it already had in hand, and the
+  route uses it for `settings.currency` and `settings.ratingEnabled`. Reading it twice
+  would double the per-turn read cost for nothing.
+- **`settleCredits` returns early with no write when the delta is zero**, which is the
+  common case.
+
+#### Two policies that are decisions, not accidents
+
+- **A shortfall is written off, not overdrawn.** If the true cost exceeds what the
+  balance can cover, the turn has already been answered and cannot be un-answered. So
+  the charge clamps at zero and the remainder comes back as `unbilled`, which the route
+  records as `unbilledCredits` on the day document. The now-zero balance blocks the
+  *next* turn, which is the correct enforcement point, and the write-off is visible to
+  the platform owner rather than silent. Persistently non-zero means
+  `RESERVATION_CREDITS` reserves too little or `TOKENS_PER_CREDIT` is set too high.
+- **Refunds go to the purchased balance first**, because it does not expire while an
+  allowance resets in days — a credit returned there is worth more to the shop. And
+  `aiUsageCount` is only unwound when `aiUsageCurrentDate` still matches the month the
+  charge was made in, or a refund across a month boundary would hand out a credit
+  against the new allowance.
+
+#### Nothing new at the document root
+
+The reservation is expressed by moving the two fields that are **already** in
+`entitlementFieldsLocked()` — `aiUsageCount` and `aiBonusCredits` — rather than by
+adding an `aiReserved` field. `fieldsUnchanged()` is a **deny-list**: any new top-level
+field on `businessInstances` is owner-writable with one `updateDoc`, which for a credit
+balance means free AI forever. Credit telemetry therefore lives on the Admin-SDK-only
+day documents, and `firestore.rules` was not touched. If you do add a top-level field,
+add its exact name to `entitlementFieldsLocked()` in the same commit.
+
+`withUserCredits(uid, flow, fn)` resolves the business from the **caller's own user
+doc**, never from the request, matching `activateSubscription` — and the reserve sits
+*after* each flow's `requireUser`, so an unauthenticated replay cannot drain a
+stranger's balance. `businessAnalysis` additionally re-throws `AiCreditsExhaustedError`
+as the first line of its own catch, or that catch flattens an exhausted balance into
+"Zen AI is currently over-leveraged, try again in a few seconds" and the owner retries
+forever against a wall.
+
+`generateContentPlan` and `api/admin/chat` stay free: platform-owner tooling, not
+tenant usage.
+
+### Buying credits — two rails, three writers, one balance
+
+The allowance is what the plan includes; a **pack** is what a shop buys when it runs out.
+Packs are one-off, never expire, and land in the same `aiBonusCredits` integer the
+allowance overflows into — so there is one balance to reason about, not two.
+
+`src/lib/credit-packs.ts` is the price list: `CREDIT_PACKS`, `creditPack(id)`,
+`packPrice`, `packAmountMinor`, `pricePerCredit`. Client-safe, so the UI can quote before
+it spends, and **both servers re-derive the price from the pack id** rather than trusting
+the amount the client says it paid.
+
+| Pack | NGN | USD |
+|---|---|---|
+| 250 credits | ₦2,500 | $2.50 |
+| 1,000 credits | ₦8,000 | $8 |
+| 5,000 credits | ₦35,000 | $35 |
+
+**Three writers move `aiBonusCredits`, and the client is not one of them.** The field is
+in `entitlementFieldsLocked()`, so a tenant cannot write its own balance with an
+`updateDoc` — every path below is Admin SDK or super-admin:
+
+| Rail | Writer | Authenticated by |
+|---|---|---|
+| Paystack (NGN) | `src/actions/ai-credits.ts` → `purchaseAiCredits` | `requireUser(idToken)`, then Paystack verify |
+| Dodo (USD) | `src/app/api/webhooks/dodo/route.ts` | `crypto.timingSafeEqual` on the signature |
+| Grant | `/admin-imamshaffy/ai-usage` | super-admin, through the rules catch-all |
+
+Each appends a row to **`ai_credit_ledger`** (`src/lib/ai-credit-ledger.ts`): append-only,
+`credits` always positive, `balanceBefore`/`balanceAfter`, and `kind: 'purchase' | 'grant'`.
+Spending is deliberately *not* in it — that is metered per day on the rollups — so the
+collection's sum stays "credits ever given to this shop". It needs **no `firestore.rules`
+entry**: the catch-all at the top of the file already grants the platform owner read and
+write, and everyone else is denied by default. That also means it is **not** readable
+client-side by a tenant; a customer-facing receipt list would need a rule.
+
+#### Five traps, all of them already stepped in
+
+- **The Dodo webhook's credit branch must sit before the plan gate.** The whole grant used
+  to be wrapped in `if (businessId && planId)`. A pack has no `planId`, so a credit
+  purchase reaching that check succeeds, returns 200, and grants nothing — the customer is
+  charged and gets no credits, with no error anywhere. The `metadata.kind === 'credits' ||
+  packId` branch is therefore first.
+- **`kind` on the `purchases` row is what keeps packs out of MRR.** The admin dashboard
+  derives MRR latest-payment-wins, so an unmarked ₦8,000 pack would reset a Business
+  shop's monthly rate to ₦8,000, and corrupt ARPU, the paying-customer count and the
+  billing-currency guess with it. `src/lib/platform-revenue.ts` owns the discriminator:
+  `purchaseKind` reads a **missing** `kind` as `'subscription'` (every historical row),
+  `billingCurrencyByBusiness` skips packs, and lifetime/TTM totals deliberately keep them —
+  those are totals, not rates.
+- **`FieldValue.increment`, never a computed total.** A chat turn in flight is debiting the
+  same field, so `previousBalance + pack.credits` can lose a debit. `balanceBefore` /
+  `balanceAfter` on the ledger row are the reading at write time, which is why the admin
+  grant does its increment inside a `runTransaction`.
+- **Webhook idempotency is two-layer.** An early return on an existing
+  `processed_webhooks/{webhookId}`, *and* `batch.create()` of that same marker inside the
+  grant batch — so a redelivery racing the first attempt fails the batch instead of
+  granting twice. A database error must **throw**, not 200: Dodo only retries a failure.
+- **`metadata` is not a price list.** It carries the `packId` and nothing else that
+  matters; the credits and the expected amount come from `CREDIT_PACKS` server-side.
+  The Paystack rail additionally replay-guards on
+  `purchases.where('reference','==',reference)` and matches the currency, with no
+  amount-tolerance window.
+
+**Known gap, unchanged:** the NGN rail has no webhook, so if the browser dies between
+paying and the action running, the grant never happens — already true of subscriptions. The
+reference is written to `checkout_attempts` before the charge, so a "restore my purchase"
+retry is possible later.
+
+#### Where a shop buys, and where it is told to
+
+One surface takes money: `src/components/settings/ai-credits-section.tsx`, mounted on
+`/billing` as a **sibling** of the plans card, not inside it —
+`subscription-section.tsx` early-returns a "Lifetime Access Active" card, and a lifetime
+shop spends tokens like everybody else. It renders **one** rail per shop (Paystack for
+NGN, Dodo for USD): offering a button the shop's gateway cannot settle is a failed
+payment.
+
+`/ai-insights` only ever *links* there, at `/billing?topup=1#ai-credits` — `?topup=1`
+highlights and scrolls to the section. Embedding a second payment surface would load the
+Paystack and Dodo scripts into the chat route for no other reason. The chat page shows a
+"Top up" link beside the balance pill once the balance is under a tenth of the allowance
+(floored at three — "5 left" is a warning on Starter's 15 and noise on Business's 1,500),
+and on exhaustion the 429's `code: 'credits_exhausted'` raises a banner **instead of** a
+toast: a toast disappears and leaves the shop staring at a composer that will keep
+refusing. The banner clears on `status === 'streaming'`, which is proof the server
+accepted the balance, because a 429 never streams a token.
 
 ## Usage analytics — what is recorded, and what must never be
 
-The admin board at `/admin-imamshaffy/ai-usage` reads two things:
+The admin board at `/admin-imamshaffy/ai-usage` reads three things:
 
 - **`platform_stats/ai_usage_global/daily/{YYYY-MM-DD}`** — one platform-wide
   rollup per UTC day, written by `route.ts`. Everything time-based on the board
   comes from here.
 - **`businessInstances.aiToolUsageCounts`** — per-tenant *lifetime* tool counts,
   which is also what the `uses` figure on `/ai-insights/use-cases` reads.
+- **`ai_credit_ledger`**, newest 40 rows — the Credit ledger card. Ordering on one
+  field needs no composite index, and this read is `.catch(() => null)`-tolerated on
+  purpose: the ledger is newer than the rest of the board, so a rules or deployment
+  mismatch should cost the page its ledger card and not every chart on it.
+
+The **Cost ceiling** column is per-tenant, from `businessTokensIn`/`businessTokensOut` on
+the day documents priced through `estimateCostUsd`. It is a ceiling rather than an invoice,
+and a tenant with turns but no tokens reads `—` rather than `$0.00`: those day documents
+predate per-tenant attribution (August 2026), and "cost nothing" and "was not measured" are
+different answers. This column is the only thing that can tell you whether the credit
+prices clear their marginal cost.
+
+The **grant** control writes through a `runTransaction` — the increment plus a ledger row
+in one commit — and takes an optional reason that ends up on the row. It validates the
+amount first: `Number('')` is `NaN`, which Firestore rejects at the SDK boundary with a
+message about unsupported field values that says nothing about credits, while `0` and
+negatives commit happily and write a ledger row asserting a movement that never happened.
 
 The shared vocabulary — intent rules, keyword allow-list, tool grouping — lives
 in `src/lib/ai-analytics.ts`, which is imported by **both** the route and the

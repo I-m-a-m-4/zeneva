@@ -413,7 +413,7 @@ function composer(
   ctx.moveTo(dx, y + 72); ctx.lineTo(dx, y + 94);
   ctx.stroke();
   icon(ctx, 'sparkles', dx + 14, y + 83, 14, G.orange, 2);
-  text(ctx, '84 daily AI responses left', dx + 28, y + 83, {
+  text(ctx, '84 AI credits left', dx + 28, y + 83, {
     size: 12.5, weight: 500, color: G.mid, baseline: 'middle',
   });
 

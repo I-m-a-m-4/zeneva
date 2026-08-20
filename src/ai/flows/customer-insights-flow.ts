@@ -9,6 +9,7 @@
 
 import { ai } from '@/ai/genkit';
 import { requireUser } from '@/actions/admin-guard';
+import { withUserCredits } from '@/lib/server/ai-credits';
 import { 
     CustomerInsightsInputSchema, 
     CustomerInsightsOutputSchema, 
@@ -21,8 +22,8 @@ import {
 // call on the platform's API key. Token stays out of the input schema so it is
 // never forwarded to the model.
 export async function getCustomerInsights(input: CustomerInsightsInput, idToken?: string): Promise<CustomerInsightsOutput> {
-  await requireUser(idToken);
-  return customerInsightsFlow(input);
+  const uid = await requireUser(idToken);
+  return withUserCredits(uid, 'getCustomerInsights', () => customerInsightsFlow(input));
 }
 
 const prompt = ai.definePrompt({

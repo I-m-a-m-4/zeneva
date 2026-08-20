@@ -1,8 +1,8 @@
 
 "use client";
 
-import { productTroubleshoot } from "@/ai/flows/product-troubleshoot-flow";
-import type { Product, AISuggestions } from "@/types";
+import type { Product } from "@/types";
+import { analyseProductQuality } from "@/lib/product-quality";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { usePOS } from "@/context/pos-context";
 import { hasProFeatures } from "@/lib/plan";
 import { AlertTriangle, CheckCircle, Lightbulb, Loader2, PartyPopper, Package, FileText, DollarSign, BarChart, Zap, Edit, Flame, ShieldAlert, Info } from "lucide-react";
-import React, { useState, useTransition, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import {
@@ -22,11 +22,6 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { useFirestore } from "@/firebase";
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import { idToken } from '@/lib/id-token';
 
 function IssueDetailsDialog({ isOpen, onOpenChange, issue }: { isOpen: boolean, onOpenChange: (open: boolean) => void, issue: { title: string, items: Product[] } | null }) {
   if (!issue) return null;
@@ -101,7 +96,7 @@ const severityIcons = {
 }
 
 export default function TroubleshootPage() {
-    const { products, business, isLoading: isDataLoading, currentUserProfile, isLoading: isUserLoading } = usePOS();
+    const { products, business, isLoading: isDataLoading, currentUserProfile, isLoading: isUserLoading, currencySymbol } = usePOS();
     const isLoading = isDataLoading || isUserLoading;
     const router = useRouter();
 
@@ -114,19 +109,34 @@ export default function TroubleshootPage() {
         }
     }, [currentUserProfile, isLoading, router]);
 
-    const [isPending, startTransition] = useTransition();
-    const [suggestions, setSuggestions] = useState<AISuggestions | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedIssue, setSelectedIssue] = useState<{ title: string, items: Product[] } | null>(null);
-    const firestore = useFirestore();
-    const { toast } = useToast();
 
-    useEffect(() => {
-        if (business?.settings?.aiTroubleshootSuggestions) {
-            setSuggestions(business.settings.aiTroubleshootSuggestions);
-        }
-    }, [business]);
-    
+    /*
+     * Data quality, computed on the device.
+     *
+     * This used to call `productTroubleshoot`, which shipped **every product** — name,
+     * description, price, category and SKU — to Gemini and asked for "the top 3-5 most
+     * critical suggestions", specifically naming missing prices, poor descriptions and
+     * inconsistent categorisation as what to look for.
+     *
+     * Two things were wrong with that. It cost 60,000+ input tokens for a 1,200-product
+     * shop against a flat 2-credit charge, so it lost money on every press and lost more
+     * the bigger the shop. And the page **already computed the same checks locally** — the
+     * `analysis` memo below has done `!p.price`, `!p.category` and short-description checks
+     * all along. Gemini was being paid to read a list and describe conclusions the page had
+     * already reached.
+     *
+     * `analyseProductQuality` is a strict superset: it adds duplicate names, duplicate
+     * barcodes, negative stock, expiry, below-cost pricing, estimated cost prices and
+     * categories spelled two ways — and, unlike prose, it returns **the affected products**,
+     * so every row links straight to them through `handleFixClick`. It is instant, free,
+     * works offline, and cannot miscount.
+     */
+    const quality = useMemo(
+        () => (products ? analyseProductQuality(products, { now: new Date() }) : null),
+        [products],
+    );
     const analysis = useMemo(() => {
         if (!products) return null;
         const productsWithoutPrice = products.filter(p => !p.price || p.price <= 0);
@@ -153,40 +163,6 @@ export default function TroubleshootPage() {
         setIsModalOpen(true);
     };
 
-    const handleGetSuggestions = () => {
-        if (!products || products.length === 0 || !business?.id || !firestore) {
-            toast({ variant: 'destructive', title: 'Cannot Run AI Analysis', description: 'Product or business data is not available.' });
-            return;
-        }
-        startTransition(async () => {
-            const sanitizedProducts = products.map(p => ({
-                id: p.id,
-                name: p.name,
-                description: p.description,
-                price: p.price,
-                category: p.category,
-                sku: p.sku,
-            }));
-
-            const result = await productTroubleshoot({ products: sanitizedProducts }, await idToken());
-            
-            const dataToSave: AISuggestions = { ...result, createdAt: serverTimestamp() };
-
-            try {
-                const businessDocRef = doc(firestore, 'businessInstances', business.id);
-                await updateDoc(businessDocRef, {
-                    'settings.aiTroubleshootSuggestions': dataToSave
-                });
-                setSuggestions({ ...result, createdAt: new Date() });
-                toast({ variant: 'success', title: 'Suggestions Saved', description: 'Your AI suggestions have been generated and saved.' });
-            } catch (error) {
-                console.error("Failed to save AI suggestions:", error);
-                toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save the AI suggestions.' });
-                setSuggestions({ ...result, createdAt: new Date() });
-            }
-        });
-    };
-    
     if (isLoading) {
         return <div className="flex items-center justify-center h-64"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
     }
@@ -250,66 +226,78 @@ export default function TroubleshootPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary"/> AI-Powered Suggestions</CardTitle>
+                    <CardTitle className="font-headline flex items-center gap-2"><Lightbulb className="text-primary"/> What needs fixing</CardTitle>
                     <CardDescription>
-                        Use GenAI to get advanced merchandising and data quality recommendations for your live inventory. Suggestions are saved and can be revisited anytime.
+                        Everything Zeneva can see wrong with your product records, worst first. Tap any
+                        row to see exactly which products it affects.
                     </CardDescription>
                 </CardHeader>
-                {canUseAIFeature ? (
-                    <>
-                        <CardContent>
-                            {isPending ? (
-                                <div className="space-y-2 p-8 text-center">
-                                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                                    <p className="text-muted-foreground">AI is analyzing your inventory...</p>
+                {/*
+                  * No plan gate, and that is deliberate.
+                  *
+                  * This card used to be behind `canUseAIFeature` because it called Gemini. It no
+                  * longer does — it is arithmetic over products the browser already has — so gating
+                  * it would mean charging for `if` statements. It is also exactly what a new free
+                  * shop most needs to see, and a shop whose data is in order is the one most likely
+                  * to upgrade later.
+                  */}
+                <CardContent>
+                    {!quality || quality.issues.length === 0 ? (
+                        <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
+                            <PartyPopper className="mx-auto h-12 w-12" />
+                            <p className="mt-4 font-medium">Nothing to fix</p>
+                            <p className="text-sm">Every product has what Zeneva needs to report on it properly.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-3">
+                                <div>
+                                    <p className="text-2xl font-semibold leading-none">{quality.score}%</p>
+                                    <p className="text-xs text-muted-foreground mt-1">of products are clean</p>
                                 </div>
-                            ) : suggestions?.suggestions?.length > 0 ? (
-                                <Accordion type="multiple" className="w-full space-y-2">
-                                    {suggestions.suggestions.map((suggestion, index) => (
-                                        <AccordionItem key={index} value={`item-${index}`} className="border-b-0 rounded-lg border bg-muted/50 px-4">
-                                            <AccordionTrigger className="py-3 hover:no-underline">
-                                                <div className="flex items-center gap-3">
-                                                    {severityIcons[suggestion.severity]}
-                                                    <span className="font-medium text-base">{suggestion.title}</span>
-                                                </div>
-                                            </AccordionTrigger>
-                                            <AccordionContent className="pb-4 text-muted-foreground">
-                                                {suggestion.description}
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                    ))}
-                                </Accordion>
+                                {quality.urgent > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        <span className="font-medium text-destructive">{quality.urgent.toLocaleString()}</span> need
+                                        attention before they can be sold or reported on properly.
+                                    </p>
+                                )}
+                            </div>
 
-                            ) : (
-                                <div className="text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
-                                    <PartyPopper className="mx-auto h-12 w-12" />
-                                    <p className="mt-4 font-medium">Ready for some AI magic?</p>
-                                    <p className="text-sm">Click the button to get merchandising and SEO tips based on your products.</p>
-                                </div>
-                            )}
-                        </CardContent>
-                        <CardFooter className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                            <Button onClick={handleGetSuggestions} disabled={isPending || analysis.totalProducts === 0}>
-                                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {isPending ? "Analyzing..." : suggestions ? "Regenerate Suggestions" : "Get AI Suggestions"}
-                            </Button>
-                            {suggestions?.createdAt && (
-                                <p className="text-xs text-muted-foreground">
-                                    Last generated: {formatDistanceToNow(suggestions.createdAt.toDate ? suggestions.createdAt.toDate() : new Date(suggestions.createdAt), { addSuffix: true })}
-                                </p>
-                            )}
-                        </CardFooter>
-                    </>
-                ) : (
-                    <CardContent className="text-center py-12">
-                        <Zap className="h-16 w-16 mx-auto text-muted-foreground/50"/>
-                        <h3 className="text-xl font-semibold mt-4">Upgrade to Unlock AI Suggestions</h3>
-                        <p className="text-muted-foreground mt-2 max-w-md mx-auto">Get advanced merchandising, data quality recommendations, and more by upgrading to our Pro or Business plan.</p>
-                        <Button asChild className="mt-6">
-                            <Link href="/billing">Upgrade Your Plan</Link>
-                        </Button>
-                    </CardContent>
-                )}
+                            <Accordion type="multiple" className="w-full space-y-2">
+                                {quality.issues.map((issue) => (
+                                    <AccordionItem key={issue.id} value={issue.id} className="border-b-0 rounded-lg border bg-muted/50 px-4">
+                                        <AccordionTrigger className="py-3 hover:no-underline">
+                                            <div className="flex items-center gap-3 text-start">
+                                                {severityIcons[issue.severity === 'high' ? 'High' : issue.severity === 'medium' ? 'Medium' : 'Low']}
+                                                <span className="font-medium text-base">{issue.title}</span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pb-4 space-y-3">
+                                            <p className="text-muted-foreground">{issue.detail}</p>
+                                            {typeof issue.amountAtRisk === 'number' && issue.amountAtRisk > 0 && (
+                                                <p className="text-sm font-medium">
+                                                    {currencySymbol}{Math.round(issue.amountAtRisk).toLocaleString()} of stock is involved.
+                                                </p>
+                                            )}
+                                            {/*
+                                              * The thing prose could never do: name the products.
+                                              * The old AI answer said "some products are missing prices";
+                                              * this opens the list of them.
+                                              */}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleFixClick(issue.title, issue.products)}
+                                            >
+                                                {issue.action} ({issue.products.length.toLocaleString()})
+                                            </Button>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </>
+                    )}
+                </CardContent>
             </Card>
 
             <IssueDetailsDialog 

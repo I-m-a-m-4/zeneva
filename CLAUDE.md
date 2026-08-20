@@ -35,6 +35,29 @@ the run deliberately does **not** write `full_products_sync` — that stamp is k
 by business, not by who fetched it, so writing it would make the real owner skip
 their own full sync and try to sell from 500 of their 12,000 products.
 
+### The stamp survives what it is stamping — the empty-POS bug
+
+`full_products_sync` lives in **localStorage**; the products it certifies live in
+**SQLite**. Nothing keeps those two storages in step, and the stamp carries a 24-hour
+throttle, so a desktop install whose `zeneva.db` is locked or corrupt gets zero products
+and a fresh stamp saying the sync succeeded — then refuses to try again for a day. That is
+what put "No products found" on paying users' tills. Three defects, all now fixed, and the
+shape of each is worth keeping:
+
+- `fetchFullProducts` set `hasFullSyncedProducts` in its **`finally`**, so any throw still
+  flipped `allProducts` from `null` (skeleton) to `[]` (empty state). It is set on the
+  success path only.
+- `syncProductsToOffline` swallowed write errors, so the stamp was written when nothing had
+  reached disk. It returns `boolean` now, and the caller checks it.
+- Nothing reconciled "stamp says synced, cache holds nothing". `cacheContradictsStamp`
+  forces one re-sync per session, and `getCachedProductsResult` distinguishes *the mirror
+  is empty* from *the mirror could not be read* — `getCachedProducts` returning `[]` could
+  not.
+
+`productSyncError` (`null | 'network' | 'permission' | 'cache'`) and
+`isProductCatalogPending` are the context's answers for the UI; the POS reads both. Never
+reintroduce a code path where an unreadable cache is indistinguishable from an empty shop.
+
 ## Loss prevention — read before touching a detector or an audit-log write
 
 `docs/loss-prevention.md` is required reading for anything touching
@@ -135,6 +158,103 @@ The short version:
   reporting `does not provide an export named 'RATING_WINDOW_DAYS'` for a constant
   that is plainly exported.
 
+## Achievements — read before touching a badge, a date on one, or the unlock card
+
+`src/lib/achievements.ts` (pure ladders), `src/hooks/use-achievements.ts` (the seen
+set and the unlock queue), `src/components/achievements/*` and
+`src/app/(app)/achievements/page.tsx`. `npm run test:achievements` is 48 checks over
+the pure module and is the fastest way to know you have not broken a date.
+
+- **Nothing may invent a date.** The page this replaced stamped product and customer
+  milestones with `new Date()` plus `milestone.value / 10` milliseconds so the
+  timeline would sort — and then printed that on a downloadable certificate.
+  `products.length >= 100` has no event behind it, so `earnedAt` is `null` and the
+  surface shows the *figure* instead. Sales crossings do have an event, and
+  `salesCrossingDates` finds it by walking the held receipts forward from
+  `base = max(0, lifetimeRevenue − heldSum)`. A threshold passed before the window
+  never satisfies `before < value`, so it gets honest silence rather than being pinned
+  to the oldest receipt in the cache. The clamp matters: the counter can lag a receipt
+  already in the cache, and a negative base moves *every* date one rung early.
+- **The module never reads the clock at all** — stronger than the "`now` is an input"
+  rule in `forensics.ts`/`business-rating.ts`, and for the same reason.
+- **One figure, one ladder.** Sales badges use lifetime `stats.totalRevenue`, the same
+  figure `notification-rules.ts` announces. The old page summed the **200** held
+  receipts and filtered them to the current year, so a shop was told it had crossed
+  ₦1 million and found no badge for it. `revenueIsFloor` marks the fallback so a floor
+  is never stated as a total.
+- **`safeToDate` returns the epoch, not null**, so epoch receipts are filtered in
+  `computeAchievements` and re-checked at every render site. Miss that and a receipt
+  with no timestamp dates a milestone to 1 January 1970.
+- **`productCount: null` ≠ `0`** — null drops the ladder out of the earned/total tally
+  and out of `focus`; `0` asserts an empty catalogue. Impersonation passes `null`
+  because products are capped at `IMPERSONATION_PRODUCT_CAP` (500) and the ladder tops
+  out at 1,000, so a 12,000-product shop would be shown 500 as its ceiling.
+- **`focus` is the nearest rung, not the biggest prize.** Two customers short beats a
+  ₦95m gap for getting somebody to act.
+- **Celebration history is keyed per business** (`zeneva_ach_seen_<id>`), and so are
+  the goals (`zeneva_goals_<id>`). Both were bare global keys — the same trap CLAUDE.md
+  documents for the `pos_synced_*` blobs. The legacy `seenMilestones` is **not**
+  migrated (it holds labels, not ids, and its owner is unknowable); legacy `userGoals`
+  is adopted once, and **not** while impersonating.
+- **The first run seeds silently.** Without it an existing shop is walked through eight
+  cards at once. Same one-shot risk as the rating's tier high-water seeding: it is
+  gated on `!isLoading` and a present business doc, or it seeds an empty set against
+  half-hydrated data and the real figures arrive as eight fresh unlocks.
+- **Only the top rung per ladder is celebrated, and `ids` retires the whole batch.**
+  Retiring only the rung shown makes ₦500k announce itself *after* ₦1m.
+- **Owner only, never while impersonating**, computed exactly as the notification
+  trigger pass in `(app)/layout.tsx` computes it. A cashier is not who wants to be told
+  the shop crossed ₦1m — the milestone notification is already `target: 'owner'`.
+- **One mount, in the layout.** `<AchievementCelebration />` sits beside
+  `<UpdateRequiredModal />` because the moment worth celebrating is the sale that
+  crosses the line, at the till — and because the rating's confetti already taught that
+  a hook consumed by two components fires twice.
+
+## Loading skeletons — read before adding one, or before a page shows an empty state
+
+There used to be exactly **one** skeleton for the whole app: `src/app/(app)/loading.tsx`,
+a route-group fallback shared by all thirty routes. It drew a four-up stat grid over five
+full-width bars, which is the shape of almost none of them — the POS is a product grid,
+Receipts is one card holding a table, Settings is a two-column split. It is **deleted**.
+Each route now has its own `loading.tsx`; `src/components/shared/page-skeletons.tsx` holds
+the twelve primitives they share, with every height traced back to the component it stands
+in for.
+
+Four rules:
+
+- **Never add page padding.** `(app)/layout.tsx` renders `<main>` with `p-4 sm:p-6`
+  already. The old universal skeleton wrapped itself in `p-4 sm:p-6` too, so it sat at
+  double the real gutter and the whole page slid left the moment data arrived. Use
+  `SkeletonPage` for the vertical rhythm and let `main` do the gutters. Two documented
+  exceptions: `/ai-insights` is the only full-bleed route (`isFullBleedRoute`) and supplies
+  its own, and `onboarding` is a `fixed inset-0 z-50` overlay that ignores `main` entirely —
+  its skeleton must be the same overlay or it flashes as a strip at the top.
+  `sales/pos/layout.tsx` adds its **own** `p-4 sm:p-6` on top of `main`'s and keeps the
+  4-step progress nav mounted across steps, so the four POS step skeletons add neither.
+- **A page with an in-page skeleton needs a colocated `skeleton.tsx`, not a second
+  drawing.** `loading.tsx` covers the route transition; the in-page branch covers the data
+  wait, which is far longer and the one users actually watch. Five routes have both
+  (`dashboard`, `inventory`, `inventory/details`, `billing`, `settings`) and each exports one
+  `…BodySkeleton` that both import. They had all drifted: billing's predated the AI credits
+  rail, settings' had no tab bar, and `inventory/details` — which is the **edit form** — was
+  being covered by a skeleton drawn for a read-only product view.
+- **Mirror the real box, and check what actually renders.** The dashboard's showed four
+  cards at `lg:grid-cols-4`; an owner gets eight (nine with recorded debts) at
+  `lg:grid-cols-3`, and staff without `view_reports` get three and no charts — which is why
+  `DashboardBodySkeleton` takes `cards` and `charts`, and why `hasReportPermission` is
+  computed *above* the early return.
+- **No text in a skeleton.** A `loading.tsx` is a server component and cannot reach
+  `useI18n`, so any copy ships as untranslated English in an eleven-language app.
+  `role="status"` + `aria-busy` with no label is the deliberate choice; the bars say
+  nothing worth reading anyway.
+
+**And the empty state is not the loading state.** `null` means "still coming", `[]` means
+"there are none" — collapsing them is what put "No products found" on a POS whose
+catalogue had simply failed to load. Keep the skeleton up while the value is `null`
+(`select-products/page.tsx:470`, `inventory/page.tsx`'s table body), and give the failure
+its own branch that says *why* and offers Retry. `products === null` is load-bearing in
+both.
+
 ## Never run a second `next dev` in this repo
 
 Two dev servers share `.next`. That corrupts
@@ -202,6 +322,34 @@ The short version:
   to `/invoices` because that page queries properly; never restate it as the shop's
   total debt.
 
+### Telling the platform owner — `error_logs`, not a new channel
+
+A silent failure on a paying user's till is only a bug report if somebody sees it. The
+channel that reaches the owner already exists, so **reuse it**: `error_logs` is
+`allow create: if true` / read by super-admin only (`firestore.rules:222`, `:386`), and
+`src/app/admin-imamshaffy/layout.tsx` holds a live `onSnapshot` on the newest 20 that
+badges unread against `localStorage.zeneva_last_viewed_errors` and calls
+`notify(...)` → `/admin-imamshaffy/developer-logs` for anything under 60 s old.
+
+`reportAnomaly(code, message, ctx)` in `src/lib/error-logger.ts` writes into it with
+`type: 'anomaly'`, and it is **deliberately not routed through `logErrorToFirestore`**:
+that path's `NOISE_PATTERNS` drops exactly the strings an anomaly is made of
+("permission-denied", "Failed to fetch"), and its 5-per-session budget is for a page
+that is falling over — an anomaly must not be crowded out of it.
+
+- **Throttled per code, per device, per day** (`zeneva_anomaly_<code>` + a session set).
+  A device with a broken `zeneva.db` hits the same anomaly on every launch; the point is
+  to learn that it happened, not to buy a document each time. If the write itself fails
+  the throttle key is **removed again** so the next launch retries, and the payload goes
+  into the `failed_logs` queue.
+- **An anomaly is a condition, not an exception.** The five that exist are the
+  empty-POS causes — `product_cache_write_failed`, `product_sync_permission_denied`,
+  `product_sync_failed`, `product_cache_unreadable`, `product_cache_lost` — and three of
+  those throw nothing at all. Anything that leaves a shop unable to trade belongs here;
+  a caught `console.error` does not.
+- The admin popup reads `data.message || data.errorMessage || …` and titles anomalies
+  **"Zeneva Anomaly Detected"**, so they are distinguishable from crash logs at a glance.
+
 ## Zen AI — read before touching the chat client or a stale-bundle bug
 
 `docs/zen-ai.md` is required reading for anything touching `/ai-insights` or
@@ -226,6 +374,41 @@ The short version:
   `proposal-guard.ts` re-validates it against live data first. `addToQueue` is
   the only thing that enforces RBAC, injects `activeBranchId`, survives offline
   and updates the SQLite mirror — a direct `updateDoc` skips all four.
+- **Every Gemini call meters, or it is free.** `src/lib/server/ai-credits.ts` is
+  the only place that prices AI work or moves a balance — the chat route and all
+  five `src/ai/flows/*` server actions go through it. A new call site that does
+  not `reserveCredits` costs the platform money silently, which is exactly how
+  `visualCount` ran unmetered on the platform key for months. Credits come from
+  **weighted tokens** (`tokensIn + tokensOut × 8`, `20_000` per credit), so a
+  24-step forensic scan costs what it costs and `linkToPage` costs 1. Reserve
+  inside a transaction, settle in `onFinish`, release on error — with a
+  `creditsResolved` latch, because nothing promises only one of those fires.
+  **`aiUsageCount` counts credits, not messages**, and `AI_MONTHLY_LIMITS` is now
+  15/400/1,500 — so every surface that renders it must say "credits". The
+  allowance is hand-typed in four places besides the constant (both `plans.proF5`
+  / `plans.bizF3` across all eleven catalogs, `use-cases/page.tsx`,
+  `help-center/page.tsx`). No new **top-level** field was added on purpose:
+  `fieldsUnchanged()` is a deny-list, so the reservation moves the two fields
+  already in `entitlementFieldsLocked()`. `docs/zen-ai.md` has the rest.
+- **Credits are purchasable, and the client never writes the balance.** Prices live in
+  `src/lib/credit-packs.ts` (250/1,000/5,000; ₦2,500/₦8,000/₦35,000, $2.50/$8/$35) and
+  **both servers re-derive the price from the `packId`** — `metadata` is not a price
+  list. Three writers touch `aiBonusCredits`: `purchaseAiCredits`
+  (`src/actions/ai-credits.ts`, Paystack/NGN, replay-guarded on the `reference`), the
+  Dodo webhook (USD), and the admin grant — all Admin SDK or super-admin, because the
+  field is in `entitlementFieldsLocked()`. Four things that already went wrong:
+  the Dodo credit branch must sit **before** `if (businessId && planId)` or a pack (which
+  has no `planId`) returns 200 and grants nothing; `kind: 'credits'` on the `purchases`
+  row is what keeps a one-off pack out of MRR/ARPU (`purchaseKind` reads a **missing**
+  `kind` as `'subscription'`, and lifetime/TTM totals keep packs on purpose — they are
+  totals, not rates); it is always `FieldValue.increment`, never `previous + credits`,
+  because a chat turn is debiting the same field; and `ai_credit_ledger` needs **no
+  `firestore.rules` entry** (the super-admin catch-all covers it) which also means no
+  tenant can read it. Buying happens in exactly one place —
+  `settings/ai-credits-section.tsx`, mounted on `/billing` as a **sibling** of the plans
+  card because `subscription-section.tsx` early-returns for `accessLevel === 'lifetime'`,
+  and rendering **one** rail per shop. `/ai-insights` only links there
+  (`/billing?topup=1#ai-credits`).
 - The tools live in `src/app/api/chat/tools.ts`, not the route — and the count is
   derived from `TOOL_LINES` in `zen-status.tsx`, so don't hardcode it anywhere.
   Two of their query shapes have **no Firestore composite index** (`receipts` by
@@ -247,6 +430,80 @@ The short version:
   paths are copied verbatim from `AppConfig.logoIconUrl`; its gradient ids must
   stay per-instance, and its sheen is SMIL, so reduced-motion is handled in JS
   rather than CSS.
+
+## Smart import — read before touching the importer or adding a source
+
+`docs/smart-import.md` is required reading for anything touching
+`src/lib/import/*`, `src/components/inventory/smart-import/*`, or
+`src/app/api/import/route.ts`.
+
+The short version:
+
+- **Seven sources, one pipeline.** Excel/CSV, paste, photo of stock, photo of an
+  invoice, typed sentence, capture from another Windows program, barcode — all become
+  `RawTable` → `mapColumns` → `DraftProduct[]` → `stageRows` → `addToQueue`. Rows read
+  off a photo go through `aiRowsToTable` into the *same* mapper and coercion as a
+  spreadsheet, which is why `₦12,000` means the same thing from all seven and why a
+  money-parser fix fixes all seven.
+- **Structured data is free; understanding mess costs credits.** A clean spreadsheet
+  import is free at any size, including a headerless one — `column-map.ts` infers from
+  the *values* (two money columns: the higher mean is the selling price). Only the
+  residue reaches a model. `IMPORT_CREDIT_FLOORS` in `src/lib/import/pricing.ts` is
+  client-safe on purpose so the UI **quotes before it spends**; the server charges
+  `max(measured, floor)` via the new `floor` argument to `settleCredits`. The floors
+  are a product decision, not a measurement, and the module says so.
+- **It is a route, not a Genkit flow, and that is not stylistic.**
+  `prepare-tauri.mjs` wipes `src/ai` for native builds, which is why `visualCount`
+  never worked on desktop/Android/iOS — it returned a canned string. Its dialog was
+  also never mounted, so it was dead on the web too. `/api/import` has `OPTIONS` +
+  CORS so the shells reach it, and `generateObject` reports real tokens.
+- **The model is never an authority.** Every response is re-validated by pure code:
+  `applyAiMapping` only fills unclaimed columns, `applyAiMatches` can only pick from
+  candidates the local index produced (checked on both sides — a hallucinated id would
+  merge a row into an unrelated product), and `bulk-op` returns a *rule* that is
+  previewed before a single write. Nothing server-side writes to `products`.
+- **Duplicates: be certain, or ask.** SKU is the barcode here, so a code match is a
+  fact and is never a question. `50cl` and `500ml` reduce to the same normalised name
+  via `extractSize` — no string metric finds that, they share no characters. A
+  *disagreeing* size costs 0.45 of the score. An unanswered question always resolves
+  to `create`, never a merge: a visible duplicate is deletable, a wrong merge silently
+  corrupts a stock figure for months. A certain match **claims** its product so a
+  second row for it is forced to be a question.
+- **`ImportIntent` is asked once per batch, never inferred per row.** The same file
+  means "my correct figures" or "goods that just arrived" and no cleverness recovers
+  which. `overwrite` writes only the fields the draft actually carries — `undefined`
+  means the source said nothing, `0` means it said zero, which is why `parseMoney`
+  returns `number | null`. `add-stock` takes cost from an invoice, never the selling
+  price, and fills a missing SKU but never replaces one.
+- **The XLSX reader is hand-written** because npm's SheetJS is pinned at 0.18.5 with
+  CVE-2023-30533 and this parses supplier files. `fflate` is now a **direct** dep
+  (it was transitive via `jspdf`). Cells are placed by **column letter**, rich text is
+  joined across `<r><t>` runs, and dates need `styles.xml` or an expiry imports as
+  `46388`.
+- **Bulk edit emits a rule, not values.** Margin ≠ markup (50% on ₦100 is ₦200 vs
+  ₦150) and shopkeepers say "50%" for both. A margin with no cost price is **skipped**,
+  never computed from 0 — that sets the price to 0 and the POS sells it free.
+  `groupWrites` turns a uniform `set` over 1,000 products into one queued action.
+- **The desktop bot has two paths and both are needed.** `src-tauri/src/win_grid.rs`
+  reads a legacy program's grid directly via UI Automation (`list_desktop_windows`,
+  `read_desktop_grid`) — **read-only**: tree navigation plus `Name` and `ControlType`,
+  nothing that sends input. It is a tree *walk* rather than `FindAll` with a property
+  condition because `windows` 0.61 has no `VARIANT::from(i32)`, and because a walk is
+  bounded where a descendants-scope `FindAll` materialises every cell first. All of it
+  is `cfg(target_os = "windows")` with same-named stubs elsewhere — **the mobile targets
+  build from this crate**, so an ungated module breaks Android and iOS. Both branches
+  are `cargo check`ed. Apps that draw their own grid expose nothing to UIA, which is
+  why the focus-triggered clipboard bridge stays as the fallback.
+- **`localYmd` exists because `toISOString()` is a day early in Lagos.**
+  `new Date('3 April 2027')` is local midnight = `2027-04-02T23:00Z`.
+- `npm run test:import` — 110 checks, and it must be `.ts` not `.mts` (same
+  CJS-interop trap as the rating harness). It found both of the above on first run.
+- Two adjacent things found while building this and worth knowing: the chat route's
+  global daily counter **only ever incremented**, so the `date` guard made day two read
+  day one's total and 429 everybody from the second request onward (fixed —
+  `globalDateIsToday`); and **`update-settings` has no case in the queue's commit
+  switch**, so a queued settings write updates the screen, never reaches Firestore and
+  retries forever. New categories use a direct `updateDoc` because of it.
 
 ## Android signing — read before touching release builds
 

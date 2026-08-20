@@ -340,11 +340,20 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                     read: false,
                 }).catch(() => {});
 
-                sendDirectUserPush(thread.userId, {
-                    title: '💬 New Message from Support',
-                    body: payload.text,
-                    url: '/support'
-                }).catch((err) => console.warn('Support push error:', err));
+                // Wrapped, not just `.catch()`ed: a promise handler cannot catch a
+                // *synchronous* throw, and this call threw synchronously in native
+                // builds (the prepare-tauri stub was missing the export, so it was
+                // `undefined(...)`). That took the whole reply handler down with it,
+                // even though the reply document had already been written.
+                try {
+                    sendDirectUserPush(thread.userId, {
+                        title: '💬 New Message from Support',
+                        body: payload.text,
+                        url: '/support'
+                    }).catch((err) => console.warn('Support push error:', err));
+                } catch (err) {
+                    console.warn('Support push unavailable:', err);
+                }
             }
 
             // Also send email to user's Gmail via Resend if option is enabled

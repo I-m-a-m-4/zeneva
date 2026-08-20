@@ -340,7 +340,7 @@ const es: Messages = {
     proF2: '5 cuentas de empleado',
     proF3: 'TPV avanzado con lectura de códigos de barras',
     proF4: 'Facturación y gestión de deudas',
-    proF5: 'Zen AI — 100 mensajes/día',
+    proF5: 'Zen AI — 150 créditos/mes',
     proF6: 'Importación masiva inteligente de inventario',
     proF7: 'Enlaces de recibo compartibles (WhatsApp/SMS)',
     proF8: 'Pedidos pendientes y registro retroactivo',
@@ -352,7 +352,7 @@ const es: Messages = {
     bizDesc: 'Para negocios consolidados que necesitan nuestras herramientas de IA más potentes y soporte prioritario.',
     bizF1: 'Productos y cuentas de empleado ilimitados',
     bizF2: 'Todo lo incluido en Pro',
-    bizF3: 'Zen AI — 500 mensajes/día',
+    bizF3: 'Zen AI — 600 créditos/mes',
     bizF4: 'Panel de rendimiento del negocio con IA',
     bizF5: 'Inteligencia de clientes avanzada (CRM+)',
     bizF6: 'Informes de rotación de inventario (análisis ABC)',
@@ -774,6 +774,16 @@ const es: Messages = {
     noProductsSearchHint:
       'No hay resultados para «{term}» en tu catálogo sincronizado.',
     categoryEmpty: 'Esta categoría está vacía por ahora.',
+    catalogUnavailableTitle: 'No se pudieron cargar tus productos',
+    catalogUnavailableNetwork:
+      'Tu catálogo está a salvo en el servidor: este dispositivo no pudo descargarlo. Revisa tu conexión e inténtalo de nuevo.',
+    catalogUnavailablePermission:
+      'Esta cuenta no tiene permiso para ver la lista de productos. Pide al propietario del negocio acceso al inventario.',
+    catalogUnavailableCache:
+      'No se pudo abrir la copia sin conexión de tu catálogo, así que se está descargando de nuevo.',
+    retryLoadingProducts: 'Intentar de nuevo',
+    noProductsStaffHint:
+      'Todavía no se ha añadido ningún producto a esta tienda. Pide al propietario o a un encargado que los añada.',
     clearSearch: 'Borrar búsqueda',
     nextCustomer: 'Siguiente: cliente',
     viewCart: 'Ver carrito ({n})',

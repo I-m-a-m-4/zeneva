@@ -8,6 +8,19 @@ export interface Product {
     category: string;
     price: number;
     costPrice?: number;
+    /**
+     * True when `costPrice` was derived rather than known.
+     *
+     * A cost filled from a stated margin ("I sell drinks at 25%") is a guess, and
+     * without this flag it is indistinguishable from one read off a supplier's invoice
+     * — so every margin report would present arithmetic on an assumption as fact, and
+     * the shop would price against it. Absent or `false` means the figure came from a
+     * human or a waybill.
+     *
+     * A real cost may overwrite an estimate freely; an estimate must never overwrite a
+     * real cost. See `src/lib/import/cost-prices.ts`.
+     */
+    costPriceEstimated?: boolean;
     stock: number;
     imageUrl?: string;
     imageHint?: string;
@@ -589,14 +602,44 @@ export interface Invitation {
     branchId?: string;
 }
 
+/**
+ * A payment made *to* Zeneva. Two kinds live in this one collection.
+ *
+ * The declared types used to be narrower than what the writers actually write:
+ * `plan` was `'Pro' | 'Business'` while `activateSubscription` writes a lowercase
+ * `PlanId`, and `currency` was `'NGN'` only while the Dodo rail writes `'USD'` —
+ * so a reader that narrowed on either was reasoning about a shape that does not
+ * exist in the collection.
+ *
+ * `kind` is the discriminator, and anything computing a *rate* must respect it: a
+ * credit pack is bought once. `src/lib/platform-revenue.ts` holds the helpers, and
+ * a missing `kind` means `'subscription'` — every row written before packs existed.
+ */
 export interface Purchase {
     id: string;
-    userId: string;
+    /** Absent on Dodo rows: a webhook is authenticated by signature, not by a user. */
+    userId?: string;
     businessId: string;
-    plan: 'Pro' | 'Business';
+    /**
+     * Free text, not a `PlanId`. Subscriptions write the plan id; credit packs
+     * write something readable like `"1000 AI credits"` so a table cell is not
+     * blank. Match it the way `purchasePlanMonthlyNgn` does, and only for
+     * subscription rows.
+     */
+    plan: string;
+    /** Missing on every row written before AI credit packs shipped. */
+    kind?: 'subscription' | 'credits';
+    /** Credit rows only — the `CreditPackId` that was bought. */
+    packId?: string;
+    /** Credit rows only — credits granted, re-derived server-side from the pack id. */
+    credits?: number;
     amount: number;
-    currency: 'NGN';
+    currency: 'NGN' | 'USD';
     timestamp: any; // Firestore Timestamp
+    reference?: string;
+    gateway?: 'paystack' | 'dodopayments';
+    /** True when a server action verified the charge with the gateway itself. */
+    verifiedServerSide?: boolean;
     userProfile?: UserProfile; // For admin dashboard display
 }
 
@@ -604,7 +647,13 @@ export interface SubscriptionHistory {
     id: string;
     action: string;
     amount: number;
-    currency: 'NGN';
+    /**
+     * Was declared `'NGN'` only, which was wrong: the Dodo webhook writes
+     * `pData.currency || 'USD'` into this collection for both a subscription and a
+     * credit pack. A reader that narrowed on the old type printed ₦ against a dollar
+     * amount — an $8 pack shown as "₦8".
+     */
+    currency: 'NGN' | 'USD';
     timestamp: any; // Firestore Timestamp
 }
 

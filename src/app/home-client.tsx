@@ -1196,7 +1196,7 @@ export default function Home() {
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> 5 Staff Accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced POS with barcode scanning</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Invoicing & Debt Management</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 3,000 messages/month</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 400 credits/month</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Smart Bulk Inventory Import</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Shareable Receipt Links (WhatsApp/SMS)</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Backorders & Backdating Capability</li>
@@ -1229,7 +1229,7 @@ export default function Home() {
                                     <ul className="mt-6 space-y-4 text-sm">
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Unlimited products & staff accounts</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> All features in Pro</li>
-                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 15,000 messages/month</li>
+                                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Zen AI — 1,500 credits/month</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> AI Business Performance Dashboard</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Advanced Customer Intelligence (CRM+)</li>
                                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> Inventory Velocity Reports (ABC Analysis)</li>

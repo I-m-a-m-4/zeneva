@@ -16,7 +16,9 @@ interface ErrorLogPayload {
   userAgent: string;
   userId?: string;
   businessId?: string;
-  type: 'react' | 'window' | 'unhandledrejection' | 'api';
+  type: 'react' | 'window' | 'unhandledrejection' | 'api' | 'anomaly';
+  code?: string;
+  details?: Record<string, any>;
   createdAt?: any;
 }
 
@@ -107,6 +109,80 @@ export const logErrorToFirestore = async (
     }
   } finally {
     isLogging = false;
+  }
+};
+
+/**
+ * Reports a silent data anomaly — something that is not a thrown error but is
+ * still wrong, and that nobody would otherwise find out about.
+ *
+ * It lands in `error_logs`, which the admin shell already watches live
+ * (`admin-imamshaffy/layout.tsx`): a new document raises the unread badge and an
+ * OS notification, so writing one *is* the way to tell the platform owner.
+ *
+ * Deliberately not routed through `logErrorToFirestore`:
+ *
+ * - the `NOISE_PATTERNS` filter there would drop most of these, because an
+ *   anomaly usually *names* its cause and the causes are "permission-denied",
+ *   "Failed to fetch" and friends;
+ * - the 5-per-session error budget is for a page that is falling over, and an
+ *   anomaly must not be crowded out of it.
+ *
+ * Throttled per `code` per device per day. A device with a broken SQLite file
+ * hits the same anomaly on every launch, and the point is to learn that it
+ * happened, not to pay for a document each time.
+ */
+const ANOMALY_THROTTLE_MS = 24 * 60 * 60 * 1000;
+const anomaliesThisSession = new Set<string>();
+
+export const reportAnomaly = async (
+  code: string,
+  message: string,
+  context?: { userId?: string; businessId?: string; details?: Record<string, any> }
+) => {
+  if (typeof window === 'undefined') return;
+  if (anomaliesThisSession.has(code)) return;
+  anomaliesThisSession.add(code);
+
+  const throttleKey = `zeneva_anomaly_${code}`;
+  try {
+    const last = Number(localStorage.getItem(throttleKey) || 0);
+    if (last && Date.now() - last < ANOMALY_THROTTLE_MS) return;
+    localStorage.setItem(throttleKey, Date.now().toString());
+  } catch {
+    // No localStorage — report it anyway; the session guard above still holds.
+  }
+
+  const payload: ErrorLogPayload = {
+    message: `[${code}] ${message}`,
+    stack: `Anomaly: ${code}`,
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+    userId: context?.userId || 'unknown',
+    businessId: context?.businessId || 'unknown',
+    type: 'anomaly',
+    code,
+    details: context?.details,
+    createdAt: serverTimestamp(),
+  };
+
+  try {
+    await addDoc(collection(firestore, 'error_logs'), payload);
+  } catch (err) {
+    nativeConsoleError('Failed to report anomaly, queuing locally:', err);
+    try {
+      const offlineLogs = JSON.parse(localStorage.getItem('failed_logs') || '[]');
+      offlineLogs.push({
+        payload: { ...payload, createdAt: new Date().toISOString() },
+        error: err instanceof Error ? err.message : String(err),
+        timestamp: Date.now(),
+      });
+      localStorage.setItem('failed_logs', JSON.stringify(offlineLogs.slice(-20)));
+      // The write never landed, so let the next launch try again.
+      localStorage.removeItem(throttleKey);
+    } catch {
+      // Nothing left to try.
+    }
   }
 };
 

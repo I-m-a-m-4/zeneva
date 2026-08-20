@@ -20,6 +20,8 @@
  * a toast, so the owner learns why rather than seeing a silent no-op.
  */
 
+import { describeBulkOp, groupWrites, previewBulkOp } from '@/lib/import/bulk-ops';
+
 /** Absolute ceilings. Anything past these is a data-entry or model error. */
 const MAX_STOCK = 1_000_000;
 const MAX_PRICE = 1_000_000_000;
@@ -30,7 +32,33 @@ const MAX_SALE_TOTAL = 1_000_000_000;
 /** How far the live value may have drifted from what the model saw. */
 const STOCK_DRIFT_TOLERANCE = 0;
 
-type GuardOk = { ok: true; current?: number };
+/**
+ * A write this guard has authorised, ready for `addToQueue`.
+ *
+ * Returned by the multi-product proposals rather than leaving the caller to rebuild the
+ * list, because the guard is the only thing that knows which rows survived validation. A
+ * caller that reconstructed the writes from the proposal card would be writing rows the
+ * guard had already rejected.
+ *
+ * Exactly one of `productId` / `productIds` is set: single-product writes go through
+ * `update-product` and grouped ones through `bulk-update-products`.
+ */
+export type GuardWrite = {
+  productId?: string;
+  productIds?: string[];
+  values: Record<string, any>;
+  /** Queue description, shown in the offline queue and the sync log. */
+  label: string;
+};
+
+type GuardOk = {
+  ok: true;
+  current?: number;
+  /** Set by proposals that touch many products at once. */
+  writes?: GuardWrite[];
+  /** Products affected, when that differs from `writes.length` because of grouping. */
+  count?: number;
+};
 type GuardFail = { ok: false; reason: string };
 export type GuardResult = GuardOk | GuardFail;
 
@@ -121,6 +149,98 @@ export function validateProposal(
       if (!Array.isArray(action.items) || action.items.length === 0) return fail('The sale has no items.');
       if (action.items.length > MAX_SALE_LINES) return fail(`A sale cannot have more than ${MAX_SALE_LINES} lines.`);
       return { ok: true };
+
+    /*
+     * Cost prices for many products at once.
+     *
+     * No staleness check, and that is deliberate rather than an omission. A stock
+     * adjustment says "set it to 12" and is only correct relative to what it was when the
+     * model looked, so drift invalidates it. "The cost price is ₦380" is a statement about
+     * a purchase the owner made — it does not depend on what Zeneva currently holds, so a
+     * cashier selling three units in the meantime changes nothing about whether it is true.
+     *
+     * What is checked is existence and sanity, per row, and a row whose product has since
+     * been deleted is dropped rather than failing the whole card: refusing twenty good
+     * cost prices because the twenty-first product was deleted would be maddening.
+     */
+    case 'COST_PRICES': {
+      const rows = Array.isArray(action.matched) ? action.matched : [];
+      if (rows.length === 0) return fail('That proposal has no matched products in it.');
+
+      const writes: GuardWrite[] = [];
+      for (const row of rows) {
+        const product = products?.find((p) => p.id === row?.productId);
+        if (!product) continue;
+        const cost = Number(row?.newCost);
+        if (!isFiniteNumber(cost) || cost < 0 || cost > MAX_PRICE) continue;
+        // Unchanged rows are dropped so approving twice costs no writes.
+        if (isFiniteNumber(product.costPrice) && Math.abs(product.costPrice - cost) < 0.005) continue;
+
+        writes.push({
+          productId: product.id,
+          // `costPriceEstimated: false` matters: this figure came from a human, so it must
+          // clear any earlier margin-derived guess rather than sit alongside it looking
+          // identical.
+          values: { costPrice: cost, costPriceEstimated: false },
+          label: `Cost price for ${product.name}`,
+        });
+      }
+
+      if (writes.length === 0) {
+        return fail('Nothing to apply — those products already have those cost prices, or they have been deleted.');
+      }
+      return { ok: true, writes };
+    }
+
+    /*
+     * A margin sweep, revalidated by recomputing the rule.
+     *
+     * The card carries a *rule* and a sample, never the full list of values, so approval
+     * recomputes against the products as they stand now — `previewBulkOp` is the same
+     * function that produced the server's preview, and it is what enforces the two things
+     * that must hold however this is reached: a real cost price is never overwritten by an
+     * estimate, and a product with no selling price is skipped rather than given a cost of
+     * zero.
+     *
+     * So the model's numbers are not trusted here; only its *percentage* and *basis* are,
+     * and both are bounded below.
+     */
+    case 'COST_ESTIMATE': {
+      const percent = Number(action.percent);
+      if (!isFiniteNumber(percent) || percent <= 0 || percent >= 100) {
+        return fail('That margin is not a usable percentage.');
+      }
+      if (action.basis !== 'margin' && action.basis !== 'markup') {
+        return fail('That proposal does not say whether it is a margin or a markup.');
+      }
+      if (!products || products.length === 0) return fail('No products to work on.');
+
+      const op = {
+        field: 'costPrice' as const,
+        mode:
+          action.basis === 'margin'
+            ? { kind: 'cost-from-margin' as const, percent }
+            : { kind: 'cost-from-markup' as const, percent },
+        filter: action.category ? { categories: [String(action.category)] } : {},
+      };
+
+      const preview = previewBulkOp(products as any, op);
+      if (preview.changes.length === 0) {
+        return fail(
+          preview.skipped.length > 0
+            ? `Nothing to estimate — ${preview.skipped[0].reason}`
+            : 'Nothing matches that any more.',
+        );
+      }
+
+      const writes: GuardWrite[] = groupWrites(preview).map((group) => ({
+        productIds: group.productIds,
+        values: group.value,
+        label: `${describeBulkOp(op, '')} (${group.productIds.length} products)`,
+      }));
+
+      return { ok: true, writes, count: preview.changes.length };
+    }
 
     default:
       return fail(`"${action.action}" is not an action Zen AI is allowed to apply.`);

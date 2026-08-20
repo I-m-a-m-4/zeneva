@@ -9,6 +9,7 @@
 
 import { ai } from '@/ai/genkit';
 import { requireUser } from '@/actions/admin-guard';
+import { withUserCredits, AiCreditsExhaustedError } from '@/lib/server/ai-credits';
 import {
   BusinessAnalysisInputSchema,
   BusinessAnalysisOutputSchema,
@@ -18,17 +19,23 @@ import {
 
 // Server Action = public endpoint. Guard sits outside the try/catch so an auth
 // failure is not reported to the caller as a transient AI error.
+//
+// `withCredits` is inside it, so an exhausted balance *is* reported through the
+// catch below — which would flatten it into "Zen AI is over-leveraged". So the
+// exhausted case is rethrown untouched at the top of the catch; a shop out of
+// credits needs to be told that, not told to try again in a few seconds.
 export async function businessAnalysis(
   input: BusinessAnalysisInput,
   idToken?: string
 ): Promise<BusinessAnalysisOutput> {
-  await requireUser(idToken);
+  const uid = await requireUser(idToken);
   try {
     console.log("Starting Business Analysis AI Flow with input size:", JSON.stringify(input).length);
-    const result = await businessAnalysisFlow(input);
+    const result = await withUserCredits(uid, 'businessAnalysis', () => businessAnalysisFlow(input));
     console.log("Business Analysis AI Flow completed successfully.");
     return result;
   } catch (error: any) {
+    if (error instanceof AiCreditsExhaustedError) throw error;
     console.error("CRITICAL ERROR in Business Analysis AI Flow:", error);
     if (error.message?.includes('token')) {
       throw new Error("The dataset is too large for the AI to process. We are working on further optimizing the data summaries.");

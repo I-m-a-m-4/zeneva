@@ -325,7 +325,7 @@ const ja: Messages = {
     proF2: 'スタッフアカウント 5つ',
     proF3: 'バーコード読み取り対応の高機能レジ',
     proF4: '請求書と売掛金の管理',
-    proF5: 'Zen AI — 1日 100 メッセージ',
+    proF5: 'Zen AI — 月 150 クレジット',
     proF6: 'かしこい在庫の一括取り込み',
     proF7: '共有できるレシートリンク（WhatsApp／SMS）',
     proF8: '取り寄せ販売と日付のさかのぼり入力',
@@ -337,7 +337,7 @@ const ja: Messages = {
     bizDesc: '最も強力な AI 機能と優先サポートを必要とする、確立したお店向け。',
     bizF1: '商品もスタッフアカウントも無制限',
     bizF2: 'Pro のすべての機能',
-    bizF3: 'Zen AI — 1日 500 メッセージ',
+    bizF3: 'Zen AI — 月 600 クレジット',
     bizF4: 'AI による業績ダッシュボード',
     bizF5: '高度な顧客インテリジェンス（CRM+）',
     bizF6: '在庫回転レポート（ABC 分析）',
@@ -739,6 +739,16 @@ const ja: Messages = {
     noProductsFound: '商品が見つかりません',
     noProductsSearchHint: '同期済みカタログに「{term}」に一致する商品がありません。',
     categoryEmpty: 'このカテゴリは現在空です。',
+    catalogUnavailableTitle: '商品を読み込めませんでした',
+    catalogUnavailableNetwork:
+      '商品カタログはサーバー上に残っています。この端末が取得できなかっただけです。接続を確認して、もう一度お試しください。',
+    catalogUnavailablePermission:
+      'このアカウントには商品一覧を表示する権限がありません。オーナーに在庫へのアクセス権を依頼してください。',
+    catalogUnavailableCache:
+      'カタログのオフラインコピーを開けなかったため、再ダウンロードしています。',
+    retryLoadingProducts: '再試行',
+    noProductsStaffHint:
+      'この店舗にはまだ商品が登録されていません。オーナーまたは管理者に登録を依頼してください。',
     clearSearch: '検索をクリア',
     nextCustomer: '次へ：顧客',
     viewCart: 'カートを見る（{n}）',

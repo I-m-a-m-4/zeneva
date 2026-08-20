@@ -333,7 +333,7 @@ const en = {
     proF2: '5 Staff Accounts',
     proF3: 'Advanced POS with barcode scanning',
     proF4: 'Invoicing & Debt Management',
-    proF5: 'Zen AI — 3,000 messages/month',
+    proF5: 'Zen AI — 150 credits/month',
     proF6: 'Smart Bulk Inventory Import',
     proF7: 'Shareable Receipt Links (WhatsApp/SMS)',
     proF8: 'Backorders & Backdating Capability',
@@ -345,7 +345,7 @@ const en = {
     bizDesc: 'For established businesses that require our most powerful AI tools and support.',
     bizF1: 'Unlimited products & staff accounts',
     bizF2: 'All features in Pro',
-    bizF3: 'Zen AI — 15,000 messages/month',
+    bizF3: 'Zen AI — 600 credits/month',
     bizF4: 'AI Business Performance Dashboard',
     bizF5: 'Advanced Customer Intelligence (CRM+)',
     bizF6: 'Inventory Velocity Reports (ABC Analysis)',
@@ -753,6 +753,16 @@ const en = {
     noProductsSearchHint:
       'We couldn\'t find matches for "{term}" in your synchronized catalog.',
     categoryEmpty: 'This category is currently empty.',
+    catalogUnavailableTitle: 'Couldn\'t load your products',
+    catalogUnavailableNetwork:
+      'Your catalog is safe on the server — this device just couldn\'t fetch it. Check your connection and try again.',
+    catalogUnavailablePermission:
+      'This account isn\'t allowed to view the product list. Ask the business owner to grant inventory access.',
+    catalogUnavailableCache:
+      'The offline copy of your catalog couldn\'t be opened, so it is being downloaded again.',
+    retryLoadingProducts: 'Try again',
+    noProductsStaffHint:
+      'No products have been added to this shop yet. Ask the owner or a manager to add them.',
     clearSearch: 'Clear Search',
     nextCustomer: 'Next: Customer',
     viewCart: 'View Cart ({n})',

@@ -325,7 +325,7 @@ const de: Messages = {
     proF2: '5 Mitarbeiterkonten',
     proF3: 'Erweiterte Kasse mit Barcode-Scan',
     proF4: 'Rechnungen und Forderungsverwaltung',
-    proF5: 'Zen AI — 100 Nachrichten/Tag',
+    proF5: 'Zen AI — 150 Credits/Monat',
     proF6: 'Intelligenter Massenimport des Bestands',
     proF7: 'Teilbare Beleg-Links (WhatsApp/SMS)',
     proF8: 'Nachbestellungen und Rückdatierung',
@@ -337,7 +337,7 @@ const de: Messages = {
     bizDesc: 'Für etablierte Unternehmen, die unsere leistungsstärksten KI-Werkzeuge und bevorzugten Support benötigen.',
     bizF1: 'Unbegrenzte Produkte und Mitarbeiterkonten',
     bizF2: 'Alle Funktionen aus Pro',
-    bizF3: 'Zen AI — 500 Nachrichten/Tag',
+    bizF3: 'Zen AI — 600 Credits/Monat',
     bizF4: 'KI-Dashboard zur Geschäftsentwicklung',
     bizF5: 'Erweiterte Kundenanalyse (CRM+)',
     bizF6: 'Berichte zur Lagerumschlagshäufigkeit (ABC-Analyse)',
@@ -762,6 +762,16 @@ const de: Messages = {
     noProductsSearchHint:
       'Keine Treffer für „{term}“ in Ihrem synchronisierten Katalog.',
     categoryEmpty: 'Diese Kategorie ist derzeit leer.',
+    catalogUnavailableTitle: 'Produkte konnten nicht geladen werden',
+    catalogUnavailableNetwork:
+      'Ihr Katalog ist auf dem Server sicher — dieses Gerät konnte ihn nur nicht abrufen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+    catalogUnavailablePermission:
+      'Dieses Konto darf die Produktliste nicht sehen. Bitten Sie die Inhaberin oder den Inhaber um Zugriff auf das Lager.',
+    catalogUnavailableCache:
+      'Die Offline-Kopie Ihres Katalogs konnte nicht geöffnet werden und wird erneut heruntergeladen.',
+    retryLoadingProducts: 'Erneut versuchen',
+    noProductsStaffHint:
+      'Diesem Geschäft wurden noch keine Produkte hinzugefügt. Bitten Sie die Inhaberin, den Inhaber oder eine leitende Person, sie anzulegen.',
     clearSearch: 'Suche zurücksetzen',
     nextCustomer: 'Weiter: Kunde',
     viewCart: 'Warenkorb ansehen ({n})',

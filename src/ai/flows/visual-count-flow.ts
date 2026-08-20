@@ -3,6 +3,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { requireUser } from '@/actions/admin-guard';
+import { withUserCredits } from '@/lib/server/ai-credits';
 
 const VisualCountInputSchema = z.object({
     imageBase64: z.string().describe('The base64 encoded image of the products to count.'),
@@ -29,10 +30,16 @@ export type VisualCountOutput = z.infer<typeof VisualCountOutputSchema>;
  * The token is a separate parameter rather than a schema field on purpose:
  * `VisualCountInputSchema` is fed straight into the prompt, and a credential
  * has no business being sent to the model.
+ *
+ * It is also the **most expensive** call in the product, and until credits arrived
+ * it was completely free: no quota field was read, so a caller could replay this
+ * endpoint with full-resolution photographs indefinitely. It is now the
+ * highest-weighted entry in `FLOW_CREDITS`, and it is the shape the coming AI
+ * product upload should copy.
  */
 export async function visualCount(input: VisualCountInput, idToken?: string): Promise<VisualCountOutput> {
-    await requireUser(idToken);
-    return visualCountFlow(input);
+    const uid = await requireUser(idToken);
+    return withUserCredits(uid, 'visualCount', () => visualCountFlow(input));
 }
 
 const prompt = ai.definePrompt({

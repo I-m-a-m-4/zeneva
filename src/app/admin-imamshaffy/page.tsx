@@ -168,7 +168,9 @@ import { rankBusinesses } from '@/lib/outreach-scoring';
 import {
   internalOwnerIds,
   billingCurrencyByBusiness,
+  isCreditPackPurchase,
   purchasePlanMonthlyNgn,
+  splitPurchases,
   subscriptionRunRate,
   toNgn,
 } from '@/lib/platform-revenue';
@@ -277,13 +279,20 @@ function useCollectionCount(path: string, isCollectionGroup = false): number | n
     return total;
 }
 
-function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, payingBusinessesCount, businesses }: {
-    open: boolean; 
-    onOpenChange: (open: boolean) => void; 
-    validPurchases: any[]; 
+function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, totalCreditPackRevenue = 0, payingBusinessesCount, businesses }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    validPurchases: any[];
     checkoutAttempts?: any[];
-    totalSubscriptionRevenue: number; 
-    payingBusinessesCount: number; 
+    totalSubscriptionRevenue: number;
+    /**
+     * One-off Zen AI credit-pack sales, in NGN. Reported beside the subscription
+     * figure rather than folded into it: it is real money that recurs for nobody,
+     * so adding it to the number the LTV card divides would overstate what a
+     * subscriber is worth.
+     */
+    totalCreditPackRevenue?: number;
+    payingBusinessesCount: number;
     businesses: BusinessInstance[] | null;
 }) {
     // The attempts list is capped at ADMIN_LOG_LIMIT rows, so the tab heading is
@@ -302,14 +311,14 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                         Detailed breakdown of active subscriptions, MRR contributions, ARR target, and Customer Lifetime Value (LTV).
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 py-2">
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription className="text-xs">Paying Customers</CardDescription>
                             <CardTitle className="text-2xl font-bold">{payingBusinessesCount}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-[10px] text-muted-foreground">Active businesses with purchase history.</p>
+                            <p className="text-[10px] text-muted-foreground">Businesses that have paid for a plan. A shop that only ever bought AI credits is not counted.</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -319,6 +328,15 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                         </CardHeader>
                         <CardContent>
                             <p className="text-[10px] text-muted-foreground">Zeneva's own subscription fees collected to date. Not platform GMV — that is what merchants sold. Dollar payments converted at ₦1,500/$1.</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">AI Credit Packs</CardDescription>
+                            <CardTitle className="text-2xl font-bold">₦{Math.round(totalCreditPackRevenue).toLocaleString()}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[10px] text-muted-foreground">One-off Zen AI top-ups. Deliberately outside MRR, ARR and LTV — a pack is bought once and recurs for nobody.</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -358,17 +376,27 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                                         // customer is billed against — not this row's share of
                                         // MRR. The list is all-time, so several rows can belong
                                         // to one subscription and they do not sum to MRR.
-                                        const planMonthly = purchasePlanMonthlyNgn(p.plan, p.currency);
+                                        //
+                                        // A credit pack bills nothing monthly, and
+                                        // `purchasePlanMonthlyNgn` name-matches its `plan` text:
+                                        // "1,000 AI credits" contains no "business", so it would
+                                        // fall through to Pro and print ₦10,000/mo against a
+                                        // ₦8,000 one-off sale.
+                                        const isPack = isCreditPackPurchase(p);
+                                        const planMonthly = isPack ? 0 : purchasePlanMonthlyNgn(p.plan, p.currency);
                                         return (
                                             <TableRow key={p.id || index}>
                                                 <TableCell className="font-medium max-w-[180px] truncate" title={biz?.name || 'Unknown Business'}>{biz?.name || 'Unknown Business'}</TableCell>
-                                                <TableCell className="capitalize">{p.plan || 'Pro'}</TableCell>
+                                                <TableCell className="capitalize">
+                                                    {p.plan || 'Pro'}
+                                                    {isPack && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">one-off</span>}
+                                                </TableCell>
                                                 <TableCell className="uppercase">{p.currency || 'NGN'}</TableCell>
                                                 <TableCell className="text-right font-mono">
                                                     {p.currency === 'USD' ? '$' : '₦'}{p.amount.toLocaleString()}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono font-semibold text-emerald-500">
-                                                    ₦{planMonthly.toLocaleString()}
+                                                    {isPack ? <span className="text-muted-foreground font-normal">—</span> : `₦${planMonthly.toLocaleString()}`}
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -2794,13 +2822,26 @@ function AdminDashboardContent({
             return true;
         });
 
+        /*
+         * Plan payments and one-off Zen AI credit packs both land in `purchases`,
+         * and only the first kind may touch a rate. The MRR loop below reads each
+         * business's *latest* payment, so an unsplit ₦2,500 pack bought after a
+         * ₦30,000 subscription would report that shop as paying ₦2,500 a month —
+         * a pack sale lowering the run rate. Rows with no `kind` predate packs and
+         * are all subscriptions. See `src/lib/platform-revenue.ts`.
+         */
+        const { subscriptions: subscriptionPurchases, creditPacks: creditPackPurchases } = splitPurchases(validPurchases);
+
         // Normalised to NGN. `amount` is stored in whatever currency the customer
         // paid, so summing it raw adds $30 to ₦30,000 and reports ₦30,030.
-        const totalSubscriptionRevenue = validPurchases.reduce((sum, p) => sum + toNgn(p.amount, p.currency), 0);
+        const totalSubscriptionRevenue = subscriptionPurchases.reduce((sum, p) => sum + toNgn(p.amount, p.currency), 0);
+        // Real revenue, reported separately because it recurs for nobody.
+        const totalCreditPackRevenue = creditPackPurchases.reduce((sum, p) => sum + toNgn(p.amount, p.currency), 0);
+        const totalCompanyRevenue = totalSubscriptionRevenue + totalCreditPackRevenue;
 
         const platformAOV = totalReceipts > 0 ? (platformGmv / totalReceipts) : 0;
 
-        const payingBusinessIds = new Set(validPurchases.map(p => p.businessId));
+        const payingBusinessIds = new Set(subscriptionPurchases.map(p => p.businessId));
         const payingBusinesses = activeBusinesses?.filter(b => {
             return payingBusinessIds.has(b.id);
         });
@@ -2818,7 +2859,7 @@ function AdminDashboardContent({
 
         // Group valid purchases by businessId to find the latest subscription payment
         const latestPurchaseByBusiness = new Map<string, any>();
-        for (const p of validPurchases) {
+        for (const p of subscriptionPurchases) {
             const existing = latestPurchaseByBusiness.get(p.businessId);
             if (!existing || (p.timestamp?.seconds || 0) > (existing.timestamp?.seconds || 0)) {
                 latestPurchaseByBusiness.set(p.businessId, p);
@@ -2857,8 +2898,12 @@ function AdminDashboardContent({
         }, {} as Record<string, number>);
         const newUserGrowth = Object.entries(usersByDate).map(([date, count]) => ({ date, 'New Users': count }));
 
-        // Same NGN normalisation and same exclusions as the total above, so the
-        // chart and the tile cannot tell different stories.
+        /*
+         * Money received per day — both kinds. Same NGN normalisation and the same
+         * internal-account exclusions as the totals above, so it reconciles with
+         * `totalCompanyRevenue`, **not** with the Sub Revenue tile. A cash-in chart
+         * that hid pack sales would show a day with revenue as a day with none.
+         */
         const revenueByDate = validPurchases.reduce((acc, purchase) => {
             if (purchase.timestamp?.seconds) {
                 const date = format(new Date(purchase.timestamp.seconds * 1000), 'MMM d');
@@ -2981,6 +3026,7 @@ function AdminDashboardContent({
             totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers,
             newUserGrowth, revenueGrowth, categoryData, activeSubscriptions,
             trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue,
+            totalCreditPackRevenue, totalCompanyRevenue,
             richestBusiness, topPerformers, allPerformers, averageSalesPerDay, averageReceiptsPerDay, dailyGmvData, dailyReceiptsData,
             earliestBusiness, daysActive,
             uniqueDownloaders: downloadClicks?.length || 0,
@@ -3544,7 +3590,17 @@ function AdminDashboardContent({
                         <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="LTV" value={`₦${analyticsData.ltv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Crown} description="Est. Lifetime Value" />
                         </button>
-                        <StatCard title="Sub Revenue" value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString()}`} icon={ShieldCheck} description="Total Software Sales" />
+                        {/* Subscriptions only. Credit-pack sales are reported in the
+                            description and broken out in the SaaS metrics dialog, so a
+                            one-off top-up never reads as software revenue. */}
+                        <StatCard
+                            title="Sub Revenue"
+                            value={`₦${analyticsData.totalSubscriptionRevenue.toLocaleString()}`}
+                            icon={ShieldCheck}
+                            description={analyticsData.totalCreditPackRevenue > 0
+                                ? `+₦${Math.round(analyticsData.totalCreditPackRevenue).toLocaleString()} AI credits · ₦${Math.round(analyticsData.totalCompanyRevenue).toLocaleString()} all in`
+                                : 'Total Software Sales'}
+                        />
                         <StatCard title="Platform AOV" value={`₦${analyticsData.platformAOV.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={ShoppingCart} description="Avg. Receipt Value" />
                     </div>
                     </Card>
@@ -4995,6 +5051,7 @@ function AdminDashboardContent({
                 validPurchases={analyticsData.validPurchases || []}
                 checkoutAttempts={checkoutAttempts}
                 totalSubscriptionRevenue={analyticsData.totalSubscriptionRevenue || 0}
+                totalCreditPackRevenue={analyticsData.totalCreditPackRevenue || 0}
                 payingBusinessesCount={analyticsData.payingBusinesses?.length || 0}
                 businesses={businesses}
             />

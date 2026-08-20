@@ -7,8 +7,11 @@
  * - **GMV** — the sum of tenant receipts: what the shops using Zeneva sold to
  *   *their* customers. Real money, but not Zeneva's. It belongs nowhere near
  *   Zeneva's own revenue, run rate or valuation.
- * - **`purchases`** — subscription payments made *to* Zeneva. That is the
- *   company's revenue, and it is what everything in this module measures.
+ * - **`purchases`** — payments made *to* Zeneva. That is the company's revenue,
+ *   and it is what everything in this module measures. Two kinds live in there
+ *   now: plan subscriptions, and one-off Zen AI credit packs. `purchaseKind`
+ *   tells them apart, and anything computing a *rate* must use subscriptions
+ *   only — a one-off sale has no monthly anything.
  *
  * This exists because three surfaces need the same answer — the admin
  * dashboard's SaaS tiles, its SaaS metrics dialog, and the cap table's valuation
@@ -72,6 +75,73 @@ export function toNgn(amount: number | undefined, currency: string | undefined):
 }
 
 /**
+ * What a `purchases` row was for.
+ *
+ * The collection held nothing but subscriptions until Zen AI credit packs became
+ * purchasable, and a pack is one-off revenue that must not touch a rate. Rows
+ * written before the discriminator existed have no `kind` at all, and every one of
+ * them is a subscription — so missing reads as `'subscription'`, never as unknown.
+ */
+export type PurchaseKind = 'subscription' | 'credits';
+
+export interface PurchaseKindLike {
+  kind?: string | null;
+}
+
+export function purchaseKind(purchase: PurchaseKindLike): PurchaseKind {
+  return (purchase.kind ?? '').toLowerCase() === 'credits' ? 'credits' : 'subscription';
+}
+
+/** True for a plan payment. The only kind that may contribute to MRR or ARR. */
+export function isSubscriptionPurchase(purchase: PurchaseKindLike): boolean {
+  return purchaseKind(purchase) === 'subscription';
+}
+
+/** True for a one-off Zen AI credit pack. Real revenue, but not recurring. */
+export function isCreditPackPurchase(purchase: PurchaseKindLike): boolean {
+  return purchaseKind(purchase) === 'credits';
+}
+
+/**
+ * Split a purchase list by kind, in one pass.
+ *
+ * Every figure derived from `purchases` has to pick a side deliberately. Three of
+ * them silently went wrong the moment packs shipped, all through the same
+ * latest-payment-wins logic:
+ *
+ * - **MRR/ARR.** The run rate is read off each business's *latest* purchase, so a
+ *   ₦2,500 pack bought after a ₦30,000 subscription reports that shop as paying
+ *   ₦2,500 a month — a pack sale *reducing* the run rate.
+ * - **Paying-customer counts.** A Starter shop that buys one pack is not a
+ *   subscriber.
+ * - **Billing currency.** `billingCurrencyByBusiness` picks which price list a
+ *   business is billed against; a USD pack bought by a naira subscriber would flip
+ *   them to the dollar list and overstate their monthly price by ₦15,000.
+ *
+ * Totals of money *received* legitimately include both — that is what
+ * `creditPackRevenueNgn` and a subscription total add up to.
+ */
+export function splitPurchases<T extends PurchaseKindLike>(
+  purchases: T[],
+): { subscriptions: T[]; creditPacks: T[] } {
+  const subscriptions: T[] = [];
+  const creditPacks: T[] = [];
+  for (const p of purchases) {
+    (isCreditPackPurchase(p) ? creditPacks : subscriptions).push(p);
+  }
+  return { subscriptions, creditPacks };
+}
+
+/** One-off credit-pack revenue, normalised to NGN. Never part of a rate. */
+export function creditPackRevenueNgn(
+  purchases: Array<PurchaseKindLike & { amount?: number; currency?: string }>,
+): number {
+  return purchases
+    .filter(isCreditPackPurchase)
+    .reduce((sum, p) => sum + toNgn(p.amount, p.currency), 0);
+}
+
+/**
  * Monthly list price of a plan, in NGN.
  *
  * Regional pricing is not a straight conversion — Business is ₦30,000 or $30,
@@ -107,14 +177,20 @@ export function purchasePlanMonthlyNgn(
  * Latest payment wins. `settings.currency` is deliberately not used for this —
  * that is the currency the shop *trades* in, and a Nigerian shop selling in
  * naira can perfectly well have paid Zeneva in dollars through Dodo.
+ *
+ * Credit packs are excluded. This answers "which plan price list applies", and a
+ * shop can buy a $8 pack on the dollar rail while subscribing in naira — letting
+ * that pack win would price their Business plan at $30 (₦45,000) instead of
+ * ₦30,000 and overstate their MRR by half.
  */
 export function billingCurrencyByBusiness(
-  purchases: Array<{ businessId?: string; currency?: string; timestamp?: any }>,
+  purchases: Array<PurchaseKindLike & { businessId?: string; currency?: string; timestamp?: any }>,
 ): Map<string, string> {
   const latest = new Map<string, { at: number; currency: string }>();
 
   for (const p of purchases) {
     if (!p.businessId) continue;
+    if (!isSubscriptionPurchase(p)) continue;
     const at = safeToDate(p.timestamp).getTime();
     const existing = latest.get(p.businessId);
     if (!existing || at >= existing.at) {

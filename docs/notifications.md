@@ -174,6 +174,55 @@ A `system_broadcasts` document on its own only drives the dismissible banner —
 read by neither bridge and not by the bell. That is why Send Broadcast writes an
 announcement alongside it.
 
+## Reaching the platform owner — anomalies
+
+Everything above carries a message *to* a tenant. The reverse direction — telling the
+platform owner that something broke on a user's device — uses a different collection,
+and the reason it is worth documenting here is that it is easy to build a third channel
+by accident when a perfectly good one already exists.
+
+`error_logs` is `allow create: if true`, readable only by a super admin
+(`firestore.rules:222` and `:386`). `src/app/admin-imamshaffy/layout.tsx` already holds
+a live `onSnapshot` on the newest 20 by `createdAt desc`: it badges anything newer than
+`localStorage.zeneva_last_viewed_errors`, and for `added` documents under 60 seconds old
+it calls the same `notify()` used everywhere else, landing the tap on
+`/admin-imamshaffy/developer-logs`. So a write into `error_logs` already produces a
+badge, a popup on the owner's desktop and somewhere to tap. Nothing new was needed.
+
+`reportAnomaly(code, message, { userId, businessId, details })` in
+`src/lib/error-logger.ts` is the writer. Four things about it:
+
+- **It is not `logErrorToFirestore`.** That function's `NOISE_PATTERNS` filter drops
+  exactly the strings an anomaly is made of — "permission-denied", "Failed to fetch" —
+  because for a crash log those are noise. And its 5-per-session budget exists for a
+  page that is falling over; an anomaly must not be crowded out of it by a render loop.
+- **An anomaly is a condition, not an exception.** Three of the five that exist throw
+  nothing at all: a stamp that outlived its data, a cache that read as empty, a mirror
+  that refused a write. The test is "can this shop still trade", not "did something
+  throw".
+- **Throttled per code, per device, per day** via `zeneva_anomaly_<code>` plus an
+  in-session `Set`. A desktop install with a locked `zeneva.db` hits the same anomaly on
+  every launch, and the owner needs to know it happened once, not 40 times. If the write
+  fails, the throttle key is deleted again so the next launch retries, and the payload
+  joins the `failed_logs` queue that `flushOfflineErrors` drains.
+- The popup title is **"Zeneva Anomaly Detected"** rather than "New Developer Log", so
+  a device that cannot sell is distinguishable from a stack trace without opening the
+  page.
+
+The five codes, all from the empty-POS investigation:
+
+| Code | Means |
+|---|---|
+| `product_cache_write_failed` | products fetched, SQLite refused the write — `full_products_sync` withheld |
+| `product_cache_unreadable` | the mirror could not be read at all; on desktop it is the only product store |
+| `product_cache_lost` | a fresh stamp over an empty store — the state that produced "No products found" |
+| `product_sync_permission_denied` | rules refused the catalogue listing; the POS is unusable for that user |
+| `product_sync_failed` | the retry budget is spent — `PRODUCT_SYNC_MAX_RETRIES` backed-off attempts all failed |
+
+Adding a sixth needs only a `reportAnomaly` call with a new stable `code` — the throttle
+is keyed on it, so a code that varies per call (an interpolated count, a timestamp)
+defeats the throttle and bills the platform for a document per launch.
+
 ## Debugging a notification that did not arrive
 
 In order, because each step rules out the one below:

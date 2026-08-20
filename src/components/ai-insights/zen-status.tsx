@@ -70,6 +70,8 @@ const TOOL_LINES: Record<string, string> = {
   runLossPreventionScan: 'Sweeping for losses',
   getBusinessOverview: 'Taking a full stock-take',
   proposeStockAdjustment: 'Drafting a stock adjustment',
+  proposeCostPrices: 'Matching your cost prices',
+  proposeCostEstimate: 'Working costs back from your prices',
   proposePriceChange: 'Drafting a price change',
   proposeLoyaltyAdjustment: 'Drafting a loyalty adjustment',
   proposeRestock: 'Drafting a restock',

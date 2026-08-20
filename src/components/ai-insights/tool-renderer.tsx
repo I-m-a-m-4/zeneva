@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Package, DollarSign, Users, Sparkles, CheckCircle2, XCircle,
   AlertTriangle, TrendingUp, ArrowRight, ReceiptText, LayoutGrid, Table2,
+  Coins, Calculator,
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -1018,6 +1019,8 @@ export function ProposalCard({ result, onApprove, onReject }: {
     LOYALTY_ADJUSTMENT: <Users className="w-4 h-4 text-emerald-500" />,
     THRESHOLD_CHANGE: <TrendingUp className="w-4 h-4 text-amber-500" />,
     RECORD_SALE: <ReceiptText className="w-4 h-4 text-orange-500" />,
+    COST_PRICES: <Coins className="w-4 h-4 text-teal-500" />,
+    COST_ESTIMATE: <Calculator className="w-4 h-4 text-teal-500" />,
   };
   const labels: Record<string, string> = {
     STOCK_ADJUSTMENT: 'Stock adjustment',
@@ -1025,11 +1028,15 @@ export function ProposalCard({ result, onApprove, onReject }: {
     LOYALTY_ADJUSTMENT: 'Loyalty points',
     THRESHOLD_CHANGE: 'Low-stock threshold',
     RECORD_SALE: 'Record a sale',
+    COST_PRICES: 'Cost prices',
+    COST_ESTIMATE: 'Estimate cost prices',
   };
 
   const isApproved = result.status === 'APPROVED';
   const isRejected = result.status === 'REJECTED';
   const isSale = result.action === 'RECORD_SALE';
+  const isCostList = result.action === 'COST_PRICES';
+  const isCostEstimate = result.action === 'COST_ESTIMATE';
   const isMoney = result.action === 'PRICE_CHANGE';
   const show = (v: any) => (isMoney ? fmtMoney(v, result.currency) : Number(v ?? 0).toLocaleString());
   const cash = (v: any) => fmtMoney(v, result.currency);
@@ -1048,7 +1055,78 @@ export function ProposalCard({ result, onApprove, onReject }: {
 
       <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{result.reason}</p>
 
-      {isSale ? (
+      {isCostList ? (
+        /*
+         * A cost list is many rows, so it gets the same treatment as a sale: the rows
+         * themselves, not a single before/after. Every product name shown here was resolved
+         * by the deterministic matcher server-side, never chosen by the model — so the card
+         * is showing the owner what will actually be written, which is the only version
+         * worth approving.
+         */
+        <div className="space-y-2 mb-3">
+          <div className="max-h-44 overflow-y-auto space-y-1">
+            {(result.matched ?? []).map((row: any) => (
+              <div key={row.productId} className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="truncate">
+                  {row.productName}
+                  {row.wrote && row.wrote.toLowerCase() !== String(row.productName).toLowerCase() && (
+                    <span className="text-muted-foreground"> · you said “{row.wrote}”</span>
+                  )}
+                </span>
+                <span className="shrink-0 font-medium">
+                  {row.currentCost > 0 && (
+                    <span className="text-muted-foreground line-through me-1">{cash(row.currentCost)}</span>
+                  )}
+                  {cash(row.newCost)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {(result.matched ?? []).some((r: any) => r.notBelowPrice) && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-500">
+              Some of these are not below the selling price — check they are costs, not prices.
+            </p>
+          )}
+          {(result.ambiguous?.length ?? 0) > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              {result.ambiguous.length} line{result.ambiguous.length === 1 ? '' : 's'} matched more than
+              one product and {result.ambiguous.length === 1 ? 'was' : 'were'} left out — set{' '}
+              {result.ambiguous.length === 1 ? 'it' : 'those'} on the Cost prices screen.
+            </p>
+          )}
+          {(result.unmatched?.length ?? 0) > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Not found: {result.unmatched.slice(0, 5).join(', ')}
+              {result.unmatched.length > 5 ? ` +${result.unmatched.length - 5} more` : ''}
+            </p>
+          )}
+        </div>
+      ) : isCostEstimate ? (
+        <div className="space-y-2 mb-3">
+          <div className="rounded-lg bg-muted/50 p-2">
+            <p className="text-xs font-medium">{result.rule}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {Number(result.count ?? 0).toLocaleString()} products · saved as{' '}
+              <strong>estimates</strong> until a waybill replaces them
+            </p>
+          </div>
+          <div className="max-h-32 overflow-y-auto space-y-1">
+            {(result.sample ?? []).map((row: any, i: number) => (
+              <div key={i} className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="truncate">{row.productName}</span>
+                <span className="shrink-0 font-medium">{cash(row.newCost)}</span>
+              </div>
+            ))}
+          </div>
+          {Number(result.skipped ?? 0) > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              {Number(result.skipped).toLocaleString()} left alone
+              {result.skippedReason ? ` — ${result.skippedReason}` : ''}
+            </p>
+          )}
+        </div>
+      ) : isSale ? (
         /*
          * A sale is a receipt, not a single before/after value, so it gets a
          * line-item body. Everything shown here was resolved server-side from

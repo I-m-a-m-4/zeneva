@@ -13,7 +13,7 @@ import { idb } from '@/lib/idb';
 import {   syncProductsToOffline, 
   syncProductToOffline,
   deleteMultipleProductsFromOffline,
-  getCachedProducts, 
+  getCachedProductsResult,
   getCachedCustomers,
   syncCustomersToOffline,
   syncReceiptsToOffline,
@@ -38,6 +38,7 @@ import {   syncProductsToOffline,
   getCachedAuditLogs
 } from '@/lib/sqlite-sync';
 import { isNativeApp, isMobileApp } from '@/lib/platform';
+import { reportAnomaly } from '@/lib/error-logger';
 
 import { 
   POS_CART_KEY, 
@@ -197,6 +198,23 @@ interface POSContextType {
   isFullSyncingCustomers: boolean;
   isFullSyncingProducts: boolean;
   isFullSyncingReceipts: boolean;
+  /**
+   * True while the product catalogue is still arriving and there is nothing to
+   * show yet. Surfaces that list products must hold their loading skeleton on
+   * this — `products.length === 0` cannot tell an empty shop from a catalogue
+   * that has not loaded, which is how the POS came to show "No products found"
+   * to shops with a full catalogue.
+   */
+  isProductCatalogPending: boolean;
+  /**
+   * Why the catalogue is unavailable, when it is unavailable for a reason other
+   * than the shop being empty. `'permission'` — Firestore rules refused the
+   * list; `'cache'` — the local mirror could not be read; `'network'` — the sync
+   * failed and its retries are spent.
+   */
+  productSyncError: null | 'network' | 'permission' | 'cache';
+  /** Re-runs the full product sync from a failed state. */
+  retryProductSync: () => void;
   processQueue: () => Promise<void>;
   clearFailedActions: () => void;
   optimisticProducts: Product[];
@@ -233,6 +251,15 @@ const POSContext = createContext<POSContextType | undefined>(undefined);
  */
 const ONLINE_ORDERS_LISTENER_LIMIT = 200;
 
+/*
+ * A failed product sync leaves the POS with nothing to sell, and there is no
+ * realtime listener to fill the gap, so it retries instead of waiting out the
+ * 24-hour window. Bounded, because the usual cause of a *repeated* failure is
+ * not something a fourth attempt fixes, and each attempt is billed reads.
+ */
+const PRODUCT_SYNC_MAX_RETRIES = 3;
+const PRODUCT_SYNC_RETRY_BASE_MS = 4000;
+
 export function POSProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
@@ -267,6 +294,31 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [hasFullSyncedProducts, setHasFullSyncedProducts] = useState(false);
   const [hasFullSyncedReceipts, setHasFullSyncedReceipts] = useState(false);
   const [hasFullSyncedCustomers, setHasFullSyncedCustomers] = useState(false);
+  /**
+   * Why the catalogue is empty, when it is empty for a reason other than the
+   * shop having no products.
+   *
+   * There is no realtime products listener (see `productsQuery` below), so the
+   * catalogue exists only if `fetchFullProducts` succeeded or the local mirror
+   * held it. When neither is true the POS must say so and offer a retry — the
+   * screen it used to show was "No products found", which reads as an empty shop
+   * and sent owners looking for a category filter that was never set.
+   */
+  const [productSyncError, setProductSyncError] = useState<null | 'network' | 'permission' | 'cache'>(null);
+  /**
+   * True between a failed sync and its scheduled retry. It is state, not a ref,
+   * because the POS holds its loading skeleton on it — a retry that is about to
+   * happen is still "loading", and the whole point of this is that the grid must
+   * not fall through to an empty state while the catalogue is still coming.
+   */
+  const [isProductRetryScheduled, setIsProductRetryScheduled] = useState(false);
+  /** Counts consecutive failed full-product syncs; drives the bounded retry. */
+  const productSyncAttemptsRef = useRef(0);
+  const productRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Holds the latest `fetchFullProducts` so the retry can re-enter it. */
+  const fetchFullProductsRef = useRef<(() => Promise<void>) | null>(null);
+  /** Set once per session when a forced re-sync has already been spent on a stamp/store disagreement. */
+  const forcedProductResyncRef = useRef(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
@@ -619,8 +671,32 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const onlineOrdersQuery = useMemoFirebase(() => (canFetchSubData ? query(collection(firestore, 'businessInstances', businessId, 'onlineOrders'), orderBy('createdAt', 'desc'), limit(ONLINE_ORDERS_LISTENER_LIMIT)) : null), [canFetchSubData, businessId, firestore]);
   const { data: initialOnlineOrders } = useCollection<OnlineOrder>(onlineOrdersQuery);
 
+  /**
+   * True while the catalogue is still on its way and there is nothing to show.
+   *
+   * This is the single answer to "skeleton, or empty state?" — every surface that
+   * lists products should hold its skeleton on this rather than inferring it from
+   * `products.length === 0`, which cannot tell an empty shop from a catalogue
+   * that has not arrived. It stays true across the local-mirror hydration, the
+   * full sync, and the gap before a scheduled retry, and goes false only when
+   * something terminal has happened: a completed sync, a recorded failure, or
+   * going offline (where whatever is cached is all there will be).
+   */
+  const isProductCatalogPending = useMemo(() => {
+    if (!businessId || !isRealOnline) return false;
+    if (syncedProducts.length > 0) return false;
+    if (initialProducts && initialProducts.length > 0) return false;
+    if (!isCacheHydrated) return true;
+    if (isFullSyncingProducts || isProductRetryScheduled) return true;
+    if (productSyncError) return false; // terminal — the page shows the reason and a retry
+    return !hasFullSyncedProducts;
+  }, [
+    businessId, isRealOnline, syncedProducts, initialProducts, isCacheHydrated,
+    isFullSyncingProducts, isProductRetryScheduled, productSyncError, hasFullSyncedProducts,
+  ]);
+
   const allProducts = useMemo(() => {
-    if (initialProducts === null && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline && !!businessId) return null;
+    if (initialProducts === null && syncedProducts.length === 0 && isProductCatalogPending) return null;
     let merged = [...(initialProducts || [])];
     const existingIds = new Set(merged.map(p => p.id));
     syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
@@ -641,7 +717,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
       return dateB - dateA;
     });
-  }, [initialProducts, syncedProducts, queuedActions, isRealOnline, businessId, hasFullSyncedProducts]);
+  }, [initialProducts, syncedProducts, queuedActions, isRealOnline, businessId, isProductCatalogPending]);
 
   const products = useMemo(() => {
     if (!allProducts) return null;
@@ -1134,6 +1210,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let allFetched: Product[] = [];
     let lastDoc: any = null;
     let hasMore = true;
+    /**
+     * Every page must reach the local mirror before the run may claim the
+     * catalogue is persisted. `syncProductsToOffline` used to swallow its write
+     * error, so a run that wrote nothing to disk still stamped
+     * `full_products_sync` — and the stamp is what suppresses the next 24 hours
+     * of syncing.
+     */
+    let persisted = true;
     const BATCH_SIZE = 2000; // Smaller batch for products due to potential image data/complexity
     const cap = isImpersonating ? IMPERSONATION_PRODUCT_CAP : Infinity;
 
@@ -1145,9 +1229,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
           orderBy("name", "asc"),
           limit(Math.min(BATCH_SIZE, cap - allFetched.length))
         );
-        
+
         if (lastDoc) q = query(q, startAfter(lastDoc));
-        
+
         const snap = await getDocs(q);
         if (snap.empty) {
           hasMore = false;
@@ -1157,7 +1241,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
           // Same reason as the customer loop: persist the page before the
           // full_products_sync stamp can claim it was persisted.
-          await syncProductsToOffline(businessId, batch);
+          if (!(await syncProductsToOffline(businessId, batch))) persisted = false;
 
           setSyncedProducts(prev => {
             const merged = [...prev];
@@ -1175,6 +1259,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // The catalogue is in memory, so this session can sell either way.
+      productSyncAttemptsRef.current = 0;
+      setProductSyncError(null);
+      setIsProductRetryScheduled(false);
+      setHasFullSyncedProducts(true);
+
       /*
        * A capped run must not claim the catalogue is complete.
        *
@@ -1190,25 +1280,108 @@ export function POSProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setLastSyncMetadata(businessId, 'full_products_sync', Date.now());
-      setHasFullSyncedProducts(true);
-      
+      if (!persisted) {
+        /*
+         * Same rule as impersonation, different reason: the stamp is a claim
+         * about *disk*, and the disk write failed. Withhold it so the next
+         * launch re-fetches instead of hydrating an empty mirror and believing
+         * it is up to date.
+         */
+        reportAnomaly(
+          'product_cache_write_failed',
+          `Fetched ${allFetched.length} products but the local SQLite mirror rejected the write. full_products_sync withheld so the next launch re-syncs.`,
+          { userId: user.uid, businessId, details: { fetched: allFetched.length } }
+        );
+      } else {
+        setLastSyncMetadata(businessId, 'full_products_sync', Date.now());
+      }
+
       const lastToast = Number(localStorage.getItem('last_product_sync_toast_time') || 0);
       if (Date.now() - lastToast > 24 * 60 * 60 * 1000) {
         toast({ title: "Product Catalog Synced", description: `Synchronized ${allFetched.length} products for offline access.` });
         localStorage.setItem('last_product_sync_toast_time', Date.now().toString());
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
+      /*
+       * This block used to end in a `finally` that ran
+       * `setHasFullSyncedProducts(true)` unconditionally. That flag is what makes
+       * `allProducts` return `[]` instead of `null`, so any failure here — a
+       * dropped connection mid-pagination, a request aborted by navigation —
+       * turned the loading skeleton into "No products found" for the rest of the
+       * session on a shop with a full catalogue. It is now set only on the
+       * success path above.
+       */
+      const isPermission = error?.code === 'permission-denied' || error?.message?.includes('permission');
+
+      if (isPermission) {
+        /*
+         * A user who may not list products will never receive any, so holding
+         * the skeleton forever would be worse than showing the reason. The flag
+         * is set to stop the spinner, but the error is recorded so the POS says
+         * "we could not load your products" rather than "you have none".
+         */
         setHasFullSyncedProducts(true);
+        setProductSyncError('permission');
+        reportAnomaly(
+          'product_sync_permission_denied',
+          `Product sync was refused by Firestore rules (${error?.code || 'permission'}). This user cannot list their own catalogue, so the POS is unusable for them.`,
+          { userId: user.uid, businessId, details: { code: error?.code || null } }
+        );
         return;
       }
+
       console.error("Full Product Sync Failed:", error);
+      setProductSyncError('network');
+      productSyncAttemptsRef.current += 1;
+
+      if (productSyncAttemptsRef.current <= PRODUCT_SYNC_MAX_RETRIES) {
+        // Back off and try again — the common cause is a connection that dropped
+        // mid-pagination, which the next attempt clears. Without this the shop
+        // waited for the 24-hour window even though nothing was cached.
+        const delay = PRODUCT_SYNC_RETRY_BASE_MS * productSyncAttemptsRef.current;
+        if (productRetryTimerRef.current) clearTimeout(productRetryTimerRef.current);
+        setIsProductRetryScheduled(true);
+        productRetryTimerRef.current = setTimeout(() => {
+          productRetryTimerRef.current = null;
+          setIsProductRetryScheduled(false);
+          fetchFullProductsRef.current?.();
+        }, delay);
+      } else {
+        setIsProductRetryScheduled(false);
+        reportAnomaly(
+          'product_sync_failed',
+          `Product sync failed ${productSyncAttemptsRef.current} times in a row: ${error?.message || String(error)}. The POS has no catalogue on this device.`,
+          { userId: user.uid, businessId, details: { code: error?.code || null, attempts: productSyncAttemptsRef.current } }
+        );
+      }
     } finally {
       setIsFullSyncingProducts(false);
-      setHasFullSyncedProducts(true);
     }
   }, [businessId, firestore, isFullSyncingProducts, toast, user, isRealOnline, isImpersonating]);
+
+  /**
+   * Lets the bounded retry above re-enter the latest `fetchFullProducts` without
+   * putting the callback in its own dependency list.
+   */
+  useEffect(() => {
+    fetchFullProductsRef.current = fetchFullProducts;
+  }, [fetchFullProducts]);
+
+  useEffect(() => () => {
+    if (productRetryTimerRef.current) clearTimeout(productRetryTimerRef.current);
+  }, []);
+
+  /** Manual retry for the POS's "couldn't load your products" state. */
+  const retryProductSync = useCallback(() => {
+    productSyncAttemptsRef.current = 0;
+    setProductSyncError(null);
+    setIsProductRetryScheduled(false);
+    if (productRetryTimerRef.current) {
+      clearTimeout(productRetryTimerRef.current);
+      productRetryTimerRef.current = null;
+    }
+    fetchFullProductsRef.current?.();
+  }, []);
 
   const fetchFullReceipts = useCallback(async () => {
     const isOnline = isRealOnline;
@@ -2208,9 +2381,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
       };
 
       Promise.all([
-        getCachedProducts(businessId).then(p => {
-          if (p.length > 0) setSyncedProducts(p);
-          reclaim('pos_synced_products', p.length > 0);
+        getCachedProductsResult(businessId).then(({ ok, rows }) => {
+          if (rows.length > 0) setSyncedProducts(rows);
+          /*
+           * `ok: false` means the store itself could not be read, which is not
+           * the same as an empty shop. It matters because on desktop this table
+           * is the *only* place products live — the localStorage blob is
+           * reclaimed just below and never rewritten — while the sync stamp
+           * still falls back to localStorage. Recording the failure is what lets
+           * `checkFullSyncStatus` distrust a stamp it would otherwise obey, and
+           * what stops the POS reporting an empty catalogue as an empty shop.
+           */
+          if (!ok) {
+            setProductSyncError('cache');
+            reportAnomaly(
+              'product_cache_unreadable',
+              'The local SQLite product mirror could not be read. On desktop it is the only product store, so the POS starts with an empty catalogue until a re-sync lands.',
+              { userId: user?.uid, businessId }
+            );
+          }
+          reclaim('pos_synced_products', rows.length > 0);
         }),
         getCachedCustomers(businessId).then(c => {
           if (c.length > 0) setSyncedCustomers(c);
@@ -2313,6 +2503,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (stats) syncStatsToOffline(businessId, stats);
   }, [businessId, allProducts, allCustomers, allReceipts, users, auditLogs, business, stats]);
 
+  /*
+   * The sync-status check below must know how many products are actually in hand
+   * without re-arming on every product mutation — it also kicks off the customer
+   * and receipt syncs, so putting `syncedProducts` in its dependency list would
+   * re-run all three whenever a sale decremented one stock figure.
+   */
+  const syncedProductCountRef = useRef(0);
+  const expectedProductCountRef = useRef(0);
+  useEffect(() => {
+    syncedProductCountRef.current = syncedProducts.length;
+    // `stats.totalProducts` is maintained by the reconciliation effect above and
+    // is the only independent evidence of what the catalogue *should* hold.
+    const known = Number((stats as any)?.totalProducts ?? 0);
+    if (Number.isFinite(known) && known > 0) expectedProductCountRef.current = known;
+  }, [syncedProducts, stats]);
+
   useEffect(() => {
     if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user) return;
 
@@ -2327,15 +2533,62 @@ export function POSProvider({ children }: { children: ReactNode }) {
       if (lastProdSync > 0) setHasFullSyncedProducts(true);
       if (lastReceiptSync > 0) setHasFullSyncedReceipts(true);
       if (lastCustSync > 0) setHasFullSyncedCustomers(true);
-      
+
       const now = Date.now();
       const dayInterval = 24 * 60 * 60 * 1000; // Changed from 1 hour to 24 hours to save reads
-      
+
       if (now - lastCustSync > dayInterval && !isFullSyncingCustomers) {
         fetchFullCustomers();
       }
 
-      if (now - lastProdSync > dayInterval && !isFullSyncingProducts) {
+      /*
+       * A stamp that describes rows the store no longer has.
+       *
+       * `setLastSyncMetadata` writes both localStorage and SQLite and
+       * `getLastSyncMetadata` falls back to localStorage, but the products
+       * themselves live in SQLite alone on desktop — the localStorage blob is
+       * reclaimed after the first successful hydration and `syncedProducts` is
+       * never written back to it. So a locked, deleted or recreated database
+       * leaves a fresh timestamp standing over an empty table, and every branch
+       * below reads that timestamp as proof the catalogue is present: the flag
+       * above stops the skeleton, and the 24-hour test skips the re-fetch. The
+       * shop then shows "No products found" for a day, across relaunches, with
+       * nothing logged and nothing retried.
+       *
+       * The stamp is a claim about the store, so verify it against the store.
+       * Re-fetching an empty catalogue costs a single read, which is the right
+       * price for making this self-heal.
+       */
+      const cacheContradictsStamp =
+        lastProdSync > 0 &&
+        isCacheHydrated &&
+        syncedProductCountRef.current === 0 &&
+        !isImpersonating &&
+        !forcedProductResyncRef.current;
+
+      if (cacheContradictsStamp) {
+        forcedProductResyncRef.current = true;
+
+        // Only tell the admin when something independently says there *are*
+        // products; a brand-new shop with an empty catalogue is not an anomaly.
+        if (expectedProductCountRef.current > 0) {
+          reportAnomaly(
+            'product_cache_lost',
+            `full_products_sync is stamped ${Math.round((now - lastProdSync) / 60000)} minutes old but the local product store is empty while the business is expected to hold ${expectedProductCountRef.current} products. Forcing a re-sync.`,
+            {
+              userId: user.uid,
+              businessId,
+              details: {
+                stampAgeMs: now - lastProdSync,
+                expected: expectedProductCountRef.current,
+                platform: (window as any).__TAURI_INTERNALS__ ? 'native' : 'web',
+              },
+            }
+          );
+        }
+
+        if (!isFullSyncingProducts) fetchFullProducts();
+      } else if (now - lastProdSync > dayInterval && !isFullSyncingProducts) {
         fetchFullProducts();
       } else if (lastProdSync <= 0) {
         /*
@@ -2361,7 +2614,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     checkFullSyncStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted, businessId, firestore, isRealOnline, user]);
+  }, [isMounted, businessId, firestore, isRealOnline, user, isCacheHydrated]);
   
   // Initial Delta Sync (Silent Catch-up on mount)
   // Runs once per online session. The "no-op → reconnect → effect re-fires"
@@ -2713,14 +2966,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
                (isLoadingBusiness && !business) || 
                ((() => {
                  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+                 /*
+                  * The product terms all route through `isProductCatalogPending`
+                  * now. They used to test `!hasFullSyncedProducts` directly, which
+                  * was only safe because `fetchFullProducts` set that flag in a
+                  * `finally` — including after a throw. With the flag set on
+                  * success alone, a failed sync would leave this stuck true and
+                  * hang the whole shell, so the terminal cases live in one place
+                  * that is guaranteed to resolve.
+                  */
                  if (isTauri) {
-                   return syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline;
+                   return isProductCatalogPending;
                  }
-                 return (!!businessId && syncedProducts.length === 0 && !hasFullSyncedProducts && isRealOnline) || 
-                        ((!customers || customers.length === 0) && !hasFullSyncedCustomers && isRealOnline) || 
+                 return isProductCatalogPending ||
+                        ((!customers || customers.length === 0) && !hasFullSyncedCustomers && isRealOnline) ||
                         ((!receipts || receipts.length === 0) && !hasFullSyncedReceipts && isRealOnline) ||
-                        (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline && !hasFullSyncedCustomers) ||
-                        (isFullSyncingProducts && (!products || products.length === 0) && isRealOnline && !hasFullSyncedProducts);
+                        (isFullSyncingCustomers && (!customers || customers.length === 0) && isRealOnline && !hasFullSyncedCustomers);
                })()) ||
                !isMounted, 
     isUserLoading: isUserLoading || (!!user && !profile), 
@@ -2739,6 +3000,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isConfettiActive, triggerConfetti, setIsConfettiActive,
     queuedActions, isQueueProcessing, addToQueue, processQueue, clearFailedActions: () => {}, updateQueuedAction: () => {}, addProductWithImage, removeFromQueue: () => {},
     mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, optimisticProducts: [],
+    isProductCatalogPending, productSyncError, retryProductSync,
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
     searchCustomers, searchCustomersByField, searchReceipts: async () => [],
@@ -2753,7 +3015,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     stats, 
     isSubscriptionActive: resolveSubscriptionActive(business)
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, isProductCatalogPending, productSyncError, retryProductSync, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

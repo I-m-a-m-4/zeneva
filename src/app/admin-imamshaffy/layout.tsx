@@ -101,9 +101,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             // Only notify if it's a completely new error (added recently)
             // and wasn't already viewed
             if (!isNaN(time) && time > lastViewedTime && (Date.now() - time) < 60000) {
+              // `message` is the field the logger actually writes — `errorMessage`
+              // was never written by anything, so every one of these popups used
+              // to read "A new system error was just logged." and say nothing.
               notify(
-                'New Developer Log', 
-                data.errorMessage || 'A new system error was just logged.',
+                data.type === 'anomaly' ? 'Zeneva Anomaly Detected' : 'New Developer Log',
+                data.message || data.errorMessage || 'A new system error was just logged.',
                 '/admin-imamshaffy/developer-logs'
               );
             }

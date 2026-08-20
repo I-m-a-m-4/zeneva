@@ -88,7 +88,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import BarcodeDisplay from 'react-barcode';
-import { Skeleton } from '@/components/ui/skeleton';
+import { EditProductBodySkeleton } from './skeleton';
 import { logAuditEvent } from '@/lib/audit';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { cn } from '@/lib/utils';
@@ -133,28 +133,7 @@ function useCurrentUserProfile() {
 }
 
 function EditProductSkeleton() {
-    return (
-        <div className="grid flex-1 auto-rows-max gap-4">
-            <div className="flex items-center gap-4">
-                <Skeleton className="h-7 w-7 rounded-md" />
-                <Skeleton className="h-7 w-48" />
-                <div className="hidden items-center gap-2 md:ml-auto md:flex">
-                    <Skeleton className="h-9 w-20" />
-                    <Skeleton className="h-9 w-24" />
-                </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-[1fr_250px] lg:grid-cols-3 lg:gap-8">
-                <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
-                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-4 w-48" /></CardHeader><CardContent><div className="grid gap-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-20 w-full" /></div></CardContent></Card>
-                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-4 w-48" /></CardHeader><CardContent><div className="grid gap-6 sm:grid-cols-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div></CardContent></Card>
-                </div>
-                <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
-                    <Card><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent><Skeleton className="h-10 w-full" /></CardContent></Card>
-                    <Card><CardHeader><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-4 w-48" /></CardHeader><CardContent><Skeleton className="aspect-square w-full" /></CardContent></Card>
-                </div>
-            </div>
-        </div>
-    )
+    return <EditProductBodySkeleton />;
 }
 
 function EditProductContent() {

@@ -1,3 +1,5 @@
+mod win_grid;
+
 #[cfg(desktop)]
 use tauri::Manager;
 
@@ -45,7 +47,9 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
         calculate_secure_loyalty, 
         calculate_royalty, 
-        validate_subscription
+        validate_subscription,
+        win_grid::list_desktop_windows,
+        win_grid::read_desktop_grid
     ])
     .plugin(tauri_plugin_sql::Builder::default().build())
     .plugin(tauri_plugin_fs::init())

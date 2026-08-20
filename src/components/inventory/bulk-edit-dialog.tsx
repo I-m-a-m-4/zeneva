@@ -14,6 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { ScrollArea } from '../ui/scroll-area';
 import { logAuditEvent } from '@/lib/audit';
 import type { Product } from '@/types';
+import AiBulkEdit from './smart-import/ai-bulk-edit';
+import { Sparkles, Table2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface BulkEditDialogProps {
   productIds: string[];
@@ -28,6 +31,16 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
   const [editedProducts, setEditedProducts] = React.useState<Record<string, { stock: number; price: number }>>({});
+
+  /**
+   * Which half of the dialog is showing.
+   *
+   * The hand-editing grid stays the default: it is what somebody who ticked six
+   * products came here for, and it costs nothing. The instruction tab is the answer to
+   * the case this grid cannot serve at all — a thousand cost prices, where the rows
+   * are not the point and typing is not an option.
+   */
+  const [mode, setMode] = React.useState<'grid' | 'ai'>('grid');
 
   const productsToEdit = React.useMemo(() => {
     if (!products) return [];
@@ -117,9 +130,47 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
         <DialogHeader>
           <DialogTitle>Bulk Edit Products</DialogTitle>
           <DialogDescription>
-            Quickly edit the price and stock for {productIds.length} selected products.
+            {mode === 'grid'
+              ? `Quickly edit the price and stock for ${productIds.length} selected products.`
+              : 'Describe a change and Zeneva works out which products it affects.'}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
+          {([
+            { id: 'grid' as const, label: `Edit ${productIds.length} selected`, icon: Table2 },
+            { id: 'ai' as const, label: 'Change many at once', icon: Sparkles },
+          ]).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setMode(tab.id)}
+              aria-pressed={mode === tab.id}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                mode === tab.id
+                  ? 'bg-background shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <tab.icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'ai' ? (
+          <div className="py-2">
+            <AiBulkEdit
+              selectedIds={productIds}
+              onDone={() => {
+                onSuccess();
+                onOpenChange(false);
+              }}
+            />
+          </div>
+        ) : (
+          <>
         <div className="py-4">
           <ScrollArea className="h-96">
             <Table>
@@ -165,6 +216,8 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
             Save Changes
           </Button>
         </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -51,6 +51,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CachedImage } from '@/components/shared/cached-image';
 import { CurrencyAmount } from '@/components/shared/currency-amount';
 import { useI18n } from '@/context/i18n-context';
+import { DashboardBodySkeleton } from './skeleton';
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -62,31 +63,18 @@ const CategoryPieChart = dynamic(() => import('@/components/dashboard/category-p
   loading: () => <Skeleton className="h-[350px]" />
 });
 
-function DashboardSkeleton() {
+/*
+ * The shape lives in `./skeleton.tsx` so this and `loading.tsx` cannot drift.
+ * `restricted` mirrors the `view_reports` check below: staff who may not see
+ * money get three cards and no charts, which is what actually arrives for them.
+ */
+function DashboardSkeleton({ restricted }: { restricted: boolean }) {
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="w-full">
-          <Skeleton className="h-8 w-1/2" />
-          <Skeleton className="h-4 w-3/4 mt-2" />
-        </div>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-      </div>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Skeleton className="h-[350px]" />
-        <Skeleton className="h-[350px]" />
-      </div>
-      <div className="grid gap-6 md:grid-cols-3">
-        <Skeleton className="h-[300px]" />
-        <Skeleton className="h-[300px]" />
-        <Skeleton className="h-[300px]" />
-      </div>
-    </div>
+    <DashboardBodySkeleton
+      cards={restricted ? 3 : 8}
+      charts={!restricted}
+      className="bg-background p-1 pb-10 sm:pb-1"
+    />
   );
 }
 
@@ -476,15 +464,16 @@ export default function DashboardPage() {
   };
 
   const { currentUserProfile } = usePOS();
-  
+
+  const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
+  const isRestricted = !hasReportPermission;
+
   if (isLoading || !finalDashboardData) {
-    return <DashboardSkeleton />;
+    return <DashboardSkeleton restricted={isRestricted} />;
   }
 
   const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold, serviceRevenue, productRevenue, recentSalesItems } = finalDashboardData;
 
-  const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
-  const isRestricted = !hasReportPermission;
 
   return (
     <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1 pb-10 sm:pb-1">

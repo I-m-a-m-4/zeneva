@@ -6,7 +6,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import {
   ArrowUp, Loader2, Clock, TrendingUp, DollarSign, Users, ReceiptText,
-  SquarePen, BookOpen, Trash2, Send, Gauge, X,
+  SquarePen, BookOpen, Trash2, Send, Gauge, X, Zap,
   PanelLeft, PanelLeftClose, XCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -243,6 +243,17 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
     },
   }), []);
 
+  /*
+   * The credits wall, held until the server accepts a turn again.
+   *
+   * Declared before `useChat` because `onError` closes over the setter. Cleared on
+   * `streaming` rather than on send: a 429 is refused before a single token, so
+   * reaching `streaming` is proof the balance was accepted. Clearing on send instead
+   * would blank the banner and then re-draw it a moment later on every retry, which
+   * flickers the one piece of the screen the shop is trying to read.
+   */
+  const [creditsExhausted, setCreditsExhausted] = React.useState<{ plan: string; monthlyLimit: number } | null>(null);
+
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: sessionId,
     transport,
@@ -250,13 +261,43 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
       // The server sends {"error": "..."} for quota/auth failures; surface that
       // rather than the raw JSON blob the SDK puts in err.message.
       let description = err?.message || 'Something went wrong.';
+      let parsed: any = null;
       try {
-        const parsed = JSON.parse(description);
+        parsed = JSON.parse(description);
         if (parsed?.error) description = parsed.error;
       } catch { /* not JSON - use as-is */ }
+
+      /*
+       * Running out of credits is the one failure that is not a fault, and a toast
+       * is the wrong shape for it: it disappears after a few seconds and leaves the
+       * shop looking at a composer that will keep refusing. The route tags it with
+       * `code: 'credits_exhausted'` precisely so this can become a persistent thing
+       * with a way out of it — see the banner below.
+       *
+       * The toast is suppressed in that case rather than shown alongside; two
+       * copies of the same sentence, one of which vanishes, reads as two problems.
+       */
+      if (parsed?.code === 'credits_exhausted') {
+        setCreditsExhausted({
+          plan: typeof parsed.plan === 'string' ? parsed.plan : '',
+          monthlyLimit: Number(parsed.monthlyLimit) || 0,
+        });
+        return;
+      }
+
       toast({ title: 'Zen AI could not respond', description, variant: 'destructive' });
     },
   });
+
+  /*
+   * Cleared the moment the server accepts a turn again — `streaming` is proof the
+   * balance was accepted, because a 429 is refused before a single token. Clearing
+   * on send instead would blank the banner and re-draw it a moment later on every
+   * retry, flickering the one piece of the screen the shop is trying to read.
+   */
+  React.useEffect(() => {
+    if (status === 'streaming') setCreditsExhausted(null);
+  }, [status]);
 
   const isLoading = status === 'submitted' || status === 'streaming';
   const [localInput, setLocalInput] = React.useState('');
@@ -504,6 +545,54 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
           return;
         }
         addToQueue({ type: 'complete-sale', payload: built.payload }, `Zen AI: recording sale ${built.receiptNumber}`);
+      } else if (action.action === 'COST_PRICES' || action.action === 'COST_ESTIMATE') {
+        /*
+         * The multi-product proposals apply `check.writes` rather than reading the card.
+         *
+         * The guard is the only thing that knows which rows survived validation — it drops
+         * products that have since been deleted, rows that would change nothing, and for a
+         * margin sweep it recomputes the whole thing against live products so a real cost
+         * price is never overwritten by an estimate. Rebuilding the writes from the
+         * proposal here would quietly reinstate everything it just rejected.
+         */
+        const writes = check.writes ?? [];
+        if (writes.length === 0) {
+          toast({ title: 'Not applied', description: 'Nothing was left to change.', variant: 'destructive' });
+          return;
+        }
+
+        let queued = 0;
+        for (const write of writes) {
+          const id = write.productIds
+            ? addToQueue(
+                { type: 'bulk-update-products', payload: { productIds: write.productIds, values: write.values } },
+                `Zen AI: ${write.label}`,
+              )
+            : addToQueue(
+                { type: 'update-product', payload: { productId: write.productId, values: write.values } },
+                `Zen AI: ${write.label}`,
+              );
+          if (id) queued++;
+        }
+
+        if (queued === 0) {
+          toast({
+            title: 'Not applied',
+            description: 'Those changes could not be queued — you may not have permission to change inventory.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const affected = check.count ?? writes.length;
+        toast({
+          variant: 'success',
+          title: action.action === 'COST_ESTIMATE' ? 'Cost prices estimated' : 'Cost prices set',
+          description:
+            action.action === 'COST_ESTIMATE'
+              ? `${affected.toLocaleString()} products estimated. They stay marked as estimates until a waybill replaces them.`
+              : `${affected.toLocaleString()} cost price${affected === 1 ? '' : 's'} updated.`,
+        });
       } else {
         toast({ title: 'Not applied', description: `Unrecognised action "${action.action}".`, variant: 'destructive' });
         return;
@@ -586,15 +675,78 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   const currentMonthStr = todayStr.substring(0, 7); // YYYY-MM
   const plan = effectivePlan(businessData);
   const monthlyLimit = aiMonthlyLimit(businessData);
-  
+
+  // These are **credits**, not turns. `aiUsageCount` kept its name but changed
+  // its unit when the weighted debit landed — see `src/lib/server/ai-credits.ts`.
+  // This block has to stay the mirror of `quoteFrom()` there, because the server
+  // is what actually refuses a turn: showing a number it does not honour is worse
+  // than showing none.
   let used = 0;
   if (businessData?.aiUsageCurrentDate === currentMonthStr) {
     used = businessData?.aiUsageCount || 0;
   }
   const bonus = businessData?.aiBonusCredits || 0;
-  
+
   const remaining = Math.max(0, monthlyLimit - used);
+  // The allowance is spent first, so this flips exactly when it runs dry —
+  // `reserveCredits` never lets `aiUsageCount` climb past the limit.
   const isUsingBonus = used >= monthlyLimit && bonus > 0;
+  // What the server will actually allow: allowance remainder plus purchased
+  // balance. Showing only the allowance read as "0 left" to a shop holding 500
+  // bought credits.
+  const creditsLeft = remaining + bonus;
+
+  /*
+   * Where a shop goes to buy more. `?topup=1` highlights and scrolls to the pack
+   * section; `#ai-credits` is the anchor on it. Deliberately a **link** rather than
+   * a payment surface embedded here — one place takes money, and putting a second
+   * one on the chat page would load the Paystack and Dodo scripts into a route that
+   * has no other reason to carry them.
+   */
+  const TOP_UP_HREF = '/billing?topup=1#ai-credits';
+
+  /*
+   * "Nearly out" — a tenth of the allowance, floored at three. Proportional rather
+   * than a flat number because the allowances differ by two orders of magnitude:
+   * "5 left" is a warning on Starter's 15 and noise on Business's 1,500.
+   */
+  const lowCredits = creditsLeft > 0 && creditsLeft <= Math.max(3, Math.ceil(monthlyLimit * 0.1));
+
+  /*
+   * The wall, with a door in it.
+   *
+   * One node rendered in two places — above the opening composer and above the
+   * floating one — because those two are separate subtrees and a shop can hit the
+   * limit from either. It replaces a toast rather than joining one (see `onError`).
+   */
+  const creditWall = creditsExhausted && (
+    <div className="w-full rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">You are out of AI credits</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {creditsExhausted.monthlyLimit > 0
+              ? `Your ${creditsExhausted.plan || 'current'} plan includes ${creditsExhausted.monthlyLimit.toLocaleString()} credits a month, and it is spent. Top-up credits never expire.`
+              : 'Your monthly allowance is spent. Top-up credits never expire.'}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href={TOP_UP_HREF}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          >
+            <Zap className="h-3.5 w-3.5" /> Top up
+          </Link>
+          <Link
+            href="/billing"
+            className="inline-flex items-center rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            Upgrade plan
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex h-full min-h-0 bg-background text-foreground relative overflow-hidden">
@@ -794,6 +946,11 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                 ))}
               </div>
 
+              {/* Out of credits — sits above the composer rather than inside it, so
+                  the way out is the first thing read and the input still looks like
+                  an input. */}
+              {creditWall && <div className="w-full mb-3">{creditWall}</div>}
+
               {/* Input */}
               <div className="w-full bg-card rounded-2xl border border-border shadow-sm focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:shadow-md transition-all">
                 <form onSubmit={handleSend} className="flex flex-col">
@@ -816,7 +973,17 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                       {businessData && (
                         <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                           <Gauge className="w-3.5 h-3.5 text-orange-500" />
-                          {isUsingBonus ? `${bonus} bonus credits left` : `${remaining} monthly AI responses left`}
+                          {isUsingBonus
+                            ? `${bonus.toLocaleString()} top-up credits left`
+                            : `${creditsLeft.toLocaleString()} AI credits left`}
+                          {/* Only when it is nearly gone. A permanent "Top up" beside
+                              a healthy balance is an advert; beside a nearly-empty one
+                              it is the next thing they need. */}
+                          {lowCredits && (
+                            <Link href={TOP_UP_HREF} className="text-orange-600 dark:text-orange-500 underline underline-offset-2 hover:opacity-80">
+                              Top up
+                            </Link>
+                          )}
                         </span>
                       )}
                     </div>
@@ -961,6 +1128,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
           className="absolute bottom-0 left-0 right-0 p-4 pb-20 md:p-5 md:pb-8 bg-gradient-to-t from-background via-background/90 to-transparent z-20"
         >
           <div className="max-w-3xl mx-auto">
+            {creditWall && <div className="mb-3">{creditWall}</div>}
             <div className="w-full bg-card rounded-2xl border border-border shadow-md focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:shadow-lg transition-all">
               <form onSubmit={handleSend} className="flex items-center p-2">
                 <input
@@ -981,7 +1149,14 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
               {businessData && (
                 <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                   <Gauge className="w-3.5 h-3.5 text-orange-500" />
-                  {isUsingBonus ? `${bonus} bonus credits left` : `${remaining} monthly AI responses left`}
+                  {isUsingBonus
+                    ? `${bonus.toLocaleString()} top-up credits left`
+                    : `${creditsLeft.toLocaleString()} AI credits left`}
+                  {lowCredits && (
+                    <Link href={TOP_UP_HREF} className="text-orange-600 dark:text-orange-500 underline underline-offset-2 hover:opacity-80">
+                      Top up
+                    </Link>
+                  )}
                 </span>
               )}
             </div>

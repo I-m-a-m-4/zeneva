@@ -28,6 +28,7 @@ import {
   Box,
   Activity,
   ChevronDown,
+  Coins,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -72,10 +73,10 @@ import { Button } from "@/components/ui/button";
 import { CachedImage } from "@/components/shared/cached-image";
 import { useFirestore } from '@/firebase';
 import { collection, doc, writeBatch, serverTimestamp, query, where, orderBy, limit, startAfter, onSnapshot, count, getAggregateFromServer, getDocs, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
-import VisualCountDialog from '@/components/inventory/visual-count-dialog';
 import type { Product, UserProfile } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import ImportDialog from '@/components/inventory/import-dialog';
+import SmartImportDialog from '@/components/inventory/smart-import/smart-import-dialog';
+import CostPriceDialog from '@/components/inventory/cost-price-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -93,9 +94,20 @@ import BarcodeDialog from '@/components/inventory/barcode-dialog';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { QrCode } from 'lucide-react';
 import { ImageDialog } from "@/components/shared/image-dialog";
+import { InventoryBodySkeleton } from './skeleton';
 
 
-function ProductRowSkeleton() {
+/**
+ * One loading row, matching the real product row cell for cell: checkbox,
+ * thumbnail, name over SKU, status badge, price, stock (from `md` up) and the
+ * actions menu.
+ *
+ * `canManageStock` is not cosmetic — the real table omits the price and stock
+ * columns for staff who may not see them (see the `TableHead`s below), so a
+ * fixed seven cells would draw two columns that never arrive and every bar
+ * would land under the wrong heading.
+ */
+function ProductRowSkeleton({ canManageStock = true }: { canManageStock?: boolean }) {
   return (
     <TableRow>
       <TableCell className="w-12"><Skeleton className="h-4 w-4" /></TableCell>
@@ -111,12 +123,16 @@ function ProductRowSkeleton() {
       <TableCell>
         <Skeleton className="h-6 w-full" />
       </TableCell>
-      <TableCell>
-        <Skeleton className="h-6 w-full" />
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        <Skeleton className="h-6 w-full" />
-      </TableCell>
+      {canManageStock && (
+        <TableCell>
+          <Skeleton className="h-6 w-full" />
+        </TableCell>
+      )}
+      {canManageStock && (
+        <TableCell className="hidden md:table-cell">
+          <Skeleton className="h-6 w-full" />
+        </TableCell>
+      )}
       <TableCell>
         <Skeleton className="h-8 w-8 ms-auto" />
       </TableCell>
@@ -144,26 +160,9 @@ const isService = (p: Product) =>
   p.category?.toLowerCase() === 'service' ||
   p.category?.toLowerCase() === 'services';
 
-function InventoryPageSkeleton() {
-  return (
-    <div className="p-4 sm:p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <Skeleton className="h-8 w-1/3" />
-        <Skeleton className="h-8 w-24" />
-      </div>
-      <Skeleton className="h-10 w-full" />
-      <div className="grid grid-cols-1 gap-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </div>
-    </div>
-  );
-}
-
 export default function InventoryPage() {
     return (
-        <React.Suspense fallback={<InventoryPageSkeleton />}>
+        <React.Suspense fallback={<InventoryBodySkeleton />}>
             <InventoryPageContent />
         </React.Suspense>
     );
@@ -196,6 +195,7 @@ function InventoryPageContent() {
   } = usePOS();
 
   const [isImportOpen, setIsImportOpen] = React.useState(false);
+  const [isCostPriceOpen, setIsCostPriceOpen] = React.useState(false);
   const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = React.useState(false);
@@ -481,58 +481,13 @@ function InventoryPageContent() {
     setSelectedProductIds([]);
   }
 
-  const handleVisualAddItems = async (items: any[]) => {
-    if (!business?.id || items.length === 0) return;
-    setIsLoading(true);
-
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-
-    try {
-        if (isTauri) {
-            items.forEach(item => {
-                const newId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random();
-                addToQueue({
-                    type: 'add-product',
-                    payload: { 
-                      ...item, 
-                      id: newId, 
-                      businessId: business.id,
-                      ...(activeBranchId && activeBranchId !== 'all' ? { branchId: activeBranchId } : {})
-                    }
-                }, t('inventory.queueImporting', { name: item.name }));
-            });
-
-            toast({
-              title: t('inventory.importQueuedTitle'),
-              description: t('inventory.importQueuedDescription', { count: items.length }),
-            });
-            triggerRefresh();
-        } else {
-            const batch = writeBatch(firestore);
-            const productsRef = collection(firestore, 'products');
-            items.forEach(item => {
-                const productRef = doc(productsRef);
-                batch.set(productRef, {
-                    ...item,
-                    businessId: business.id,
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                    ...(activeBranchId && activeBranchId !== 'all' ? { branchId: activeBranchId } : {})
-                });
-            });
-            await batch.commit();
-            toast({
-              title: t('inventory.importSuccessTitle'),
-              description: t('inventory.importSuccessDescription', { count: items.length }),
-            });
-            triggerRefresh();
-        }
-    } catch (error) {
-        toast({ title: t('inventory.importFailedTitle'), description: t('inventory.importFailedDescription'), variant: 'destructive' });
-    } finally {
-        setIsLoading(false);
-    }
-  };
+  // The old Visual Count dialog lived here. Its handler was the only surviving
+  // half — the dialog itself was imported but never mounted, so photographing
+  // stock was unreachable from this page, and on desktop/Android/iOS it could not
+  // have worked anyway: prepare-tauri.mjs stubs src/ai/flows, so visualCount
+  // returned a canned string. Photographing stock is now a source inside
+  // SmartImportDialog, which goes through duplicate matching and the review step
+  // instead of writing straight to Firestore.
 
   const handleExport = async () => {
     if (!business?.id) return;
@@ -816,6 +771,12 @@ function InventoryPageContent() {
                 )}
 
                 {canManageStock && (
+                  <DropdownMenuItem onClick={() => setIsCostPriceOpen(true)}>
+                    <Coins className="me-2 h-4 w-4" /> Cost prices
+                  </DropdownMenuItem>
+                )}
+
+                {canManageStock && (
                   <DropdownMenuItem asChild>
                     <Link href="/inventory/debts">
                       <TrendingDown className="me-2 h-4 w-4" /> {t('inventory.manageDebts')}
@@ -1034,11 +995,41 @@ function InventoryPageContent() {
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-y-auto min-h-0">
           {(isLoading && displayedProducts.length === 0) || products === null ? (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-12">
-              <Loader2 className="h-12 w-12 animate-spin text-primary opacity-50 mb-4" />
-              <p className="text-muted-foreground animate-pulse font-medium">{t('inventory.scanningCatalogs')}</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-2 uppercase tracking-widest">{t('inventory.justAMoment')}</p>
-            </div>
+            /*
+              The catalogue is still arriving. This used to be a centred spinner
+              over "Scanning catalogs…", which said nothing about what was
+              coming; `ProductRowSkeleton` had been written for exactly this and
+              was left unused. Drawing the real table — same headings, same
+              column set — means the rows land in place instead of replacing a
+              different picture.
+
+              `products === null` is the load-bearing half of the condition: it
+              is the state a locked or empty offline mirror leaves behind, and it
+              must keep showing this rather than falling through to an empty
+              table. Same rule as the POS grid.
+            */
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-12">
+                    <Skeleton className="h-4 w-4" />
+                  </TableHead>
+                  <TableHead className="w-16 sm:w-[100px]">
+                    <span className="sr-only">{t('inventory.colImage')}</span>
+                  </TableHead>
+                  <TableHead className="font-semibold">{t('common.name')}</TableHead>
+                  <TableHead className="font-semibold">{t('common.status')}</TableHead>
+                  {canManageStock && <TableHead className="font-semibold">{t('common.price')}</TableHead>}
+                  {canManageStock && <TableHead className="hidden md:table-cell font-semibold">{t('inventory.colStock')}</TableHead>}
+                  <TableHead className="text-end font-semibold pe-6">{t('common.actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody aria-busy="true">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ProductRowSkeleton key={i} canManageStock={canManageStock} />
+                ))}
+              </TableBody>
+            </Table>
           ) : (
             displayedProducts && displayedProducts.length > 0 ? (
               <Table>
@@ -1296,14 +1287,14 @@ function InventoryPageContent() {
       </Card>
       
       {business && (
-        <ImportDialog
+        <SmartImportDialog
           isOpen={isImportOpen}
           onOpenChange={setIsImportOpen}
-          businessId={business.id}
-          products={products}
           onSuccess={handleImportSuccess}
         />
       )}
+
+      <CostPriceDialog isOpen={isCostPriceOpen} onOpenChange={setIsCostPriceOpen} />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -1369,23 +1360,4 @@ function InventoryPageContent() {
   );
 }
 
-function DashboardSkeleton() {
-  return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="w-full space-y-2">
-          <Skeleton className="h-8 w-1/3" />
-          <Skeleton className="h-4 w-1/2" />
-        </div>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
-      </div>
-      <Skeleton className="h-[400px] w-full" />
-    </div>
-  );
-}
 

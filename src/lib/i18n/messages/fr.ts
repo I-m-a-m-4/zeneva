@@ -340,7 +340,7 @@ const fr: Messages = {
     proF2: '5 comptes employés',
     proF3: 'Caisse avancée avec lecture de codes-barres',
     proF4: 'Facturation et gestion des créances',
-    proF5: 'Zen AI — 100 messages/jour',
+    proF5: 'Zen AI — 150 crédits/mois',
     proF6: 'Import groupé intelligent du stock',
     proF7: 'Liens de reçus partageables (WhatsApp/SMS)',
     proF8: 'Commandes en attente et saisie rétroactive',
@@ -352,7 +352,7 @@ const fr: Messages = {
     bizDesc: 'Pour les entreprises établies qui exigent nos outils IA les plus puissants et un support prioritaire.',
     bizF1: 'Produits et comptes employés illimités',
     bizF2: 'Toutes les fonctionnalités Pro',
-    bizF3: 'Zen AI — 500 messages/jour',
+    bizF3: 'Zen AI — 600 crédits/mois',
     bizF4: 'Tableau de bord IA de performance',
     bizF5: 'Connaissance client avancée (CRM+)',
     bizF6: 'Rapports de rotation des stocks (analyse ABC)',
@@ -778,6 +778,16 @@ const fr: Messages = {
     noProductsSearchHint:
       "Aucun résultat pour « {term} » dans votre catalogue synchronisé.",
     categoryEmpty: 'Cette catégorie est vide pour le moment.',
+    catalogUnavailableTitle: 'Impossible de charger vos produits',
+    catalogUnavailableNetwork:
+      'Votre catalogue est intact sur le serveur — cet appareil n\'a pas pu le récupérer. Vérifiez votre connexion et réessayez.',
+    catalogUnavailablePermission:
+      'Ce compte n\'est pas autorisé à consulter la liste des produits. Demandez au propriétaire de l\'entreprise un accès à l\'inventaire.',
+    catalogUnavailableCache:
+      'La copie hors ligne de votre catalogue n\'a pas pu être ouverte, elle est donc en cours de retéléchargement.',
+    retryLoadingProducts: 'Réessayer',
+    noProductsStaffHint:
+      'Aucun produit n\'a encore été ajouté à cette boutique. Demandez au propriétaire ou à un responsable de les ajouter.',
     clearSearch: 'Effacer la recherche',
     nextCustomer: 'Suivant : client',
     viewCart: 'Voir le panier ({n})',

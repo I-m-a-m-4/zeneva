@@ -12,6 +12,7 @@
 import {ai} from '@/ai/genkit';
 import { requireUser } from '@/actions/admin-guard';
 import { adminFirestore } from '@/firebase/admin';
+import { withUserCredits } from '@/lib/server/ai-credits';
 import {z} from 'genkit';
 
 const ZenevaSupportChatInputSchema = z.object({
@@ -29,9 +30,13 @@ export type ZenevaSupportChatOutput = z.infer<typeof ZenevaSupportChatOutputSche
 // Server Action = public endpoint. Verify the caller before spending an LLM
 // call on the platform's API key. Token stays out of the input schema so it is
 // never forwarded to the model.
+//
+// Cheapest of the metered flows at one credit — it answers questions about the app
+// from a fixed knowledge base, so it does not grow with the shop's data the way the
+// analysis flows do.
 export async function zenevaSupportChat(input: ZenevaSupportChatInput, idToken?: string): Promise<ZenevaSupportChatOutput> {
   const uid = await requireUser(idToken);
-  return supportChatFlow({ ...input, uid });
+  return withUserCredits(uid, 'zenevaSupportChat', () => supportChatFlow({ ...input, uid }));
 }
 
 const addProductTool = ai.defineTool({
