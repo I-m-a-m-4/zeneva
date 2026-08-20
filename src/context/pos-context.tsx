@@ -2495,11 +2495,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
      * another business must be dropped rather than trusted, because the backfills
      * below skip whenever the cache looks populated.
      *
-     * A missing marker is a legacy install, not a mismatch: adopt and stamp it,
-     * so upgrading to this build costs nobody a re-sync.
+     * If the marker is missing entirely, we must also purge to prevent
+     * leaking cross-tenant data. 
      */
     const cacheOwner = secureStorage.getItem<string>(CACHE_OWNER_KEY);
-    const cacheWasForeign = !!cacheOwner && cacheOwner !== businessId;
+    const cacheWasForeign = !cacheOwner || cacheOwner !== businessId;
     if (cacheWasForeign) {
       purgeOwnedCaches();
       // The initialisers may already have seeded another business's rows into

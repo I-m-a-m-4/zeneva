@@ -312,7 +312,7 @@ export default function AuthenticatedLayout({
       console.warn("Global Permission Error Caught:", error);
       
       // If the error is related to the current business, we might need to block access
-      if (error.path?.includes('businessInstances') || error.path?.includes('onlineOrders')) {
+      if (error.message?.includes('businessInstances') || error.message?.includes('onlineOrders')) {
         setHasPermissionError(true);
         setPermissionErrorDetails(error);
       } else {
@@ -340,7 +340,7 @@ export default function AuthenticatedLayout({
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      logErrorToFirestore(event.reason instanceof Error ? event.reason : new Error(String(event.reason)), 'unhandledrejection', { userId: user?.uid, businessId: businessInstance?.id });
+      logErrorToFirestore(event.reason instanceof Error ? event.reason : new Error(String(event.reason)), 'unhandled_rejection', { userId: user?.uid, businessId: businessInstance?.id });
     };
 
     window.addEventListener('error', handleWindowError);
@@ -366,6 +366,19 @@ export default function AuthenticatedLayout({
     // Navigate immediately — Firebase clears the local auth token synchronously,
     // so the UI can transition to the welcome page right away without waiting
     // for the network round-trip. The signOut() call completes in the background.
+    
+    // Explicitly clear cross-tenant caches to prevent data leakage on next login
+    if (typeof window !== 'undefined') {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('zeneva_cached_') || key.startsWith('pos_offline_') || key === 'zeneva_is_impersonating' || key === 'zeneva_impersonated_user_id')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    }
+    
     router.replace(signedOutLandingRoute());
     signOut(getAuth()).catch(() => {
       // Rare: if sign-out fails (e.g. no network), the auth listener will

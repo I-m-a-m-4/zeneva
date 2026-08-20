@@ -104,7 +104,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         lastLoadedUserIdRef.current = targetUserId;
 
         // Try getting cached businessId first to avoid an extra DB read
-        let businessId = typeof window !== 'undefined' ? localStorage.getItem('zeneva_cached_business_id') : null;
+        // Key the cache by user ID to prevent Admin's business ID from polluting normal user's state
+        const cacheKey = `zeneva_cached_business_id_${targetUserId}`;
+        let businessId = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
         
         if (!businessId || businessId === 'undefined' || businessId === 'null' || businessId === 'none') {
           const userDocRef = doc(firestore, 'users', targetUserId);
@@ -116,15 +118,9 @@ export function BranchProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        const isValidBusinessId = businessId && 
-                                  businessId !== 'undefined' && 
-                                  businessId !== 'null' && 
-                                  businessId !== 'none' && 
-                                  businessId.trim() !== '';
-        
-        if (isValidBusinessId) {
+        if (businessId) {
           if (typeof window !== 'undefined') {
-            localStorage.setItem('zeneva_cached_business_id', businessId);
+            localStorage.setItem(cacheKey, businessId);
           }
 
           const branchesQuery = query(
@@ -133,7 +129,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
             orderBy('createdAt', 'asc')
           );
           
-          const businessDocRef = doc(firestore, 'businessInstances', businessId);
+          const businessDocRef = doc(firestore, 'businessInstances', businessId as string);
 
           // Fetch branches and business instance in parallel
           const [branchesSnap, businessDocSnap] = await Promise.all([
@@ -160,8 +156,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
             businessName = businessDocSnap.data().name || businessName;
             businessAddress = businessDocSnap.data().address || '';
             if (typeof window !== 'undefined') {
-              localStorage.setItem('zeneva_cached_business_name', businessName);
-              localStorage.setItem('zeneva_cached_business_address', businessAddress);
+              localStorage.setItem(`zeneva_cached_business_name_${targetUserId}`, businessName);
+              localStorage.setItem(`zeneva_cached_business_address_${targetUserId}`, businessAddress);
             }
           }
             
@@ -226,7 +222,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
             setBranches(fetchedBranches);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('zeneva_cached_branches', JSON.stringify(fetchedBranches));
+              localStorage.setItem(`zeneva_cached_branches_${targetUserId}`, JSON.stringify(fetchedBranches));
             }
             
             if (fetchedBranches.length > 0 && activeBranchId !== 'all') {
@@ -241,6 +237,11 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       } catch (err: any) {
         if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
           setBranches([]);
+          // If a permission denied occurs, clear the user's cache so it can self-heal on the next mount
+          if (typeof window !== 'undefined') {
+            const targetUserId = lastLoadedUserIdRef.current;
+            if (targetUserId) localStorage.removeItem(`zeneva_cached_business_id_${targetUserId}`);
+          }
         } else {
           // Retries are already exhausted by this point. Flag it so the
           // connectivity watcher above re-runs the load instead of leaving the
