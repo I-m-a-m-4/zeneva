@@ -292,17 +292,35 @@ export default function AuthenticatedLayout({
   const { requestPermission: handleRequestFcmPermission } = useFCM();
 
   React.useEffect(() => {
-    // Only request notification permissions on Native Desktop or Native Mobile (Tauri)
-    const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-    
-    if (isNative && !isUserLoading && user) {
-      // Small delay to ensure UI is ready before prompting for notifications
+    if (isUserLoading || !user) return;
+
+    // Silently refresh the FCM token for ANY platform where permission is
+    // already granted. This is the signal the uninstall tracker uses: if the
+    // user has previously said "yes" to notifications, we want a live token on
+    // file so the dry-run scan can tell us whether the app is still installed.
+    // No UI prompt is shown (showToast = false). If permission is 'default' or
+    // 'denied', requestPermission will simply no-op after checking the state.
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+    if (Notification.permission === 'granted') {
+      // Token is already granted — silently refresh / ensure it's in Firestore.
       const timer = setTimeout(() => {
         handleRequestFcmPermission(false);
-      }, 5000);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+
+    // For Tauri native apps, also prompt (with a delay) if permission hasn't
+    // been decided yet, since native apps own their own notification dialog.
+    const isNative = (window as any).__TAURI_INTERNALS__;
+    if (isNative && Notification.permission === 'default') {
+      const timer = setTimeout(() => {
+        handleRequestFcmPermission(false);
+      }, 6000);
       return () => clearTimeout(timer);
     }
   }, [user, isUserLoading, handleRequestFcmPermission]);
+
 
   const [hasPermissionError, setHasPermissionError] = React.useState(false);
   const [permissionErrorDetails, setPermissionErrorDetails] = React.useState<FirestorePermissionError | null>(null);
