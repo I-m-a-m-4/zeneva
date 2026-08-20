@@ -17,7 +17,7 @@ android {
     compileSdk = 36
     namespace = "com.zeneva.app"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
+        manifestPlaceholders["usesCleartextTraffic"] = "true"
         applicationId = "com.zeneva.app"
         minSdk = 24
         targetSdk = 36
@@ -52,7 +52,7 @@ android {
             }
         }
         getByName("release") {
-            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
