@@ -92,6 +92,20 @@ export function resolveNotificationLink(notif: NotificationLike): string {
   const explicit = (notif.link || notif.url || '').trim();
   if (explicit) return explicit;
 
+  // Handle marketing/download announcements before the global fallback catches them.
+  // Global announcements often lack an explicit link, but we want them to take the
+  // user to the download page rather than the blank-ish notification detail view.
+  if (mentions('zeneva on windows') || mentions('microsoft store') || mentions('windows desktop')) {
+    return '/download';
+  }
+  if (mentions('mobile app') || mentions('android app') || mentions('google play')) {
+    return 'https://play.google.com/store/apps/details?id=com.zeneva.app';
+  }
+  
+  if (mentions('sales are waiting to sync')) {
+    return '/dashboard';
+  }
+
   // See the header: prose gets no keyword sniffing.
   if (notif.isGlobal) return notificationDetailLink(notif);
 
