@@ -272,8 +272,8 @@ export default function Home() {
                                             </g>
                                             
                                             {/* Text */}
-                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1">Download from the</text>
-                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2">Microsoft Store</text>
+                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1"><T k="landing.downloadFrom" /></text>
+                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2"><T k="landing.microsoftStore" /></text>
                                         </svg>
                                     </a>
                                     <a href={googlePlayStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden flex-shrink-0">
@@ -290,8 +290,8 @@ export default function Home() {
                                             </g>
                                             
                                             {/* Text */}
-                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em">GET IT ON</text>
-                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="19" fontWeight="600" letterSpacing="-0.2px">Google Play</text>
+                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em"><T k="landing.getItOn" /></text>
+                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="19" fontWeight="600" letterSpacing="-0.2px"><T k="landing.googlePlay" /></text>
                                         </svg>
                                     </a>
                                 </div>

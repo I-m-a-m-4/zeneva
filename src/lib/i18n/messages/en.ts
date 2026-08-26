@@ -7,6 +7,7 @@ const en = {
   common: {
     save: 'Save',
     saving: 'Saving...',
+    saveChanges: 'Save Changes',
     cancel: 'Cancel',
     close: 'Close',
     delete: 'Delete',
@@ -55,6 +56,13 @@ const en = {
     share: 'Share',
     copy: 'Copy',
     copied: 'Copied',
+    description: 'Description',
+    discard: 'Discard',
+    done: 'Done',
+    remove: 'Remove',
+    upload: 'Upload',
+    error: 'Error',
+    type: 'Type',
     items_one: '{count} item',
     items_other: '{count} items',
     selected_one: '{count} selected',
@@ -124,6 +132,14 @@ const en = {
    * signed-in screen already loads.
    */
   landing: {
+    downloadFrom: 'Download from the',
+    microsoftStore: 'Microsoft Store',
+    getItOn: 'GET IT ON',
+    googlePlay: 'Google Play',
+    flashSale: 'Flash Sale',
+    premiumFor: 'Zeneva Premium for',
+    save: '(Save {amount}!)',
+    claimOffer: 'Claim offer',
     heroEyebrow: 'The Operating System For Your Business',
     heroLine1: 'Never Lose a Sale.',
     heroLine2: 'Never Waste',
@@ -756,8 +772,8 @@ const en = {
     catalogUnavailableTitle: 'Couldn\'t load your products',
     catalogUnavailableNetwork:
       'Your catalog is safe on the server — this device just couldn\'t fetch it. Check your connection and try again.',
-    catalogUnavailablePermission:
-      'This account isn\'t allowed to view the product list. Ask the business owner to grant inventory access.',
+    catalogUnavailableAccess:
+      'The server wouldn\'t release your product list to this device, and we couldn\'t confirm why. This is usually temporary — try again. If it keeps happening, sign out and sign back in.',
     catalogUnavailableCache:
       'The offline copy of your catalog couldn\'t be opened, so it is being downloaded again.',
     retryLoadingProducts: 'Try again',
@@ -878,6 +894,291 @@ const en = {
     exportCompleteDescription: 'Your product data has been downloaded.',
     exportFailedTitle: 'Export Failed',
     exportFailedDescription: 'Could not fetch data for export.',
+    // --- Add / edit product form ---
+    addNewService: 'Add New Service',
+    saveProduct: 'Save Product',
+    saveService: 'Save Service',
+    productDetails: 'Product Details',
+    serviceDetails: 'Service Details',
+    productDetailsHint: 'Provide the core details for your new product.',
+    serviceDetailsHint: 'Provide the core details for your new service.',
+    namePlaceholder: 'e.g. Quantum HD Monitor',
+    descriptionPlaceholder: 'A detailed description of the product.',
+    inventoryConfig: 'Inventory Configuration',
+    inventoryConfigHint: 'Configure how this item is organized and sold.',
+    productType: 'Product Type',
+    standardItem: 'Standard Item',
+    variant: 'Variant',
+    variantTooltip: 'A single product with different options like size, color, or material. Each variant has its own stock, price, and SKU.',
+    variantTypeHint: 'A product with options like size or color.',
+    singleTypeHint: 'Standard individual product with its own stock.',
+    uomTitle: 'Units of Measure (UoM)',
+    uomTooltip: 'Allows selling the same item in different quantities. For example, sell by the Piece, or sell a Carton of 12 for a different price.',
+    addUom: 'Add UoM',
+    baseUnit: 'Base Unit',
+    baseUnitPlaceholder: 'e.g. Piece',
+    unitName: 'Unit Name',
+    unitNamePlaceholder: 'e.g. Carton',
+    uomMultiplier: 'Contains (multiplier)',
+    priceOptional: 'Price (Opt.)',
+    priceOverride: 'Override',
+    variantAttributes: 'Variant Attributes',
+    addAttribute: 'Add Attribute',
+    variantAttributesHint: 'Define attributes like Size and Color (comma separated values).',
+    attributeName: 'Attribute Name',
+    attributeNamePlaceholder: 'e.g. Size',
+    attributeValues: 'Values (comma separated)',
+    attributeValuesPlaceholder: 'e.g. S, M, L',
+    variantMatrixTitle: 'Variant Image, Pricing & Stock',
+    colPhoto: 'Photo',
+    colVariantOption: 'Variant Option',
+    colCost: 'Cost',
+    pricingTitle: 'Pricing',
+    pricingAndStockTitle: 'Pricing & Stock',
+    pricingProductHint: 'Manage inventory and pricing information for this product.',
+    pricingServiceHint: 'Manage pricing information for this service.',
+    barcodeSku: 'Barcode (SKU)',
+    skuPlaceholder: 'QHDM-001',
+    barcodeHint: 'This unique code generates the barcode.',
+    stock: 'Stock',
+    costPriceTooltip: 'Entering the cost price allows Zeneva to accurately calculate and display your profit margins in Reports.',
+    expiryDate: 'Expiry Date (Optional)',
+    expiryPlaceholder: 'DD/MM/YY',
+    expiryFormatHint: 'Format: DD/MM/YY or DD/MM/YYYY',
+    productCategory: 'Product Category',
+    serviceCategory: 'Service Category',
+    manageCategories: 'Manage Categories',
+    manageCategoriesHint: 'Create new categories or manage/delete existing ones.',
+    addNewCategory: 'Add New Category',
+    newCategoryPlaceholder: 'e.g. Electronics, Bakery...',
+    existingCategories: 'Existing Categories',
+    noCategoriesYet: 'No categories defined yet.',
+    deleteCategoryAria: 'Delete {name}',
+    typeProduct: 'Product',
+    typeService: 'Service',
+    selectCategory: 'Select a category',
+    noCategoriesDefined: 'No categories defined.',
+    createOneNow: 'Create one now',
+    productImage: 'Product Image',
+    serviceImage: 'Service Image',
+    productImageHint: 'Upload an image (max 5MB) for your product.',
+    serviceImageHint: 'Upload an image (max 5MB) for your service.',
+    clickToUpload: 'Click to upload',
+    pickImage: 'Pick Image',
+    productPreviewAlt: 'Product preview',
+    // Validation messages on the product form
+    valNameMin: 'Product name must be at least 3 characters.',
+    valPriceRequired: 'Price is required and must be greater than 0.',
+    valStockWhole: 'Stock must be a whole number.',
+    valUnitNameRequired: 'Unit name required',
+    valMultiplierMin: 'Multiplier must be at least 1',
+    valProductRequired: 'Product required',
+    valQuantityRequired: 'Quantity required',
+    // Toasts on the product form
+    permissionDeniedTitle: 'Permission Denied',
+    permissionAddProducts: 'You do not have permission to add products.',
+    imageTooLargeTitle: 'Image Too Large',
+    imageTooLargeBody: 'Please select an image smaller than 5MB.',
+    categoryCreatedTitle: 'Category Created',
+    categoryCreatedBody: 'Added "{name}" to your categories.',
+    categoryCreateFailed: 'Failed to create category.',
+    categoryDeletedTitle: 'Category Deleted',
+    categoryDeletedBody: 'Removed "{name}".',
+    categoryDeleteFailed: 'Failed to delete category.',
+    sessionMissing: 'Session data not found. Please refresh.',
+    productLimitTitle: 'Product Limit Reached',
+    productLimitBody: 'You have reached your limit of {limit} products for the {plan} plan. Please upgrade to add more.',
+    invalidDateTitle: 'Invalid Date',
+    invalidDateBody: 'Please use DD/MM/YY format.',
+    productSavedTitle: 'Product Added',
+    productSavedBody: '{name} has been added successfully.',
+    saveFailedTitle: 'Save Failed',
+    saveFailedBody: 'Could not save the product.',
+    barcodeScannedTitle: 'Barcode Scanned',
+    barcodeScannedBody: 'SKU set to: {code}',
+    queueAddedVariant: 'Added variant: {name}',
+    // --- Edit product page ---
+    editProductTitle: 'Edit Product: {name}',
+    editServiceTitle: 'Edit Service: {name}',
+    productDetailsUpdateHint: 'Update the core details for your product.',
+    serviceDetailsUpdateHint: 'Update the core details for your service.',
+    servicePreviewAlt: 'Service preview',
+    barcodeGeneratedHint: "This barcode is generated from the product's SKU.",
+    addSkuForBarcode: 'Add an SKU to generate a barcode for this product.',
+    stockHistoryTitle: 'Stock Adjustment & Sales History',
+    serviceHistoryTitle: 'Service Activity & Sales History',
+    stockHistoryHint:
+      'Track manual additions, sales, and changes to stock quantity. Changes made offline will appear as "Syncing".',
+    serviceHistoryHint:
+      'Track sales, creations, and updates for this service. Changes made offline will appear as "Syncing".',
+    logFilterAll: 'All Activities',
+    logFilterSales: 'Sales Only',
+    logFilterAdjustments: 'Adjustments Only',
+    logFilterUpdates: 'Updates & Cre. Only',
+    colAction: 'Action',
+    colChange: 'Change',
+    colUser: 'User',
+    colProduct: 'Product',
+    noLogsFound: 'No activity or sales logs found matching the filter.',
+    syncingBadge: 'Syncing',
+    updatedLabel: 'Updated',
+    justNow: 'Just now',
+    productNotFound: 'Product not found.',
+    deleteProductButton: 'Delete Product',
+    deleteOneConfirmBody:
+      'This will permanently delete {name}. This action cannot be undone and will remove all associated data.',
+    changesQueuedTitle: 'Changes Queued',
+    changesQueuedOnline: '{name} will be updated momentarily.',
+    changesQueuedOffline: '{name} will be updated when connection is restored.',
+    updateFailedTitle: 'Update Failed',
+    unexpectedError: 'An unexpected error occurred.',
+    deletionQueuedNamed: '{name} will be deleted.',
+    valPricePositive: 'Price must be a positive number.',
+    valCostPositive: 'Cost price must be a positive number.',
+    // --- Quick edit dialog ---
+    quickEditTitle: 'Quick Edit: {name}',
+    quickEditProductHint: 'Quickly update pricing and stock for this product.',
+    quickEditServiceHint: 'Quickly update pricing for this service.',
+    compositeStockNote: 'Note: This is a bundle. Stock is usually managed via its components.',
+    noStockPermission: "You don't have permission to edit stock.",
+    measurementUnit: 'Measurement Unit',
+    changesSavedTitle: 'Changes Saved',
+    changesSavedOffline: '{name} will be updated when you come online.',
+    queueFailedBody: 'Could not queue product update. Please try again.',
+    // --- Barcode dialog ---
+    productBarcodeTitle: 'Product Barcode',
+    barcodePrintHint: 'Print this barcode to use for scanning during stock-taking or at checkout.',
+    // --- Bulk edit dialog ---
+    bulkEditTitle: 'Bulk Edit Products',
+    bulkEditGridHint_one: 'Quickly edit the price and stock for {count} selected product.',
+    bulkEditGridHint_other: 'Quickly edit the price and stock for {count} selected products.',
+    bulkEditAiHint: 'Describe a change and Zeneva works out which products it affects.',
+    bulkEditTabGrid: 'Edit {count} selected',
+    bulkEditTabAi: 'Change many at once',
+    permissionBulkEdit: 'You do not have permission to bulk edit products.',
+    bulkUpdatedTitle: 'Products Updated',
+    bulkUpdatedBody_one: '{count} product has been updated successfully.',
+    bulkUpdatedBody_other: '{count} products have been updated successfully.',
+    bulkSaveFailedBody: 'Could not save changes.',
+    // --- Cost price dialog ---
+    costPricesTitle: 'Cost prices',
+    costPricesDesc: 'Zeneva needs what you paid for something to tell you what you made on it.',
+    costCoverage: '{percent}% of your sales have a real cost price behind them',
+    costUnexplained: 'unexplained',
+    costBarKnown: 'Known',
+    costBarEstimated: 'Estimated',
+    costBarLegend:
+      'Green is known, amber is estimated. Anything you photograph a waybill for replaces an estimate automatically.',
+    costTabQueue: 'The ones that matter',
+    costTabSweep: 'Estimate from margin',
+    costTabList: 'Paste a list',
+    costQueueNoPermission:
+      'Those changes could not be queued — you may not have permission to change inventory.',
+    costQueueFailed: 'Those changes could not be queued — check your permissions.',
+    costSavedTitle: 'Cost prices saved',
+    costSavedBody_one: '{count} product updated.',
+    costSavedBody_other: '{count} products updated.',
+    costSavedFromListBody_one: '{count} product updated from your list.',
+    costSavedFromListBody_other: '{count} products updated from your list.',
+    costNothingToFill_one: 'Nothing to fill. {count} product was left alone — {reason}',
+    costNothingToFill_other: 'Nothing to fill. {count} products were left alone — {reason}',
+    costNoMatch: 'No products match that.',
+    costEstimatesAppliedTitle: 'Estimates applied',
+    costEstimatesAppliedBody:
+      '{count} cost prices estimated. They are marked as estimates until a waybill replaces them.',
+    costNothingToChange: 'Nothing to change — every matched product already has that cost price.',
+    // The ones that matter
+    costAllCovered: 'Every product has a cost price',
+    costAllCoveredHint:
+      'Nothing to fill in. New products picked up from a waybill will already have theirs.',
+    costQueueHint:
+      'Ranked by how much money has moved through each one, so the top of this list fixes most of your margin figures. You do not have to finish it.',
+    costColProduct: 'Product',
+    costColSellsFor: 'Sells for',
+    costColYouPaid: 'You paid',
+    costWhySold: '{units} sold · {amount} of sales unexplained',
+    costWhyUnsold: 'Not sold recently · {count} in stock',
+    costWhyEstimate: 'currently an estimate',
+    costFilledIn: '{count} filled in',
+    costTypeEach: 'Type what you paid for each one',
+    costSaveNone: 'Save cost prices',
+    costSaveSome_one: 'Save {count} cost price',
+    costSaveSome_other: 'Save {count} cost prices',
+    // Estimate from margin
+    costSweepHint:
+      'If you know roughly what you make on a group of products, Zeneva can work the cost backwards from the selling price. Every value it writes is marked as an estimate, and products that already have a real cost price are left alone.',
+    costSweepOn: 'On',
+    costSweepEveryProduct: 'Every product',
+    costSweepIMakeAbout: 'I make about',
+    costSweepMeasuredAs: 'Measured as',
+    costSweepOfPrice: 'of the selling price',
+    costSweepOnCost: 'on top of the cost',
+    costSweepExample: 'On something selling for {price} that means a cost of {cost}.',
+    costSweepShowMe: 'Show me what that would do',
+    costWillEstimate: '{count} will be estimated',
+    costLeftAlone: '{count} left alone — {reason}',
+    costChangeIt: 'Change it',
+    costApplyTo: 'Apply to {count}',
+    // Paste a list
+    costPasteHint:
+      'Paste what your supplier sent you, or what is in your notebook. Zeneva matches each line to a product you already have — it will not create anything new here.',
+    costReadingIsFree: 'Reading the list is free.',
+    costMatchToProducts: 'Match to my products',
+    costNoPairsRead:
+      'No "product then cost" pairs could be read from that. One product per line, with the cost after it.',
+    costAiFailed: 'Something went wrong. Please try again.',
+    costCountMatched: '{count} matched',
+    costCountUnsure: '{count} unsure',
+    costCountUnreadable: '{count} unreadable',
+    costStartAgain: 'Start again',
+    costAmbiguous_one:
+      '{count} line could be more than one product. Unmatched lines are skipped, never guessed.',
+    costAmbiguous_other:
+      '{count} lines could be more than one product. Unmatched lines are skipped, never guessed.',
+    costLetAiDecide: 'Let AI decide',
+    costCreditsLeft: '{count} credits left.',
+    costColYourLine: 'Your line',
+    costColMatchedTo: 'Matched to',
+    costColCost: 'Cost',
+    costNoMatchSkipped: 'No match — skipped',
+    costWasAmount: 'was {amount}',
+    costIsEstimate: '(estimate)',
+    costNotBelowPrice: 'not below the {price} selling price',
+    costNothingSavedYet: 'Nothing is saved until you press below.',
+    costSetNone: 'Set cost prices',
+    costSetSome_one: 'Set {count} cost price',
+    costSetSome_other: 'Set {count} cost prices',
+    // --- Bulk operation descriptions, from `bulkOpClauses` in `lib/import/bulk-ops.ts`.
+    // Two slots so a translation can put the scope first; see that function's note.
+    bulkOpSentence: '{action} {scope}',
+    bulkActionCostFromMargin: 'Estimate cost prices at a {percent}% margin off the selling price',
+    bulkActionCostFromMarkup: 'Estimate cost prices assuming a {percent}% markup',
+    bulkScopeEveryProduct: 'for every product',
+    bulkScopeCategories: 'for category {categories}',
+    // Why a product was left out of a bulk change — keyed by `BulkSkipCode`.
+    bulkSkipCategorySetOnly: 'Category can only be set to a value, not adjusted.',
+    bulkSkipNoCategoryName: 'No category name given.',
+    bulkSkipNotANumber: 'Not a usable number.',
+    bulkSkipMarginPriceOnly: 'A margin or markup can only set the selling price.',
+    bulkSkipNoCostPrice: 'No cost price on record, so a margin cannot be worked out.',
+    bulkSkipMarginImpossible: 'A margin of 100% or more is not possible.',
+    bulkSkipCostFillOnly: 'That only works when filling in cost prices.',
+    bulkSkipAlreadyHasRealCost: 'Already has a real cost price, so it was left alone.',
+    bulkSkipNoSellingPrice: 'No selling price on record, so the cost cannot be worked back.',
+    bulkSkipMarkupUnusable: 'That markup is not a usable number.',
+    bulkSkipMarginWouldZeroCost: 'A margin of 100% or more would make the cost zero.',
+    bulkSkipNothingToRoundTo: 'Nothing to round to.',
+    bulkSkipNothingToRound: 'Nothing recorded to round.',
+    bulkSkipNoCostForPercent:
+      'No cost price on record, so a percentage change has nothing to work from.',
+    bulkSkipNothingToAdjust: 'Nothing recorded to adjust by a percentage.',
+    bulkSkipUnrecognised: 'Unrecognised operation.',
+    // Why the importer thinks a row is an existing product — keyed by `MatchExplanationCode`.
+    matchSameCode: 'same code {sku}',
+    matchSameName: 'same name',
+    matchSimilarName: 'similar name',
+    matchSimilarNameSameSize: 'similar name, same size',
+    matchSimilarNameDifferentSize: 'similar name but a different size',
   },
   customers: {
     title: 'Customers',
@@ -1017,6 +1318,510 @@ const en = {
     downloadedDescription: 'Your dashboard image has been saved.',
     downloadFailed: 'Download Failed',
     downloadFailedDescription: 'Could not capture the dashboard image.',
+  },
+  /*
+   * Reports — the Analytics / Profit & Loss / Daily Sales / Business Rating tabs and
+   * the 28 panels under them.
+   *
+   * Three conventions this namespace follows, because it is the largest one here:
+   *
+   * - A KPI card is a pair: `kpiX` is the label, `kpiXHint` the line under the number.
+   *   They are always adjacent so a reviewer can see that the hint still describes the
+   *   label it sits with.
+   * - `gate*Name`/`gate*Body` are the upgrade pitch `FeatureGate` draws over a locked
+   *   panel. These are the most commercially load-bearing strings on the page and were
+   *   invisible to the i18n guard until `featureName`/`featureDescription` were added to
+   *   its attribute allow-list.
+   * - The image-capture toasts are **not** duplicated here. `dashboard.downloadFailed`,
+   *   `dashboard.downloadFailedDescription` and `dashboard.downloadedDescription` are the
+   *   same words for the same action on the same widget, so the reports page reads them
+   *   from there rather than adding three more strings to eleven catalogs and letting the
+   *   two pages drift.
+   */
+  reports: {
+    title: 'Reports',
+    subtitle: 'Deep dive into your business performance.',
+
+    // Period-over-period chips. `deltaVsPrevious` carries its own `%` so a
+    // language that puts the sign elsewhere can move it.
+    deltaNewThisPeriod: 'new this period',
+    deltaFlat: 'flat',
+    deltaVsPrevious: '{pct}% vs previous',
+
+    tabAnalytics: 'Analytics Dashboard',
+    tabProfitLoss: 'Profit & Loss',
+    tabDailySales: 'Daily Sales Items',
+    tabBusinessRating: 'Business Rating',
+
+    updatingMetrics: 'Updating metrics...',
+    loadingDashboard: 'Loading analytical dashboard...',
+    exportReport: 'Export Report',
+    exportCsv: 'Export data as CSV',
+    exportImage: 'Export as High-Res Image',
+    exportPdf: 'Export as PDF (Print)',
+
+    loadingDataTitle: 'Loading Data...',
+    loadingDataBody:
+      'It is taking a bit longer. If you are offline, we are showing your local synchronized data.',
+    generatingTitle: 'Generating Report...',
+    generatingBody: 'Please wait while we capture your dashboard.',
+    downloadedTitle: 'Report Downloaded',
+    exportedTitle: 'Analytics exported',
+    exportedBody: 'Your CSV has been saved.',
+
+    kpiRevenue: 'Revenue',
+    kpiRevenueHint: 'Total earnings',
+    kpiNetCost: 'Net Cost',
+    kpiNetCostHint: 'Total cost of sales',
+    kpiNetProfit: 'Net Profit',
+    kpiNetProfitHint: 'Earnings minus costs',
+    kpiProductRevenue: 'Product Revenue',
+    kpiProductRevenueHint: 'Revenue from physical goods',
+    kpiServiceRevenue: 'Service Revenue',
+    kpiServiceRevenueHint: 'Revenue from services',
+    kpiSales: 'Sales',
+    kpiSalesHint: 'Total transactions',
+    kpiUniqueProducts: 'Unique Products',
+    kpiUniqueProductsHint: 'Different products sold',
+    kpiUnitsSold: 'Units Sold',
+    kpiUnitsSoldHint: 'Total pieces moved',
+    kpiDailyVelocity: 'Daily Velocity',
+    kpiDailyVelocityHint: 'Sales per day',
+    kpiDailyRevenue: 'Daily Revenue',
+    kpiDailyRevenueHint: 'Average revenue per day',
+    kpiCatalogSize: 'Catalog Size',
+    kpiCatalogSizeHint: 'Total unique products in inventory',
+    kpiAvgOrder: 'Avg Order',
+    kpiAvgOrderHint: 'Revenue per sale',
+    kpiCustomers: 'Customers',
+    /*
+     * Two vars on purpose. `count` is what selects `_one` vs `_other` (translate only
+     * pluralises on a numeric `count`), and `formatted` is what renders — the card
+     * shows a thousands-separated figure, which `{count}` would print raw.
+     */
+    kpiCustomersBought_one: '{formatted} bought in this period',
+    kpiCustomersBought_other: '{formatted} bought in this period',
+    kpiCustomersHint: 'Total customers on file',
+
+    gateVisualName: 'Advanced Visual Analytics',
+    gateVisualBody:
+      'Unlock deep dive visual charts, sales trends, and profit margins to truly understand your business.',
+    gateCustomerName: 'Customer Intelligence & Inventory Velocity',
+    gateCustomerBody:
+      'Unlock advanced CRM analytics, customer lifetime value, and optimize stock levels with data-driven ABC analysis.',
+    gateProfitLossName: 'Profit & Loss Statement',
+    gateProfitLossBody:
+      "Unlock detailed profit & loss statements to analyze your store's margins.",
+    gateDailySalesBody: 'Unlock daily item sales tracking and inventory audit logs.',
+
+    /*
+     * ── Shared vocabulary for the 22 panels ──
+     *
+     * A column header that appears in more than one panel gets one key here rather than one
+     * per panel, so the same column cannot end up worded two ways in Korean. Six words are
+     * read from other namespaces instead of being restated, because those catalogs already
+     * say exactly them in all eleven languages: `common.price`, `common.total`,
+     * `inventory.category`, `inventory.searchProducts`, `dashboard.totalRevenue` and
+     * `dashboard.unitsSold`.
+     *
+     * `common.share` is deliberately **not** reused. There it is the verb (share a receipt);
+     * here it is a noun (share of revenue). Most of the eleven use different words, and
+     * reusing it would put "Send" at the head of a percentage column.
+     */
+    colItem: 'Item',
+    colProduct: 'Product',
+    colCustomer: 'Customer',
+    colClass: 'Class',
+    colUnits: 'Units',
+    colQtySold: 'Qty Sold',
+    colOrders: 'Orders',
+    colRevenue: 'Revenue',
+    colProfit: 'Profit',
+    colMargin: 'Margin',
+    colShare: 'Share',
+    colSales: 'Sales',
+    colCost: 'Cost',
+    colGrossProfit: 'Gross Profit',
+    colCogs: 'COGS',
+    colTotalSpent: 'Total Spent',
+    colReceipt: 'Receipt',
+    colDateTime: 'Date & Time',
+    colImage: 'Image',
+    colMember: 'Member',
+    revenueColon: 'Revenue:',
+
+    // Export toasts shared by the panels that can export on their own.
+    exportSuccessful: 'Export Successful',
+    generatingPdf: 'Generating PDF...',
+    generatingPdfBody: 'Please wait while we create your document.',
+    noDataTitle: 'No Data',
+    noDataToExport: 'No items available to export.',
+
+    // Payment Method Reconciliation
+    pmTitle: 'Payment Method Reconciliation',
+    pmSubtitle: 'Breakdown of revenue collection by payment channel.',
+    pmTransactions: 'Transactions',
+
+    // Top Customers
+    tcTitle: 'Top Customers',
+    tcSubtitle: 'Customers with the highest spending in this period.',
+    tcEmptyTitle: 'No Customer Data',
+    tcEmptyBody: 'Link sales to customers to see this report.',
+
+    // Sales Over Time
+    sotTitle: 'Sales Over Time',
+    sotSubtitle: 'Revenue performance trends.',
+    sotEmpty:
+      'No sales were recorded in this period. Once your first sale is made, this chart will automatically activate.',
+
+    // Dead Stock Analysis
+    dsTitle: 'Dead Stock Analysis',
+    dsSubtitle: 'Items with no sales in 60+ days (Locked Capital).',
+    dsLockedCapital: 'Estimated Locked Capital',
+    dsUnitsLeft: 'units left',
+    dsSku: 'SKU:',
+    dsValueLocked: 'Value Locked',
+    dsViewInventory: 'View full inventory',
+    dsEmpty: 'No significant dead stock detected. Your inventory is moving well!',
+
+    // Inventory Depletion Warning
+    depTitle: 'Inventory Depletion Warning',
+    depSubtitle:
+      'Predictive alerts for products likely to run out soon based on their 30-day sales velocity.',
+    depStock: 'Stock:',
+    depSelling: 'Selling ~',
+    depPerDay: '/day',
+    depRunsOut_one: 'Runs out in {count} day',
+    depRunsOut_other: 'Runs out in {count} days',
+
+    // Insight of the day
+    iotdTitle: 'Insight of the day',
+    iotdVsMedian: 'vs median',
+    iotdRotation: '1 of {total} · new one tomorrow',
+    iotdAtStake: 'At stake',
+
+    /*
+     * Date range presets. These are the only strings in the batch a translator must keep
+     * short — they sit in a dropdown beside a calendar, and the trigger shows the chosen one.
+     */
+    drToday: 'Today',
+    drYesterday: 'Yesterday',
+    drLast7: 'Last 7 Days',
+    drLast30: 'Last 30 Days',
+    drThisMonth: 'This Month',
+    drLastMonth: 'Last Month',
+    drAllTime: 'All Time',
+
+    // Profit & Loss chart (the title reuses `tabProfitLoss`, the same two words)
+    plcSubtitle: 'Financial health overview.',
+    plcTotalCost: 'Total Cost',
+    plcEmpty:
+      "No sales recorded in this period. Add 'Cost Prices' to your products to track true profitability.",
+
+    // How you compare — the anonymous peer benchmark
+    pcTitle: 'How you compare',
+    pcEmptyTitle: 'No comparison available yet',
+    pcEmptyBody:
+      'Zeneva compares you against the median shop once enough shops have traded to make the figure meaningful. Nothing here is ever estimated.',
+    pcVsMedianShop: 'vs median shop',
+    pcFootnote:
+      'Median of {shops} Zeneva shops with {sales}+ sales in the last {days} days. Shops are never named and no shop can see yours.',
+    pcFootnoteAsOf:
+      'Median of {shops} Zeneva shops with {sales}+ sales in the last {days} days, as of {asOf}. Shops are never named and no shop can see yours.',
+
+    // Revenue Forecast
+    rfTitle: 'Revenue Forecast',
+    rfSubtitle: 'AI-powered 30-day projection based on your current run rate.',
+    rfNotEnough: 'Not enough data to generate a forecast.',
+    rfProjection: '30-Day Projection',
+    rfVsPrevious7: '{pct}% vs previous 7 days',
+    rfRunRate: 'Current Daily Run Rate',
+    rfPerDay: '/ day',
+    rfHistorical: 'Historical',
+    rfForecast: 'Forecast',
+
+    // Market Basket Analysis
+    baTitle: 'Market Basket Analysis',
+    baSubtitle: 'Discover which products are frequently bought together.',
+    baHint:
+      'Use these insights to create **bundle deals** or optimize your store layout for cross-selling.',
+    baJointSales: 'Joint Sales',
+    baFootnote: 'Only sets with more than 1 joint sale are shown.',
+    baEmptySearch: 'No product pairings found matching your search.',
+    baEmptyNoPairs:
+      'Not enough multi-item sales yet to detect significant product pairings.',
+
+    // Business Traffic Insights (hourly heatmap)
+    hhTitle: 'Business Traffic Insights',
+    hhSubtitle: 'Peak times and days for your business.',
+    hhPeakHours: 'Peak Hours',
+    hhPeakDays: 'Peak Days',
+    hhPeakWindow: 'Peak Traffic Window',
+    hhBusiestDay: 'Busiest Day of Week',
+    /*
+     * Day names are a hardcoded English array in the heatmap (`DAYS`), not date-fns
+     * output, so they are keys here. Seven keys rather than a `{day}` interpolation:
+     * the chart's X axis takes `.substring(0, 3)` of each, which is a three-letter
+     * abbreviation in English and cuts a Japanese or Arabic name mid-word — so each
+     * language needs the short form spelled out too.
+     */
+    hhDaySunday: 'Sunday',
+    hhDayMonday: 'Monday',
+    hhDayTuesday: 'Tuesday',
+    hhDayWednesday: 'Wednesday',
+    hhDayThursday: 'Thursday',
+    hhDayFriday: 'Friday',
+    hhDaySaturday: 'Saturday',
+    hhDayShortSunday: 'Sun',
+    hhDayShortMonday: 'Mon',
+    hhDayShortTuesday: 'Tue',
+    hhDayShortWednesday: 'Wed',
+    hhDayShortThursday: 'Thu',
+    hhDayShortFriday: 'Fri',
+    hhDayShortSaturday: 'Sat',
+    hhSalesCount: '{count} Sales',
+    hhPeakLine: '{label} — {count} sales',
+
+    // Customer Intelligence
+    caTitle: 'Customer Intelligence',
+    caAnonymousBuyer: 'Anonymous Buyer',
+    caSubtitle: 'Gain deeper insights into your customer base growth and retention.',
+    caTotalCustomers: 'Total Customers',
+    caNewLast30: 'New Customers (Last 30d)',
+    caReturning: 'Returning Customers',
+    caRetentionRate: '{pct}% retention rate',
+    caAcquisition: 'Customer Acquisition',
+    caNewCustomers: 'New Customers',
+    caNoAcquisition: 'No acquisition data for this period.',
+    caTop5: 'Top 5 Customers by Spending',
+
+    // Team performance
+    spAvgBasket: 'Avg basket',
+    spItemsPerSale: 'Items / sale',
+    spDiscounted: 'Discounted',
+    spPriceOverrides: 'Price overrides',
+    spNoAuthor: 'Recorded before sales carried an author',
+    spTitleSolo: 'Till activity',
+    spTitleTeam: 'Team performance',
+    spSubtitleSolo: 'What went through the till in this period.',
+    spSubtitleTeam_one: 'Who rang up what in this period — {count} person.',
+    spSubtitleTeam_other: 'Who rang up what in this period — {count} people.',
+    spSubtitleTeamPlus_one:
+      'Who rang up what in this period — {count} person, plus sales with no recorded author.',
+    spSubtitleTeamPlus_other:
+      'Who rang up what in this period — {count} people, plus sales with no recorded author.',
+    spFootnote:
+      "These are activity figures, not a verdict. Discounts and price overrides are often exactly what a good salesperson should be doing — a high figure is a reason to ask, not a reason to suspect. Revenue is the receipt total, so the rows here add up to the shop's revenue for the period.",
+    spRunScan: 'Run the loss-prevention scan in the audit log',
+
+    // Category performance
+    cpTitle: 'Category performance',
+    cpSubtitle: 'Which parts of the catalogue earn — by revenue, with margin beside it.',
+    /*
+     * `foldTail` in reports-aggregates.ts used to hardcode the folded row's label. It now
+     * takes it as an argument so the pure module stays language-free — see the note there.
+     */
+    cpOther: 'Other ({count})',
+    cpFoldedTail:
+      '{total} categories sold; the chart folds the smallest {folded} into “Other”.',
+    cpMarginUnknownPartial:
+      'Cost price missing on {pct}% of units sold — margin unknown, not zero',
+    cpMarginUnknownNone: 'No cost prices recorded — margin unknown, not zero',
+    cpVsPrevious: 'vs previous',
+    cpNew: 'new',
+    cpFlat: 'flat',
+    cpFootnote:
+      'Revenue here is the sum of price × quantity on each line, so it excludes tax and is gross of receipt-level discounts — it will not match the Revenue card above exactly, which is the till total. Shares add to 100% within this panel.',
+
+    // Inventory Velocity & ABC Analysis
+    abcTitle: 'Inventory Velocity & ABC Analysis',
+    abcSubtitle: 'Categorizes products based on their revenue contribution.',
+    abcAllProducts: 'All Products ({count})',
+    abcClassA: 'Class A ({count})',
+    abcClassB: 'Class B ({count})',
+    abcClassC: 'Class C ({count})',
+    abcEmptyTitle: 'Not Enough Sales Data',
+    abcEmptyBody: 'This report will be generated once you have more sales records to analyze.',
+    abcProductInsight: 'Product Insight',
+    abcInsightSubtitle: 'Detailed performance metrics for the selected period.',
+    abcRevShare: 'Rev Share',
+    abcCumulative: '(cum.)',
+    abcRecommendation: 'Strategic Recommendation',
+    abcClose: 'Close Analysis',
+    abcNoProducts: 'No products found.',
+
+    /*
+     * Margin leaks. Five of these are `_one`/`_other` pairs because the English is assembled
+     * from `x === 1 ? 'item has' : 'items have'` fragments interleaved with the figure — the
+     * exact shape rule 1 of the extraction forbids, since no other language splits a verb
+     * from its subject in the same place.
+     */
+    mlTitle: 'Margin leaks',
+    mlSubtitle: 'Money that left without a decision behind it.',
+    mlCleanBody:
+      'No items sold below cost, no manual price overrides and no discounts in this period.',
+    mlCleanUncosted_one:
+      '{count} item has no cost price, so below-cost selling could not be checked for it.',
+    mlCleanUncosted_other:
+      '{count} items have no cost price, so below-cost selling could not be checked for them.',
+    mlAcross: 'across below-cost sales and manual price overrides in this period.',
+    mlSoldBelowCost: 'Sold below cost',
+    mlColSoldFor: 'Sold for',
+    mlColLost: 'Lost',
+    mlOverridesTitle: 'Given away by manual price overrides',
+    mlColUnitsTyped: 'Units at a typed price',
+    mlColBelowShelf: 'Below shelf price by',
+    mlOverridesFootnote:
+      "Measured against what the shelf price was at the moment of sale, not today's price — so an honest price rise never shows up here. Overrides are often legitimate; this is the bill for them, not an allegation.",
+    mlDiscountsTitle: 'Discounts given',
+    mlDiscountsFootnote_one:
+      'Across {formatted} sale. Discounts are recorded on the sale as a whole, with no per-item breakdown, so this figure is deliberately not split across products — doing so would be guesswork. Who applied them is in the Team performance panel below.',
+    mlDiscountsFootnote_other:
+      'Across {formatted} sales. Discounts are recorded on the sale as a whole, with no per-item breakdown, so this figure is deliberately not split across products — doing so would be guesswork. Who applied them is in the Team performance panel below.',
+    mlUncostedFootnote_one:
+      '{count} item sold in this period has no cost price, so it was left out of the below-cost check entirely rather than assumed profitable. Adding cost prices in Inventory is what makes that check complete.',
+    mlUncostedFootnote_other:
+      '{count} items sold in this period have no cost price, so they were left out of the below-cost check entirely rather than assumed profitable. Adding cost prices in Inventory is what makes that check complete.',
+
+    // Business rating panel
+    brFirstReading: 'First reading',
+    brPlusPts: '+{count} pts',
+    brOffTitle: 'Business rating is off',
+    brOffBody:
+      'Nothing has been deleted. Turn it back on any time in Settings → General and your score, streak and history pick up where they left off.',
+    brOpenSettings: 'Open Settings',
+    brPitchTitle: 'Want to see where your money is leaking?',
+    /*
+     * Ends on "in money" on purpose — currency, not points. It is the promise the panel
+     * itself keeps, so a translation must not turn it into "in points" or "as a score".
+     */
+    brPitchBody:
+      'Business rating reads your own sales and scores the four things that multiply revenue — your margin, your average basket, how often buyers come back, and your momentum. Then it names the single biggest opportunity you are missing, in money.',
+    brTurnOn: 'Turn on business rating',
+    brNoThanks: 'No thanks',
+    brLevelBadge: 'Level {index}',
+    brLevelUp: 'Level {index} — {name}',
+    brNotRated: 'Not rated yet',
+    brToNextTier: '{points} to {name}',
+    brTopTier: 'Top tier held',
+    brNothingYet: 'Nothing to work with yet.',
+    brNothingLeft: 'Nothing left on the table. Keep selling.',
+    brHintWithMedian: '{hint} · platform median {median}',
+    brClaimPrivate:
+      'Built from your receipts. Nothing is sent anywhere or shown to anyone else.',
+    brClaimPriced: 'Every opportunity is priced from your own sales, never a projection.',
+    brClaimReversible: 'You can switch it off again in Settings at any time.',
+    brNewTier: 'A tier you have never held before. Well done.',
+    brNewBest: 'New best',
+    brNeedFirstSale: 'Record your first sale to get a rating.',
+    brOnTheTable: 'On the table',
+    brYourBest: 'Your best',
+    brDaysRecorded_one: '{count} day recorded',
+    brDaysRecorded_other: '{count} days recorded',
+    brScoredOnLast: 'scored on the last {days} days of sales',
+    brCheckBack: 'Check back tomorrow to see the trend.',
+    brBadges: 'Badges',
+
+    /*
+     * Top items. The product/service split is spelled out rather than interpolated (rule 1):
+     * `This chart will highlight your best {noun}` cannot be one key, because the article and
+     * the adjective agreement both move with the noun in half of the eleven.
+     */
+    tiValue: 'Value',
+    tiByUnits: 'By units sold',
+    tiByRevenue: 'By revenue',
+    tiByProfit: 'By profit',
+    tiEmptyProducts:
+      'This chart will highlight your best products once you start making sales through the POS.',
+    tiEmptyServices:
+      'This chart will highlight your best services once you start making sales through the POS.',
+    tiNoCostProducts:
+      'No product in this period has a cost price recorded, so profit cannot be worked out. Add cost prices in Inventory, or rank by units or revenue.',
+    tiNoCostServices:
+      'No service in this period has a cost price recorded, so profit cannot be worked out. Add cost prices in Inventory, or rank by units or revenue.',
+    tiSoldProducts_one: '{formatted} product sold.',
+    tiSoldProducts_other: '{formatted} products sold.',
+    tiSoldServices_one: '{formatted} service sold.',
+    tiSoldServices_other: '{formatted} services sold.',
+    tiUncosted_one: '{count} has no cost price, so its profit is unknown rather than zero and it is not charted.',
+    tiUncosted_other: '{count} have no cost price, so their profit is unknown rather than zero and they are not charted.',
+    tiAtALoss_one: '{count} sold at a loss — see the full list.',
+    tiAtALoss_other: '{count} sold at a loss — see the full list.',
+    tiNoneProducts: 'No products sold in this period.',
+    tiNoneServices: 'No services sold in this period.',
+    tiViewAllProducts: 'View all products',
+    tiViewAllServices: 'View all services',
+    tiDialogTitleProducts: 'All products sold ({count})',
+    tiDialogTitleServices: 'All services sold ({count})',
+    tiDialogBody:
+      'Ranked {measure} for the period selected at the top of the page. Revenue here is line revenue — the sum of price × quantity — so it excludes tax and is gross of any receipt-level discount, and will not exactly match the Revenue figure in the cards above.',
+    tiShowingOf: '{shown} of {total}',
+    tiExportCsv: 'Export CSV',
+    tiNothingMatches: 'Nothing matches “{query}”.',
+    tiNoCostRecorded: 'No cost price recorded',
+    tiNoCostRecordedFor: '{name}, so profit is unknown — not zero.',
+
+    // Advanced Income Statement
+    plsTitle: 'Advanced Income Statement',
+    plsSubtitle:
+      'Formal, accounting-standard breakdown of revenue, COGS, operating expenses, and net profit.',
+    plsExportStatement: 'Export Statement',
+    plsExportedBody: 'Advanced Profit & Loss statement exported as PDF.',
+    plsGrossRevenue: 'Gross Revenue',
+    plsGrossRevenueHint: 'Total sales before deductions',
+    plsCogs: 'Cost of Goods Sold (COGS)',
+    plsCogsHint: 'Product acquisition costs',
+    plsMarginPct: '% Margin',
+    plsNetOperatingIncome: 'Net Operating Income',
+    plsNetMarginPct: '% Net Margin',
+    plsColLineItem: 'Financial Line Item',
+    plsColAmount: 'Amount ({symbol})',
+    plsColPctGross: '% of Gross Revenue',
+    plsGrossSalesRevenue: 'Gross Sales Revenue',
+    plsLessDiscounts: 'Less: Discounts & Price Markdowns',
+    plsNetSalesRevenue: 'Net Sales Revenue',
+    plsTotalCogs: 'Total Cost of Goods Sold',
+    plsOperatingExpenses: 'Operating Expenses',
+    plsTotalOperatingExpenses: 'Total Operating Expenses',
+    plsNetOperatingProfit: 'Net Operating Profit',
+    plsHeatmapTitle: 'Category Profitability & Margin Heatmap',
+    plsHeatmapSubtitle:
+      'Breakdown of net profit contributions and profit margins across product categories.',
+    plsProfitMargin: 'Profit Margin',
+    plsHeatmapEmpty: 'No sales records available to generate category profitability data.',
+
+    // Daily Sales Items Log
+    dsiTitle: 'Daily Sales Items Log',
+    dsiSubtitle:
+      'Detailed logs of individual product and service items sold on the selected day.',
+    dsiExportPdf: 'Export as PDF',
+    dsiExportCsv: 'Export as CSV',
+    dsiGeneratingBody: 'Please wait while we capture the daily sales table.',
+    dsiExportedCsvBody: 'Daily sales items exported as CSV.',
+    dsiExportedImageBody: 'Table exported as High-Res Image.',
+    dsiExportedPdfBody: 'Table exported as PDF.',
+    dsiExportFailed: 'Export Failed',
+    dsiExportFailedBody: 'Could not capture the image.',
+    dsiCashSales: "Day's Cash Sales",
+    dsiCashHint: 'Total physical cash expected in drawer',
+    dsiTransfers: 'Expected Bank Transfers',
+    dsiTransfersHint: 'Total transfers processed via POS',
+    dsiCard: 'Card Transactions',
+    dsiCardHint: 'Total POS card payments collected',
+    dsiVerified: 'Verified Transfers',
+    dsiVerifiedHint: 'Confirmed landing in terminal',
+    dsiPickDay: 'Pick a day',
+    dsiSearchPlaceholder: 'Search by item name or receipt...',
+    dsiAllTypes: 'All Types',
+    dsiProductsOnly: 'Products Only',
+    dsiServicesOnly: 'Services Only',
+    dsiRowsOption: '{count} rows',
+    dsiShowing: 'Showing {from}-{to} of {total} item sales',
+    dsiEmptyTitle: 'No sales items logged',
+    dsiEmptyBody: 'There are no records matching your active filters on this day.',
+    dsiPageOf: 'Page {page} of {total}',
+    dsiPrevPage: 'Previous Page',
+    dsiNextPage: 'Next Page',
   },
   support: {
     title: 'Support',
@@ -1179,6 +1984,122 @@ const en = {
     rights: '© 2026 ZENEVATECH SOLUTIONS (BN: 9673520). All rights reserved.',
     privacyShort: 'Privacy',
     termsShort: 'Terms',
+  },
+  tour: {
+    skip: 'Skip',
+    done: "Let's Go!",
+    next: 'Next',
+    back: 'Back',
+    welcomeTitle: 'Welcome to Zeneva',
+    welcomeDesc: "Your store is officially set up. Let's take a quick 3-step tour to help you get started.",
+    inventoryTitle: '1. Manage Inventory',
+    inventoryDesc: "This is where you'll add your products, track stock levels, and organize categories.",
+    posTitle: '2. Point of Sale (POS)',
+    posDesc: "Ready to sell? Use the POS to quickly ring up customers and print digital receipts.",
+    dashboardTitle: '3. Track Analytics',
+    dashboardDesc: "Head back here anytime to see your daily sales, revenue growth, and store insights.",
+  },
+  auth: {
+    // --- Shared across the pre-login screens ---
+    logoAlt: 'Zeneva Logo',
+    emailPlaceholder: 'm@example.com',
+    password: 'Password',
+    authenticating: 'Authenticating...',
+    loadingWorkspace: 'Loading your workspace...',
+    serviceUnavailable: 'Authentication service not available.',
+    tryAgainShort: 'Please try again.',
+    legalSignIn: 'Zeneva is a registered business application. Corporate Affairs Commission (CAC) Registration — BN: 9673520. All rights reserved. By signing in, you agree to our',
+    legalSignUp: 'Zeneva is a registered business application. Corporate Affairs Commission (CAC) Registration — BN: 9673520. All rights reserved. By signing up, you agree to our',
+    legalAnd: 'and',
+    // --- Welcome carousel. `\n` is the deliberate line break the design shows;
+    // each locale places it where its own headline reads best. ---
+    welcomeSlide1: 'Welcome to the future\nof smart retail',
+    welcomeSlide2: 'Empower your business\nto scale endlessly',
+    welcomeSlide3: 'Manage your inventory\nwith absolute ease',
+    welcomeSlide4: 'One point of sale,\nwherever you grow',
+    pauseVideo: 'Pause video',
+    playVideo: 'Play video',
+    pauseVideoButton: 'Pause Video',
+    playVideoButton: 'Play Video',
+    goToVideo: 'Go to video {number}',
+    goToSlide: 'Go to slide {number}',
+    createAccountButton: 'Create account',
+    signInButton: 'Sign in',
+    // --- Login ---
+    loginTitle: 'Login',
+    loginSubtitle: 'Enter your email below to login to your account',
+    createAccountLink: 'Create Account',
+    forgotPasswordLink: 'Forgot your password?',
+    loginButton: 'Login',
+    orContinueWith: 'Or continue with',
+    noAccountPrompt: "Don't have an account?",
+    signUpLink: 'Sign up',
+    authFailedTitle: 'Authentication Failed',
+    redirectSignInFailed: 'Failed to complete redirect sign-in.',
+    googleAuthFailedTitle: 'Google Authentication Failed',
+    googleTemporaryIssue: 'Google Authentication encountered a temporary system issue. Switching to redirect auth...',
+    loginFailedTitle: 'Login Failed',
+    invalidCredentials: 'Invalid email or password. Please try again.',
+    invalidCredentialsDetailed: 'Invalid email or password. Please check your credentials and try again.',
+    loginSlide1Title: 'Operating System for Business',
+    loginSlide1Desc: 'Streamline your inventory, maximize your profit, and build lasting customer relationships.',
+    loginSlide2Title: 'Precision Analytics',
+    loginSlide2Desc: 'Real-time insights tailored for high-growth retail environments.',
+    loginSlide3Title: 'Work From Anywhere',
+    loginSlide3Desc: 'Secure, cloud-based access that puts your business in the palm of your hand.',
+    // --- Signup ---
+    signupTitle: 'Create an account',
+    signupSubtitle: 'Join growing retail brands on Zeneva.',
+    haveAccountPrompt: 'Already have an account?',
+    loginLink: 'Login',
+    continueWithGoogle: 'Continue with Google',
+    orSignupWithEmail: 'Or signup with email',
+    createAccountSubmit: 'Create an account',
+    joiningBusiness: 'You are joining {business} as a {role}.',
+    invalidInvitationTitle: 'Invalid Invitation',
+    invalidInvitationBody: 'This invitation link is either invalid or has already been used.',
+    invitationLookupFailed: 'Could not retrieve invitation details.',
+    profileSetupFailedTitle: 'Profile Setup Failed',
+    profileSetupFailedBody: "We logged you in but couldn't create your profile. Please try again.",
+    googleSignInFailedTitle: 'Google Sign-In Failed',
+    popupBlocked: 'Your browser blocked the sign-in popup. Please allow popups for this site and try again.',
+    googleUnavailable: 'Google Authentication is temporarily unavailable. Please try again in a moment.',
+    signupFailedTitle: 'Signup Failed',
+    emailAlreadyRegistered: 'This email is already registered. Please log in instead.',
+    featuredExperience: 'Featured Experience',
+    valInvalidEmail: 'Invalid email address.',
+    valNoAliases: 'Email aliases (plus addressing like name+alias@gmail.com) are not allowed.',
+    valNoDisposable: 'Temporary/disposable email addresses are not allowed.',
+    valPasswordMin: 'Password must be at least 6 characters.',
+    signupSlide1Title: 'Scale Your Business Operations',
+    signupSlide1Desc: 'Join a network of thriving businesses and unlock premium tools designed for exponential growth.',
+    signupSlide2Title: 'Thriving Ecosystem',
+    signupSlide2Desc: 'Place your business in the spotlight with an infrastructure built for success.',
+    signupSlide3Title: 'Global Reach',
+    signupSlide3Desc: "Scale from a single location to a global franchise with Zeneva's multi-store intelligence.",
+    signupSlide4Title: 'One Point of Sale',
+    signupSlide4Desc: 'Manage your inventory with absolute ease and grow without boundaries.',
+    // --- Forgot password ---
+    forgotPasswordTitle: 'Forgot Password',
+    forgotPasswordSubtitle: 'Enter your email to receive a password reset link.',
+    forgotPasswordSentSubtitle: 'Check your inbox (and Spam/Promotions folder) for the reset link.',
+    sendResetLink: 'Send Reset Link',
+    resetSentTitle: 'Password Reset Email Sent',
+    resetSentBody: 'An email has been sent to {email} with instructions.',
+    resetFailedTitle: 'Request Failed',
+    invalidEmailAddress: 'Please enter a valid email address.',
+    resetSendFailed: 'Could not send reset email. Please try again.',
+    cantFindEmail: "Can't find the email?",
+    checkSpamFolder: 'Check your Spam or Junk folder',
+    checkPromotionsTab: 'Check the Promotions tab (if using Gmail)',
+    deliveryDelayed: 'Wait a few minutes, as delivery can be delayed',
+    resendEmail: 'Resend Email',
+    backToLogin: 'Back to Login',
+    rememberPasswordPrompt: 'Remember your password?',
+    securityFirstTitle: 'Security First.',
+    securityFirstBody: 'Protecting your business data is our primary mission. Follow the reset instructions sent to your email to regain secure access to your Command Center.',
+    tacticalVaultLocked: 'Tactical Vault Locked',
+    backgroundAlt: 'Tactical Intelligence Background',
   },
 };
 

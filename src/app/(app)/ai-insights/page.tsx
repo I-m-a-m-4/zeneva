@@ -691,19 +691,21 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
   // The allowance is spent first, so this flips exactly when it runs dry —
   // `reserveCredits` never lets `aiUsageCount` climb past the limit.
   const isUsingBonus = used >= monthlyLimit && bonus > 0;
-  // What the server will actually allow: allowance remainder plus purchased
-  // balance. Showing only the allowance read as "0 left" to a shop holding 500
-  // bought credits.
+  // What the server will actually allow: allowance remainder plus any extra
+  // credits on the account. Showing only the allowance read as "0 left" to a shop
+  // holding 500 granted credits.
   const creditsLeft = remaining + bonus;
 
   /*
-   * Where a shop goes to buy more. `?topup=1` highlights and scrolls to the pack
-   * section; `#ai-credits` is the anchor on it. Deliberately a **link** rather than
-   * a payment surface embedded here — one place takes money, and putting a second
-   * one on the chat page would load the Paystack and Dodo scripts into a route that
-   * has no other reason to carry them.
+   * Where a shop goes for more, and there is only one door: a bigger plan.
+   *
+   * Credits are not sold separately — no packs, no top-ups — so this is the plans
+   * page and nothing else. Deliberately a **link** rather than a payment surface
+   * embedded here: one place takes money, and putting a second one on the chat page
+   * would load the Paystack and Dodo scripts into a route that has no other reason
+   * to carry them.
    */
-  const TOP_UP_HREF = '/billing?topup=1#ai-credits';
+  const UPGRADE_HREF = '/billing';
 
   /*
    * "Nearly out" — a tenth of the allowance, floored at three. Proportional rather
@@ -726,22 +728,16 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
           <p className="text-sm font-semibold text-foreground">You are out of AI credits</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {creditsExhausted.monthlyLimit > 0
-              ? `Your ${creditsExhausted.plan || 'current'} plan includes ${creditsExhausted.monthlyLimit.toLocaleString()} credits a month, and it is spent. Top-up credits never expire.`
-              : 'Your monthly allowance is spent. Top-up credits never expire.'}
+              ? `Your ${creditsExhausted.plan || 'current'} plan includes ${creditsExhausted.monthlyLimit.toLocaleString()} credits a month, and it is spent. It resets at the start of next month, or a higher plan gives you more every month.`
+              : 'Your monthly allowance is spent. It resets at the start of next month, or a higher plan gives you more every month.'}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Link
-            href={TOP_UP_HREF}
+            href={UPGRADE_HREF}
             className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
-            <Zap className="h-3.5 w-3.5" /> Top up
-          </Link>
-          <Link
-            href="/billing"
-            className="inline-flex items-center rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            Upgrade plan
+            <Zap className="h-3.5 w-3.5" /> Upgrade plan
           </Link>
         </div>
       </div>
@@ -974,14 +970,14 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                         <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                           <Gauge className="w-3.5 h-3.5 text-orange-500" />
                           {isUsingBonus
-                            ? `${bonus.toLocaleString()} top-up credits left`
+                            ? `${bonus.toLocaleString()} extra credits left`
                             : `${creditsLeft.toLocaleString()} AI credits left`}
-                          {/* Only when it is nearly gone. A permanent "Top up" beside
+                          {/* Only when it is nearly gone. A permanent "Upgrade" beside
                               a healthy balance is an advert; beside a nearly-empty one
                               it is the next thing they need. */}
                           {lowCredits && (
-                            <Link href={TOP_UP_HREF} className="text-orange-600 dark:text-orange-500 underline underline-offset-2 hover:opacity-80">
-                              Top up
+                            <Link href={UPGRADE_HREF} className="text-orange-600 dark:text-orange-500 underline underline-offset-2 hover:opacity-80">
+                              Upgrade
                             </Link>
                           )}
                         </span>
@@ -1150,11 +1146,11 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string, user: 
                 <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                   <Gauge className="w-3.5 h-3.5 text-orange-500" />
                   {isUsingBonus
-                    ? `${bonus.toLocaleString()} top-up credits left`
+                    ? `${bonus.toLocaleString()} extra credits left`
                     : `${creditsLeft.toLocaleString()} AI credits left`}
                   {lowCredits && (
-                    <Link href={TOP_UP_HREF} className="text-orange-600 dark:text-orange-500 underline underline-offset-2 hover:opacity-80">
-                      Top up
+                    <Link href={UPGRADE_HREF} className="text-orange-600 dark:text-orange-500 underline underline-offset-2 hover:opacity-80">
+                      Upgrade
                     </Link>
                   )}
                 </span>

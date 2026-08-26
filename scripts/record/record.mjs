@@ -33,9 +33,11 @@ import { launch } from './browser.mjs';
 import { Page, sleep } from './page.mjs';
 import { Recorder, hasFfmpeg, probe, uniqueRatio } from './capture.mjs';
 import { mixAudio, resolveMusic, synthBed } from './audio.mjs';
-import { synthNarration, DEFAULT_VOICE, VOICES } from './narrate.mjs';
+import { synthNarration, DEFAULT_VOICE, VOICES, ENGINES, pickEngine, voicesFor, defaultVoiceFor } from './narrate.mjs';
 import { FLOWS, FLOW_ROUTES, FLOW_CARDS } from './flows.mjs';
 import { parseRecipe, recipeToFlow, recipeRoutes, parseCardOverrides } from './recipe.mjs';
+// One transcription of Microsoft's published numbers, shared with the checker.
+import { STORE } from './store.mjs';
 import { readControl, resetLive, writeJson } from './control.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -113,7 +115,20 @@ function parseArgs(argv) {
     musicVolume: 0.28, musicVolumeSet: false, clickSfx: true, typingSfx: true,
     // Narration is opt-in because it costs API calls against a real key. The
     // take is identical without it, so nothing silently starts spending.
-    narrate: false, voice: DEFAULT_VOICE, voiceStyle: null,
+    //
+    // Voice and engine start `null` rather than at a named default: the right
+    // default voice depends on which engine ends up speaking, and that is not
+    // known until the arguments have all been read. Resolved in `main`, where it
+    // can also be logged.
+    narrate: false, voice: null, voiceEngine: null, voiceStyle: null, voiceRate: null,
+    /*
+     * Microsoft Store delivery. Off by default because it is a *delivery* format,
+     * not a better one: the Store's published spec asks for 50 Mbps and a keyframe
+     * every half second, which on screen content is roughly two hundred times the
+     * bitrate crf 18 chooses and buys nothing you can see. It is the right encode
+     * for a store listing and the wrong one for everything else.
+     */
+    store: false,
     /*
      * `plain` and no camera, so an invocation that says nothing about either
      * produces the take this recorder has always produced. Both are opt-in for the
@@ -144,6 +159,17 @@ function parseArgs(argv) {
       case '--narrate': out.narrate = true; break;
       case '--voice': out.voice = next(); out.narrate = true; break;
       case '--voice-style': out.voiceStyle = next(); out.narrate = true; break;
+      case '--voice-engine': {
+        const v = String(next() ?? '');
+        if (!ENGINES.includes(v)) {
+          throw new Error(`--voice-engine must be one of ${ENGINES.join(', ')}, got ${JSON.stringify(v)}`);
+        }
+        out.voiceEngine = v;
+        out.narrate = true;
+        break;
+      }
+      case '--voice-rate': out.voiceRate = Number(next()); out.narrate = true; break;
+      case '--store': out.store = true; break;
       // Keeps its documented meaning — "skip the bed, keep the ticks" — which now
       // has to turn off the synthesised one too, or the flag would stop working.
       case '--no-music': out.music = null; out.bed = false; break;
@@ -183,7 +209,7 @@ Zeneva marketing recorder
 
   npm run record -- [options]
 
-  --flow      pos | inventory | zen | all        (default: pos)
+  --flow      pos | inventory | zen | trailer | all   (default: pos)
   --device    desktop | mobile | both            (default: desktop)
   --theme     light | dark | both                (default: light)
 
@@ -253,24 +279,47 @@ Audio:
   --no-typing-sfx       skip keystroke ticks
   --silent              no audio at all
 
-Narration (speaks the captions — needs GEMINI_API_KEY):
+Narration (speaks the captions):
   --narrate             speak every caption the take shows, each line landing on
-                        the frame it was written for. Off by default: it is the
-                        one option that spends money, one request per caption.
-  --voice <name>        Charon | Kore | Puck | Aoede | Fenrir | Leda
-                        (default: Charon — warm and measured.) Implies --narrate.
+                        the frame it was written for. Off by default.
+  --voice-engine <e>    gemini | windows. Defaults to gemini when GEMINI_API_KEY
+                        is set, otherwise the Windows SAPI voices, which need
+                        nothing installed. Implies --narrate.
+  --voice <name>        gemini:  Charon | Kore | Puck | Aoede | Fenrir | Leda
+                        windows: David | Zira
+                        (default: whichever the chosen engine calls its own.)
+                        Implies --narrate.
   --voice-style "..."   how to read it: "slower, and a little drier". Gemini TTS
                         takes direction in the prompt, not as a parameter, so this
-                        is prepended to each line. Implies --narrate.
+                        is prepended to each line. Gemini only. Implies --narrate.
+  --voice-rate <n>      SAPI speaking rate, -10..10 (default: -1, a shade under
+                        normal). Windows only. Implies --narrate.
 
   The captions are already the script, so narration adds no writing — it speaks
   the sentences the flow was going to put on screen anyway. With music, the bed
   ducks under the voice automatically and lifts again in the gaps. Lines are
-  cached per take, so re-scoring the same footage does not pay for TTS twice.
+  cached by what they sound like, so re-scoring the same footage does not pay for
+  TTS twice — and the engine is part of that key, so switching engines is not a
+  silent no-op.
 
-  With no key, the take records and scores exactly as it would have; the recorder
-  logs one line saying narration was skipped. A missing key costs you a voice
-  track, not a video.
+  Gemini is the better voice and the one that costs money: one request per
+  caption, against a real key. With no key and no --voice-engine, the recorder
+  falls back to SAPI and logs which voice it picked before the take, so a robotic
+  voice-over is never a surprise you find in the finished file.
+
+Microsoft Store delivery:
+  --store               encode to the Store's published trailer spec instead of
+                        the default crf 18: 50 Mbps, closed GOP of half the frame
+                        rate, exactly 2 consecutive B frames, CABAC, limited-range
+                        4:2:0, and AAC-LC 384 kbps stereo at 48 kHz. Bigger and
+                        not better — it is a delivery format, not a quality one.
+
+  A trailer is five files, not one. After the take, build the rest and check it:
+    node scripts/record/store.mjs marketing-out/zeneva-trailer-desktop-light.mp4
+
+  That writes the 1920x1080 PNG thumbnail, the WebVTT captions, the MP3 audio
+  description and the 16:9 super hero art, then prints every published
+  requirement with a tick or a cross beside it.
 
   Everything is synthesised — nothing to download, nothing to license. With no
   --music, takes get a quiet ambient pad, because clicks over pure silence sound
@@ -940,6 +989,7 @@ async function record(opts, flowId, device, theme, creds, live) {
         dir: path.join(opts.outDir, '.frames'),
       } : null,
       zooms,
+      store: opts.store ? STORE : null,
     });
     clock.lap('encode');
 
@@ -963,13 +1013,15 @@ async function record(opts, flowId, device, theme, creds, live) {
      * missing key or a dead API returns null and the take is scored exactly as it
      * was before narration existed.
      */
-    const narrationFile = opts.narrate
+    const narration = opts.narrate
       ? await synthNarration({
           lines: spoken.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
           dir: opts.outDir,
           stamp,
+          engine: opts.voiceEngine,
           voice: opts.voice,
           style: opts.voiceStyle,
+          rate: opts.voiceRate,
           duration: recorder.videoSeconds,
           log,
         })
@@ -987,7 +1039,10 @@ async function record(opts, flowId, device, theme, creds, live) {
       musicVolume: synth && !opts.musicVolumeSet ? 0.22 : opts.musicVolume,
       clicks: opts.clickSfx ? clicks.map(toVideoTime) : [],
       keys: opts.typingSfx ? keys.map(toVideoTime) : [],
-      narration: narrationFile,
+      narration: narration?.file ?? null,
+      // The Store's published audio spec, applied only when asked for. See the
+      // `store` note in the defaults.
+      audioBitrate: opts.store ? STORE.audioBitrate : null,
     });
 
     if (scored.scored) {
@@ -1017,7 +1072,17 @@ async function record(opts, flowId, device, theme, creds, live) {
         // The spoken script, with the instant each line landed. This is what
         // lets a re-score re-narrate without re-shooting — the caption timings
         // die with the frame sequence otherwise.
-        narration: spoken.map((n) => ({ text: n.text, at: toVideoTime(n.at) })),
+        //
+        // `dur` is how long the line took to say, measured off the synthesised
+        // audio, and it is here for the closed-caption file: a `.vtt` cue has to
+        // end, and the only honest end for a caption is when its sentence stops
+        // being spoken. Absent on a take recorded without narration, where
+        // store.mjs falls back to a words-per-second estimate and says so.
+        narration: spoken.map((n) => {
+          const at = toVideoTime(n.at);
+          const measured = narration?.lines.find((l) => l.text === String(n.text).trim());
+          return measured ? { text: n.text, at, dur: measured.dur } : { text: n.text, at };
+        }),
         // Not read back by add-audio — recorded so a re-score can see where the
         // camera was, since a beat that lands mid-punch reads differently from
         // one on a static frame.
@@ -1148,12 +1213,30 @@ async function main() {
   const devices = expand(opts.device, Object.keys(DEVICES), { alias: ['both'] });
   const themes = expand(opts.theme, ['light', 'dark'], { alias: ['both'] });
 
+  /*
+   * Settle the voice before anything expensive, and say out loud which one it is.
+   *
+   * The engine is resolved here rather than inside `synthNarration` so that the
+   * operator reads "voice: David (windows)" in the log *before* the take, not
+   * afterwards in a finished video that sounds wrong. An engine that picked itself
+   * silently would hand back SAPI on footage somebody expected Gemini to read, and
+   * the only symptom would be the audio.
+   */
+  if (opts.narrate) {
+    opts.voiceEngine ??= pickEngine();
+    opts.voice ??= defaultVoiceFor(opts.voiceEngine);
+  }
+
   // Checked here rather than at the synthesis call, for the same reason a recipe
   // is validated before Chrome launches: a mistyped voice would otherwise record
   // the whole take and then fail once per caption, and the operator would read
   // six identical API errors instead of "there is no voice called that".
-  if (opts.narrate && !VOICES.some((v) => v.id === opts.voice)) {
-    throw new Error(`unknown voice "${opts.voice}" — try: ${VOICES.map((v) => v.id).join(', ')}`);
+  if (opts.narrate) {
+    const catalog = voicesFor(opts.voiceEngine);
+    if (!catalog.some((v) => v.id === opts.voice)) {
+      throw new Error(`unknown ${opts.voiceEngine} voice "${opts.voice}" — `
+        + `try: ${catalog.map((v) => v.id).join(', ')}`);
+    }
   }
 
   mkdirSync(opts.outDir, { recursive: true });

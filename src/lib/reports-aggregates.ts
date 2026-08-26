@@ -397,12 +397,24 @@ export function aggregateCategories(itemStats: ItemStat[]): CategoryStat[] {
  * the colours stop being distinguishable and the legend stops being readable. So
  * the tail collapses into one honest bucket rather than being silently dropped.
  */
-export function foldTail(rows: CategoryStat[], keep: number): CategoryStat[] {
+/**
+ * Folds everything past `keep` into one row.
+ *
+ * `otherLabel` is passed in rather than built here: this module is pure and has no `t`,
+ * and the folded row is drawn on the chart axis, so a hardcoded "Other" was the one
+ * English word left on a translated panel. The caller knows the tail count before
+ * calling (`rows.length - keep`), so it can format the whole label itself.
+ */
+export function foldTail(
+  rows: CategoryStat[],
+  keep: number,
+  otherLabel?: string,
+): CategoryStat[] {
   if (rows.length <= keep) return rows;
   const head = rows.slice(0, keep);
   const tail = rows.slice(keep);
   const other: CategoryStat = {
-    category: `Other (${tail.length})`,
+    category: otherLabel ?? `Other (${tail.length})`,
     units: tail.reduce((s, r) => s + r.units, 0),
     revenue: tail.reduce((s, r) => s + r.revenue, 0),
     revenueShare: tail.reduce((s, r) => s + r.revenueShare, 0),

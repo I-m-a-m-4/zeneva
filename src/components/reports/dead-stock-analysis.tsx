@@ -8,6 +8,7 @@ import { PackageX, TrendingDown, AlertTriangle, ArrowRight } from 'lucide-react'
 import { subDays, isAfter } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/context/i18n-context';
 import Link from 'next/link';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -51,9 +52,9 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <PackageX className="h-5 w-5 text-destructive" />
-                    Dead Stock Analysis
+                    {t('reports.dsTitle')}
                 </CardTitle>
-                <CardDescription>Items with no sales in 60+ days (Locked Capital).</CardDescription>
+                <CardDescription>{t('reports.dsSubtitle')}</CardDescription>
             </CardHeader>
             <CardContent>
                 {deadStock.length > 0 ? (
@@ -61,7 +62,7 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
                         <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <TrendingDown className="h-4 w-4 text-destructive" />
-                                <span className="text-sm font-semibold">Estimated Locked Capital</span>
+                                <span className="text-sm font-semibold">{t('reports.dsLockedCapital')}</span>
                             </div>
                             <span className="text-lg font-bold text-destructive">{currencySymbol}{totalLockedCapital.toLocaleString()}</span>
                         </div>
@@ -75,14 +76,14 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
                                                 <p className="text-sm font-medium truncate" title={product.name}>{product.name}</p>
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     <Badge variant="outline" className="text-[10px] h-4">
-                                                        {product.stock} units left
+                                                        {product.stock} {t('reports.dsUnitsLeft')}
                                                     </Badge>
-                                                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">SKU: {product.sku}</span>
+                                                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">{t('reports.dsSku')} {product.sku}</span>
                                                 </div>
                                             </div>
                                             <div className="text-right flex-shrink-0">
                                                 <p className="text-sm font-bold text-primary">{currencySymbol}{product.lockedCapital.toLocaleString()}</p>
-                                                <p className="text-[10px] text-muted-foreground whitespace-nowrap">Value Locked</p>
+                                                <p className="text-[10px] text-muted-foreground whitespace-nowrap">{t('reports.dsValueLocked')}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -92,7 +93,7 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
 
                         <div className="pt-2">
                             <Link href="/inventory?sortBy=stock-desc" className="text-xs text-primary flex items-center gap-1 hover:underline">
-                                View full inventory <ArrowRight className="h-3 w-3" />
+                                {t('reports.dsViewInventory')} <ArrowRight className="h-3 w-3" />
                             </Link>
                         </div>
                     </div>
@@ -101,7 +102,7 @@ export default function DeadStockAnalysis({ products, receipts, currencySymbol }
                         <div className="flex justify-center mb-3">
                             <AlertTriangle className="h-10 w-10 opacity-20" />
                         </div>
-                        <p className="text-sm">No significant dead stock detected. Your inventory is moving well!</p>
+                        <p className="text-sm">{t('reports.dsEmpty')}</p>
                     </div>
                 )}
             </CardContent>

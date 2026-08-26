@@ -50,9 +50,12 @@ export const STAFF_LIMITS: Record<PlanId, number> = {
  *
  * ## Why these are small
  *
- * A credit costs the platform about **$0.006** of Gemini (see `src/lib/credit-packs.ts`
- * for the derivation). The allowance is given away, so it is pure cost with no revenue
- * against it, and it has to be costed against the plan price rather than waved through:
+ * A credit costs the platform about **$0.006** of Gemini: `TOKENS_PER_CREDIT` is 20,000
+ * weighted tokens, and the weighting exists so that figure holds however the tokens
+ * split — 20,000 input at $0.30/1M is $0.0060, and the 2,500 output tokens that weigh
+ * the same at $2.50/1M is $0.00625. The allowance is given away, so it is pure cost with
+ * no revenue against it, and it has to be costed against the plan price rather than
+ * waved through:
  *
  * | Plan     | Credits | Gemini cost | Plan price   | AI as % of revenue |
  * |----------|---------|-------------|--------------|--------------------|
@@ -65,13 +68,16 @@ export const STAFF_LIMITS: Record<PlanId, number> = {
  * allowance were the ones costing the most while paying the same.
  *
  * `TOKENS_PER_CREDIT` was deliberately **not** touched to achieve this. Lowering it would
- * have made every credit buy less work, including credits people had already **bought** —
- * a shop that paid for 1,000 would find them worth less than when they paid. The
- * allowance is a gift and can be resized; a purchased balance is a promise and cannot.
+ * have made every credit buy less work, including credits already sitting on an account
+ * as a grant — the number a shop was told it had would quietly be worth less than when
+ * it was given. The allowance is a gift and can be resized; a balance already handed
+ * over is a promise and cannot.
  *
- * Overflow is bought through `aiBonusCredits` rather than by upgrading a tier, which is
- * the point: AI cost scales with usage and a tier does not. Smaller allowances are what
- * make the packs in `credit-packs.ts` a real product rather than decoration.
+ * **This allowance is the only way to get credits.** Overflow used to be sold as one-off
+ * packs through `aiBonusCredits`; that product is scrapped, so a shop that needs more AI
+ * moves up a tier. Which means these numbers *are* the AI product — an allowance too
+ * small to work with cannot be topped up any more, it can only be upgraded past.
+ * `aiBonusCredits` survives as the super-admin grant on `/admin-imamshaffy/ai-usage`.
  *
  * **Starter is 3, and that is intentional.** It is enough to watch Zen answer a question
  * or read one photograph — enough to want it — and nowhere near enough to run a shop on.

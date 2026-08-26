@@ -219,8 +219,9 @@ console.log(`Verified ${stubs.length} stubs against the modules they replace.`);
 
 console.log('--- Setting up root page redirect ---');
 const rootPagePath = path.resolve(process.cwd(), 'src/app/page.tsx');
-// Mobile opens on the /welcome carousel; desktop goes straight to /login.
-// signedOutLandingRoute() reads the userAgent, so this has to run client-side.
+// Mobile opens on the /welcome carousel; desktop gets it on a genuine first
+// launch and /login after that. signedOutLandingRoute() reads the userAgent and
+// a localStorage flag, so this has to run client-side.
 const redirectContent = `'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -236,7 +237,7 @@ export default function Home() {
 
 if (fs.existsSync(rootPagePath)) {
     fs.writeFileSync(rootPagePath, redirectContent);
-    console.log('Root page updated: /welcome on mobile, /login on desktop');
+    console.log('Root page updated: /welcome on mobile and on a desktop first launch, /login after that');
 }
 
 console.log('--- Preparation Complete ---');

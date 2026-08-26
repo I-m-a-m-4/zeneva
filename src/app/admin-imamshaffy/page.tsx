@@ -95,6 +95,7 @@ import {
     Languages,
     ChevronDown,
     ChevronUp,
+    DoorOpen,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -188,6 +189,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CyberShield from '@/components/admin/cyber-shield';
 import UninstallTracker from '@/components/admin/uninstall-tracker';
+import LaunchFunnel from '@/components/admin/launch-funnel';
 // Shared with the standalone /users directory and detail pages. These used to be
 // module-private copies here; a second copy is how the two surfaces drift apart.
 import {
@@ -602,6 +604,102 @@ function UserListDialog({ open, onOpenChange, title, description, users, busines
                         </TableBody>
                     </Table>
                 </ScrollArea>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function DownloadIntelligenceDialog({ open, onOpenChange, downloadClicks, downloadStats }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    downloadClicks: any[];
+    downloadStats: any;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Download className="h-5 w-5 text-primary" />
+                        Download Intelligence
+                    </DialogTitle>
+                    <DialogDescription>
+                        Detailed breakdown of app download clicks, platforms, and geographic distribution.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-2">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Unique Downloaders</CardDescription>
+                            <CardTitle className="text-2xl font-bold">{downloadClicks.length}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Total Clicks</CardDescription>
+                            <CardTitle className="text-2xl font-bold">{downloadStats.totalClicks}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                    <Card className="md:col-span-2">
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Platform Breakdown</CardDescription>
+                            <CardTitle className="text-sm font-bold flex gap-4 mt-2">
+                                <span className="flex items-center gap-1"><Laptop className="h-4 w-4" /> Win: {downloadStats.windows}</span>
+                                <span className="flex items-center gap-1"><Laptop className="h-4 w-4" /> Mac: {downloadStats.macos}</span>
+                                <span className="flex items-center gap-1"><Smartphone className="h-4 w-4" /> Android: {downloadStats.android}</span>
+                            </CardTitle>
+                        </CardHeader>
+                    </Card>
+                </div>
+                
+                <Tabs defaultValue="log" className="w-full mt-4">
+                    <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
+                        <TabsTrigger value="log" className="snap-start shrink-0">Click Log ({downloadClicks.length})</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="log" className="space-y-4 mt-2">
+                        <div className="max-h-96 overflow-auto border rounded-md">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date / Time</TableHead>
+                                        <TableHead>User ID / IP</TableHead>
+                                        <TableHead>Country</TableHead>
+                                        <TableHead>Platforms</TableHead>
+                                        <TableHead className="text-right">Clicks</TableHead>
+                                        <TableHead>Source / Button</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {downloadClicks.map((d, index) => {
+                                        const dateStr = d.lastClicked?.toDate 
+                                            ? format(d.lastClicked.toDate(), "PPP p")
+                                            : (d.lastClicked?.seconds 
+                                                ? format(new Date(d.lastClicked.seconds * 1000), "PPP p")
+                                                : (d.timestamp?.toDate ? format(d.timestamp.toDate(), "PPP p") : 'Unknown Date'));
+                                        return (
+                                            <TableRow key={d.id || index}>
+                                                <TableCell className="text-[10px] text-muted-foreground">{dateStr}</TableCell>
+                                                <TableCell className="font-mono text-xs max-w-[150px] truncate" title={d.id || d.userId || d.ip || 'Unknown'}>{d.id || d.userId || d.ip || 'Unknown'}</TableCell>
+                                                <TableCell className="text-xs max-w-[150px] truncate">{d.country || d.location || 'N/A'}</TableCell>
+                                                <TableCell className="capitalize text-xs">{(d.platforms || []).join(', ') || 'N/A'}</TableCell>
+                                                <TableCell className="text-right font-mono text-xs">{d.clicks || 1}</TableCell>
+                                                <TableCell className="text-xs">{d.button || d.source || 'N/A'}</TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                    {downloadClicks.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center text-muted-foreground py-6 text-sm">
+                                                No download data recorded.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </TabsContent>
+                </Tabs>
             </DialogContent>
         </Dialog>
     );
@@ -1567,16 +1665,18 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                                     if (ms < 60000) return `${Math.round(ms / 1000)}s`;
                                     return `${Math.round(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
                                 };
-                                const fmtTime = (at: number) => {
-                                    try { return format(new Date(at), 'HH:mm:ss'); } catch { return '—'; }
-                                };
+                                const fmtTime = (at: number) => { try { return format(new Date(at), 'HH:mm:ss'); } catch { return '—'; } };
 
                                 // Auto-generated insights
                                 const observations: { icon: string; text: string; tone: string }[] = [];
+                                const onboardingCompleted = ju.surveyCompleted === true || (hitOnboarding && hitDashboard);
+                                const posTime = timePerPage.get('/sales/pos/select-products') || 0;
+                                const usedPOS = hitPOS && posTime > 5000;
+
                                 if (js.length === 0) observations.push({ icon: '👻', text: 'Never opened a page after signing up.', tone: 'text-destructive' });
                                 if (js.length === 1) observations.push({ icon: '🚪', text: `Bounced on the first page (${js[0]?.label}).`, tone: 'text-destructive' });
-                                if (hitPOS && !hitOnboarding) observations.push({ icon: '⚡', text: 'Skipped onboarding and went straight to the POS — likely has prior experience.', tone: 'text-emerald-600' });
-                                if (hitPOS && hitOnboarding) observations.push({ icon: '✅', text: 'Completed onboarding and used the POS — strong activation.', tone: 'text-green-600' });
+                                if (usedPOS && !onboardingCompleted) observations.push({ icon: '⚡', text: 'Skipped onboarding and went straight to the POS — likely has prior experience.', tone: 'text-emerald-600' });
+                                if (usedPOS && onboardingCompleted) observations.push({ icon: '✅', text: 'Completed onboarding and used the POS — strong activation.', tone: 'text-green-600' });
                                 if (!hitDashboard && js.length > 3) observations.push({ icon: '🗺️', text: 'Explored several pages but never reached the dashboard — may be disoriented.', tone: 'text-amber-600' });
                                 if (loginLoops > 3) observations.push({ icon: '⚠️', text: `Hit /login or /signup ${loginLoops} times — likely had auth trouble.`, tone: 'text-orange-600' });
                                 if (loops.length > 0) observations.push({ icon: '🔄', text: `Revisited: ${loops.map(l => `${l.page} ×${l.count}`).join(', ')}.`, tone: 'text-amber-600' });
@@ -2338,6 +2438,7 @@ function AdminDashboardContent({
     const [isAgeMilestoneOpen, setIsAgeMilestoneOpen] = useState(false);
     const [isTopPerformersOpen, setIsTopPerformersOpen] = useState(false);
     const [isSaaSMetricsOpen, setIsSaaSMetricsOpen] = useState(false);
+    const [isDownloadIntelOpen, setIsDownloadIntelOpen] = useState(false);
     const [certificateModalState, setCertificateModalState] = useState<{ open: boolean; title: string; description: string; value: string; icon: any; } | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -3472,6 +3573,10 @@ function AdminDashboardContent({
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList className="no-capture flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
                     <TabsTrigger value="overview" className="snap-start shrink-0">Overview</TabsTrigger>
+                    <TabsTrigger value="acquisition" className="gap-2 snap-start shrink-0">
+                        <DoorOpen className="h-4 w-4" />
+                        Acquisition
+                    </TabsTrigger>
                     <TabsTrigger value="users" className="snap-start shrink-0">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts" className="snap-start shrink-0">Comms Center</TabsTrigger>
                     <TabsTrigger value="followups" className="snap-start shrink-0">Strategic Outreach</TabsTrigger>
@@ -3553,7 +3658,7 @@ function AdminDashboardContent({
                             />
                         </button>
                         <button 
-                            onClick={() => toast({ title: "Download Traffic Intelligence", description: `Total engagement: ${analyticsData.downloadStats.totalClicks} total clicks. Breakdown: ${analyticsData.downloadStats.windows} Windows, ${analyticsData.downloadStats.macos} macOS, ${analyticsData.downloadStats.android} Android.` })} 
+                            onClick={() => setIsDownloadIntelOpen(true)} 
                             className="text-left w-full h-full transition-transform active:scale-95"
                         >
                             <StatCard 
@@ -4096,6 +4201,13 @@ function AdminDashboardContent({
 
                     </div>
                  </TabsContent>
+
+                {/* Everyone who installed and never got as far as an account. This
+                    is the only surface in the app that sees a signed-out user —
+                    every other analytics path is gated on `onAuthStateChanged`. */}
+                <TabsContent value="acquisition" className="space-y-6">
+                    <LaunchFunnel />
+                </TabsContent>
 
 
 
@@ -5044,6 +5156,13 @@ function AdminDashboardContent({
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <DownloadIntelligenceDialog
+                open={isDownloadIntelOpen}
+                onOpenChange={setIsDownloadIntelOpen}
+                downloadClicks={downloadClicks || []}
+                downloadStats={analyticsData.downloadStats}
+            />
 
             <SaaSMetricsDetailDialog
                 open={isSaaSMetricsOpen}

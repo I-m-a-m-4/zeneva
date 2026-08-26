@@ -267,8 +267,8 @@ const ARTICLES: Article[] = [
     id: 'zen-ai-limits',
     category: 'ai-reports',
     q: 'How many Zen AI credits do I get?',
-    a: 'A monthly credit allowance that depends on your plan: 3 a month on Starter, 150 on Pro, and 600 on Business. Credits, not messages — a quick question costs one, while a deep report that reads your whole sales history costs several. The allowance resets each month, and you can buy top-up credits that never expire.',
-    keywords: ['ai', 'limit', 'quota', 'credits', 'messages', 'monthly', 'allowance', 'top up'],
+    a: 'A monthly credit allowance that depends on your plan: 3 a month on Starter, 150 on Pro, and 600 on Business. Credits, not messages — a quick question costs one, while a deep report that reads your whole sales history costs several. The allowance resets at the start of each month, and if you need more every month, a higher plan is the way to get it.',
+    keywords: ['ai', 'limit', 'quota', 'credits', 'messages', 'monthly', 'allowance', 'upgrade'],
   },
   {
     id: 'reports',

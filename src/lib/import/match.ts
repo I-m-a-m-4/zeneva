@@ -150,6 +150,8 @@ function toCandidate(
   reason: MatchCandidate['reason'],
   score: number,
   explanation: string,
+  explanationCode: MatchCandidate['explanationCode'],
+  explanationVars?: MatchCandidate['explanationVars'],
 ): MatchCandidate {
   return {
     productId: item.product.id,
@@ -162,6 +164,8 @@ function toCandidate(
     reason,
     score,
     explanation,
+    explanationCode,
+    explanationVars,
   };
 }
 
@@ -191,7 +195,9 @@ export function matchDraft(
     if (hits.length > 0) {
       return {
         kind: 'certain',
-        match: toCandidate(hits[0], 'sku', 1, `same code ${hits[0].product.sku}`),
+        match: toCandidate(hits[0], 'sku', 1, `same code ${hits[0].product.sku}`, 'same-code', {
+          sku: String(hits[0].product.sku ?? ''),
+        }),
       };
     }
   }
@@ -202,7 +208,7 @@ export function matchDraft(
   // ── Tier 2: normalised name equality. A fact about the strings. ──
   const exact = (index.byName.get(normalized) ?? []).filter(available);
   if (exact.length === 1) {
-    return { kind: 'certain', match: toCandidate(exact[0], 'name-exact', 1, 'same name') };
+    return { kind: 'certain', match: toCandidate(exact[0], 'name-exact', 1, 'same name', 'same-name') };
   }
   if (exact.length > 1) {
     // The catalogue itself already holds two products under one name. Zeneva
@@ -210,7 +216,7 @@ export function matchDraft(
     // shop's stock figures on it.
     return {
       kind: 'possible',
-      candidates: exact.map((item) => toCandidate(item, 'name-exact', 1, 'same name')),
+      candidates: exact.map((item) => toCandidate(item, 'name-exact', 1, 'same name', 'same-name')),
     };
   }
 
@@ -240,13 +246,16 @@ export function matchDraft(
     // `Coke 50cl` and `Coke 150cl` are genuinely different products and are
     // exactly the pair a name-only score gets wrong.
     let explanation = 'similar name';
+    let explanationCode: MatchCandidate['explanationCode'] = 'similar-name';
     if (draftSize && item.size) {
       if (sizesEqual(draftSize, item.size)) {
         score = Math.min(1, score + 0.18);
         explanation = `similar name, same size`;
+        explanationCode = 'similar-name-same-size';
       } else {
         score -= 0.45;
         explanation = 'similar name but a different size';
+        explanationCode = 'similar-name-different-size';
       }
     } else if (draftSize || item.size) {
       // One names a size and the other does not. Mildly suspicious, not damning:
@@ -255,7 +264,7 @@ export function matchDraft(
     }
 
     if (score >= ASK_THRESHOLD) {
-      scored.push(toCandidate(item, 'name-similar', Math.min(1, score), explanation));
+      scored.push(toCandidate(item, 'name-similar', Math.min(1, score), explanation, explanationCode));
     }
   }
 

@@ -16,6 +16,7 @@ import { logAuditEvent } from '@/lib/audit';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import type { Product, UserProfile } from '@/types';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 import { getIndustryConfig } from '@/lib/industry';
 
 interface QuickEditDialogProps {
@@ -25,10 +26,10 @@ interface QuickEditDialogProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const quickEditSchema = z.object({
-  price: z.coerce.number().min(0, "Price must be a positive number."),
-  costPrice: z.coerce.number().min(0, "Cost price must be positive.").optional(),
-  stock: z.coerce.number().int("Stock must be a whole number.").min(0),
+const makeQuickEditSchema = (t: (key: string) => string) => z.object({
+  price: z.coerce.number().min(0, t('inventory.valPricePositive')),
+  costPrice: z.coerce.number().min(0, t('inventory.valCostPositive')).optional(),
+  stock: z.coerce.number().int(t('inventory.valStockWhole')).min(0),
   material: z.string().optional(),
   variantValue: z.string().optional(),
   baseUnit: z.string().optional(),
@@ -40,16 +41,18 @@ const quickEditSchema = z.object({
   spiceLevel: z.string().optional(),
 });
 
-type QuickEditFormValues = z.infer<typeof quickEditSchema>;
+type QuickEditFormValues = z.infer<ReturnType<typeof makeQuickEditSchema>>;
 
 export default function QuickEditDialog({ product, userProfile, isOpen, onOpenChange }: QuickEditDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { triggerRefresh, addToQueue, business } = usePOS();
+  const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const isSubmittingRef = React.useRef(false);
   const industryConfig = getIndustryConfig(business?.settings?.industry);
 
+  const quickEditSchema = React.useMemo(() => makeQuickEditSchema(t), [t]);
 
   const canManageProduct = userProfile?.role === 'admin' || userProfile?.role === 'manager';
 
@@ -188,15 +191,17 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
 
       toast({
         variant: 'success',
-        title: 'Changes Saved',
-        description: `${product.name} will be updated ${navigator.onLine ? 'momentarily' : 'when you come online'}.`,
+        title: t('inventory.changesSavedTitle'),
+        description: navigator.onLine
+          ? t('inventory.changesQueuedOnline', { name: product.name })
+          : t('inventory.changesSavedOffline', { name: product.name }),
       });
       onOpenChange(false);
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Update Failed',
-        description: 'Could not queue product update. Please try again.',
+        title: t('inventory.updateFailedTitle'),
+        description: t('inventory.queueFailedBody'),
       });
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -207,9 +212,11 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Quick Edit: {product?.name}</DialogTitle>
+          <DialogTitle>{t('inventory.quickEditTitle', { name: product?.name ?? '' })}</DialogTitle>
           <DialogDescription>
-            Quickly update pricing {product?.categoryType === 'service' ? '' : 'and stock '}for this {product?.categoryType === 'service' ? 'service' : 'product'}.
+            {product?.categoryType === 'service'
+              ? t('inventory.quickEditServiceHint')
+              : t('inventory.quickEditProductHint')}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -219,7 +226,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
               name="price"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price</FormLabel>
+                  <FormLabel>{t('common.price')}</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.01" {...field} disabled={!canManageProduct} />
                   </FormControl>
@@ -232,7 +239,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
               name="costPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cost Price</FormLabel>
+                  <FormLabel>{t('inventory.costPrice')}</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.01" {...field} disabled={!canManageProduct} />
                   </FormControl>
@@ -246,16 +253,16 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                 name="stock"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stock</FormLabel>
+                    <FormLabel>{t('inventory.stock')}</FormLabel>
                     <FormControl>
                       <Input type="number" {...field} disabled={!canManageProduct} />
                     </FormControl>
                     {product?.type === 'composite' && (
                       <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200 mt-1">
-                        Note: This is a bundle. Stock is usually managed via its components.
+                        {t('inventory.compositeStockNote')}
                       </p>
                     )}
-                    {!canManageProduct && <p className="text-xs text-muted-foreground pt-1">You don't have permission to edit stock.</p>}
+                    {!canManageProduct && <p className="text-xs text-muted-foreground pt-1">{t('inventory.noStockPermission')}</p>}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -267,7 +274,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                     name="baseUnit"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Measurement Unit</FormLabel>
+                        <FormLabel>{t('inventory.measurementUnit')}</FormLabel>
                         <FormControl>
                             <Input placeholder={industryConfig.defaultUnit} {...field} disabled={!canManageProduct} />
                         </FormControl>
@@ -293,10 +300,10 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                 ))}
             </div>
             <DialogFooter className='mt-6'>
-              <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="outline" size="lg" type="button" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
               <Button type="submit" size="lg" disabled={isSubmitting || !canManageProduct}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save Changes
+                {t('common.saveChanges')}
               </Button>
             </DialogFooter>
           </form>

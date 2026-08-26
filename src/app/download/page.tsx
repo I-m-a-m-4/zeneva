@@ -60,10 +60,12 @@ import { InteractiveGrid } from '@/components/interactive-grid';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AppConfig } from '@/lib/config';
 import { cn } from "@/lib/utils";
+import { useI18n } from '@/context/i18n-context';
 
 
 
 export default function DownloadPage() {
+  const { t } = useI18n();
   const [version, setVersion] = useState(AppConfig.version || "2.9.2");
 
   useEffect(() => {
@@ -405,8 +407,8 @@ export default function DownloadPage() {
                                             </g>
                                             
                                             {/* Text */}
-                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1">Download from the</text>
-                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2">Microsoft Store</text>
+                                            <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1">{t('landing.downloadFrom')}</text>
+                                            <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2">{t('landing.microsoftStore')}</text>
                                         </svg>
                                     </a>
                                 </div>
@@ -768,8 +770,8 @@ export default function DownloadPage() {
                                 </svg>
                             </div>
                             <div className="text-left">
-                                <div className="text-[10px] font-medium text-slate-400 tracking-widest uppercase mb-0.5">Download from the</div>
-                                <div className="text-white font-semibold text-lg leading-tight tracking-tight">Microsoft Store</div>
+                                <div className="text-[10px] font-medium text-slate-400 tracking-widest uppercase mb-0.5">{t('landing.downloadFrom')}</div>
+                                <div className="text-white font-semibold text-lg leading-tight tracking-tight">{t('landing.microsoftStore')}</div>
                             </div>
                             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all ml-auto" />
                         </a>
@@ -791,8 +793,8 @@ export default function DownloadPage() {
                                 </svg>
                             </div>
                             <div className="text-left">
-                                <div className="text-[10px] font-medium text-slate-400 tracking-widest uppercase mb-0.5">Get it on</div>
-                                <div className="text-white font-semibold text-lg leading-tight tracking-tight">Google Play</div>
+                                <div className="text-[10px] font-medium text-slate-400 tracking-widest uppercase mb-0.5">{t('landing.getItOn')}</div>
+                                <div className="text-white font-semibold text-lg leading-tight tracking-tight">{t('landing.googlePlay')}</div>
                             </div>
                             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all ml-auto" />
                         </a>

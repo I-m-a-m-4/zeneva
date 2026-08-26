@@ -44,14 +44,11 @@ import {
 } from '@/components/ui/table';
 import { aggregateStaff } from '@/lib/reports-aggregates';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import type { Receipt, UserProfile } from '@/types';
 
 /** Bars past this stop being readable; the table below carries everyone. */
 const CHART_ROWS = 10;
-
-const chartConfig = {
-  revenue: { label: 'Revenue', color: 'hsl(var(--primary))' },
-} satisfies ChartConfig;
 
 interface StaffPerformanceProps {
   receipts: Receipt[];
@@ -64,6 +61,11 @@ export default function StaffPerformance({
   users,
   currencySymbol = '',
 }: StaffPerformanceProps) {
+  const { t } = useI18n();
+  // Inside the component: the series label is translated and there is no `t` at module scope.
+  const chartConfig = {
+    revenue: { label: t('reports.colRevenue'), color: 'hsl(var(--primary))' },
+  } satisfies ChartConfig;
   const stats = React.useMemo(() => aggregateStaff(receipts, users), [receipts, users]);
 
   const money = (n: number) =>
@@ -95,12 +97,14 @@ export default function StaffPerformance({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
-          {solo ? 'Till activity' : 'Team performance'}
+          {solo ? t('reports.spTitleSolo') : t('reports.spTitleTeam')}
         </CardTitle>
         <CardDescription>
           {solo
-            ? 'What went through the till in this period.'
-            : `Who rang up what in this period — ${attributed.length} ${attributed.length === 1 ? 'person' : 'people'}${unattributed ? ', plus sales with no recorded author' : ''}.`}
+            ? t('reports.spSubtitleSolo')
+            : t(unattributed ? 'reports.spSubtitleTeamPlus' : 'reports.spSubtitleTeam', {
+                count: attributed.length,
+              })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -134,7 +138,7 @@ export default function StaffPerformance({
                     indicator="line"
                     formatter={(value: any) => (
                       <span className="text-xs">
-                        Revenue:{' '}
+                        {t('reports.revenueColon')}{' '}
                         <span className="font-mono font-medium tabular-nums text-foreground">
                           {money(Number(value))}
                         </span>
@@ -152,14 +156,14 @@ export default function StaffPerformance({
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead className="text-end">Sales</TableHead>
-                <TableHead className="text-end">Revenue</TableHead>
-                <TableHead className="text-end">Share</TableHead>
-                <TableHead className="hidden text-end sm:table-cell">Avg basket</TableHead>
-                <TableHead className="hidden text-end md:table-cell">Items / sale</TableHead>
-                <TableHead className="hidden text-end md:table-cell">Discounted</TableHead>
-                <TableHead className="hidden text-end lg:table-cell">Price overrides</TableHead>
+                <TableHead>{t('reports.colMember')}</TableHead>
+                <TableHead className="text-end">{t('reports.colSales')}</TableHead>
+                <TableHead className="text-end">{t('reports.colRevenue')}</TableHead>
+                <TableHead className="text-end">{t('reports.colShare')}</TableHead>
+                <TableHead className="hidden text-end sm:table-cell">{t('reports.spAvgBasket')}</TableHead>
+                <TableHead className="hidden text-end md:table-cell">{t('reports.spItemsPerSale')}</TableHead>
+                <TableHead className="hidden text-end md:table-cell">{t('reports.spDiscounted')}</TableHead>
+                <TableHead className="hidden text-end lg:table-cell">{t('reports.spPriceOverrides')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,7 +182,7 @@ export default function StaffPerformance({
                       </p>
                       {isUnattributed ? (
                         <p className="text-[11px] text-muted-foreground">
-                          Recorded before sales carried an author
+                          {t('reports.spNoAuthor')}
                         </p>
                       ) : (
                         s.role && (
@@ -230,17 +234,14 @@ export default function StaffPerformance({
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1 space-y-1">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              These are activity figures, not a verdict. Discounts and price overrides
-              are often exactly what a good salesperson should be doing — a high figure
-              is a reason to ask, not a reason to suspect. Revenue is the receipt total,
-              so the rows here add up to the shop&apos;s revenue for the period.
+              {t('reports.spFootnote')}
             </p>
             <Link
               href="/audit-log"
               className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              Run the loss-prevention scan in the audit log
+              {t('reports.spRunScan')}
             </Link>
           </div>
         </div>

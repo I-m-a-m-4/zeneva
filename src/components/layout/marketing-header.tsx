@@ -71,15 +71,15 @@ export default function MarketingHeader() {
              {/* Centered content */}
              <div className="flex-1 flex items-center justify-center gap-2 sm:gap-3 text-sm min-w-0 px-1">
                 <span className="hidden md:inline-flex bg-transparent text-primary px-2 py-0.5 font-bold rounded text-[10px] uppercase tracking-wider border border-primary/30 shrink-0">
-                  Flash Sale
+                  {t('landing.flashSale')}
                 </span>
                 <span className="font-medium tracking-tight text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
-                  <span className="truncate">Zeneva Premium for <span className="font-bold text-black">₦300,000/yr</span></span>
+                  <span className="truncate">{t('landing.premiumFor')} <span className="font-bold text-black">₦300,000/yr</span></span>
                   <span className="text-black/50 line-through text-[10px] sm:text-xs shrink-0 hidden sm:inline">₦360,000</span>
-                  <span className="text-emerald-600 font-bold text-[10px] sm:text-xs tracking-tight shrink-0 hidden lg:inline">(Save ₦60,000!)</span>
+                  <span className="text-emerald-600 font-bold text-[10px] sm:text-xs tracking-tight shrink-0 hidden lg:inline">{t('landing.save', { amount: '₦60,000' })}</span>
                 </span>
                 <Link href="/pricing" onClick={() => setShowBanner(false)} className="bg-[#1e293b] text-white px-2 sm:px-4 py-1.5 rounded-md font-semibold hover:bg-[#0f172a] transition-all hover:scale-105 active:scale-95 text-[10px] sm:text-xs whitespace-nowrap ml-auto sm:ml-1 shadow-sm shrink-0">
-                  Claim offer
+                  {t('landing.claimOffer')}
                 </Link>
              </div>
 

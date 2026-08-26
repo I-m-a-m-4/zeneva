@@ -38,8 +38,9 @@ import { useFirestore } from '@/firebase';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import ImportCustomersDialog from '@/components/customers/import-customers-dialog';
+import CustomerImportDialog from '@/components/customers/smart-import/customer-import-dialog';
 import { useRouter } from 'next/navigation';
+import { useBranch } from '@/context/branch-context';
 import NProgress from 'nprogress';
 import { logAuditEvent } from '@/lib/audit';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -51,8 +52,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
+import CustomerHealthPanel, { type HealthFilter } from '@/components/customers/customer-health-panel';
+import {
+  computeCustomerHealth,
+  buildMergePlan,
+  normalizeCode,
+  type DuplicateGroup,
+} from '@/lib/customer-health';
 import {
   computeCustomerSegments,
   FILTERABLE_SEGMENTS,
@@ -137,18 +146,23 @@ export default function CustomersPage() {
     triggerRefresh, 
     isFullSyncingCustomers,
     searchCustomers,
+    allCustomersUnfiltered,
     addToQueue
   } = usePOS();
   const { toast } = useToast();
   const router = useRouter();
   const { t } = useI18n();
   const firestore = useFirestore();
+  const { isMultiBranchEnabled } = useBranch();
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
+  const [activeTab, setActiveTab] = React.useState<'all' | 'health'>('all');
+  const [healthFilter, setHealthFilter] = React.useState<HealthFilter>('all');
+  const [isFixingHealth, setIsFixingHealth] = React.useState(false);
 
   const [searchTerm, setSearchTerm] = React.useState('');
   const [sortBy, setSortBy] = React.useState<'recent' | 'spent' | 'loyalty' | 'name'>('spent');
@@ -235,6 +249,121 @@ export default function CustomersPage() {
     [displayCustomers, receipts, now],
   );
 
+  /**
+   * The integrity report, over the **whole** customer book.
+   *
+   * `allCustomersUnfiltered` and not `displayCustomers`, for two reasons the
+   * context's own comment spells out: branch filtering hides exactly the
+   * customers the "no branch" check is looking for, and two records for one
+   * person sitting in two branches are still one duplicate worth merging.
+   *
+   * `now` is threaded through even though no check uses it yet — the module takes
+   * it as an input so that the first time-based check anybody adds cannot quietly
+   * start reading the clock. Same reason the segments memo above takes it.
+   */
+  const healthReport = React.useMemo(
+    () => computeCustomerHealth(allCustomersUnfiltered ?? null, {
+      isMultiBranch: isMultiBranchEnabled,
+      now: now.getTime(),
+    }),
+    [allCustomersUnfiltered, isMultiBranchEnabled, now],
+  );
+
+  /** Every code in use, so a suggested replacement cannot collide with one. */
+  const codesInUse = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const c of allCustomersUnfiltered || []) {
+      const code = normalizeCode(c.code);
+      if (code) set.add(code);
+    }
+    return set;
+  }, [allCustomersUnfiltered]);
+
+  /**
+   * Merge a duplicate group: one update, then a delete per retired record.
+   *
+   * Everything goes through `addToQueue`, never a direct `updateDoc`. It is the
+   * only thing that enforces RBAC, injects the active branch, survives being
+   * offline and updates the SQLite mirror — the same rule Zen AI's proposals
+   * follow. `update-customer` and `delete-customer` both have real cases in the
+   * queue's commit switch, which is worth checking before adding an action type
+   * (`update-settings` does not, and silently retries forever).
+   *
+   * Order matters: the update lands before the deletes, so if the queue drains
+   * halfway the surviving record already carries the merged totals. The other way
+   * round loses the money.
+   */
+  const handleMergeGroup = React.useCallback(async (group: DuplicateGroup) => {
+    const plan = buildMergePlan(group.members);
+    if (!plan) return;
+
+    setIsFixingHealth(true);
+    try {
+      await addToQueue(
+        { type: 'update-customer', payload: { id: plan.primaryId, values: plan.values } },
+        plan.summary,
+      );
+
+      for (const id of plan.duplicateIds) {
+        await addToQueue(
+          { type: 'delete-customer', payload: { id } },
+          `Removed duplicate customer record`,
+        );
+      }
+
+      if (business && currentUser) {
+        const primary = group.members.find(m => m.id === plan.primaryId);
+        logAuditEvent(firestore, business.id, currentUser, {
+          action: 'customer.merge',
+          entity: { type: 'Customer', id: plan.primaryId, name: primary?.name },
+          details: {
+            matchedOn: group.kind,
+            mergedIds: plan.duplicateIds,
+            mergedCount: plan.duplicateIds.length,
+            totalSpentAfter: plan.values.totalSpent,
+            loyaltyPointsAfter: plan.values.loyaltyPoints,
+          },
+        }).catch(() => {
+          // An audit write must never block the merge the user asked for.
+        });
+      }
+
+      toast({
+        variant: 'success',
+        title: 'Customers merged',
+        description: `${plan.duplicateIds.length} duplicate record${plan.duplicateIds.length === 1 ? '' : 's'} removed. Spend and points were kept.`,
+      });
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Merge failed',
+        description: 'Nothing was changed. Please try again.',
+      });
+    } finally {
+      setIsFixingHealth(false);
+    }
+  }, [addToQueue, business, currentUser, firestore, toast]);
+
+  /** Resolve a code collision by giving one record a free code. */
+  const handleRecode = React.useCallback(async (customer: Customer, newCode: string) => {
+    setIsFixingHealth(true);
+    try {
+      await addToQueue(
+        { type: 'update-customer', payload: { id: customer.id, values: { code: newCode } } },
+        `Changed customer code for ${customer.name || 'customer'} to ${newCode}`,
+      );
+      toast({
+        variant: 'success',
+        title: 'Code changed',
+        description: `${customer.name || 'That customer'} is now ${newCode}.`,
+      });
+    } catch {
+      toast({ variant: 'destructive', title: 'Could not change the code', description: 'Please try again.' });
+    } finally {
+      setIsFixingHealth(false);
+    }
+  }, [addToQueue, toast]);
+
   /** Every tag in use, for the filter. Sorted so the control is stable. */
   const allTags = React.useMemo(() => {
     const set = new Set<string>();
@@ -257,7 +386,18 @@ export default function CustomersPage() {
       });
     }
 
-    let base = [...(displayCustomers || [])].map(c => {
+    /*
+     * On the Health tab the table lists the flagged records, and it has to draw
+     * from the *unfiltered* book to do that honestly. Branch filtering removes a
+     * customer with no `branchId` from every specific branch's view, so filtering
+     * first and then flagging would hide exactly the rows the "no branch" check
+     * exists to surface. Integrity is a property of the business, not of a branch.
+     */
+    const source = activeTab === 'health'
+      ? (allCustomersUnfiltered || [])
+      : (displayCustomers || []);
+
+    let base = [...source].map(c => {
       const fromReceipts = receiptTotals[c.id] || 0;
       return {
         ...c,
@@ -297,6 +437,27 @@ export default function CustomersPage() {
       filtered = filtered.filter(c => (c.tags || []).some(tg => String(tg).trim() === tagFilter));
     }
 
+    /*
+     * Health filtering. Reads the same `issuesByCustomer` map the tiles are
+     * counted from, so a tile that says 4 and a table that lists 7 cannot happen
+     * — the mismatch the Inventory Health tab's comment warns about.
+     *
+     * The "Likely duplicates" tile covers three kinds at once (phone, email,
+     * name), because to a shopkeeper they are one idea: this looks like the same
+     * person twice.
+     */
+    if (activeTab === 'health' && healthReport) {
+      filtered = filtered.filter(c => {
+        const issues = healthReport.issuesByCustomer.get(c.id);
+        if (!issues || issues.length === 0) return false;
+        if (healthFilter === 'all') return true;
+        if (healthFilter === 'duplicate-phone') {
+          return issues.some(i => i === 'duplicate-phone' || i === 'duplicate-email' || i === 'duplicate-name');
+        }
+        return issues.includes(healthFilter);
+      });
+    }
+
     // Apply sorting
     filtered.sort((a, b) => {
       if (sortBy === 'spent') {
@@ -315,7 +476,13 @@ export default function CustomersPage() {
     });
 
     return filtered;
-  }, [searchTerm, displayCustomers, sortBy, searchedCustomers, receipts, segmentFilter, tagFilter, segmentData]);
+  }, [searchTerm, displayCustomers, allCustomersUnfiltered, sortBy, searchedCustomers, receipts, segmentFilter, tagFilter, segmentData, activeTab, healthFilter, healthReport]);
+
+  // Switching tab or health filter changes what is listed, so the page has to
+  // reset with it — same reason as the filters below.
+  React.useEffect(() => {
+    setPage(0);
+  }, [activeTab, healthFilter]);
 
   // Any change to what is being filtered has to reset the page, or a narrowed
   // result set leaves the reader stranded on a page that no longer exists.
@@ -480,6 +647,52 @@ export default function CustomersPage() {
 
   return (
     <>
+      {/*
+        * Tabs above the card, mirroring the Inventory page's All / Health split so
+        * the two pages behave the same way. The dot is the only badge — a count
+        * here would compete with the tiles inside the tab that already carry it.
+        */}
+      <div className="w-full mb-4">
+        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'all' | 'health')} className="w-full md:max-w-md">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="all">All customers</TabsTrigger>
+            <TabsTrigger value="health" className="flex items-center gap-1.5">
+              Health
+              {!!healthReport && healthReport.affected > 0 && (
+                <span className="flex h-2 w-2 rounded-full bg-red-500" />
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {activeTab === 'health' && (
+        <div className="mb-6">
+          {/*
+            * `null` means the book is still arriving — keep a skeleton up rather
+            * than drawing "no issues found" over a list that has not loaded. The
+            * empty-vs-pending distinction the POS learned the hard way.
+            */}
+          {healthReport === null ? (
+            <div className="space-y-4" role="status" aria-busy="true">
+              <Skeleton className="h-28 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : (
+            <CustomerHealthPanel
+              report={healthReport}
+              currencySymbol={currencySymbol}
+              activeFilter={healthFilter}
+              onFilterChange={setHealthFilter}
+              onMerge={handleMergeGroup}
+              onRecode={handleRecode}
+              codesInUse={codesInUse}
+              busy={isFixingHealth}
+            />
+          )}
+        </div>
+      )}
+
       <Card className="w-full">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -874,14 +1087,14 @@ export default function CustomersPage() {
         />
       )}
       {currentUser?.businessId && (
-        <ImportCustomersDialog
+        <CustomerImportDialog
           isOpen={isImportOpen}
           onOpenChange={setIsImportOpen}
-          businessId={currentUser.businessId}
-          existingCustomers={displayCustomers || []}
           onSuccess={() => {
+            // The dialog stays open on its own summary screen; it triggers a refresh
+            // itself, so this only needs to close the *page's* notion of the flow when
+            // the owner dismisses it.
             triggerRefresh();
-            setIsImportOpen(false);
           }}
         />
       )}

@@ -49,6 +49,12 @@ function ReceiptContent() {
       setMounted(true);
   }, []);
 
+  React.useEffect(() => {
+    if (receipt && receipt.paymentMethod === 'Invoice') {
+      router.replace(`/invoice/details?id=${receipt.id}`);
+    }
+  }, [receipt, router]);
+
   const isLoading = isReceiptLoading || (receipt && !business && isBusinessLoading);
 
   if (!mounted || (isLoading && !receipt) || !firestore) {
@@ -59,9 +65,8 @@ function ReceiptContent() {
     notFound();
   }
 
-  // If this is an invoice, redirect to the invoice detail page
+  // If this is an invoice, yield to redirect effect
   if (receipt.paymentMethod === 'Invoice') {
-    router.replace(`/invoice/details?id=${receipt.id}`);
     return null;
   }
 

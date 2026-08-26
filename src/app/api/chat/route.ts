@@ -568,14 +568,15 @@ export async function POST(req: Request) {
     }
     recordBlocked(db, 'plan_limit', todayStr);
     // `code` is the point of this body. Prose alone left the owner at a dead end
-    // they could not act on; a machine-readable code lets the chat UI put a Top up
-    // button under the message. Keep it stable — the client matches on the string.
+    // they could not act on; a machine-readable code lets the chat UI put an
+    // Upgrade button under the message. Keep it stable — the client matches on the
+    // string.
     return new Response(
       JSON.stringify({
         error:
           `You are out of AI credits. The ${reserved.quote.plan} plan includes ` +
-          `${reserved.quote.monthlyLimit.toLocaleString()} credits a month, and your ` +
-          `top-up balance is empty. Top up, or upgrade for a larger monthly allowance.`,
+          `${reserved.quote.monthlyLimit.toLocaleString()} credits a month, and it is spent. ` +
+          `It resets at the start of next month, or upgrade for a larger monthly allowance.`,
         code: 'credits_exhausted',
         remaining: 0,
         plan: reserved.quote.plan,

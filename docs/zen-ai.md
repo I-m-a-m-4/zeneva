@@ -406,92 +406,76 @@ forever against a wall.
 `generateContentPlan` and `api/admin/chat` stay free: platform-owner tooling, not
 tenant usage.
 
-### Buying credits — two rails, three writers, one balance
+### Credits are not sold — the allowance is the product
 
-The allowance is what the plan includes; a **pack** is what a shop buys when it runs out.
-Packs are one-off, never expire, and land in the same `aiBonusCredits` integer the
-allowance overflows into — so there is one balance to reason about, not two.
+**A shop that needs more Zen AI upgrades a tier.** There are no packs, no top-ups and no
+"pick your own amount" range. The allowance in `AI_MONTHLY_LIMITS` is the whole of the AI
+product, which is why those three numbers carry the weight they do: an allowance too small
+to work with can no longer be topped up, only upgraded past.
 
-`src/lib/credit-packs.ts` is the price list: `CREDIT_PACKS`, `creditPack(id)`,
-`packPrice`, `packAmountMinor`, `pricePerCredit`. Client-safe, so the UI can quote before
-it spends, and **both servers re-derive the price from the pack id** rather than trusting
-the amount the client says it paid.
+`aiBonusCredits` still exists on the business document and is still spent **after** the
+monthly allowance, so a shop holding a balance is never refused a turn it can pay for.
+It has exactly one writer left:
 
-| Pack | NGN | USD |
-|---|---|---|
-| 250 credits | ₦2,500 | $2.50 |
-| 1,000 credits | ₦8,000 | $8 |
-| 5,000 credits | ₦35,000 | $35 |
+| Writer | Authenticated by |
+|---|---|
+| The grant control on `/admin-imamshaffy/ai-usage` | super-admin, through the rules catch-all |
 
-**Three writers move `aiBonusCredits`, and the client is not one of them.** The field is
-in `entitlementFieldsLocked()`, so a tenant cannot write its own balance with an
-`updateDoc` — every path below is Admin SDK or super-admin:
+The field is in `entitlementFieldsLocked()`, so a tenant cannot write its own balance with
+an `updateDoc`. The grant moves it with **`FieldValue.increment` inside a
+`runTransaction`**, never `previous + credits` — a chat turn is debiting the same field and
+a read-then-write hands those credits back — and it appends a row to **`ai_credit_ledger`**
+(`src/lib/ai-credit-ledger.ts`) in the same commit: append-only, `credits` always positive,
+`balanceBefore`/`balanceAfter`. Spending is deliberately *not* in it — that is metered per
+day on the rollups — so the collection's sum stays "credits ever given to this shop". It
+needs **no `firestore.rules` entry**: the catch-all at the top of the file already grants
+the platform owner read and write, and everyone else is denied by default. That also means
+it is **not** readable client-side by a tenant; a customer-facing receipt list would need a
+rule.
 
-| Rail | Writer | Authenticated by |
-|---|---|---|
-| Paystack (NGN) | `src/actions/ai-credits.ts` → `purchaseAiCredits` | `requireUser(idToken)`, then Paystack verify |
-| Dodo (USD) | `src/app/api/webhooks/dodo/route.ts` | `crypto.timingSafeEqual` on the signature |
-| Grant | `/admin-imamshaffy/ai-usage` | super-admin, through the rules catch-all |
+#### What was scrapped, and what to know before proposing it again
 
-Each appends a row to **`ai_credit_ledger`** (`src/lib/ai-credit-ledger.ts`): append-only,
-`credits` always positive, `balanceBefore`/`balanceAfter`, and `kind: 'purchase' | 'grant'`.
-Spending is deliberately *not* in it — that is metered per day on the rollups — so the
-collection's sum stays "credits ever given to this shop". It needs **no `firestore.rules`
-entry**: the catch-all at the top of the file already grants the platform owner read and
-write, and everyone else is denied by default. That also means it is **not** readable
-client-side by a tenant; a customer-facing receipt list would need a rule.
+Credit packs shipped and were removed. Deleted: `src/lib/credit-packs.ts` (a
+250/1,000/5,000 price list at ₦2,500/₦8,000/₦35,000), `src/actions/ai-credits.ts`
+(`purchaseAiCredits`, the Paystack/NGN rail), and
+`src/components/settings/ai-credits-section.tsx` (the `/billing` rail). Also gone: the Dodo
+checkout route's `packId` branch with its three `DODO_CREDITS_*_PRODUCT_ID` env vars, and
+the webhook's credit-grant branch.
 
-#### Five traps, all of them already stepped in
+Four things to carry forward, because they are the reasons rather than the mechanics:
 
-- **The Dodo webhook's credit branch must sit before the plan gate.** The whole grant used
-  to be wrapped in `if (businessId && planId)`. A pack has no `planId`, so a credit
-  purchase reaching that check succeeds, returns 200, and grants nothing — the customer is
-  charged and gets no credits, with no error anywhere. The `metadata.kind === 'credits' ||
-  packId` branch is therefore first.
-- **`kind` on the `purchases` row is what keeps packs out of MRR.** The admin dashboard
-  derives MRR latest-payment-wins, so an unmarked ₦8,000 pack would reset a Business
-  shop's monthly rate to ₦8,000, and corrupt ARPU, the paying-customer count and the
-  billing-currency guess with it. `src/lib/platform-revenue.ts` owns the discriminator:
-  `purchaseKind` reads a **missing** `kind` as `'subscription'` (every historical row),
-  `billingCurrencyByBusiness` skips packs, and lifetime/TTM totals deliberately keep them —
-  those are totals, not rates.
-- **`FieldValue.increment`, never a computed total.** A chat turn in flight is debiting the
-  same field, so `previousBalance + pack.credits` can lose a debit. `balanceBefore` /
-  `balanceAfter` on the ledger row are the reading at write time, which is why the admin
-  grant does its increment inside a `runTransaction`.
-- **Webhook idempotency is two-layer.** An early return on an existing
-  `processed_webhooks/{webhookId}`, *and* `batch.create()` of that same marker inside the
-  grant batch — so a redelivery racing the first attempt fails the batch instead of
-  granting twice. A database error must **throw**, not 200: Dodo only retries a failure.
-- **`metadata` is not a price list.** It carries the `packId` and nothing else that
-  matters; the credits and the expected amount come from `CREDIT_PACKS` server-side.
-  The Paystack rail additionally replay-guards on
-  `purchases.where('reference','==',reference)` and matches the currency, with no
-  amount-tolerance window.
+- **The USD rail was never live.** `DODO_CREDITS_*_PRODUCT_ID` was never configured, so the
+  dollar button always answered "not available yet". Any future credit product has the same
+  obstacle: **Dodo needs a real product per price**, so an arbitrary amount needs either a
+  pay-what-you-want product (unverified — the docs were unreachable) or `quantity` over a
+  fixed unit, which forces a flat rate.
+- **The price question is what killed it.** A single flat rate reprices both ends (250
+  credits gets cheaper, 5,000 gets dearer); a volume curve that preserves today's three
+  prices needs the arbitrary-amount mechanism above. Neither is a coding problem, and
+  neither should be chosen inside a refactor.
+- **The Dodo webhook now refuses a credit delivery** rather than ignoring it. Falling
+  through would reach `if (businessId && planId)`, where a $2.50 payment carrying a
+  `planId` could buy a plan. It logs the payment id and says to grant manually.
+- **Historical rows are kept and must keep rendering.** `kind: 'credits'` on a `purchases`
+  row and `kind: 'purchase'` on a ledger row are money that was actually taken.
+  `src/lib/platform-revenue.ts` still owns the discriminator — `purchaseKind` reads a
+  **missing** `kind` as `'subscription'` (every other row), `billingCurrencyByBusiness`
+  skips credit rows so a USD pack cannot flip a naira subscriber onto the dollar price
+  list, and lifetime/TTM totals deliberately keep them because those are totals, not rates.
 
-**Known gap, unchanged:** the NGN rail has no webhook, so if the browser dies between
-paying and the action running, the grant never happens — already true of subscriptions. The
-reference is written to `checkout_attempts` before the charge, so a "restore my purchase"
-retry is possible later.
+#### Where a shop is told it is out
 
-#### Where a shop buys, and where it is told to
-
-One surface takes money: `src/components/settings/ai-credits-section.tsx`, mounted on
-`/billing` as a **sibling** of the plans card, not inside it —
-`subscription-section.tsx` early-returns a "Lifetime Access Active" card, and a lifetime
-shop spends tokens like everybody else. It renders **one** rail per shop (Paystack for
-NGN, Dodo for USD): offering a button the shop's gateway cannot settle is a failed
-payment.
-
-`/ai-insights` only ever *links* there, at `/billing?topup=1#ai-credits` — `?topup=1`
-highlights and scrolls to the section. Embedding a second payment surface would load the
-Paystack and Dodo scripts into the chat route for no other reason. The chat page shows a
-"Top up" link beside the balance pill once the balance is under a tenth of the allowance
-(floored at three — "5 left" is a warning on Starter's 15 and noise on Business's 1,500),
-and on exhaustion the 429's `code: 'credits_exhausted'` raises a banner **instead of** a
-toast: a toast disappears and leaves the shop staring at a composer that will keep
-refusing. The banner clears on `status === 'streaming'`, which is proof the server
+Nothing on `/ai-insights` takes money, and nothing quotes a price. The chat page shows an
+**Upgrade** link beside the balance pill once the balance is under a tenth of the allowance
+(floored at three — "5 left" is a warning on Starter's 3 and noise on Business's 600), and
+on exhaustion the 429's `code: 'credits_exhausted'` raises a banner **instead of** a toast:
+a toast disappears and leaves the shop staring at a composer that will keep refusing. The
+banner names the allowance, says it resets at the start of next month, and offers one
+button to `/billing`. It clears on `status === 'streaming'`, which is proof the server
 accepted the balance, because a 429 never streams a token.
+
+`code: 'credits_exhausted'` is matched on the string by the client and by the importer's
+`AiCreditsError` — keep it stable even though the prose around it changed.
 
 ## Usage analytics — what is recorded, and what must never be
 

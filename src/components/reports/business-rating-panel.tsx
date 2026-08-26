@@ -72,6 +72,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import { usePOS } from '@/context/pos-context';
 import { useBusinessRating, type RatingMover } from '@/hooks/use-business-rating';
 import { useRatingBenchmark } from '@/hooks/use-rating-benchmark';
@@ -153,8 +154,13 @@ function ScoreRing({ score, grade }: { score: number | null; grade: string }) {
 }
 
 function DeltaChip({ delta }: { delta: number | null }) {
+  const { t } = useI18n();
   if (delta === null) {
-    return <span className="text-xs font-medium text-muted-foreground">First reading</span>;
+    return (
+      <span className="text-xs font-medium text-muted-foreground">
+        {t('reports.brFirstReading')}
+      </span>
+    );
   }
   const Icon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
   return (
@@ -207,6 +213,7 @@ function PillarRow({
   open: boolean;
   onToggle: () => void;
 }) {
+  const { t: translate } = useI18n();
   const t = tone(pillar.score);
   // Nothing to offer when the pillar is already at the ceiling — showing "+0 pts"
   // and an action next to a full meter reads as busywork.
@@ -222,7 +229,7 @@ function PillarRow({
         aria-expanded={worthFixing ? open : undefined}
         title={
           showMedian
-            ? `${pillar.hint} · platform median ${median}`
+            ? translate('reports.brHintWithMedian', { hint: pillar.hint, median })
             : pillar.hint
         }
         className={cn(
@@ -275,7 +282,7 @@ function PillarRow({
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{pillar.fix.label}</span>
           {pillar.measured && pillar.headroom >= 1 && (
             <span className="shrink-0 text-[11px] font-bold tabular-nums text-primary">
-              +{pillar.headroom} pts
+              {translate('reports.brPlusPts', { count: pillar.headroom })}
             </span>
           )}
           <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -393,6 +400,7 @@ function RatingOptInCard({
   onEnable: () => void;
   onDecline: () => void;
 }) {
+  const { t } = useI18n();
   if (!neverAsked) {
     return (
       <Card className="flex flex-col items-center gap-3 p-8 text-center sm:p-10">
@@ -400,14 +408,13 @@ function RatingOptInCard({
           <EyeOff className="h-5 w-5" />
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">Business rating is off</p>
+          <p className="text-sm font-semibold text-foreground">{t('reports.brOffTitle')}</p>
           <p className="mx-auto max-w-sm text-xs text-muted-foreground">
-            Nothing has been deleted. Turn it back on any time in Settings → General and your
-            score, streak and history pick up where they left off.
+            {t('reports.brOffBody')}
           </p>
         </div>
         <Button asChild variant="outline" size="sm" className="mt-1">
-          <Link href="/settings">Open Settings</Link>
+          <Link href="/settings">{t('reports.brOpenSettings')}</Link>
         </Button>
       </Card>
     );
@@ -422,14 +429,12 @@ function RatingOptInCard({
 
         <div className="space-y-2">
           <h3 className="text-lg font-bold text-foreground sm:text-xl">
-            Want to see where your money is leaking?
+            {t('reports.brPitchTitle')}
           </h3>
+          {/* Ends on "in money" on purpose — currency, not points. The note lives on
+              `brPitchBody` in en.ts so a translator sees it. */}
           <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-            Business rating reads your own sales and scores the four things that multiply
-            revenue — your margin, your average basket, how often buyers come back, and your
-            momentum. Then it names the single biggest opportunity you are missing, in{' '}
-            {/* Currency, not points. Same promise the panel itself keeps. */}
-            money.
+            {t('reports.brPitchBody')}
           </p>
         </div>
 
@@ -437,9 +442,9 @@ function RatingOptInCard({
             above this component. */}
         <ul className="mx-auto max-w-sm space-y-1.5 text-left text-xs text-muted-foreground">
           {[
-            'Built from your receipts. Nothing is sent anywhere or shown to anyone else.',
-            'Every opportunity is priced from your own sales, never a projection.',
-            'You can switch it off again in Settings at any time.',
+            t('reports.brClaimPrivate'),
+            t('reports.brClaimPriced'),
+            t('reports.brClaimReversible'),
           ].map((line) => (
             <li key={line} className="flex items-start gap-2">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
@@ -451,10 +456,10 @@ function RatingOptInCard({
         <div className="mt-1 flex flex-col gap-2 sm:flex-row">
           <Button onClick={onEnable} disabled={isSaving} className="min-w-[11rem]">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Turn on business rating
+            {t('reports.brTurnOn')}
           </Button>
           <Button variant="ghost" onClick={onDecline} disabled={isSaving} className="text-muted-foreground">
-            No thanks
+            {t('reports.brNoThanks')}
           </Button>
         </div>
       </div>
@@ -463,6 +468,7 @@ function RatingOptInCard({
 }
 
 export default function BusinessRatingPanel() {
+  const { t } = useI18n();
   const { currencySymbol, triggerConfetti, business } = usePOS();
   const rating = useBusinessRating();
   const benchmark = useRatingBenchmark(rating.enabled);
@@ -557,9 +563,9 @@ export default function BusinessRatingPanel() {
           <Crown className="h-6 w-6 shrink-0 text-primary" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-foreground">
-              Level {leveledUpTo.index} — {leveledUpTo.name}
+              {t('reports.brLevelUp', { index: leveledUpTo.index, name: leveledUpTo.name })}
             </p>
-            <p className="text-xs text-muted-foreground">A tier you have never held before. Well done.</p>
+            <p className="text-xs text-muted-foreground">{t('reports.brNewTier')}</p>
           </div>
         </Card>
       )}
@@ -571,18 +577,18 @@ export default function BusinessRatingPanel() {
         <div className="w-full min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-xl font-bold tracking-tight text-foreground">
-              {score === null ? 'Not rated yet' : tier.name}
+              {score === null ? t('reports.brNotRated') : tier.name}
             </span>
             {score !== null && (
               <span className="rounded border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Level {tier.index}
+                {t('reports.brLevelBadge', { index: tier.index })}
               </span>
             )}
             <DeltaChip delta={delta} />
             {isPersonalBest && (
               <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
                 <Sparkles className="h-3 w-3" />
-                New best
+                {t('reports.brNewBest')}
               </span>
             )}
             {streak > 0 && <StreakBadge streak={streak} atRisk={streakAtRisk} />}
@@ -594,7 +600,7 @@ export default function BusinessRatingPanel() {
           {delta !== null && delta !== 0 && movers.length > 0 && <Movers movers={movers} />}
 
           {score === null ? (
-            <p className="text-sm text-muted-foreground">Record your first sale to get a rating.</p>
+            <p className="text-sm text-muted-foreground">{t('reports.brNeedFirstSale')}</p>
           ) : (
             <div className="space-y-1.5">
               <div className="relative h-1.5 overflow-hidden rounded-full bg-primary/15">
@@ -604,7 +610,9 @@ export default function BusinessRatingPanel() {
                 />
               </div>
               <p className="text-xs font-medium text-muted-foreground">
-                {tier.next ? `${toNextTier} to ${tier.next.name}` : 'Top tier held'}
+                {tier.next
+                  ? t('reports.brToNextTier', { points: toNextTier, name: tier.next.name })
+                  : t('reports.brTopTier')}
               </p>
             </div>
           )}
@@ -645,7 +653,7 @@ export default function BusinessRatingPanel() {
         <Card className="flex flex-col gap-3 p-5 lg:col-span-3">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-              On the table
+              {t('reports.brOnTheTable')}
             </span>
             {onTheTable > 0 && (
               <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
@@ -662,7 +670,7 @@ export default function BusinessRatingPanel() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {score === null ? 'Nothing to work with yet.' : 'Nothing left on the table. Keep selling.'}
+              {score === null ? t('reports.brNothingYet') : t('reports.brNothingLeft')}
             </p>
           )}
         </Card>
@@ -674,7 +682,9 @@ export default function BusinessRatingPanel() {
       {/* Personal best + trend */}
       <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-6">
         <div className="shrink-0">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Your best</span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            {t('reports.brYourBest')}
+          </span>
           <p className="text-2xl font-bold tabular-nums text-foreground">{best ?? '--'}</p>
         </div>
         {/* The peer figure is not repeated here — the comparison card above owns it. */}
@@ -683,19 +693,20 @@ export default function BusinessRatingPanel() {
             <>
               <TrendLine points={history.map((h) => h.s)} />
               <p className="mt-1 text-xs text-muted-foreground">
-                {history.length} days recorded
-                {facts.truncated && ` · scored on the last ${facts.coveredDays} days of sales`}
+                {t('reports.brDaysRecorded', { count: history.length })}
+                {facts.truncated &&
+                  ` · ${t('reports.brScoredOnLast', { days: facts.coveredDays })}`}
               </p>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground">Check back tomorrow to see the trend.</p>
+            <p className="text-xs text-muted-foreground">{t('reports.brCheckBack')}</p>
           )}
         </div>
         <Link
           href="/achievements"
           className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
         >
-          Badges
+          {t('reports.brBadges')}
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </Card>

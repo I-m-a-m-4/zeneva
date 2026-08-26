@@ -58,6 +58,7 @@ import {
 import { AI_DAILY_COLLECTION, aiDailyDocId } from '@/lib/ai-analytics';
 import { IMPORT_CREDIT_FLOORS, type ImportAiAction } from '@/lib/import/pricing';
 import { IMPORT_FIELDS } from '@/lib/import/types';
+import { CUSTOMER_IMPORT_FIELDS } from '@/lib/import/customers';
 
 /**
  * Native builds are a static export with no server of their own, so they call
@@ -189,6 +190,52 @@ const MatchSchema = z.object({
         .describe('The id of the candidate that is the same product, or null if none is.'),
     }),
   ),
+});
+
+// ── Customers ────────────────────────────────────────────────────────────────
+
+const CUSTOMER_FIELD_ENUM = z.enum(
+  CUSTOMER_IMPORT_FIELDS as unknown as [string, ...string[]],
+);
+
+/**
+ * A customer as the model is allowed to describe it.
+ *
+ * Every value is a `string`, for the same reason the product row's numbers are:
+ * a phone number is not a number. Asked for one, a model helpfully drops the
+ * leading zero off `08031234567` and returns `8031234567`, or renders it in
+ * scientific notation. Taking the text back verbatim and normalising it with
+ * `normalizePhone` on the client keeps one rule for every source.
+ */
+const AiCustomerSchema = z.object({
+  name: z.string().describe("The person's or company's name, exactly as written."),
+  phone: z.string().optional().describe('Phone number exactly as written, including any leading zero or +234.'),
+  email: z.string().optional().describe('Email address if one is written. Never invent one.'),
+  code: z.string().optional().describe('Customer code, account number or membership number if written.'),
+  tags: z.string().optional().describe('Any label or group written against them, e.g. "wholesale". Comma-separated if several.'),
+  notes: z.string().optional().describe('Any remark written against them, copied as-is.'),
+  totalSpent: z.string().optional().describe('Total amount spent, as written, if the source states one.'),
+  loyaltyPoints: z.string().optional().describe('Loyalty or reward points, as written, if the source states any.'),
+});
+
+const ParseCustomersSchema = z.object({
+  rows: z.array(AiCustomerSchema),
+  note: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('One short sentence about anything unreadable. Empty if all was clear.'),
+});
+
+const MapCustomerColumnsSchema = z.object({
+  mappings: z
+    .array(
+      z.object({
+        index: z.number().int().describe('The column index you were given.'),
+        field: CUSTOMER_FIELD_ENUM.nullable().describe('The Zeneva field, or null to ignore the column.'),
+      }),
+    )
+    .describe('One entry per column you were asked about.'),
 });
 
 /**
@@ -340,7 +387,6 @@ and corrupts a figure the owner will trust for months. A "no" only creates a dup
 see and delete in seconds. The two mistakes are not equally bad, so prefer null.`;
 
 const BULK_PROMPT = `You are turning a shop owner's instruction into a single bulk-edit operation.
-
 You do NOT edit anything. You describe the rule; Zeneva applies it locally, shows the owner
 every before-and-after value, and only writes what they approve.
 
@@ -361,6 +407,98 @@ margin, markup.
 - If the instruction cannot be expressed as one operation, or would change a product's name or
   SKU, or is not about editing products at all, set 'refusal' to one plain sentence saying so
   and leave the rest at safe defaults. Do not approximate a destructive guess.`;
+
+// ── Customers ────────────────────────────────────────────────────────────────
+
+const CUSTOMER_FIELD_GUIDE = `Zeneva customer fields:
+- name: what the customer is called — a person or a company. Required.
+- phone: their phone number.
+- email: their email address.
+- code: customer code, account number, membership or card number, client reference.
+- tags: any label or group they belong to, e.g. "wholesale", "staff", "VIP".
+- notes: any free remark written against them.
+- totalSpent: how much they have spent in total, if the source states a figure.
+- loyaltyPoints: their reward or loyalty points balance, if the source states one.`;
+
+/**
+ * The rule that governs every customer prompt, stated once.
+ *
+ * An invented phone number or email is worse than a blank one in a way that is
+ * easy to miss: the shop will *use* it. A wrong number gets a debt reminder sent
+ * to a stranger, and an invented address bounces silently until the day somebody
+ * wonders why this customer never opens anything. The dialog this replaces
+ * fabricated an email for every row — `name + 4 random chars + @zeneva-import.local`
+ * — so this is not a hypothetical failure, it is the one being fixed.
+ */
+const NEVER_INVENT = `Never invent contact details. If a row has no phone number, leave phone empty; if it
+has no email, leave email empty. An empty field is a correct and useful answer. A plausible
+guess is not — the shop will send real messages to whatever you put here, and a wrong number
+reaches a stranger while a wrong address reaches nobody at all.`;
+
+const CUSTOMER_MAP_PROMPT = `You are reading the column headers of a shop's customer list and saying which
+Zeneva field each one holds.
+
+${CUSTOMER_FIELD_GUIDE}
+
+Rules:
+- Answer for every column index you are given, and no others.
+- Use the sample values as much as the header. A column headed "Contact" holding 08031234567,
+  07098765432 is a phone; one holding "Musa Ibrahim", "Ada Okeke" is a name.
+- Return null for anything that is not one of the fields listed — addresses, dates, balances
+  owed, salesperson names, row numbers, internal flags. Ignoring a column is a correct answer
+  and much better than forcing it into a field it does not belong in.
+- Never map two columns to the same field.
+- A file may split a person's name across two columns ("First name", "Last name"). Map the one
+  that carries the family name or the fuller value to name and return null for the other; do
+  not map both.
+- Do not map a column of money to totalSpent unless the header says it is a total already
+  spent. A column of outstanding debt, credit limit or a single last purchase is not that, and
+  writing it to totalSpent overstates what every one of these customers is worth to the shop.
+- The headers may be in any language, or may be abbreviations. "Nom", "Tel", "Correo",
+  "Kunde", "Telefon", "Numéro" are all real column headers in customer exports.`;
+
+const CUSTOMER_TEXT_PROMPT = `You are turning a shopkeeper's own words into customer records.
+
+${CUSTOMER_FIELD_GUIDE}
+
+${NEVER_INVENT}
+
+Rules:
+- One row per distinct person or company. "Musa on 0803 123 4567 and his wife Amina" is two
+  rows, and only Musa has a phone number.
+- Copy phone numbers EXACTLY as written, keeping any leading zero or +234 and any spaces.
+  Do not reformat, do not add a country code, do not drop a leading zero. Zeneva normalises
+  them itself, and it can only do that from what was actually written.
+- Copy money exactly as written, including currency symbols and separators. "45k" stays "45k".
+- A word describing a group ("wholesale customers", "my staff", "the church people") is a tag,
+  and it applies to every person in that sentence.
+- Do not turn a remark into a name. "the man who buys drinks on Fridays" is a note on a row
+  whose name is whatever he is actually called — if no name is given, skip the row rather than
+  inventing one from the description.`;
+
+const CUSTOMER_PHOTO_PROMPT = `You are reading a photograph of a shop's customer records — a ledger page, a
+visitors' book, a page of a notebook, a stack of business cards, or a printed list.
+
+${CUSTOMER_FIELD_GUIDE}
+
+${NEVER_INVENT}
+
+Rules:
+- One row per person or company written on the page.
+- Read handwriting conservatively. A digit you cannot make out makes the WHOLE phone number
+  unusable, so leave the phone empty and put what you can read in the note instead. A phone
+  number with one wrong digit is not a partial success; it belongs to somebody else.
+- Nigerian mobile numbers are 11 digits starting 070, 080, 081, 090 or 091. If what you read
+  is not that shape and the page is not from another country, you have probably misread it —
+  prefer leaving it empty.
+- Do not carry a heading, a column title, a page number, a date or a running total into a row.
+  "Name  Phone  Amount" is the heading of the table, not a customer.
+- Where the page shows an amount against somebody, only put it in totalSpent if the column is
+  a total already spent. A single sale, a balance owed or a deposit is not, and belongs in the
+  note instead.
+- If the photograph is too blurry, too dark or too slanted to read, return no rows and say so
+  in the note. An empty answer is far better than a guessed one — these are the details the
+  shop will use to contact real people.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Handler
@@ -425,14 +563,33 @@ export async function POST(req: Request) {
   if (caller?.status === 'suspended') return fail(403, 'This account is suspended.');
 
   /*
-   * Importing is a write to the catalogue, so the same permission gates it.
+   * Importing is a write, so the same permission that gates the write gates the
+   * AI step that prepares it — and which permission that is depends on what is
+   * being imported.
    *
    * Checked here as well as in `addToQueue` on the client, because this endpoint
    * costs the platform money before any write is attempted: without it a cashier
    * who cannot add a product could still burn the shop's whole credit balance
    * photographing shelves.
+   *
+   * The two gates are the ones `addToQueue` itself applies — `manage_inventory`
+   * for `add-product`/`update-product`, `view_customers` for the three
+   * `*-customer` actions (`pos-context.tsx`). Gating both kinds on
+   * `manage_inventory` would refuse a customer import to the staff most likely to
+   * be doing one, and gating on the wrong one is worse than not gating: it lets
+   * somebody spend the shop's credits preparing a write the client will then
+   * refuse, so they pay for nothing.
    */
-  if (caller?.permissions?.manage_inventory === false) {
+  const needsCustomerPermission =
+    action === 'map-customer-columns' ||
+    action === 'parse-customer-text' ||
+    action === 'parse-customer-photo';
+
+  if (needsCustomerPermission) {
+    if (caller?.permissions?.view_customers === false) {
+      return fail(403, 'You do not have permission to manage customers.');
+    }
+  } else if (caller?.permissions?.manage_inventory === false) {
     return fail(403, 'You do not have permission to change inventory.');
   }
 
@@ -558,10 +715,25 @@ async function runAction(action: ImportAiAction, body: any, model: any): Promise
       return matchProducts(body, model);
     case 'bulk-op':
       return bulkOp(body, model);
+    case 'map-customer-columns':
+      return mapCustomerColumns(body, model);
+    case 'parse-customer-text':
+      return parseCustomerText(body, model);
+    case 'parse-customer-photo':
+      return parseCustomerImage(body, model);
   }
 }
 
-async function mapColumns(body: any, model: any): Promise<ActionResult> {
+/**
+ * Read the columns and sample rows off a request and describe them for the model.
+ *
+ * Shared by the product and customer mappers because the task is the same one —
+ * "here is a header and eight of its values, what is this column" — and the
+ * clamping is the part that must not differ between them. `SAMPLE_ROWS` being
+ * applied in one place is what keeps column mapping priced flat for a file of any
+ * size; a second copy is a second chance to send the whole file by accident.
+ */
+function describeColumns(body: any): { columns: { index: number; header: string }[]; described: string } {
   const columns: { index: number; header: string }[] = Array.isArray(body?.columns)
     ? body.columns
         .slice(0, LIMITS.headers)
@@ -584,6 +756,12 @@ async function mapColumns(body: any, model: any): Promise<ActionResult> {
       }`;
     })
     .join('\n');
+
+  return { columns, described };
+}
+
+async function mapColumns(body: any, model: any): Promise<ActionResult> {
+  const { columns, described } = describeColumns(body);
 
   const { object, usage } = await generateObject({
     model,
@@ -618,7 +796,15 @@ async function parseText(body: any, model: any): Promise<ActionResult> {
   return { data: { rows: object.rows ?? [], intent: object.intent ?? null, note: object.note ?? null }, usage };
 }
 
-async function parseImage(body: any, model: any, kind: 'photo' | 'invoice'): Promise<ActionResult> {
+/**
+ * Pull an image off a request, checked and size-capped, for either photo action.
+ *
+ * The size check runs on the base64 length rather than on decoded bytes so an
+ * oversized upload is refused without allocating it — a shelf photograph from a
+ * modern phone is several megabytes, and this endpoint is reachable from three
+ * native shells that do no resizing of their own.
+ */
+function readImage(body: any): { data: string; mimeType: string } {
   const base64 = String(body?.imageBase64 ?? '');
   // Strip a data-URL prefix if the client sent one, so both forms work.
   const data = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64;
@@ -634,6 +820,12 @@ async function parseImage(body: any, model: any, kind: 'photo' | 'invoice'): Pro
   const mimeType = /^image\/(png|jpeg|jpg|webp|heic|heif)$/i.test(String(body?.mimeType ?? ''))
     ? String(body.mimeType)
     : 'image/jpeg';
+
+  return { data, mimeType };
+}
+
+async function parseImage(body: any, model: any, kind: 'photo' | 'invoice'): Promise<ActionResult> {
+  const { data, mimeType } = readImage(body);
 
   const currency = String(body?.currency ?? '').slice(0, 8);
   const knownCategories: string[] = Array.isArray(body?.categories)
@@ -659,6 +851,103 @@ async function parseImage(body: any, model: any, kind: 'photo' | 'invoice'): Pro
             type: 'text',
             text: hints || (kind === 'invoice' ? 'Read this invoice.' : 'Read the stock in this photograph.'),
           },
+          { type: 'image', image: data, mediaType: mimeType },
+        ],
+      },
+    ],
+  });
+
+  return { data: { rows: object.rows ?? [], note: object.note ?? null }, usage };
+}
+
+// ── Customers ────────────────────────────────────────────────────────────────
+
+async function mapCustomerColumns(body: any, model: any): Promise<ActionResult> {
+  const { columns, described } = describeColumns(body);
+
+  const { object, usage } = await generateObject({
+    model,
+    schema: MapCustomerColumnsSchema,
+    system: CUSTOMER_MAP_PROMPT,
+    prompt: `Columns to identify:\n${described}`,
+  });
+
+  /*
+   * Two filters, and the second one is the one that matters.
+   *
+   * A mapping for an index that was not offered is dropped — the same check the
+   * product mapper makes. And a field claimed twice is kept only for the first
+   * column that claimed it, because the prompt's "never map two columns to the
+   * same field" is an instruction, not a guarantee. Two columns mapped to `phone`
+   * would have the second silently win in `applyCustomerAiMapping`, which is how a
+   * customer ends up with their landline in place of the mobile the shop actually
+   * reaches them on.
+   */
+  const claimedFields = new Set<string>();
+
+  return {
+    data: {
+      mappings: (object.mappings ?? [])
+        .filter((m) => columns.some((c) => c.index === m.index))
+        .map((m) => {
+          const field = m.field ?? null;
+          if (!field) return { index: m.index, field: null };
+          if (claimedFields.has(field)) return { index: m.index, field: null };
+          claimedFields.add(field);
+          return { index: m.index, field };
+        }),
+    },
+    usage,
+  };
+}
+
+async function parseCustomerText(body: any, model: any): Promise<ActionResult> {
+  const text = String(body?.text ?? '').slice(0, LIMITS.textChars).trim();
+  if (!text) throw new Error('No text supplied.');
+
+  const currency = String(body?.currency ?? '').slice(0, 8);
+
+  const { object, usage } = await generateObject({
+    model,
+    schema: ParseCustomersSchema,
+    system: CUSTOMER_TEXT_PROMPT,
+    prompt: `${currency ? `The shop's currency symbol is ${currency}.\n\n` : ''}Text from the shop owner:\n\n${text}`,
+  });
+
+  return { data: { rows: object.rows ?? [], note: object.note ?? null }, usage };
+}
+
+async function parseCustomerImage(body: any, model: any): Promise<ActionResult> {
+  const { data, mimeType } = readImage(body);
+
+  const currency = String(body?.currency ?? '').slice(0, 8);
+  /*
+   * Existing tags are offered the way existing categories are offered to the
+   * shelf-photo prompt, and for the same reason: a ledger page headed "wholesale"
+   * should join the shop's own `Wholesale` tag rather than found a second one that
+   * differs only in case. Every new spelling of a tag is a segment that silently
+   * stops matching, and nothing in the app would ever flag it.
+   */
+  const knownTags: string[] = Array.isArray(body?.tags)
+    ? body.tags.slice(0, 40).map((c: any) => String(c ?? '').slice(0, 60)).filter(Boolean)
+    : [];
+
+  const hints = [
+    currency ? `The shop's currency symbol is ${currency}.` : '',
+    knownTags.length
+      ? `Tags this shop already uses, if one fits: ${knownTags.join(', ')}. Prefer one of these over a new spelling of the same thing.`
+      : '',
+  ].filter(Boolean).join('\n');
+
+  const { object, usage } = await generateObject({
+    model,
+    schema: ParseCustomersSchema,
+    system: CUSTOMER_PHOTO_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: hints || 'Read the customer records on this page.' },
           { type: 'image', image: data, mediaType: mimeType },
         ],
       },

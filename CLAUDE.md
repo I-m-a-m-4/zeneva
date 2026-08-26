@@ -54,9 +54,63 @@ shape of each is worth keeping:
   is empty* from *the mirror could not be read* — `getCachedProducts` returning `[]` could
   not.
 
-`productSyncError` (`null | 'network' | 'permission' | 'cache'`) and
+`productSyncError` (`null | 'network' | 'access' | 'cache'`) and
 `isProductCatalogPending` are the context's answers for the UI; the POS reads both. Never
 reintroduce a code path where an unreadable cache is indistinguishable from an empty shop.
+
+### Never claim a permission you cannot prove — and prove emptiness before asserting it
+
+`src/lib/product-catalog-state.ts` is required reading before touching the catch in
+`fetchFullProducts`, `isCatalogUnverified`, or
+`src/components/shared/catalog-unavailable.tsx` (the one drawing of the failure state,
+shared by the POS grid and the Inventory table — it was duplicated in both pages, which
+is how the wrong version survived edits to one of them).
+
+A Portuguese-speaking shop with no products yet was shown a **lock icon**, "Esta conta
+não tem permissão para ver a lista de produtos. Peça ao proprietário do negócio acesso ao
+estoque", and **no Retry button** — on their own shop, as the owner. Four things were
+wrong, and each one is a rule now:
+
+- **`firestore.rules:429` gates `products` `list` on tenancy alone** — `resource.data
+  .businessId == getCurrentUserBusinessId() || resource.data.createdBy == request.auth.uid`.
+  There is no `manage_inventory`, no role term, nothing a permission could be missing
+  from. So a refusal **never** establishes that this account lacks a permission, and the
+  `'permission'` kind is gone: a refusal is `'access'` — "the server would not release it
+  and we could not confirm why". Copy that accuses the account is banned in all eleven
+  catalogs, and `npm run test:catalog-state` asserts it per language.
+- **A refusal is retried, and Retry is always offered.** It used to `return` from the
+  catch: no ladder, no button, terminal until a reload — while the dominant cause is
+  transient. Rules evaluate `getUserData()` for the query *whatever the result set
+  holds*, so a signed-up account whose `users/{uid}` write has not reached the server
+  (the client runs on the latency-compensated local copy and queries a beat too early) is
+  refused — which lands hardest on brand-new shops, i.e. the ones with no products.
+  `PRODUCT_SYNC_RETRY_POLICY` gives a refusal a shorter fuse than a dropped connection,
+  because a cashier should not watch a skeleton for 30s to learn it is real.
+- **Codes carry meaning; error prose does not.** The old test was
+  `message.includes('permission')`, which files a denied browser notification prompt or a
+  Tauri capability refusal ("Permissions associated with this command: sql:allow-load")
+  as "your account may not list products". `isServerRefusal` matches codes, plus
+  Firestore's exact "insufficient permissions" wording for an error that lost its code.
+  It is now the **only** refusal test in `pos-context.tsx` — all six sync paths (delta,
+  receipts, users, audit logs, customers, products) share it, because the other five
+  swallow a refusal silently and a false positive there stops that collection retrying
+  for the session with nothing logged.
+- **The specific cause is measured, once, and sent to `error_logs` — never guessed at on
+  screen.** `describeRefusal` names it from one `getDocFromServer` read of
+  `users/{auth.uid}`: `no-server-profile`, `tenant-mismatch`, `impersonation`,
+  `probe-failed`, or `unattributed`. Latched per business per session — the *whole*
+  report, not just the read, because reporting without the probe would file every repeat
+  as `probe-failed`, which would not be true.
+
+And the other half of it: **`catalogConfirmedEmpty` is the only witness that a shop is
+genuinely empty.** It is set when a *complete* (non-impersonating) sync returns zero rows
+— the server was asked and said none — and it makes `isCatalogUnverified` false. Without
+it, every later doubt reopened the question and put "Couldn't load your products" in
+front of a shop that had simply not added any: going offline did it, a failed retry did
+it. It is session-scoped and **never persisted**, because a stamp for it would be one more
+claim that outlives what it certifies (see `full_products_sync` above); it is cleared when
+`businessId` changes, and it is assigned from `allFetched.length === 0` rather than set to
+`true`, so a later sync that finds products clears it.
 
 ## Loss prevention — read before touching a detector or an audit-log write
 
@@ -350,6 +404,60 @@ that is falling over — an anomaly must not be crowded out of it.
 - The admin popup reads `data.message || data.errorMessage || …` and titles anomalies
   **"Zeneva Anomaly Detected"**, so they are distinguishable from crash logs at a glance.
 
+## Install → sign-up funnel — the only thing that sees a signed-out user
+
+`src/lib/launch-telemetry.ts` (client), `src/app/api/launch/route.ts` (write),
+`src/lib/launch-funnel.ts` (pure aggregation), `src/components/admin/launch-funnel.tsx`
+(the Acquisition tab). `npm run test:launch-funnel` is 66 checks over the pure module.
+
+Built because the Microsoft Store reported **29 installs → 10 first launches → 1
+sign-up** and nothing here could say what the other nine saw. **Every other analytics
+path in the codebase is gated on a signed-in user** — `UserActivityTracker` returns
+immediately on a null user, `download_clicks` only covers the marketing site's buttons,
+`api/track` is an email pixel. Somebody who opened the app, read the login form and quit
+left no trace anywhere. Those nine are **unrecoverable**; the panel says so on screen
+rather than presenting its own start date as the beginning of the story.
+
+- **Unauthenticated by necessity** — the population it measures has no account.
+  `error_logs` (`allow create: if true`) is the precedent. So: no uid, no email, no typed
+  input; `detail` is the only free-text field and holds a Firebase error code. The doc id
+  **is** the caller's `installId`, so the worst abuse is inflating one record, and it is
+  validated against a pattern rather than sanitised — a slash would write into a
+  subcollection. `app_launches` has no `firestore.rules` entry; the super-admin catch-all
+  is the only read path.
+- **One write, no read.** `set(..., {merge: true})`, and `stages` is a **nested map** —
+  never a dotted `stages.<name>` key, which `set()` does not parse as a path. That bug
+  already cost this repo the `pageViews` history and the AI usage rollup.
+- **`app_opened` never lands in `stages` or `events`.** It fires once per *session* (so
+  relaunches are countable), and writing it into either would overwrite the first-launch
+  timestamp on every relaunch and grow `events` unbounded. It increments `launches`; the
+  document existing is itself the proof the app opened.
+- **Failure stages are absent from `LAUNCH_STAGE_ORDER` on purpose.** A failure is not
+  progress — putting `signup_failed` between started and succeeded reports a stuck
+  install as further along than one still typing. Failures dedupe on stage+code so a
+  *second* cause is recorded but the same one looping is not.
+- **`saw_a_way_in` is one funnel step, not three.** `/welcome`, `/login` and `/signup`
+  are alternatives, not a sequence, so counting them separately showed every install
+  dropping out of two screens it was never sent to.
+- **`worstStep` excludes the final step** (finishing setup cannot lose anyone) and is
+  `null` when nothing was lost — reporting a zero-loss step as "the biggest drop-off"
+  invents a problem.
+- **`lostLocales` is tallied over non-signups only.** That is the question the new
+  Portuguese/Arabic/Spanish Store listings raise; asking it of everybody answers nothing.
+- `getDocs`, not `onSnapshot`, capped at 500 newest-first — a live listener on a
+  collection that grows with every install bills reads forever for a panel nobody is
+  watching. The cap is stated on screen.
+- **`markLaunched()` primes the memo before it writes.** `<LaunchTelemetry />` sits above
+  `{children}` in the root layout, so its effect runs before the root page's redirect
+  effect reads `isFirstLaunchEver()` — without the priming call a genuine first launch is
+  sent to `/login`.
+- Mounted **outside** `FirebaseClientProvider`: a broken Firebase config is itself a
+  candidate cause of lost sign-ups (3.1.2 shipped with `undefined` config and every
+  correct password reported "Invalid email or password"), so the telemetry must not
+  depend on it.
+- **It only measures builds that ship with it** — the route needs a `zeneva.space`
+  deploy, the client needs a new Store submission. Nothing retroactive exists.
+
 ## Zen AI — read before touching the chat client or a stale-bundle bug
 
 `docs/zen-ai.md` is required reading for anything touching `/ai-insights` or
@@ -434,25 +542,30 @@ The short version:
   (which derives `ZEN_TOOL_COUNT`) and nowhere else. Five docs spelled a number out
   and every one of them had drifted — 41, 41, 42, 44 against a real 46. The harness
   now asserts `TOOL_LINES` matches the real set in both directions.
-- **Credits are purchasable, and the client never writes the balance.** Prices live in
-  `src/lib/credit-packs.ts` (250/1,000/5,000; ₦2,500/₦8,000/₦35,000, $2.50/$8/$35) and
-  **both servers re-derive the price from the `packId`** — `metadata` is not a price
-  list. Three writers touch `aiBonusCredits`: `purchaseAiCredits`
-  (`src/actions/ai-credits.ts`, Paystack/NGN, replay-guarded on the `reference`), the
-  Dodo webhook (USD), and the admin grant — all Admin SDK or super-admin, because the
-  field is in `entitlementFieldsLocked()`. Four things that already went wrong:
-  the Dodo credit branch must sit **before** `if (businessId && planId)` or a pack (which
-  has no `planId`) returns 200 and grants nothing; `kind: 'credits'` on the `purchases`
-  row is what keeps a one-off pack out of MRR/ARPU (`purchaseKind` reads a **missing**
-  `kind` as `'subscription'`, and lifetime/TTM totals keep packs on purpose — they are
-  totals, not rates); it is always `FieldValue.increment`, never `previous + credits`,
-  because a chat turn is debiting the same field; and `ai_credit_ledger` needs **no
-  `firestore.rules` entry** (the super-admin catch-all covers it) which also means no
-  tenant can read it. Buying happens in exactly one place —
-  `settings/ai-credits-section.tsx`, mounted on `/billing` as a **sibling** of the plans
-  card because `subscription-section.tsx` early-returns for `accessLevel === 'lifetime'`,
-  and rendering **one** rail per shop. `/ai-insights` only links there
-  (`/billing?topup=1#ai-credits`).
+- **Credits are not sold — the allowance *is* the AI product.** A shop that needs more
+  Zen AI upgrades a tier; there are no packs, no top-ups and no credit range. That was
+  tried and scrapped: `src/lib/credit-packs.ts` (a 250/1,000/5,000 price list),
+  `src/actions/ai-credits.ts` (`purchaseAiCredits`, Paystack/NGN) and
+  `settings/ai-credits-section.tsx` (the `/billing` rail) are **deleted**, along with the
+  Dodo checkout's `packId` branch and the webhook's credit-grant branch. Do not
+  reintroduce a buy surface without deciding the price question first — the reason it
+  died is that a flat rate reprices the ends and a volume curve needs a
+  pay-what-you-want product Dodo may not offer, and **the USD rail was never live
+  anyway** (`DODO_CREDITS_*_PRODUCT_ID` was never configured, so that button always
+  refused).
+  What survives, and why: **`aiBonusCredits` still exists**, is still spent after the
+  monthly allowance, and has exactly one writer left — the super-admin grant on
+  `/admin-imamshaffy/ai-usage`. It is in `entitlementFieldsLocked()`, so a tenant cannot
+  write its own balance; it is always `FieldValue.increment`, never `previous + credits`,
+  because a chat turn is debiting the same field; and `ai_credit_ledger` records every
+  movement with **no `firestore.rules` entry** (the super-admin catch-all covers it),
+  which also means no tenant can read it. `kind: 'credits'` on a `purchases` row and the
+  `'purchase'` kind on a ledger row are **historical only** — kept because a row written
+  while packs were on sale is real money that must still render, and because
+  `purchaseKind` reads a **missing** `kind` as `'subscription'`, which every other row
+  is. The Dodo webhook now **refuses** a `kind: 'credits'` delivery rather than letting
+  it fall through to the plan gate, where a $2.50 payment could have bought a plan.
+  `/ai-insights` links to `/billing` for an upgrade and quotes no price.
 - The tools live in `src/app/api/chat/tools.ts`, not the route — and the count is
   derived from `TOOL_LINES` in `zen-status.tsx`, so don't hardcode it anywhere.
   Two of their query shapes have **no Firestore composite index** (`receipts` by
@@ -478,8 +591,8 @@ The short version:
 ## Smart import — read before touching the importer or adding a source
 
 `docs/smart-import.md` is required reading for anything touching
-`src/lib/import/*`, `src/components/inventory/smart-import/*`, or
-`src/app/api/import/route.ts`.
+`src/lib/import/*`, `src/components/inventory/smart-import/*`,
+`src/components/customers/smart-import/*`, or `src/app/api/import/route.ts`.
 
 The short version:
 
@@ -540,8 +653,39 @@ The short version:
   why the focus-triggered clipboard bridge stays as the fallback.
 - **`localYmd` exists because `toISOString()` is a day early in Lagos.**
   `new Date('3 April 2027')` is local midnight = `2027-04-02T23:00Z`.
-- `npm run test:import` — 110 checks, and it must be `.ts` not `.mts` (same
-  CJS-interop trap as the rating harness). It found both of the above on first run.
+- **The customer book has its own importer on the same rails.**
+  `src/lib/import/customers.ts` + `src/components/customers/smart-import/*`, four
+  sources (Excel/CSV, paste, photo of a ledger page, typed out), three more route
+  actions. Six things not to undo:
+  - **Only `name` is required, and nothing is invented.** The dialog it replaces
+    demanded an email and **fabricated one** — `${name}${4 random chars}@zeneva-import.local`
+    — onto thousands of live records, which is also why `isPlaceholderEmail` must stay
+    in `customer-health.ts` forever and why an incoming placeholder is dropped.
+  - **Duplicate detection reuses the Health tab's normalizers**, not a matcher tuned
+    for import. Two definitions of "the same customer" means the importer creating a
+    record the Health tab immediately flags. That sharing found a live bug:
+    `normalizeCode` stripped whitespace only, so `ACC-1` and `ACC 1` hashed apart —
+    and a code match is applied as a *fact*, so a re-import with different hyphens
+    duplicated everybody. It now strips `[\s\-_.]`, the same set as `normalizeSku`.
+  - **There is deliberately no AI matching step.** Two customers with the same name
+    are not the same person and nothing in the row says which is meant. Products pay a
+    model because `50cl` and `500ml` really are equal; here it would sell a coin flip.
+  - **Updates fill blanks only, and the two running totals take the `max`, never the
+    sum** — an import is a snapshot from another system, and summing double-counts
+    every purchase Zeneva already recorded. An update that would write nothing is
+    dropped, not queued.
+  - **`lowercaseName` or the customer cannot be found at the till**, and `totalSpent`
+    defaults to `0` because the list `orderBy`s it and Firestore drops documents
+    missing the field. `branchId` belongs to `addToQueue`, never to the importer.
+  - **The route's permission gate is per action** — `view_customers` for the three
+    customer actions, `manage_inventory` for the product ones, matching `addToQueue`.
+    Gating on the wrong one lets the shop pay credits for a write the client refuses.
+  - Staging runs against `allCustomersUnfiltered` and the dialog **waits for it**:
+    `null` is "still loading", `[]` is "none on file", and matching against a filtered
+    or unloaded book reports every row as new.
+- `npm run test:import` — 110 checks — and `npm run test:customer-import` — 143. Both
+  must be `.ts` not `.mts` (same CJS-interop trap as the rating harness). Each found a
+  real bug on its first run.
 - Two adjacent things found while building this and worth knowing: the chat route's
   global daily counter **only ever incremented**, so the `date` guard made day two read
   day one's total and 429 everybody from the second request onward (fixed —
@@ -549,8 +693,64 @@ The short version:
   switch**, so a queued settings write updates the screen, never reaches Firestore and
   retries forever. New categories use a direct `updateDoc` because of it.
 
-## Android signing — read before touching release builds
+## Marketing recorder and the store trailer — read before shooting footage
 
+`scripts/record/README.md` is required reading for anything touching
+`scripts/record/*`, and it is the only doc for a feature that drives the real app
+with a real login. The short version:
+
+- **It records the real app, so there is nothing describing what the app looks
+  like.** Selectors are the text a person reads; when one breaks, the flow's picture
+  of the app is out of date. `--headed --keep-frames` and then reading the last frame
+  out of `frames.mjpg` is the fastest way to see what was actually on screen — that
+  is how all three of the failures below were found, and each one reported something
+  that pointed somewhere else.
+- **Film length is wall-clock**, because frames are written at a constant rate. So
+  machine load is a creative constraint: the same trailer flow measured **63.9s at
+  24 fps painted and 72.2s at 15 fps**. Shoot on a quiet machine.
+- **Never shoot the trailer against `next dev`.** A single POS navigation was
+  measured at **13.4 seconds of finished film** because the route compiled on demand
+  mid-flow. `npm run build` + `npx next start -p 9007` (then `node
+  scripts/clean-sw.mjs`, or the build's own `public/sw.js` gets served) cut the same
+  take from 87.8s to 60.6s.
+- **Production `zeneva.space` currently cannot be recorded in a fresh headless
+  profile** — the POS lands on "Couldn't load your products" with the top bar saying
+  OFFLINE, so `productSyncError`/`isCatalogUnverified` are set and the grid never
+  renders. `navigator.onLine` is true from document start and all three of
+  `verifyConnectivity`'s probes succeed from that origin when tested directly, so
+  this is not the connectivity logic. Unresolved; localhost is unaffected.
+- **The achievement modal will eventually cover a click.** Every take runs in a
+  throwaway Chrome profile, so `zeneva_ach_seen_<businessId>` is always empty and
+  `<AchievementCelebration />` fires real milestones as fresh unlocks — over any page,
+  since it is mounted in `(app)/layout.tsx`. It is a *race*, not something a flow can
+  pre-empt: it took a take out **after** the flow had already dismissed it at startup.
+  Handled in `Page.clearBlocker`, which presses Escape when the thing covering a
+  target is a `[role="dialog"]`. Safe blindly — a flow working inside a dialog is not
+  blocked by it.
+- **A caption is three scripts at once**: the on-screen subtitle, the voice-over line,
+  and a `.vtt` cue. So a `hold` shorter than the caption takes to *say* puts two
+  voices on top of each other; the cue clamp hides it and the audio does not. Check
+  measured lengths with `store.mjs --scaffold`, never word count.
+- **`page.goto` keeps a page load out of the film and `clickTo` does not.** That is
+  the lever for a slow route — but it compresses the finished timeline while caption
+  marks are stamped in wall clock, which collapsed two captions onto each other 0.5s
+  apart. One caption per screen after a hidden navigation.
+- **Two numbers in Microsoft's MP4 spec cannot be met** and are reported as
+  recommendations by `store.mjs`: 50 Mbps video and 384 kbps audio are both requested
+  at encode and neither is reached, because a UI trailer is three quarters held frames
+  and no encoder spends that on skip frames or silence. Everything checkable *is*
+  checked and exact — profile, GOP, B-frames, codec, sample rate, channels, faststart,
+  edit lists. Do not "fix" those two by loosening the real ones.
+- **Captions need no writing; the audio description does.** Closed captions are the
+  caption track with each line's measured spoken length. An audio description is the
+  *picture* in audio and lives in `describe.mjs` with hard times in seconds —
+  `store.mjs` reports a clash rather than shifting one, because a description moved to
+  where it fits describes the wrong shot.
+- The trailer is a **coded flow, not a recipe**: it needs `clickAny` for a button the
+  business setting renames, and a time budget across four routes. That is the
+  domain-knowledge test `flows.mjs` already states.
+
+## Android signing — read before touching release builds
 `docs/android-signing.md` is required reading if the task involves the
 Android release, signing keys, or a Play Console upload rejection.
 

@@ -236,6 +236,25 @@ export type DraftIssue = {
  */
 export type MatchReason = 'sku' | 'name-exact' | 'name-similar' | 'ai';
 
+/**
+ * Why a candidate matched, as a code rather than a phrase.
+ *
+ * `explanation` below stays English and stays exactly as worded, because it is not
+ * only copy: `matchDraft` tests `top.explanation.includes('same size')` when deciding
+ * whether a similar-name hit is certain enough to skip the question. Translating the
+ * phrase in place would change which imports ask the owner and which ones merge
+ * silently — a wording change that corrupts stock figures. It also travels into Zen
+ * AI's tool payloads, which are English by design.
+ *
+ * So the phrase is the machine's, and the code is what a screen translates.
+ */
+export type MatchExplanationCode =
+  | 'same-code'
+  | 'same-name'
+  | 'similar-name'
+  | 'similar-name-same-size'
+  | 'similar-name-different-size';
+
 export type MatchCandidate = {
   productId: string;
   /** Denormalised so the review row renders without another products lookup. */
@@ -249,6 +268,10 @@ export type MatchCandidate = {
   score: number;
   /** One short phrase: "same barcode", "same name", "50cl = 500ml". */
   explanation: string;
+  /** The same fact as `explanation`, for a caller that needs to translate it. */
+  explanationCode: MatchExplanationCode;
+  /** What `explanationCode` interpolates — only `same-code` carries anything. */
+  explanationVars?: Record<string, string | number>;
 };
 
 /**

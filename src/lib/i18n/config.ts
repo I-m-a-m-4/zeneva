@@ -47,9 +47,14 @@ export const LOCALE_STORAGE_KEY = 'zeneva_locale';
 const BY_CODE = new Map<string, LocaleDefinition>(LOCALES.map(l => [l.code, l]));
 
 /**
- * Legacy and display-name values that predate this registry. Onboarding has
- * always written `settings.language: 'English'`, and older records may hold a
- * native name, so both spellings have to resolve rather than fall back blindly.
+ * Legacy and display-name values that predate this registry.
+ *
+ * Onboarding wrote `settings.language: 'English'` — the literal string, regardless of
+ * anything the user did — for every shop created before the language step existed, so
+ * these aliases are not a nicety: they are the only reason those records resolve at
+ * all. Onboarding now writes a code, but the old rows are permanent, and older ones
+ * may hold a native name, so both spellings have to resolve rather than fall back
+ * blindly.
  */
 const ALIASES: Record<string, LocaleCode> = LOCALES.reduce((acc, l) => {
   acc[l.label.toLowerCase()] = l.code;

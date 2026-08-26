@@ -1,15 +1,17 @@
 /**
  * The AI credit ledger — where a balance came from.
  *
- * `aiBonusCredits` is a single integer on the business document, moved by three
- * writers: a Paystack purchase (`src/actions/ai-credits.ts`), a Dodo purchase
- * (`src/app/api/webhooks/dodo/route.ts`), and a manual grant from
- * `/admin-imamshaffy/ai-usage`. Until credits were purchasable that was
- * survivable — a grant was a favour and nobody needed an audit trail for it.
+ * `aiBonusCredits` is a single integer on the business document. It had three
+ * writers: a Paystack purchase, a Dodo purchase, and a manual grant from
+ * `/admin-imamshaffy/ai-usage`. Credit packs are scrapped — credits are an
+ * allowance of the plan and are not sold — so **the grant is the only live writer
+ * now**, and it is the reason this collection stays: "who gave this shop 10,000
+ * credits" is a question about a number that keeps no history.
  *
- * Now one of those three is money. "The customer says they paid and has no
- * credits" and "who gave this shop 10,000 credits" are both questions about a
- * number that keeps no history, so every writer appends a row here.
+ * The `purchase` kind, its two gateway sources and `packId` are **kept on purpose**.
+ * Any row written while packs were on sale is real money that must still render in
+ * the admin table; deleting the shape would turn those rows into blanks. Nothing
+ * writes them any more.
  *
  * ## Shape of the thing
  *
@@ -24,20 +26,25 @@
  * A top-level collection with **no entry in `firestore.rules`**, which is exactly
  * right: the catch-all at the top of the file (`match /{allPaths=**}`) already
  * grants the platform owner read and write, and everyone else is denied by
- * default. Tenants have no business reading it, and the two purchase writers are
- * Admin SDK, which bypasses rules entirely. If a tenant-facing receipt list is
- * ever wanted, that needs a rule — do not assume this is readable client-side.
+ * default. Tenants have no business reading it, and the grant writer is super-admin
+ * through that same catch-all. If a tenant-facing receipt list is ever wanted, that
+ * needs a rule — do not assume this is readable client-side.
  *
- * No React and no Firestore imports in here, so the admin board, a server action
- * and a webhook can all share it.
+ * No React and no Firestore imports in here, so the admin board and a server action
+ * can share it.
  */
 
 export const AI_CREDIT_LEDGER_COLLECTION = 'ai_credit_ledger';
 
-/** Paid for, or given. The distinction the admin board exists to show. */
+/**
+ * Paid for, or given. The distinction the admin board exists to show.
+ *
+ * `'purchase'` is historical only — see the header. Everything written from now on
+ * is a `'grant'`.
+ */
 export type AiCreditLedgerKind = 'purchase' | 'grant';
 
-/** Which mechanism moved the credits. */
+/** Which mechanism moved the credits. The two gateways are historical only. */
 export type AiCreditLedgerSource = 'paystack' | 'dodo' | 'admin';
 
 export interface AiCreditLedgerEntry {
@@ -49,7 +56,7 @@ export interface AiCreditLedgerEntry {
   source: AiCreditLedgerSource;
   /** Always positive. Credits added to `aiBonusCredits`. */
   credits: number;
-  /** Pack id for a purchase; absent for a grant. */
+  /** Pack id for a historical purchase; absent for a grant. */
   packId?: string | null;
   /** Money paid, in `currency`'s major units. Absent for a grant. */
   amount?: number | null;

@@ -11,13 +11,7 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
-
-const chartConfig = {
-  sales: {
-    label: "Sales",
-    color: "hsl(var(--primary))",
-  },
-} satisfies ChartConfig;
+import { useI18n } from '@/context/i18n-context';
 
 interface SalesOverTimeChartProps {
     receipts: Receipt[];
@@ -26,7 +20,15 @@ interface SalesOverTimeChartProps {
 }
 
 export default function SalesOverTimeChart({ receipts, currencySymbol, data }: SalesOverTimeChartProps) {
+    const { t } = useI18n();
     const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
+    // Inside the component because the label is translated; there is no `t` at module scope.
+    const chartConfig = {
+      sales: {
+        label: t('reports.colSales'),
+        color: "hsl(var(--primary))",
+      },
+    } satisfies ChartConfig;
 
     const chartData = React.useMemo(() => {
         if (data && timeframe === 'all') return data;
@@ -72,8 +74,8 @@ export default function SalesOverTimeChart({ receipts, currencySymbol, data }: S
          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div>
-                   <CardTitle>Sales Over Time</CardTitle>
-                   <CardDescription>Revenue performance trends.</CardDescription>
+                   <CardTitle>{t('reports.sotTitle')}</CardTitle>
+                   <CardDescription>{t('reports.sotSubtitle')}</CardDescription>
                 </div>
                 <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
@@ -83,7 +85,7 @@ export default function SalesOverTimeChart({ receipts, currencySymbol, data }: S
                         <TrendingUp className="h-16 w-16 opacity-50 mb-4" />
                         <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
                              <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
-                            <p>No sales were recorded in this period. Once your first sale is made, this chart will automatically activate.</p>
+                            <p>{t('reports.sotEmpty')}</p>
                         </div>
                     </div>
                 ) : (

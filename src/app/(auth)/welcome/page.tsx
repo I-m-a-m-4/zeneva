@@ -5,31 +5,37 @@ import Link from 'next/link';
 import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import { AppConfig } from '@/lib/config';
+import { useI18n } from '@/context/i18n-context';
 
+// `slides` is module-level, so a headline cannot be JSX with a <br /> any more —
+// it has to be a key the render resolves. The line break lives inside the
+// translated value as `\n` and is drawn by `whitespace-pre-line`, which lets each
+// locale put the break where its own headline reads best.
 const slides = [
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053655/zeneva/zeneva_welcome_signup_video_6.mp4',
     poster: '/signup-video-6-poster.jpg',
-    headline: <>Welcome to the future<br />of smart retail</>,
+    headlineKey: 'auth.welcomeSlide1',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053651/zeneva/zeneva_welcome_signup_video_5.mp4',
     poster: '/signup-video-5-poster.jpg',
-    headline: <>Empower your business<br />to scale endlessly</>,
+    headlineKey: 'auth.welcomeSlide2',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053621/zeneva/zeneva_welcome_signup_video_2.mp4',
     poster: '/signup-video-2-poster.jpg',
-    headline: <>Manage your inventory<br />with absolute ease</>,
+    headlineKey: 'auth.welcomeSlide3',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053615/zeneva/zeneva_welcome_signup_video_1.mp4',
     poster: '/signup-video-1-poster.jpg',
-    headline: <>One point of sale,<br />wherever you grow</>,
+    headlineKey: 'auth.welcomeSlide4',
   },
 ];
 
 export default function WelcomePage() {
+  const { t } = useI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
@@ -44,6 +50,14 @@ export default function WelcomePage() {
   // Force the mobile browser status bar / address bar chrome to black so it
   // blends with the dark video — theme-color meta in <Head> doesn't reach the
   // App Router shell, so we set it imperatively on mount and restore on unmount.
+  //
+  // This covers the browser and the PWA only. **The Tauri Android/iOS shells ignore
+  // `theme-color` entirely** — a WebView is not Chrome — so it is not what darkens
+  // the top band there. That band is web content: the desktop title-bar spacer in
+  // `components/desktop/TauriWrapper.tsx`, which the mobile shells also render
+  // because `__TAURI_INTERNALS__` is defined on them. `/welcome` is in that file's
+  // `DARK_TOP_INSET_ROUTES`, which is what actually makes it dark. Changing the
+  // colour here will not move it.
   useEffect(() => {
     const existing = document.querySelector('meta[name="theme-color"]');
     const prev = existing?.getAttribute('content') ?? null;
@@ -165,7 +179,7 @@ export default function WelcomePage() {
         <div className="flex flex-none items-start justify-between">
           <Image
             src={AppConfig.logoUrl}
-            alt="Zeneva Logo"
+            alt={t('auth.logoAlt')}
             width={96}
             height={96}
             priority
@@ -175,7 +189,7 @@ export default function WelcomePage() {
           <button
             onClick={togglePlay}
             className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-white transition-all hover:bg-black/60 focus:outline-none"
-            aria-label={isPlaying ? 'Pause video' : 'Play video'}
+            aria-label={isPlaying ? t('auth.pauseVideo') : t('auth.playVideo')}
           >
             {isPlaying ? (
               <Pause className="h-4 w-4" fill="currentColor" stroke="currentColor" />
@@ -195,11 +209,11 @@ export default function WelcomePage() {
           {slides.map((slide, index) => (
             <h1
               key={index}
-              className={`col-start-1 row-start-1 text-[clamp(1.75rem,min(8vw,5.2vh),4.5rem)] leading-[1.05] tracking-[-0.04em] font-medium text-white drop-shadow-sm transition-opacity duration-1000 ease-in-out ${
+              className={`col-start-1 row-start-1 whitespace-pre-line text-[clamp(1.75rem,min(8vw,5.2vh),4.5rem)] leading-[1.05] tracking-[-0.04em] font-medium text-white drop-shadow-sm transition-opacity duration-1000 ease-in-out ${
                 index === currentIndex ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
               }`}
             >
-              {slide.headline}
+              {t(slide.headlineKey)}
             </h1>
           ))}
         </div>
@@ -210,7 +224,7 @@ export default function WelcomePage() {
             <button
               key={i}
               onClick={() => goToSlide(i)}
-              aria-label={`Go to video ${i + 1}`}
+              aria-label={t('auth.goToVideo', { number: i + 1 })}
               className={`rounded-full transition-all duration-300 ${
                 i === currentIndex
                   ? 'w-6 h-2 bg-white'
@@ -226,13 +240,13 @@ export default function WelcomePage() {
             href="/signup"
             className="flex h-[clamp(2.875rem,6.5vh,3.5rem)] w-full items-center justify-center rounded-full bg-white text-[clamp(0.9375rem,3.8vw,1rem)] font-medium text-black transition-transform active:scale-[0.98] hover:bg-gray-100"
           >
-            Create account
+            {t('auth.createAccountButton')}
           </Link>
           <Link
             href="/login"
             className="flex h-[clamp(2.875rem,6.5vh,3.5rem)] w-full items-center justify-center rounded-full bg-orange-950/90 text-[clamp(0.9375rem,3.8vw,1rem)] font-medium text-white backdrop-blur-sm transition-transform active:scale-[0.98] hover:bg-orange-900"
           >
-            Sign in
+            {t('auth.signInButton')}
           </Link>
         </div>
       </div>

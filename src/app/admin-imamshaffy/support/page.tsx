@@ -269,6 +269,28 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
         }
     }, [thread, firestore, messages]);
 
+    const uploadImage = async (file: File): Promise<string> => {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const resData = await response.json();
+                if (resData.url) {
+                    return resData.url;
+                }
+            }
+        } catch (e) {
+            console.warn("ImageKit upload failed, falling back to ImgBB:", e);
+        }
+        return uploadImageToImgBB(file);
+    };
+
     const uploadImageToImgBB = async (file: File): Promise<string> => {
         const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY || '2ec1d17c7ad748bbb605eda60a54a896';
         const formData = new FormData();
@@ -293,7 +315,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
         setIsUploadingImage(true);
         toast({ title: 'Uploading image...', description: 'Please wait while we host your file.' });
         try {
-            const url = await uploadImageToImgBB(file);
+            const url = await uploadImage(file);
             setAttachedImage(url);
             toast({ variant: 'success', title: 'Image Uploaded', description: 'Your file is ready to send.' });
         } catch (err) {

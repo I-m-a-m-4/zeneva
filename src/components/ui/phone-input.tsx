@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { COUNTRIES, findCountryByName, isoToFlag } from '@/lib/countries';
 
 export interface CountryCode {
   name: string;
@@ -11,118 +12,90 @@ export interface CountryCode {
   flag: string; // emoji flag
 }
 
+/**
+ * Shown first in the dropdown - the markets most Zeneva shops are in. This is
+ * ordering only. It used to double as the fallback country (`countries[0]`),
+ * which is what pinned every empty phone field to +234 regardless of the
+ * business's own country; the fallback now comes from `defaultCountry`.
+ */
+const PINNED_ISO = ['NG', 'GH', 'KE', 'ZA', 'GB', 'US', 'CA'];
+
+const toCountryCode = (c: { name: string; iso: string; dial: string }): CountryCode => ({
+  name: c.name,
+  code: c.dial,
+  iso: c.iso,
+  flag: isoToFlag(c.iso),
+});
+
+/**
+ * Every country the onboarding form offers, pinned markets first.
+ * Derived from `@/lib/countries` so there is one dial-code table in the app -
+ * see that file for why a second one was a bug rather than a duplication.
+ */
 export const COUNTRY_CODES: CountryCode[] = [
-  // Pinned – most common Zeneva markets
-  { name: 'Nigeria', code: '+234', iso: 'NG', flag: '🇳🇬' },
-  { name: 'Ghana', code: '+233', iso: 'GH', flag: '🇬🇭' },
-  { name: 'Kenya', code: '+254', iso: 'KE', flag: '🇰🇪' },
-  { name: 'South Africa', code: '+27', iso: 'ZA', flag: '🇿🇦' },
-  { name: 'United Kingdom', code: '+44', iso: 'GB', flag: '🇬🇧' },
-  { name: 'United States', code: '+1', iso: 'US', flag: '🇺🇸' },
-  { name: 'Canada', code: '+1', iso: 'CA', flag: '🇨🇦' },
-  // Alphabetical rest
-  { name: 'Afghanistan', code: '+93', iso: 'AF', flag: '🇦🇫' },
-  { name: 'Albania', code: '+355', iso: 'AL', flag: '🇦🇱' },
-  { name: 'Algeria', code: '+213', iso: 'DZ', flag: '🇩🇿' },
-  { name: 'Angola', code: '+244', iso: 'AO', flag: '🇦🇴' },
-  { name: 'Argentina', code: '+54', iso: 'AR', flag: '🇦🇷' },
-  { name: 'Australia', code: '+61', iso: 'AU', flag: '🇦🇺' },
-  { name: 'Austria', code: '+43', iso: 'AT', flag: '🇦🇹' },
-  { name: 'Bahrain', code: '+973', iso: 'BH', flag: '🇧🇭' },
-  { name: 'Bangladesh', code: '+880', iso: 'BD', flag: '🇧🇩' },
-  { name: 'Belgium', code: '+32', iso: 'BE', flag: '🇧🇪' },
-  { name: 'Benin', code: '+229', iso: 'BJ', flag: '🇧🇯' },
-  { name: 'Bolivia', code: '+591', iso: 'BO', flag: '🇧🇴' },
-  { name: 'Brazil', code: '+55', iso: 'BR', flag: '🇧🇷' },
-  { name: 'Cameroon', code: '+237', iso: 'CM', flag: '🇨🇲' },
-  { name: 'Chile', code: '+56', iso: 'CL', flag: '🇨🇱' },
-  { name: 'China', code: '+86', iso: 'CN', flag: '🇨🇳' },
-  { name: 'Colombia', code: '+57', iso: 'CO', flag: '🇨🇴' },
-  { name: "Côte d'Ivoire", code: '+225', iso: 'CI', flag: '🇨🇮' },
-  { name: 'Cyprus', code: '+357', iso: 'CY', flag: '🇨🇾' },
-  { name: 'Czech Republic', code: '+420', iso: 'CZ', flag: '🇨🇿' },
-  { name: 'Denmark', code: '+45', iso: 'DK', flag: '🇩🇰' },
-  { name: 'DR Congo', code: '+243', iso: 'CD', flag: '🇨🇩' },
-  { name: 'Egypt', code: '+20', iso: 'EG', flag: '🇪🇬' },
-  { name: 'Ethiopia', code: '+251', iso: 'ET', flag: '🇪🇹' },
-  { name: 'Finland', code: '+358', iso: 'FI', flag: '🇫🇮' },
-  { name: 'France', code: '+33', iso: 'FR', flag: '🇫🇷' },
-  { name: 'Gambia', code: '+220', iso: 'GM', flag: '🇬🇲' },
-  { name: 'Germany', code: '+49', iso: 'DE', flag: '🇩🇪' },
-  { name: 'Guinea', code: '+224', iso: 'GN', flag: '🇬🇳' },
-  { name: 'Hungary', code: '+36', iso: 'HU', flag: '🇭🇺' },
-  { name: 'India', code: '+91', iso: 'IN', flag: '🇮🇳' },
-  { name: 'Indonesia', code: '+62', iso: 'ID', flag: '🇮🇩' },
-  { name: 'Iraq', code: '+964', iso: 'IQ', flag: '🇮🇶' },
-  { name: 'Ireland', code: '+353', iso: 'IE', flag: '🇮🇪' },
-  { name: 'Israel', code: '+972', iso: 'IL', flag: '🇮🇱' },
-  { name: 'Italy', code: '+39', iso: 'IT', flag: '🇮🇹' },
-  { name: 'Jamaica', code: '+1876', iso: 'JM', flag: '🇯🇲' },
-  { name: 'Japan', code: '+81', iso: 'JP', flag: '🇯🇵' },
-  { name: 'Jordan', code: '+962', iso: 'JO', flag: '🇯🇴' },
-  { name: 'Kuwait', code: '+965', iso: 'KW', flag: '🇰🇼' },
-  { name: 'Lebanon', code: '+961', iso: 'LB', flag: '🇱🇧' },
-  { name: 'Liberia', code: '+231', iso: 'LR', flag: '🇱🇷' },
-  { name: 'Libya', code: '+218', iso: 'LY', flag: '🇱🇾' },
-  { name: 'Madagascar', code: '+261', iso: 'MG', flag: '🇲🇬' },
-  { name: 'Malawi', code: '+265', iso: 'MW', flag: '🇲🇼' },
-  { name: 'Malaysia', code: '+60', iso: 'MY', flag: '🇲🇾' },
-  { name: 'Mali', code: '+223', iso: 'ML', flag: '🇲🇱' },
-  { name: 'Mexico', code: '+52', iso: 'MX', flag: '🇲🇽' },
-  { name: 'Morocco', code: '+212', iso: 'MA', flag: '🇲🇦' },
-  { name: 'Mozambique', code: '+258', iso: 'MZ', flag: '🇲🇿' },
-  { name: 'Namibia', code: '+264', iso: 'NA', flag: '🇳🇦' },
-  { name: 'Netherlands', code: '+31', iso: 'NL', flag: '🇳🇱' },
-  { name: 'New Zealand', code: '+64', iso: 'NZ', flag: '🇳🇿' },
-  { name: 'Niger', code: '+227', iso: 'NE', flag: '🇳🇪' },
-  { name: 'Norway', code: '+47', iso: 'NO', flag: '🇳🇴' },
-  { name: 'Oman', code: '+968', iso: 'OM', flag: '🇴🇲' },
-  { name: 'Pakistan', code: '+92', iso: 'PK', flag: '🇵🇰' },
-  { name: 'Philippines', code: '+63', iso: 'PH', flag: '🇵🇭' },
-  { name: 'Poland', code: '+48', iso: 'PL', flag: '🇵🇱' },
-  { name: 'Portugal', code: '+351', iso: 'PT', flag: '🇵🇹' },
-  { name: 'Qatar', code: '+974', iso: 'QA', flag: '🇶🇦' },
-  { name: 'Romania', code: '+40', iso: 'RO', flag: '🇷🇴' },
-  { name: 'Russia', code: '+7', iso: 'RU', flag: '🇷🇺' },
-  { name: 'Rwanda', code: '+250', iso: 'RW', flag: '🇷🇼' },
-  { name: 'Saudi Arabia', code: '+966', iso: 'SA', flag: '🇸🇦' },
-  { name: 'Senegal', code: '+221', iso: 'SN', flag: '🇸🇳' },
-  { name: 'Sierra Leone', code: '+232', iso: 'SL', flag: '🇸🇱' },
-  { name: 'Singapore', code: '+65', iso: 'SG', flag: '🇸🇬' },
-  { name: 'Somalia', code: '+252', iso: 'SO', flag: '🇸🇴' },
-  { name: 'Spain', code: '+34', iso: 'ES', flag: '🇪🇸' },
-  { name: 'Sri Lanka', code: '+94', iso: 'LK', flag: '🇱🇰' },
-  { name: 'Sudan', code: '+249', iso: 'SD', flag: '🇸🇩' },
-  { name: 'Sweden', code: '+46', iso: 'SE', flag: '🇸🇪' },
-  { name: 'Switzerland', code: '+41', iso: 'CH', flag: '🇨🇭' },
-  { name: 'Tanzania', code: '+255', iso: 'TZ', flag: '🇹🇿' },
-  { name: 'Togo', code: '+228', iso: 'TG', flag: '🇹🇬' },
-  { name: 'Trinidad & Tobago', code: '+1868', iso: 'TT', flag: '🇹🇹' },
-  { name: 'Tunisia', code: '+216', iso: 'TN', flag: '🇹🇳' },
-  { name: 'Turkey', code: '+90', iso: 'TR', flag: '🇹🇷' },
-  { name: 'UAE', code: '+971', iso: 'AE', flag: '🇦🇪' },
-  { name: 'Uganda', code: '+256', iso: 'UG', flag: '🇺🇬' },
-  { name: 'Ukraine', code: '+380', iso: 'UA', flag: '🇺🇦' },
-  { name: 'Venezuela', code: '+58', iso: 'VE', flag: '🇻🇪' },
-  { name: 'Vietnam', code: '+84', iso: 'VN', flag: '🇻🇳' },
-  { name: 'Yemen', code: '+967', iso: 'YE', flag: '🇾🇪' },
-  { name: 'Zambia', code: '+260', iso: 'ZM', flag: '🇿🇲' },
-  { name: 'Zimbabwe', code: '+263', iso: 'ZW', flag: '🇿🇼' },
+  ...PINNED_ISO.map((iso) => COUNTRIES.find((c) => c.iso === iso))
+    .filter((c): c is (typeof COUNTRIES)[number] => !!c)
+    .map(toCountryCode),
+  ...COUNTRIES.filter((c) => !PINNED_ISO.includes(c.iso)).map(toCountryCode),
 ];
 
+/**
+ * Countries that share a dialling code. Longest-match sorting cannot break
+ * these ties, so without an explicit preference whichever entry happens to come
+ * first in the list decides: +7 is both Russia and Kazakhstan, and plain
+ * alphabetical order would render every Russian number under a Kazakh flag.
+ */
+const PREFERRED_BY_DIAL: Record<string, string> = { '+1': 'US', '+7': 'RU' };
+
+/** Longest dial code first, so "+1" cannot swallow "+1868". Computed once. */
+const BY_CODE_LENGTH = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
+
+const preferredFor = (match: CountryCode): CountryCode => {
+  const iso = PREFERRED_BY_DIAL[match.code];
+  if (!iso || iso === match.iso) return match;
+  return COUNTRY_CODES.find((c) => c.iso === iso && c.code === match.code) ?? match;
+};
+
+/** The entry for a stored country *name*, e.g. business.settings.country. */
+export function countryCodeForName(name: string | null | undefined): CountryCode | undefined {
+  const found = findCountryByName(name);
+  if (!found) return undefined;
+  return COUNTRY_CODES.find((c) => c.iso === found.iso);
+}
+
+/**
+ * National-format hints. Deliberately sparse: an absent example falls back to a
+ * neutral placeholder rather than to a Nigerian one. The old default was
+ * '801 234 5678' for all 94 countries, which is a Lagos mobile number.
+ */
+const NATIONAL_EXAMPLE: Record<string, string> = {
+  NG: '801 234 5678',
+  GH: '24 123 4567',
+  KE: '712 345 678',
+  ZA: '71 123 4567',
+  GB: '7400 123456',
+  US: '555 123 4567',
+  CA: '555 123 4567',
+};
+
 /** Parse a full E.164 number into country + local digits */
-function parseE164(value: string, countries: CountryCode[]): { country: CountryCode; local: string } {
-  const defaultCountry = countries[0];
-  if (!value) return { country: defaultCountry, local: '' };
+function parseE164(
+  value: string,
+  countries: CountryCode[],
+  fallback: CountryCode
+): { country: CountryCode; local: string } {
+  if (!value) return { country: fallback, local: '' };
   const raw = value.startsWith('+') ? value : `+${value}`;
   // Try longest match first to avoid "+1" swallowing "+1868" etc.
-  const sorted = [...countries].sort((a, b) => b.code.length - a.code.length);
+  const sorted = countries === COUNTRY_CODES
+    ? BY_CODE_LENGTH
+    : [...countries].sort((a, b) => b.code.length - a.code.length);
   for (const c of sorted) {
     if (raw.startsWith(c.code)) {
-      return { country: c, local: raw.slice(c.code.length) };
+      return { country: preferredFor(c), local: raw.slice(c.code.length) };
     }
   }
-  return { country: defaultCountry, local: value.replace(/^\+?/, '') };
+  return { country: fallback, local: value.replace(/^\+?/, '') };
 }
 
 interface PhoneInputProps {
@@ -132,10 +105,24 @@ interface PhoneInputProps {
   className?: string;
   placeholder?: string;
   disabled?: boolean;
+  /**
+   * Country *name* to show when `value` carries no dial code of its own -
+   * pass the business's own `settings.country`. Without it an empty field falls
+   * back to the first pinned entry, which is Nigeria and is wrong everywhere
+   * else. Unresolvable names are ignored rather than guessed at.
+   */
+  defaultCountry?: string;
 }
 
-export function PhoneInput({ id, value, onChange, className, placeholder = '801 234 5678', disabled }: PhoneInputProps) {
-  const { country: parsedCountry, local: parsedLocal } = useMemo(() => parseE164(value, COUNTRY_CODES), [value]);
+export function PhoneInput({ id, value, onChange, className, placeholder, disabled, defaultCountry }: PhoneInputProps) {
+  const fallbackCountry = useMemo(
+    () => countryCodeForName(defaultCountry) ?? COUNTRY_CODES[0],
+    [defaultCountry]
+  );
+  const { country: parsedCountry, local: parsedLocal } = useMemo(
+    () => parseE164(value, COUNTRY_CODES, fallbackCountry),
+    [value, fallbackCountry]
+  );
 
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(parsedCountry);
   const [localNumber, setLocalNumber] = useState(parsedLocal);
@@ -143,14 +130,32 @@ export function PhoneInput({ id, value, onChange, className, placeholder = '801 
   const [search, setSearch] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  /** An explicit pick outranks both the parsed value and `defaultCountry`. */
+  const userPickedRef = useRef(false);
 
   // Sync when parent value changes externally
   useEffect(() => {
-    const { country, local } = parseE164(value, COUNTRY_CODES);
+    if (!value) {
+      // Nothing to parse. Clear the digits but keep the country on screen:
+      // re-deriving it here is what made a country picked before any digits were
+      // typed snap straight back to the fallback.
+      setLocalNumber('');
+      return;
+    }
+    const { country, local } = parseE164(value, COUNTRY_CODES, fallbackCountry);
     setSelectedCountry(country);
     setLocalNumber(local);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
+
+  // The business country arrives after mount - the settings page hydrates it
+  // from Firestore - so this cannot be a useState initialiser alone. It must not
+  // run over an explicit pick, and not once there is a number to parse.
+  useEffect(() => {
+    if (userPickedRef.current || value) return;
+    setSelectedCountry(fallbackCountry);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fallbackCountry]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -179,6 +184,7 @@ export function PhoneInput({ id, value, onChange, className, placeholder = '801 
   );
 
   const handleCountrySelect = (country: CountryCode) => {
+    userPickedRef.current = true;
     setSelectedCountry(country);
     setOpen(false);
     setSearch('');
@@ -221,7 +227,7 @@ export function PhoneInput({ id, value, onChange, className, placeholder = '801 
           type="tel"
           inputMode="numeric"
           disabled={disabled}
-          placeholder={placeholder}
+          placeholder={placeholder ?? NATIONAL_EXAMPLE[selectedCountry.iso] ?? 'Phone number'}
           value={localNumber}
           onChange={handleNumberChange}
           className="flex-1 h-10 px-3 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"

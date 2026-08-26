@@ -33,7 +33,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import type { ImportIntent } from '@/lib/import/match';
@@ -78,8 +77,11 @@ export default function ReviewStep({
   onRunAiMatching: () => void;
   onCommit: () => void;
 }) {
+  const [showOnlyIssues, setShowOnlyIssues] = React.useState(false);
+  
   const matched = plan.addStock.length + plan.overwrite.length;
   const issueCount = rows.reduce((sum, row) => sum + row.draft.issues.length, 0);
+  const hasMatchesOrQuestions = matched > 0 || openQuestions.length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -99,32 +101,41 @@ export default function ReviewStep({
           </Badge>
         )}
         {issueCount > 0 && (
-          <Badge variant="outline" className="gap-1 border-amber-500/50 text-amber-600 dark:text-amber-500">
-            <TriangleAlert className="h-3 w-3" /> {issueCount} to check
+          <Badge 
+            variant="outline" 
+            className={cn(
+              "gap-1 border-amber-500/50 text-amber-600 dark:text-amber-500 cursor-pointer hover:bg-amber-500/10 transition-colors",
+              showOnlyIssues && "bg-amber-500/10 border-amber-500 font-bold"
+            )}
+            onClick={() => setShowOnlyIssues(!showOnlyIssues)}
+          >
+            <TriangleAlert className="h-3 w-3" /> {issueCount} to check {showOnlyIssues ? '(Filtered)' : ''}
           </Badge>
         )}
       </div>
 
       {/* ── Intent ── */}
-      <div className="rounded-lg border bg-muted/30 p-2.5">
-        <p className="mb-2 text-xs font-medium text-muted-foreground">
-          For products you already have, what does this data mean?
-        </p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <IntentOption
-            active={intent === 'replace'}
-            title="These are my correct figures"
-            body="Update the products to match what is in this data."
-            onClick={() => onIntentChange('replace')}
-          />
-          <IntentOption
-            active={intent === 'restock'}
-            title="These are goods I just received"
-            body="Add these quantities on top of what is on hand."
-            onClick={() => onIntentChange('restock')}
-          />
+      {hasMatchesOrQuestions && (
+        <div className="rounded-lg border bg-muted/30 p-2.5">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            For products you already have, what does this data mean?
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <IntentOption
+              active={intent === 'replace'}
+              title="These are my correct figures"
+              body="Update the products to match what is in this data."
+              onClick={() => onIntentChange('replace')}
+            />
+            <IntentOption
+              active={intent === 'restock'}
+              title="These are goods I just received"
+              body="Add these quantities on top of what is on hand."
+              onClick={() => onIntentChange('restock')}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Questions, above the table on purpose ── */}
       {openQuestions.length > 0 && (
@@ -163,25 +174,28 @@ export default function ReviewStep({
 
       {/* ── Rows ── */}
       <div className="min-h-0 flex-1 overflow-hidden rounded-lg border">
-        <ScrollArea className="h-full max-h-[46vh]">
+        <div className="max-h-[46vh] overflow-y-auto">
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="min-w-[180px]">Product</TableHead>
-                <TableHead className="w-28">Price</TableHead>
-                <TableHead className="w-28">Cost</TableHead>
-                <TableHead className="w-20">Stock</TableHead>
-                <TableHead className="w-[150px]">What happens</TableHead>
+                <TableHead className="w-36">Price</TableHead>
+                <TableHead className="w-36">Cost</TableHead>
+                <TableHead className="w-24">Stock</TableHead>
+                {hasMatchesOrQuestions && <TableHead className="w-[150px]">What happens</TableHead>}
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {rows
+                .filter(row => showOnlyIssues ? row.draft.issues.length > 0 : true)
+                .map((row) => (
                 <ReviewRow
                   key={row.draft.key}
                   row={row}
                   intent={intent}
                   currencySymbol={currencySymbol}
+                  hasMatchesOrQuestions={hasMatchesOrQuestions}
                   onDecide={onDecide}
                   onEdit={onEdit}
                   onRemove={onRemove}
@@ -189,7 +203,7 @@ export default function ReviewStep({
               ))}
             </TableBody>
           </Table>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* ── Footnotes ── */}
@@ -227,7 +241,7 @@ export default function ReviewStep({
         <p className="text-xs text-muted-foreground">
           Nothing is saved until you press Import.
         </p>
-        <Button size="lg" onClick={onCommit} disabled={!!busy || !!limitMessage || rows.length === 0}>
+        <Button size="lg" onClick={onCommit} disabled={!!busy || rows.length === 0}>
           {busy ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
           {commitLabel(plan)}
         </Button>
@@ -289,6 +303,7 @@ function ReviewRow({
   row,
   intent,
   currencySymbol,
+  hasMatchesOrQuestions,
   onDecide,
   onEdit,
   onRemove,
@@ -296,6 +311,7 @@ function ReviewRow({
   row: StagedRow;
   intent: ImportIntent;
   currencySymbol: string;
+  hasMatchesOrQuestions?: boolean;
   onDecide: (key: string, decision: RowDecision) => void;
   onEdit: (key: string, patch: Partial<StagedRow['draft']>) => void;
   onRemove: (key: string) => void;
@@ -371,9 +387,11 @@ function ReviewRow({
           />
         </TableCell>
 
-        <TableCell className="align-top">
-          <Outcome row={row} intent={intent} />
-        </TableCell>
+        {hasMatchesOrQuestions !== false && (
+          <TableCell className="align-top">
+            <Outcome row={row} intent={intent} />
+          </TableCell>
+        )}
 
         <TableCell className="align-top">
           <Button
@@ -570,7 +588,10 @@ function NumberCell({
           const parsed = integer ? parseInt(raw, 10) : parseFloat(raw);
           if (Number.isFinite(parsed) && parsed >= 0) onChange(parsed);
         }}
-        className={cn('h-8 text-sm', prefix && 'ps-6')}
+        className={cn(
+          'h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
+        )}
+        style={prefix ? { paddingLeft: `calc(0.5rem + ${prefix.length + 1}ch)` } : undefined}
       />
     </div>
   );

@@ -1,9 +1,16 @@
 # Smart import
 
-Getting a shop's stock into Zeneva, from whatever they actually have.
+Getting a shop's stock — and its customer book — into Zeneva, from whatever they
+actually have.
 
 Required reading before touching anything under `src/lib/import/`,
-`src/components/inventory/smart-import/`, or `src/app/api/import/route.ts`.
+`src/components/inventory/smart-import/`, `src/components/customers/smart-import/`,
+or `src/app/api/import/route.ts`.
+
+There are **two importers** sharing one pipeline, one route and one credit ledger.
+Most of this document is about products because that is where the hard-won rules
+were learned; [the customer importer](#the-customer-importer) says what it inherits,
+what it deliberately does not, and why.
 
 ## The premise
 
@@ -44,6 +51,9 @@ parser fixes all seven sources at once.
 | Photo of a supplier invoice | 3+ credits | `parse-invoice` |
 | Settling ambiguous duplicates | 1+ credits | `match` |
 | Bulk edit by instruction | 1 credit | `bulk-op` |
+| Customer columns nothing recognises | 1 credit | `map-customer-columns` |
+| Customers from a typed sentence | 1+ credits | `parse-customer-text` |
+| Photo of a customer ledger page | 3+ credits | `parse-customer-photo` |
 
 A hundred-thousand-row spreadsheet import is free. That is deliberate and is the
 thing to preserve: the free path has to be genuinely good, or the paid path looks
@@ -333,6 +343,133 @@ The refusals matter more than the arithmetic:
 `bulk-update-products` action. A `set` on a thousand products is **one** write; a
 percentage gives each product its own value and collapses to nothing.
 
+## The customer importer
+
+`src/lib/import/customers.ts` (pure), `src/components/customers/smart-import/*` (UI),
+three more actions on the same route. Reached from the Import button on `/customers`.
+
+Four sources rather than seven — Excel/CSV, paste, a photo of the customer book, or
+typed out — and the same pipeline:
+
+```
+source → RawTable → mapCustomerColumns → DraftCustomer[] → stageCustomerRows → addToQueue
+```
+
+`spreadsheet.ts` and `tabular.ts` are entity-agnostic, so the hand-written XLSX reader
+and the paste parser serve both importers with no changes. `aiCustomerRowsToTable` is
+the counterpart of `aiRowsToTable` and is load-bearing for the same reason: a phone
+number read off a handwritten page is normalised by the same code as one from Excel, so
+`0803 123 4567` and `+2348031234567` collapse to the same customer whichever door they
+came through. Duplicate detection is only as good as that being true.
+
+### What it replaced, and the bug that justifies the whole thing
+
+`import-customers-dialog.tsx` (now unreferenced, left on disk) demanded an email and
+**invented one when a row had none**:
+
+```
+`${sanitizedName}${4 random chars}@zeneva-import.local`
+```
+
+That address reached Firestore looking exactly like a real one, on thousands of real
+customer records. It also wrote a `writeBatch` directly — skipping RBAC, branch
+injection, offline survival and the local mirror — deduplicated on email only (so the
+invented addresses guaranteed nothing ever matched), and hard-required a CSV.
+
+So: **only `name` is required**, and nothing is ever invented. A row with a name and a
+phone number is a perfectly good customer; a row with a fabricated email is a worse
+one. `NEVER_INVENT` in the route says why to the model in the same terms — the shop
+*uses* these details, so a wrong number reaches a stranger and a wrong address reaches
+nobody at all. A placeholder email arriving *in* an import is dropped and explained,
+because re-importing an export of the old data would otherwise carry them back in.
+
+### One definition of "the same customer"
+
+Duplicate detection reuses `normalizePhone`, `normalizeName`, `normalizeCode` and
+`realEmail` from `src/lib/customer-health.ts` — the Health tab's own functions, not a
+matcher tuned for import. Two rules would mean the importer silently creating a record
+the Health tab immediately flags.
+
+That sharing found a real bug: `normalizeCode` stripped **whitespace only**, so `ACC-1`
+and `ACC 1` hashed apart. The importer treats a code match as a *fact* and applies it
+without asking, so a book re-imported with the hyphens typed differently would have
+silently created a second record for everybody in it. It now strips `[\s\-_.]`,
+character for character the same set as `normalizeSku` — a customer code and a SKU are
+the same kind of thing, a hand-entered identifier. It also made `suggestFreeCode`'s
+promise true; it could previously hand back `ACC-2` while `ACC2` existed.
+
+### Duplicates: the same asymmetry, one rung stricter
+
+Code, phone and email matches are **facts** and are applied without a question. A name
+match is **a question** — two people really are called Musa Ibrahim — and an unanswered
+question resolves to `create`, never to a merge. A certain match **claims** its
+customer, so a second row for the same person is forced to be a question. Duplicates
+*inside the file* are found too, and skipped rather than merged: the fix is to drop the
+row without touching the shop's data at all.
+
+**There is no AI matching step here, and that is the deliberate difference from the
+product importer.** Products pay a model to settle ambiguous name matches because
+`Coca Cola 50cl` and `Coca-Cola Original 500ml` really are the same thing and a model
+can see that. Two customers with the same name are not the same person and nothing in
+the row can tell you which one is meant — the shop can. Charging a credit to guess at
+that would be selling a coin flip.
+
+### Updates fill blanks; running totals take the maximum
+
+An import is new information about somebody the shop already knows, not a replacement
+for what they know — the record on file has been edited by staff, tagged, annotated and
+attached to receipts. So `buildCustomerUpdate` writes a value **only where the existing
+record has nothing**, and an update that would write nothing at all is dropped rather
+than queued (an empty write still costs a document and would make a re-import of the
+same file look like it changed the whole book).
+
+`totalSpent` and `loyaltyPoints` are the exceptions, and they are taken at their
+**maximum, never summed**. An import is a snapshot from another system; adding a
+snapshot to a running total double-counts every purchase Zeneva already recorded, and
+that figure feeds the rating, the segments and the CRM panel. Tags accumulate, because
+a label is additive.
+
+`undefined` ≠ `0` throughout, exactly as on the product side: absent means "leave what
+is there", zero means "the file says zero". Returning `0` for an empty cell is how an
+import wipes a loyalty balance it was never given.
+
+### Three fields that are invisible until they break
+
+- **`lowercaseName`** is what the customer search queries against. A customer imported
+  without it cannot be found at the till — not by the search box, not by the POS
+  customer picker — while looking perfect on the customers page. `lowercaseEmail` is
+  the same for email.
+- **`totalSpent` defaults to `0` on a create and is never absent.** The customers list
+  orders by it, and Firestore drops a document from an `orderBy` when the field is
+  missing, so an imported customer with no figure is invisible on the very page that
+  imported them.
+- **`branchId` is not set by the importer.** `addToQueue` injects the active branch,
+  which is the only thing that knows it.
+
+### Two more things that would be easy to get wrong
+
+**Staging runs against `allCustomersUnfiltered`, and the dialog waits for it.** The
+page's own list is branch-, search- and segment-filtered; matching against a filtered
+book reports most rows as new. `null` means "still loading" and `[]` means "none on
+file" — the dialog blocks on the former and proceeds on the latter, the same
+distinction that put "No products found" on a POS whose catalogue had simply failed to
+load.
+
+**The permission gate on the route is per action.** `view_customers` for the three
+customer actions, `manage_inventory` for the product ones, matching what `addToQueue`
+itself enforces. Gating both on `manage_inventory` would refuse a customer import to
+the staff most likely to be doing one — and gating on the *wrong* one is worse than not
+gating, because the shop pays credits to prepare a write the client then refuses.
+
+### The review screen differs in two ways
+
+Rows needing a decision are **sorted to the top** (stable, so everything else stays in
+file order for somebody reading down their own spreadsheet), and the list is **capped
+at 60 rows with a "show more"** that states the cap. A migration is three thousand rows
+with editable inputs on each; mounting all of them locks the tab on the low-end Android
+hardware this runs on, and a truncated list that looks complete is how somebody imports
+half a book believing they checked it.
+
 ## Telemetry
 
 Importer AI usage writes to `importer*` fields on the existing per-day document, not
@@ -359,7 +496,8 @@ stamping that date would make the chat route read yesterday's total as today's a
 ## Tests
 
 ```bash
-npm run test:import
+npm run test:import           # products — scripts/test-import.ts
+npm run test:customer-import  # customers — scripts/check-customer-import.ts
 ```
 
 `scripts/test-import.ts`. 110 checks over the parts where being quietly wrong is
@@ -368,26 +506,47 @@ mapping from the brief, header-free value inference, `Cost Price` not losing to
 `price`, summary-row rejection, every duplicate-matching case above, margin-vs-markup,
 and the destructive skips.
 
-It must be `.ts`, not `.mts`. There is no `"type": "module"` here, so `src/**`
+`scripts/check-customer-import.ts`. 143 checks, chosen the same way — by what it costs
+to be quietly wrong. Contact details never being invented, phone numbers surviving
+verbatim so the shared normaliser can do its job, `undefined` versus `0`, every
+certain-versus-question case, in-file duplicates, blanks-only updates, running totals
+taking the maximum rather than the sum, and the three invisible fields above. It also
+asserts that a photo table's headers are all real aliases — so a photograph cannot be
+charged for a mapping call twice, a failure that costs money and breaks nothing
+visible.
+
+Both must be `.ts`, not `.mts`. There is no `"type": "module"` here, so `src/**`
 compiles to CJS and a true-ESM importer fails named-import interop — reporting a
 missing export for a constant that is plainly exported. Same trap as the
 business-rating harness.
 
-Both bugs the harness found on first run were real: the timezone date shift above,
-and a single line of prose with a comma being read as a two-column table.
+Both bugs the product harness found on first run were real: the timezone date shift
+above, and a single line of prose with a comma being read as a two-column table. The
+customer harness found the `normalizeCode` punctuation bug described above, which was
+live on a shared function.
 
 ## Not done yet
 
 - **The dialog's copy is English only.** Every other user-facing surface goes through
   `useI18n` across eleven catalogs. Roughly sixty new strings would need translating,
   and machine-translating them into ten languages unreviewed would ship worse copy
-  than shipping English does. Nothing existing was un-translated.
-- `src/components/inventory/import-dialog.tsx` and
-  `src/components/inventory/visual-count-dialog.tsx` are now **unreferenced**. Left on
-  disk rather than deleted because the working tree is shared. `visualCount` in
+  than shipping English does. Nothing existing was un-translated. The customer
+  importer's copy is English on the same terms and adds roughly forty more strings —
+  both should be translated in one pass rather than two.
+- `src/components/inventory/import-dialog.tsx`,
+  `src/components/inventory/visual-count-dialog.tsx` and
+  `src/components/customers/import-customers-dialog.tsx` are now **unreferenced**. Left
+  on disk rather than deleted because the working tree is shared. `visualCount` in
   `src/ai/flows/` still exists and is still metered; removing it also means editing
   the stub list in `prepare-tauri.mjs`, which is load-bearing for all three native
   builds.
+- **The customer importer has no barcode or desktop-capture door.** A customer card has
+  no barcode, so that source has no meaning here. Desktop capture would work — a legacy
+  program's customer grid reads the same way its stock grid does — and is the obvious
+  next source if anybody asks for it.
+- **No customer export round-trip test.** The CSV the Export button produces should be
+  re-importable and land on `update` for every row with nothing to write. Worth an
+  assertion in the harness; the columns line up by alias today but nothing enforces it.
 - **`update-settings` has no commit handler.** It is in the `QueuedAction` union and
   `pos-context` merges it optimistically into the business object, but there is no
   case for it in the queue's commit switch — so a queued settings change updates the

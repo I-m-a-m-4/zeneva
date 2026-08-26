@@ -10,10 +10,31 @@ import Database from '@tauri-apps/plugin-sql';
 let db: Database | null = null;
 let initPromise: Promise<Database | null> | null = null;
 
+/**
+ * Has the local SQLite store ever been proven usable in this session?
+ *
+ * `null` = not yet determined, `true` = a handle was obtained and the schema
+ * applied, `false` = `Database.load` or the `CREATE TABLE` pass failed.
+ *
+ * This exists because a silent SQLite failure is indistinguishable from an empty
+ * shop to everything downstream, and desktop had *no other store*: the
+ * localStorage blob is gated off by `isDesktopApp` and the IndexedDB mirror by
+ * `isNativeApp()`. So when the driver was missing (see `src-tauri/Cargo.toml`),
+ * the catalogue had nowhere to live and every offline launch showed an empty
+ * till. Callers use this to keep a second store alive rather than trusting one
+ * that has already failed.
+ */
+let dbUsable: boolean | null = null;
+
+/** What the last `getOfflineDb()` attempt proved about the local store. */
+export function offlineDbUsable(): boolean | null {
+  return dbUsable;
+}
+
 export async function getOfflineDb() {
   if (db) return db;
   if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return null;
-  
+
   if (initPromise) {
     return initPromise;
   }
@@ -95,9 +116,11 @@ export async function getOfflineDb() {
       `);
       
       db = loadedDb;
+      dbUsable = true;
       return db;
     } catch (err) {
       console.error('Failed to initialize SQLite offline DB:', err);
+      dbUsable = false;
       initPromise = null; // Reset so we can attempt to load again
       return null;
     }
@@ -322,17 +345,43 @@ export async function getLastSyncMetadata(businessId: string, type: string): Pro
   return 0;
 }
 
-export async function getCachedCustomers(businessId: string) {
+/**
+ * Read the cached customers, distinguishing an empty book from an unreadable one.
+ *
+ * Same contract and same reason as `getCachedProductsResult`: `getCachedCustomers`
+ * returning `[]` cannot tell "this shop has no customers on file" from "the
+ * SQLite store could not be opened", and only the second is worth re-syncing
+ * over. A corrupt row is skipped rather than losing the whole book with it.
+ */
+export async function getCachedCustomersResult(
+  businessId: string
+): Promise<{ ok: boolean; rows: any[] }> {
   const db = await getOfflineDb();
-  if (!db) return [];
-  
+  if (!db) {
+    // No SQLite on this platform is normal; a failed Database.load is not.
+    const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+    return { ok: !isTauri, rows: [] };
+  }
+
   try {
     const result: any[] = await db.select('SELECT data FROM customers WHERE business_id = $1', [businessId]);
-    return result.map(r => JSON.parse(r.data));
+    const rows: any[] = [];
+    for (const r of result) {
+      try {
+        rows.push(JSON.parse(r.data));
+      } catch {
+        // One corrupt row must not lose the rest of the customer book.
+      }
+    }
+    return { ok: true, rows };
   } catch (err) {
     console.error('SQLite Retrieval Error (Customers):', err);
-    return [];
+    return { ok: false, rows: [] };
   }
+}
+
+export async function getCachedCustomers(businessId: string) {
+  return (await getCachedCustomersResult(businessId)).rows;
 }
 
 export async function getCachedBusiness(businessId: string) {
@@ -465,17 +514,34 @@ export async function getCachedStats(businessId: string) {
   }
 }
 
-export async function syncCustomersToOffline(businessId: string, customers: any[]) {
+/**
+ * Mirror customers to SQLite, reporting whether they reached disk.
+ *
+ * Returns `boolean` for the same reason `syncProductsToOffline` does: this used
+ * to swallow its error and return `void`, so `fetchFullCustomers` wrote the
+ * `full_customers_sync` stamp over a write that had failed. The stamp carries a
+ * 24-hour throttle, so a device whose `zeneva.db` was locked or corrupt ended up
+ * with zero customers and a fresh stamp saying the sync had succeeded — and then
+ * refused to try again for a day. That is the same defect as the empty-POS bug
+ * CLAUDE.md documents for products, one collection over.
+ *
+ * `false` means "not on disk"; `true` on a non-Tauri caller means "there is no
+ * SQLite mirror on this platform", which is not a failure.
+ */
+export async function syncCustomersToOffline(businessId: string, customers: any[]): Promise<boolean> {
   const db = await getOfflineDb();
-  if (!db || customers.length === 0) return;
-  
+  if (!db) return typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__;
+  if (customers.length === 0) return true;
+
   try {
     const rows = customers
       .filter(c => c?.id)
       .map(c => [c.id, businessId, JSON.stringify(c)]);
     await upsertRows(db, 'customers', ['id', 'business_id', 'data'], rows);
+    return true;
   } catch (err) {
     console.error('SQLite Sync Error (Customers):', err);
+    return false;
   }
 }
 

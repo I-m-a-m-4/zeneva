@@ -47,14 +47,11 @@ import {
   periodDelta,
 } from '@/lib/reports-aggregates';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import type { Product, Receipt } from '@/types';
 
 /** Past this the bars stop being distinguishable; the tail folds into "Other". */
 const CHART_ROWS = 8;
-
-const chartConfig = {
-  revenue: { label: 'Revenue', color: 'hsl(var(--primary))' },
-} satisfies ChartConfig;
 
 interface CategoryPerformanceProps {
   receipts: Receipt[];
@@ -70,6 +67,11 @@ export default function CategoryPerformance({
   products,
   currencySymbol = '',
 }: CategoryPerformanceProps) {
+  const { t } = useI18n();
+  // Inside the component: the series label is translated and there is no `t` at module scope.
+  const chartConfig = {
+    revenue: { label: t('reports.colRevenue'), color: 'hsl(var(--primary))' },
+  } satisfies ChartConfig;
   const money = (n: number) =>
     `${currencySymbol}${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
@@ -85,10 +87,14 @@ export default function CategoryPerformance({
 
     return {
       rows: all,
-      chartRows: foldTail(all, CHART_ROWS),
+      chartRows: foldTail(
+        all,
+        CHART_ROWS,
+        t('reports.cpOther', { count: Math.max(0, all.length - CHART_ROWS) }),
+      ),
       previousByCategory: prevMap,
     };
-  }, [receipts, previousReceipts, products]);
+  }, [receipts, previousReceipts, products, t]);
 
   if (rows.length === 0) return null;
 
@@ -101,12 +107,15 @@ export default function CategoryPerformance({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Layers className="h-5 w-5 text-primary" />
-          Category performance
+          {t('reports.cpTitle')}
         </CardTitle>
         <CardDescription>
-          Which parts of the catalogue earn — by revenue, with margin beside it.
+          {t('reports.cpSubtitle')}
           {rows.length > CHART_ROWS
-            ? ` ${rows.length} categories sold; the chart folds the smallest ${rows.length - CHART_ROWS} into “Other”.`
+            ? ` ${t('reports.cpFoldedTail', {
+                total: rows.length,
+                folded: rows.length - CHART_ROWS,
+              })}`
             : ''}
         </CardDescription>
       </CardHeader>
@@ -141,7 +150,7 @@ export default function CategoryPerformance({
                     indicator="line"
                     formatter={(value: any) => (
                       <span className="text-xs">
-                        Revenue:{' '}
+                        {t('reports.revenueColon')}{' '}
                         <span className="font-mono font-medium tabular-nums text-foreground">
                           {money(Number(value))}
                         </span>
@@ -159,13 +168,13 @@ export default function CategoryPerformance({
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-end">Revenue</TableHead>
-                <TableHead className="text-end">Share</TableHead>
-                <TableHead className="text-end">Margin</TableHead>
-                <TableHead className="hidden text-end sm:table-cell">Units</TableHead>
+                <TableHead>{t('inventory.category')}</TableHead>
+                <TableHead className="text-end">{t('reports.colRevenue')}</TableHead>
+                <TableHead className="text-end">{t('reports.colShare')}</TableHead>
+                <TableHead className="text-end">{t('reports.colMargin')}</TableHead>
+                <TableHead className="hidden text-end sm:table-cell">{t('reports.colUnits')}</TableHead>
                 {previousByCategory && (
-                  <TableHead className="hidden text-end md:table-cell">vs previous</TableHead>
+                  <TableHead className="hidden text-end md:table-cell">{t('reports.cpVsPrevious')}</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -181,7 +190,7 @@ export default function CategoryPerformance({
                     <TableCell>
                       <p className="text-sm font-medium">{c.category}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {c.items} {c.items === 1 ? 'item' : 'items'}
+                        {t('common.items', { count: c.items })}
                       </p>
                     </TableCell>
                     <TableCell className="text-end text-sm font-medium tabular-nums">
@@ -196,8 +205,10 @@ export default function CategoryPerformance({
                           className="text-xs text-muted-foreground"
                           title={
                             c.costCoverage > 0
-                              ? `Cost price missing on ${Math.round((1 - c.costCoverage) * 100)}% of units sold — margin unknown, not zero`
-                              : 'No cost prices recorded — margin unknown, not zero'
+                              ? t('reports.cpMarginUnknownPartial', {
+                                  pct: Math.round((1 - c.costCoverage) * 100),
+                                })
+                              : t('reports.cpMarginUnknownNone')
                           }
                         >
                           —
@@ -223,12 +234,12 @@ export default function CategoryPerformance({
                           <span className="text-xs text-muted-foreground">—</span>
                         ) : delta.direction === 'new' ? (
                           <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                            new
+                            {t('reports.cpNew')}
                           </span>
                         ) : delta.direction === 'flat' ? (
                           <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground">
                             <Minus className="h-3 w-3" />
-                            flat
+                            {t('reports.cpFlat')}
                           </span>
                         ) : (
                           <span
@@ -257,9 +268,7 @@ export default function CategoryPerformance({
         </ScrollArea>
 
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Revenue here is the sum of price × quantity on each line, so it excludes tax
-          and is gross of receipt-level discounts — it will not match the Revenue card
-          above exactly, which is the till total. Shares add to 100% within this panel.
+          {t('reports.cpFootnote')}
         </p>
       </CardContent>
     </Card>

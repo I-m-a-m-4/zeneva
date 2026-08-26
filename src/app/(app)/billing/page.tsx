@@ -35,35 +35,19 @@ const SubscriptionSection = dynamic(
 );
 
 /*
- * Mounted beside the plans, not inside them.
+ * There is no credit top-up rail here, deliberately.
  *
- * `SubscriptionSection` early-returns a "Lifetime Access Active" card for
- * `accessLevel === 'lifetime'`, so anything nested in it disappears for those
- * accounts — and a lifetime shop still spends Zen AI credits. `ssr: false` for the
- * same reason as the plans: it loads the Paystack and Dodo scripts.
+ * Zen AI credits are an allowance of the plan and nothing else — they are not sold
+ * separately. A shop that wants more AI moves up a tier, which is what the plans
+ * below are for. The removed section (`ai-credits-section.tsx`, with its Paystack
+ * and Dodo rails and a three-pack price list) sold credits as a one-off product;
+ * that product is scrapped, so the only surface that quotes an allowance is the
+ * plan card, and the only surface that shows the balance is `/ai-insights`.
+ *
+ * `aiBonusCredits` still exists on the business document and is still spent after
+ * the allowance — see `src/lib/server/ai-credits.ts`. It just has one writer now,
+ * the super-admin grant on `/admin-imamshaffy/ai-usage`.
  */
-const AiCreditsSection = dynamic(
-    () => import('@/components/settings/ai-credits-section'),
-    {
-        ssr: false,
-        loading: () => (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-6 w-40" />
-                    <Skeleton className="h-4 w-72" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <Skeleton className="h-24 w-full" />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Skeleton className="h-52" />
-                        <Skeleton className="h-52" />
-                        <Skeleton className="h-52" />
-                    </div>
-                </CardContent>
-            </Card>
-        ),
-    }
-);
 
 function BillingPageSkeleton() {
     return <BillingBodySkeleton />;
@@ -142,8 +126,6 @@ function BillingPage() {
         </CardContent>
       </Card>
 
-      <AiCreditsSection userProfile={userProfile} businessInstance={currentBusiness} />
-
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" />Subscription History</CardTitle>
@@ -168,11 +150,11 @@ function BillingPage() {
                                       * The row's own currency, not a hardcoded ₦.
                                       *
                                       * Every writer into `subscription_history` records a
-                                      * `currency`, and two of them write USD — the Dodo
-                                      * subscription webhook and the Dodo credit-pack
-                                      * branch beside it. Printing ₦ against all of them
-                                      * showed an $8 credit pack as "₦8", which reads as a
-                                      * mis-charge of a factor of 1,500.
+                                      * `currency`, and the Dodo subscription webhook writes
+                                      * USD. Printing ₦ against those showed an $8 payment as
+                                      * "₦8", which reads as a mis-charge of a factor of
+                                      * 1,500. Historical rows from the scrapped credit-pack
+                                      * rail are USD too, and are still listed here.
                                       */}
                                     <TableCell>{item.currency === 'USD' ? '$' : '₦'}{item.amount.toLocaleString()}</TableCell>
                                     <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(safeToDate(item.timestamp), 'PPp') : 'N/A'}</TableCell>

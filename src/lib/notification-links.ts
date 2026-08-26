@@ -92,6 +92,10 @@ export function resolveNotificationLink(notif: NotificationLike): string {
   const explicit = (notif.link || notif.url || '').trim();
   if (explicit) return explicit;
 
+  const title = (notif.title || '').toLowerCase();
+  const body = (notif.body || '').toLowerCase();
+  const mentions = (needle: string) => title.includes(needle) || body.includes(needle);
+
   // Handle marketing/download announcements before the global fallback catches them.
   // Global announcements often lack an explicit link, but we want them to take the
   // user to the download page rather than the blank-ish notification detail view.
@@ -110,9 +114,6 @@ export function resolveNotificationLink(notif: NotificationLike): string {
   if (notif.isGlobal) return notificationDetailLink(notif);
 
   const type = (notif.type || '').toLowerCase();
-  const title = (notif.title || '').toLowerCase();
-  const body = (notif.body || '').toLowerCase();
-  const mentions = (needle: string) => title.includes(needle) || body.includes(needle);
 
   if (type === 'billing' || mentions('expire') || mentions('subscribe') || title.includes('subscription')) {
     return '/billing';

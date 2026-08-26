@@ -22,6 +22,7 @@ import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
 import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
 import { FirestoreRecovery } from '@/components/shared/firestore-recovery';
 import { ClientSideInitializer } from '@/components/shared/client-initializer';
+import { LaunchTelemetry } from '@/components/shared/launch-telemetry';
 import { PushClickTracker } from '@/components/shared/push-click-tracker';
 import { NativeNotificationListener } from '@/components/shared/native-notification-listener';
 import { PWAProvider } from '@/context/pwa-context';
@@ -319,6 +320,10 @@ export default function RootLayout({
           <I18nProvider>
           <SplashScreen />
           <ClientSideInitializer />
+          {/* Outside FirebaseClientProvider on purpose — it measures people who
+              never sign in, and it has to keep reporting on a build where the
+              Firebase config itself is the fault. */}
+          <LaunchTelemetry />
           <ChunkErrorListener />
           <FirestoreRecovery />
           <FirebaseClientProvider>

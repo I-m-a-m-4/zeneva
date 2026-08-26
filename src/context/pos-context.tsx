@@ -5,7 +5,7 @@ import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfil
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { getAuth } from 'firebase/auth';
-import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, getDoc, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum, Timestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, getDoc, getDocFromServer, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum, Timestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 import { secureStorage } from '@/lib/secure-storage';
@@ -15,6 +15,7 @@ import {   syncProductsToOffline,
   deleteMultipleProductsFromOffline,
   getCachedProductsResult,
   getCachedCustomers,
+  getCachedCustomersResult,
   syncCustomersToOffline,
   syncReceiptsToOffline,
   getCachedReceipts,
@@ -35,10 +36,26 @@ import {   syncProductsToOffline,
   syncUsersToOffline,
   getCachedUsers,
   syncAuditLogsToOffline,
-  getCachedAuditLogs
+  getCachedAuditLogs,
+  offlineDbUsable
 } from '@/lib/sqlite-sync';
 import { isNativeApp, isMobileApp } from '@/lib/platform';
 import { reportAnomaly } from '@/lib/error-logger';
+import {
+  classifyProductSyncFailure,
+  describeRefusal,
+  isServerRefusal,
+  PRODUCT_SYNC_RETRY_POLICY,
+  type ProductSyncErrorKind,
+  type RefusalProbe,
+} from '@/lib/product-catalog-state';
+import {
+  normalizeName,
+  normalizePhone,
+  normalizeCode,
+  realEmail,
+  type CustomerDuplicateMatch,
+} from '@/lib/customer-health';
 
 import { 
   POS_CART_KEY, 
@@ -149,6 +166,32 @@ interface POSContextType {
   stats: BusinessStats | null;
   searchCustomers: (term: string) => Promise<Customer[]>;
   searchCustomersByField: (field: string, value: string) => Promise<Customer[]>;
+  /**
+   * Every customer in the business, before the active branch filters any out.
+   *
+   * The integrity check on the customers page needs this and cannot use
+   * `customers`. Branch filtering drops a customer with no `branchId` from every
+   * specific branch's view — which is precisely the defect the "no branch" check
+   * reports, so running it on the filtered list finds nothing, every time. Two
+   * duplicate records sitting in different branches are also still one duplicated
+   * person, and merging them is still the right fix.
+   *
+   * `null` while the list is still coming, exactly as `customers` is.
+   */
+  allCustomersUnfiltered: Customer[] | null;
+  /**
+   * Ask the server whether this person is already on file, before creating them.
+   *
+   * The local array can be stale — there is no realtime listener on customers —
+   * so a purely local check is exactly what let two tills each create their own
+   * copy of the same walk-in. This asks Firestore.
+   */
+  findExistingCustomer: (candidate: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    code?: string;
+  }) => Promise<CustomerDuplicateMatch[]>;
   searchReceipts: (term: string) => Promise<Receipt[]>;
   fetchReceiptsInRange: (from: Date, to: Date, limitCount?: number) => Promise<Receipt[]>;
   searchProducts: (term: string) => Promise<Product[]>;
@@ -208,11 +251,16 @@ interface POSContextType {
   isProductCatalogPending: boolean;
   /**
    * Why the catalogue is unavailable, when it is unavailable for a reason other
-   * than the shop being empty. `'permission'` — Firestore rules refused the
-   * list; `'cache'` — the local mirror could not be read; `'network'` — the sync
-   * failed and its retries are spent.
+   * than the shop being empty. `'access'` — the server refused to release the
+   * catalogue to this device; `'cache'` — the local mirror could not be read;
+   * `'network'` — the sync could not reach the server and its retries are spent.
+   *
+   * There is deliberately no `'permission'` member any more. The rules gate the
+   * product list on tenancy alone, so a refusal never establishes that this
+   * account lacks a permission — and the app told people it did. See
+   * `src/lib/product-catalog-state.ts`.
    */
-  productSyncError: null | 'network' | 'permission' | 'cache';
+  productSyncError: ProductSyncErrorKind | null;
   /**
    * True when there are no products *and* the emptiness cannot be trusted —
    * either a sync failure was recorded, or the device is offline with nothing
@@ -264,9 +312,11 @@ const ONLINE_ORDERS_LISTENER_LIMIT = 200;
  * realtime listener to fill the gap, so it retries instead of waiting out the
  * 24-hour window. Bounded, because the usual cause of a *repeated* failure is
  * not something a fourth attempt fixes, and each attempt is billed reads.
+ *
+ * The ladder is per failure kind and lives in
+ * `PRODUCT_SYNC_RETRY_POLICY` — a refusal gets a shorter one than a dropped
+ * connection, for the reason given there.
  */
-const PRODUCT_SYNC_MAX_RETRIES = 3;
-const PRODUCT_SYNC_RETRY_BASE_MS = 4000;
 
 /*
  * How often connectivity is probed while the OS insists there is no network.
@@ -277,6 +327,56 @@ const PRODUCT_SYNC_RETRY_BASE_MS = 4000;
  * phone three 8.5-second timeouts every 16 seconds all day.
  */
 const OFFLINE_PROBE_INTERVAL_MS = 60_000;
+
+/**
+ * How often the delta sync re-runs while the app is in the foreground.
+ *
+ * Before this existed, the delta sync ran **once per online session**, 2 seconds
+ * after mount, and nothing ever ran it again — there is no realtime listener on
+ * products or customers (`customersQuery` is deliberately `null` to save reads)
+ * and the full sync is gated to once per 24 hours. So a till that had been open
+ * since morning had no mechanism at all to learn about a customer another till
+ * created at 10am. Staff reported exactly that: a colleague adds a customer, the
+ * second device cannot find them, so it creates its own copy, and the shop ends
+ * up with two records for one person. The duplicate was the symptom; the missing
+ * poll was the cause.
+ *
+ * The cost, stated plainly because the comment on `lastSyncedTimestampRef`
+ * documents a loop that billed reads all day. Firestore charges a minimum of one
+ * document read per query even when nothing matches, and a pass is three
+ * queries, so an idle foreground device costs 3 reads per interval:
+ *
+ *   60s interval  →  180 reads/hour  →  ~1,800 over a 10-hour trading day
+ *
+ * Three tills is ~5,400 reads/day against a 50,000/day free allowance — about
+ * 11% — and that is the whole bill when nothing changes. It buys a shop that
+ * stops inventing duplicate customers, which is worth more than the reads.
+ *
+ * Two things keep it honest. It is skipped entirely when the document is hidden,
+ * so a backgrounded tab or a phone in a pocket costs nothing; and every trigger
+ * goes through `DELTA_MIN_GAP_MS`, so the burst of visibility/focus/online
+ * events that a single alt-tab produces cannot turn into three passes.
+ */
+const DELTA_POLL_MS = 60_000;
+
+/**
+ * Floor between two delta syncs, whatever asked for one.
+ *
+ * Alt-tabbing back to the app fires `visibilitychange` and `focus` together, and
+ * reconnecting fires `online` alongside both. Without a floor that is three
+ * passes — nine queries — for one user action.
+ */
+const DELTA_MIN_GAP_MS = 20_000;
+
+/**
+ * How far the delta window is rewound past the last successful sync.
+ *
+ * Guards against clock skew between this device and Firestore's servers — see
+ * the long comment at the `lastCheck` computation in `refreshData`. Two minutes
+ * is generous for the drift a consumer device actually shows while staying small
+ * enough that the re-read is a handful of documents, not a page.
+ */
+const DELTA_OVERLAP_MS = 120_000;
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
@@ -322,7 +422,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
    * screen it used to show was "No products found", which reads as an empty shop
    * and sent owners looking for a category filter that was never set.
    */
-  const [productSyncError, setProductSyncError] = useState<null | 'network' | 'permission' | 'cache'>(null);
+  const [productSyncError, setProductSyncError] = useState<ProductSyncErrorKind | null>(null);
+  /**
+   * The server has been asked for this business's catalogue and answered "none".
+   *
+   * This is the only thing that can turn "there are no products" from a guess
+   * into a fact, and without it every later doubt — going offline, a failed
+   * retry — reopened the question and put "Couldn't load your products" in front
+   * of a shop that genuinely has none. A brand-new shop is the common case in
+   * this app, so that mattered more than the edge it was protecting.
+   *
+   * Session-scoped and never persisted, on purpose. A stamp for this would be one
+   * more claim that outlives what it certifies (see `full_products_sync`), and
+   * "we asked the server this session and it said zero" is a claim that cannot
+   * rot. It is cleared when `businessId` changes so an impersonation peek or a
+   * tenant switch cannot carry it across.
+   */
+  const [catalogConfirmedEmpty, setCatalogConfirmedEmpty] = useState(false);
   /**
    * True between a failed sync and its scheduled retry. It is state, not a ref,
    * because the POS holds its loading skeleton on it — a retry that is about to
@@ -337,6 +453,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const fetchFullProductsRef = useRef<((options?: { force?: boolean }) => Promise<void>) | null>(null);
   /** Set once per session when a forced re-sync has already been spent on a stamp/store disagreement. */
   const forcedProductResyncRef = useRef(false);
+  /**
+   * One server-side profile read per session is enough to diagnose a refusal, and
+   * the retry ladder would otherwise pay for it on every attempt.
+   */
+  const refusalProbedRef = useRef(false);
   const [extraStats, setExtraStats] = useState({ totalProducts: 0, totalStockValue: 0, lowStockCount: 0 });
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
@@ -377,6 +498,27 @@ export function POSProvider({ children }: { children: ReactNode }) {
    */
   const lastSyncedTimestampRef = useRef(lastSyncedTimestamp);
   const syncInFlightRef = useRef(false);
+
+  /*
+   * When a delta sync was last *attempted*, as opposed to last succeeded.
+   *
+   * `lastSyncedTimestampRef` above only advances on success — it is the delta
+   * window boundary, and moving it after a failed pass would skip whatever
+   * changed while the pass was failing. So it cannot double as the throttle for
+   * the foreground poll: a failing sync would leave the ref stale and every
+   * trigger would be let through, hammering a Firestore that is already
+   * refusing. This one advances on every attempt.
+   */
+  const lastDeltaAttemptRef = useRef(0);
+
+  /*
+   * The live `refreshData` and `isRealOnline`, reachable from an effect that
+   * must not list them as dependencies — see the loop described above. The
+   * foreground poll re-arms a `setInterval`, so a changing dependency there
+   * costs a torn-down interval per render rather than one extra query.
+   */
+  const refreshDataRef = useRef<((silent?: boolean) => Promise<void>) | null>(null);
+  const isRealOnlineRef = useRef(true);
 
   // 🌐 INTELLIGENT CONNECTIVITY ENGINE
   // navigator.onLine can give false positives (e.g. connected to a WiFi hotspot with no cellular data)
@@ -645,6 +787,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
    */
   const isDesktopApp = isNativeApp() && !isMobileApp();
 
+  /**
+   * Whether the local SQLite store has proven itself usable this session.
+   *
+   * `null` until hydration has actually tried it, and **`null` deliberately
+   * behaves like `false`** at the write sites below: a store that has not yet
+   * answered is not a store you may rely on, and the cost of being wrong is
+   * asymmetric — a redundant IndexedDB write costs nothing, whereas skipping it
+   * against a dead SQLite leaves the catalogue with nowhere to live at all.
+   *
+   * That is not hypothetical. The desktop shell had *three* stores and every one
+   * of them was off: SQLite because the Rust crate was built with no database
+   * driver (see `src-tauri/Cargo.toml`), localStorage because the write is gated
+   * on `!isDesktopApp`, and IndexedDB because it was gated on `!isNativeApp()`.
+   * So a desktop till relaunched offline had an empty catalogue, and the only
+   * reason it ever worked was that the localStorage write used to be
+   * unconditional. Gating the mirror on a *proven* store rather than on the
+   * platform is what stops one silent failure emptying a till again.
+   */
+  const [sqliteOk, setSqliteOk] = useState<boolean | null>(() => offlineDbUsable());
+
   useEffect(() => {
     if (currentUserProfile) {
       secureStorage.setItem(USER_PROFILE_KEY, currentUserProfile);
@@ -669,18 +831,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isDesktopApp) secureStorage.setItem('pos_synced_products', syncedProducts);
-    if (!isNativeApp()) idb.set('pos_synced_products', syncedProducts);
-  }, [syncedProducts, isDesktopApp]);
+    if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_products', syncedProducts);
+  }, [syncedProducts, isDesktopApp, sqliteOk]);
 
   useEffect(() => {
     if (!isDesktopApp) secureStorage.setItem('pos_synced_customers', syncedCustomers);
-    if (!isNativeApp()) idb.set('pos_synced_customers', syncedCustomers);
-  }, [syncedCustomers, isDesktopApp]);
+    if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_customers', syncedCustomers);
+  }, [syncedCustomers, isDesktopApp, sqliteOk]);
 
   useEffect(() => {
     if (!isDesktopApp) secureStorage.setItem('pos_synced_receipts', syncedReceipts);
-    if (!isNativeApp()) idb.set('pos_synced_receipts', syncedReceipts);
-  }, [syncedReceipts, isDesktopApp]);
+    if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_receipts', syncedReceipts);
+  }, [syncedReceipts, isDesktopApp, sqliteOk]);
 
   useEffect(() => {
     if (!isDesktopApp) secureStorage.setItem('pos_synced_users', syncedUsers);
@@ -778,6 +940,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (syncedProducts.length > 0) return false;
     if (initialProducts && initialProducts.length > 0) return false;
     /*
+     * The server already answered "no products" for this business this session, so
+     * there is nothing still coming. Sitting above the sync checks keeps the
+     * empty-shop state steady through the next daily re-sync instead of flashing
+     * a skeleton over a shop we know is empty.
+     */
+    if (catalogConfirmedEmpty) return false;
+    /*
      * The local mirror has not been read yet, so nothing can be concluded about
      * the catalogue either way. This has to sit *above* the offline check: with
      * the two the other way round, every offline launch resolved to "terminal"
@@ -793,7 +962,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (productSyncError) return false; // terminal — the page shows the reason and a retry
     return !hasFullSyncedProducts;
   }, [
-    businessId, isRealOnline, syncedProducts, initialProducts, isCacheHydrated,
+    businessId, isRealOnline, syncedProducts, initialProducts, isCacheHydrated, catalogConfirmedEmpty,
     isFullSyncingProducts, isProductRetryScheduled, productSyncError, hasFullSyncedProducts,
   ]);
 
@@ -818,14 +987,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
    * empty" witness: the effect that sets it from the `full_products_sync` stamp
    * is itself gated on `isRealOnline`, so it is always false offline — and per
    * CLAUDE.md that stamp can outlive the rows it certifies anyway.
+   *
+   * `catalogConfirmedEmpty` *is* such a witness, and it is the only one. It means
+   * the server was asked for this business's products in this session and
+   * answered with none, which settles the question for good: no later doubt can
+   * unsettle a fact. Without it, a shop that genuinely has no products was told
+   * "Couldn't load your products" the moment it went offline or a retry failed —
+   * and a shop with no products yet is the commonest shop in this app.
    */
   const isCatalogUnverified = useMemo(() => {
     if (!businessId || !isCacheHydrated) return false;
     if (syncedProducts.length > 0) return false;
     if (initialProducts && initialProducts.length > 0) return false;
+    if (catalogConfirmedEmpty) return false;
     if (productSyncError) return true;
     return !isRealOnline;
-  }, [businessId, isCacheHydrated, syncedProducts, initialProducts, productSyncError, isRealOnline]);
+  }, [businessId, isCacheHydrated, syncedProducts, initialProducts, catalogConfirmedEmpty, productSyncError, isRealOnline]);
+
+  /*
+   * A confirmed-empty catalogue is a statement about one business, so it cannot
+   * survive a switch to another. `businessId` moves on impersonation, on stopping
+   * it, and on a profile that resolves late — all three would otherwise let one
+   * shop's emptiness vouch for another's.
+   */
+  useEffect(() => {
+    setCatalogConfirmedEmpty(false);
+    refusalProbedRef.current = false;
+  }, [businessId]);
 
   const allProducts = useMemo(() => {
     if (initialProducts === null && syncedProducts.length === 0 && isProductCatalogPending) return null;
@@ -1056,11 +1244,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (syncInFlightRef.current) return;
 
     syncInFlightRef.current = true;
+    lastDeltaAttemptRef.current = Date.now();
     if (!silent) setIsSyncing(true);
     try {
       // Delta Sync: Only fetch documents updated since our last check
       // This turns 10,000 reads into 1-10 reads.
-      const lastCheck = new Date(lastSyncedTimestampRef.current);
+      /*
+       * Rewound by a small overlap, deliberately.
+       *
+       * `updatedAt` is a `serverTimestamp()`, resolved by Firestore when the
+       * write lands; `lastSyncedTimestampRef` is stamped from `Date.now()` on
+       * this device. The two clocks are not the same clock. If the device runs
+       * even slightly ahead of the server, a write that happened moments before
+       * this pass gets a server timestamp *below* our boundary and is skipped —
+       * and because the boundary then advances past it, it is skipped by every
+       * later pass too. The record is invisible until the 24-hour full sync.
+       *
+       * That is the failure the duplicate-customer reports describe, and an
+       * overlap is the cheap fix: re-reading a handful of documents that were
+       * already merged costs a few reads, while missing one costs the shop a
+       * duplicated customer. Merging is idempotent — every branch below matches
+       * on id and replaces in place — so a re-read is harmless by construction.
+       */
+      const lastCheck = new Date(Math.max(0, lastSyncedTimestampRef.current - DELTA_OVERLAP_MS));
       
       const pQuery = query(collection(firestore, "products"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
       const cQuery = query(collection(firestore, "customers"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
@@ -1127,7 +1333,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         hasShownSyncToast.current = true;
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
+      if (isServerRefusal(error)) return;
       if (!silent) console.error("Delta Sync Failed:", error);
     } finally {
       syncInFlightRef.current = false;
@@ -1200,7 +1406,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) return;
+      if (isServerRefusal(error)) return;
       console.error("Failed to fetch initial receipts:", error);
     }
   }, [businessId, firestore, user, isRealOnline]);
@@ -1236,7 +1442,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         setSyncedUsers(fetched);
       }
     } catch (e: any) { 
-      if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
+      if (isServerRefusal(e)) return;
       console.error("Fetch initial users failed:", e); 
     }
   }, [businessId, firestore, user, isRealOnline]);
@@ -1251,7 +1457,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         setSyncedAuditLogs(fetched.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime()));
       }
     } catch (e: any) { 
-      if (e?.code === 'permission-denied' || e?.message?.includes('permission')) return;
+      if (isServerRefusal(e)) return;
       console.error("Fetch initial audit logs failed:", e); 
     }
   }, [businessId, firestore, user, isRealOnline]);
@@ -1273,17 +1479,29 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let lastDoc: any = null;
     let hasMore = true;
     const BATCH_SIZE = 5000;
+    /*
+     * Whether every page reached SQLite. `syncCustomersToOffline` returns
+     * `boolean` now; before it did not, and the stamp below was written over
+     * failed writes — see that function's comment for what that cost.
+     */
+    let persisted = true;
 
     try {
       while (hasMore) {
+        /*
+         * No `orderBy`, so Firestore orders by `__name__` ascending and
+         * `startAfter(lastDoc)` walks document ids. That is deliberate: it needs
+         * no composite index, and unlike a sort on `name` or `createdAt` it
+         * cannot skip or repeat a row when a customer is edited mid-walk.
+         */
         let q = query(
           collection(firestore, "customers"),
           where("businessId", "==", businessId),
           limit(BATCH_SIZE)
         );
-        
+
         if (lastDoc) q = query(q, startAfter(lastDoc));
-        
+
         const snap = await getDocs(q);
         if (snap.empty) {
           hasMore = false;
@@ -1295,7 +1513,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
           // alone is not durable, and the full_customers_sync stamp below would
           // otherwise certify a sync that never reached disk - the 24h gate then
           // suppresses the re-sync that would have fixed it.
-          await syncCustomersToOffline(businessId, batch);
+          if (!(await syncCustomersToOffline(businessId, batch))) persisted = false;
 
           setSyncedCustomers(prev => {
             const merged = [...prev];
@@ -1311,10 +1529,35 @@ export function POSProvider({ children }: { children: ReactNode }) {
           if (snap.docs.length < BATCH_SIZE) hasMore = false;
         }
       }
-      
-      setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
+
+      /*
+       * Stamp only what actually happened — and only here, on the success path.
+       *
+       * This assignment and `setHasFullSyncedCustomers(true)` both used to sit in
+       * the `finally` below, so a throw anywhere in the walk still recorded a
+       * successful full sync. Two separate harms from that, and products already
+       * had both fixed:
+       *
+       *  - The durable stamp suppressed the retry for 24 hours, so a shop that
+       *    lost its connection halfway through a sync kept a partial customer
+       *    book for a day. That is one shape of "I have 4,000 customers and only
+       *    see 1,000".
+       *  - The in-memory flag is what the customers page reads to decide the list
+       *    is settled, so flipping it after a failure turns the skeleton into an
+       *    empty state — the `null` vs `[]` collapse that put "No products found"
+       *    on a POS whose catalogue had merely failed to load.
+       */
+      if (persisted) {
+        setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
+      } else {
+        reportAnomaly(
+          'customer_cache_write_failed',
+          'Customers were fetched but could not be written to the offline store; withholding the sync stamp so the next launch retries.',
+          { businessId, details: { fetched: allFetched.length } },
+        );
+      }
       setHasFullSyncedCustomers(true);
-      
+
       // Only show the toast if it's been more than 24 hours since the last success
       // to avoid annoying the user on every app start.
       const lastToast = Number(localStorage.getItem('last_sync_toast_time') || 0);
@@ -1323,14 +1566,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('last_sync_toast_time', Date.now().toString());
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
+      if (isServerRefusal(error)) {
+        /*
+         * A cashier without `view_customers` is refused by the rules, and that is
+         * the correct outcome, not a fault. Settle the flag so the page stops
+         * waiting; the list stays at whatever this role is allowed to see.
+         */
         setHasFullSyncedCustomers(true);
         return;
       }
       console.error("Full Customer Sync Failed:", error);
+      reportAnomaly('customer_sync_failed', `Full customer sync failed: ${error?.message || error}`, {
+        businessId,
+        details: { fetched: allFetched.length },
+      });
+      /*
+       * Deliberately no `setHasFullSyncedCustomers(true)` and no stamp here. The
+       * fetch failed, so the next `checkFullSyncStatus` pass must try again — and
+       * anything reading the flag must keep showing a pending state rather than
+       * an empty book.
+       */
     } finally {
       setIsFullSyncingCustomers(false);
-      setHasFullSyncedCustomers(true);
     }
   }, [businessId, firestore, isFullSyncingCustomers, toast, user, isRealOnline]);
 
@@ -1405,6 +1662,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setHasFullSyncedProducts(true);
 
       /*
+       * The server answered, so "this shop has no products" stops being a guess.
+       *
+       * This is the fix for the complaint that started this: a shop that has
+       * genuinely added nothing yet was shown "Couldn't load your products" the
+       * moment anything cast doubt on the emptiness — going offline, a retry that
+       * failed — because nothing anywhere recorded that we had *asked* and been
+       * told zero. Recorded only on a run that was not capped: an impersonation
+       * peek that returns nothing proves nothing about the real catalogue.
+       */
+      if (!isImpersonating) setCatalogConfirmedEmpty(allFetched.length === 0);
+
+      /*
        * A capped run must not claim the catalogue is complete.
        *
        * `full_products_sync` is what tells this device it may skip the daily
@@ -1450,34 +1719,38 @@ export function POSProvider({ children }: { children: ReactNode }) {
        * session on a shop with a full catalogue. It is now set only on the
        * success path above.
        */
-      const isPermission = error?.code === 'permission-denied' || error?.message?.includes('permission');
-
-      if (isPermission) {
-        /*
-         * A user who may not list products will never receive any, so holding
-         * the skeleton forever would be worse than showing the reason. The flag
-         * is set to stop the spinner, but the error is recorded so the POS says
-         * "we could not load your products" rather than "you have none".
-         */
-        setHasFullSyncedProducts(true);
-        setProductSyncError('permission');
-        reportAnomaly(
-          'product_sync_permission_denied',
-          `Product sync was refused by Firestore rules (${error?.code || 'permission'}). This user cannot list their own catalogue, so the POS is unusable for them.`,
-          { userId: user.uid, businessId, details: { code: error?.code || null } }
-        );
-        return;
-      }
-
       console.error("Full Product Sync Failed:", error);
-      setProductSyncError('network');
+
+      /*
+       * A refusal is retried, and it is never reported as a missing permission.
+       *
+       * It used to be the opposite of both. `permission-denied` returned here
+       * immediately with `productSyncError: 'permission'`, which rendered "This
+       * account isn't allowed to view the product list. Ask the business owner to
+       * grant inventory access." with no Retry button — a dead end, shown to
+       * owners, saying something `firestore.rules` cannot make true: the
+       * `products` `list` rule tests tenancy only and has no permission or role
+       * term in it at all. Meanwhile the cause it *does* usually indicate — the
+       * signed-in account's `users/{uid}` document not being readable on the
+       * server yet, which is a brand-new shop's normal first few hundred
+       * milliseconds — is precisely the sort of thing one more attempt clears.
+       *
+       * So a refusal joins the same bounded ladder as a dropped connection, on a
+       * shorter fuse (see `PRODUCT_SYNC_RETRY_POLICY`), and settles as `'access'`:
+       * the server would not release the catalogue and we did not establish why.
+       * The why is measured once, below, and sent to the platform owner.
+       */
+      const kind = classifyProductSyncFailure(error);
+      const { maxRetries, baseDelayMs } = PRODUCT_SYNC_RETRY_POLICY[kind];
+
+      setProductSyncError(kind);
       productSyncAttemptsRef.current += 1;
 
-      if (productSyncAttemptsRef.current <= PRODUCT_SYNC_MAX_RETRIES) {
+      if (productSyncAttemptsRef.current <= maxRetries) {
         // Back off and try again — the common cause is a connection that dropped
         // mid-pagination, which the next attempt clears. Without this the shop
         // waited for the 24-hour window even though nothing was cached.
-        const delay = PRODUCT_SYNC_RETRY_BASE_MS * productSyncAttemptsRef.current;
+        const delay = baseDelayMs * productSyncAttemptsRef.current;
         if (productRetryTimerRef.current) clearTimeout(productRetryTimerRef.current);
         setIsProductRetryScheduled(true);
         productRetryTimerRef.current = setTimeout(() => {
@@ -1487,11 +1760,67 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }, delay);
       } else {
         setIsProductRetryScheduled(false);
-        reportAnomaly(
-          'product_sync_failed',
-          `Product sync failed ${productSyncAttemptsRef.current} times in a row: ${error?.message || String(error)}. The POS has no catalogue on this device.`,
-          { userId: user.uid, businessId, details: { code: error?.code || null, attempts: productSyncAttemptsRef.current } }
-        );
+        const attempts = productSyncAttemptsRef.current;
+
+        if (kind === 'access') {
+          /*
+           * One server read turns "refused, cause unknown" into a named cause in
+           * `error_logs`. `getDocFromServer` and not `getDoc` on purpose: the whole
+           * question is whether the *server* can see this profile, and the cached
+           * read the app is already running on answers yes either way.
+           *
+           * Latched to once per business per session, and the *whole* report is
+           * inside the latch. Skipping only the read and reporting anyway would
+           * file every repeat as `probe-failed` — a cause that means "the follow-up
+           * read failed", which would not have been true. A diagnosis nobody
+           * measured is the thing this change exists to stop shipping.
+           */
+          if (!refusalProbedRef.current) {
+            refusalProbedRef.current = true;
+
+            void (async () => {
+              let probe: RefusalProbe = { reachedServer: false, profileExists: false, profileBusinessId: null };
+              try {
+                const snap = await getDocFromServer(doc(firestore, 'users', user.uid));
+                probe = {
+                  reachedServer: true,
+                  profileExists: snap.exists(),
+                  profileBusinessId: snap.exists() ? ((snap.data() as any)?.businessId ?? null) : null,
+                };
+              } catch {
+                // Left as reachedServer: false — `describeRefusal` reports that.
+              }
+
+              const { cause, message } = describeRefusal(probe, {
+                queriedBusinessId: businessId,
+                authUid: user.uid,
+                isImpersonating,
+                code: error?.code || null,
+                attempts,
+              });
+
+              reportAnomaly('product_sync_permission_denied', message, {
+                userId: user.uid,
+                businessId,
+                details: {
+                  cause,
+                  code: error?.code || null,
+                  attempts,
+                  serverProfileExists: probe.profileExists,
+                  serverBusinessId: probe.profileBusinessId,
+                  probeReachedServer: probe.reachedServer,
+                  isImpersonating,
+                },
+              });
+            })();
+          }
+        } else {
+          reportAnomaly(
+            'product_sync_failed',
+            `Product sync failed ${attempts} times in a row: ${error?.message || String(error)}. The POS has no catalogue on this device.`,
+            { userId: user.uid, businessId, details: { code: error?.code || null, attempts } }
+          );
+        }
       }
     } finally {
       setIsFullSyncingProducts(false);
@@ -1602,7 +1931,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('last_receipt_sync_toast_time', Date.now().toString());
       }
     } catch (error: any) {
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
+      if (isServerRefusal(error)) {
         setHasFullSyncedReceipts(true);
         return;
       }
@@ -1904,6 +2233,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
               case 'delete-product':
                 action.payload.productIds.forEach((id: string) => batch.delete(doc(firestore, 'products', id)));
                 batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(-action.payload.productIds.length) }, { merge: true });
+                setSyncedProducts(prev => prev.filter(p => !action.payload.productIds.includes(p.id)));
+                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+                  deleteMultipleProductsFromOffline(action.payload.productIds);
+                }
                 break;
               case 'update-product':
                 batch.update(doc(firestore, 'products', action.payload.productId), { ...action.payload.values, updatedAt: serverTimestamp() });
@@ -2072,24 +2405,31 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [businessId, business, toast, processQueue, currentUserProfile, isRealOnline, activeBranchId]);
 
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
-    // If there's an image, we handle it. Ideally in background but for now let's just queue the data.
-    // In a real scenario, we might want to upload to Firebase Storage first if online,
-    // or store locally in Tauri if offline.
+    let imageUrl = productData.imageUrl || '';
     
-    // For now, let's keep it simple: Add to queue.
+    if (imageFile && typeof navigator !== 'undefined' && navigator.onLine) {
+      const formData = new FormData();
+      formData.append('file', imageFile);
+      try {
+        const response = await fetch(`/api/upload`, { method: 'POST', body: formData });
+        const result = await response.json();
+        if (response.ok && result.url) {
+          imageUrl = result.url;
+        } else {
+          console.error("ImageKit upload failed:", result.error);
+        }
+      } catch (error) {
+        console.error("Failed to upload image to ImageKit:", error);
+      }
+    }
+    
     const description = `Added product: ${productData.name}`;
-    
-    // If we have an image, we'd normally want to process it. 
-    // But since the user wants it to be fast and offline-first, 
-    // we'll just queue the data and handle image upload in the processQueue if possible, 
-    // or just save the product data.
-    
-    // TODO: Handle image persistence for offline
     
     addToQueue({
       type: 'add-product',
       payload: { 
         ...productData,
+        imageUrl,
         createdAt: Date.now(),
         updatedAt: Date.now()
       }
@@ -2190,6 +2530,131 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
     } catch { return []; }
   }, [businessId, firestore, customers, isRealOnline]);
+
+  /**
+   * Is this person already on file? Asked of the server, before a create.
+   *
+   * This is the direct fix for the duplicate-customer reports. Staff at a second
+   * till could not find a customer a colleague had just added — there is no
+   * realtime listener on `customers`, and until the foreground poll existed the
+   * delta sync ran once per session — so they typed the person in again. The
+   * `add-customer` path now asks Firestore first and shows what it finds.
+   *
+   * Three equality queries, run in parallel: code, phone, then name. Equality
+   * filters on separate fields are served by merging single-field indexes, so
+   * **none of these needs a composite index** — the same reason
+   * `searchCustomersByField` above works. Cost is a floor of three reads per
+   * customer creation, which is the cheapest thing in this file and buys the one
+   * check that actually prevents the duplicate.
+   *
+   * Ordered by how much the match proves, because the caller shows the strongest
+   * first and the wording has to match the evidence:
+   *
+   *  - `code`  — the shop's own identifier. A collision is a certainty, never a
+   *              question, in the same way a barcode match is in the importer.
+   *  - `phone` — near-certain in practice. Normalised through the health module
+   *              so `08031234567` and `+2348031234567` are one number; the
+   *              *query* has to use the raw string, so both forms are tried.
+   *  - `email` — certain when it is a real address. Placeholder
+   *              `@zeneva-import.local` addresses are skipped: they identify
+   *              nobody, and matching on one would offer to merge two unrelated
+   *              people who both came in through the old CSV importer.
+   *  - `name`  — a question, not an answer. Two people really are called Musa
+   *              Ibrahim, so this is surfaced as "is this the same person?" and
+   *              never blocks the create.
+   *
+   * Failure is silent and returns `[]` on purpose. This runs in front of a create
+   * the user has already asked for; if the lookup cannot run — offline, refused,
+   * timed out — the right outcome is to let them save, not to hold their customer
+   * hostage to a duplicate check. A visible duplicate can be merged later; a
+   * cashier who cannot record a customer is stuck at the till.
+   */
+  const findExistingCustomer = useCallback(async (candidate: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    code?: string;
+  }): Promise<CustomerDuplicateMatch[]> => {
+    if (!user || !businessId || !firestore || !isRealOnline) return [];
+
+    const code = normalizeCode(candidate.code);
+    const phoneKey = normalizePhone(candidate.phone);
+    const nameKey = normalizeName(candidate.name);
+    const email = realEmail({ email: candidate.email || '' })?.toLowerCase() || '';
+
+    if (!code && !phoneKey && !nameKey && !email) return [];
+
+    const byId = new Map<string, CustomerDuplicateMatch>();
+    /*
+     * Strongest evidence wins when the same document matches twice. Recording a
+     * phone hit as a name hit because the name query happened to run last would
+     * downgrade a near-certain duplicate into a question.
+     */
+    const rank: Record<CustomerDuplicateMatch['on'], number> = { code: 4, phone: 3, email: 2, name: 1 };
+    const record = (docs: Customer[], on: CustomerDuplicateMatch['on']) => {
+      for (const c of docs) {
+        const existing = byId.get(c.id);
+        if (!existing || rank[on] > rank[existing.on]) byId.set(c.id, { customer: c, on });
+      }
+    };
+
+    const runEquality = async (field: string, value: string): Promise<Customer[]> => {
+      try {
+        const snap = await getDocs(query(
+          collection(firestore, 'customers'),
+          where('businessId', '==', businessId),
+          where(field, '==', value),
+          limit(10),
+        ));
+        return snap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
+      } catch {
+        return [];
+      }
+    };
+
+    try {
+      /*
+       * The raw phone as typed *and* the normalised key, because `phone` is stored
+       * exactly as somebody typed it — there is no `normalizedPhone` field to
+       * query. Two shapes catch the overwhelming majority: what this user typed,
+       * and the bare national number another user probably typed.
+       */
+      const phoneValues = Array.from(new Set([
+        candidate.phone?.trim(),
+        phoneKey,
+        phoneKey ? `0${phoneKey}` : '',
+        phoneKey ? `+234${phoneKey}` : '',
+      ].filter((v): v is string => !!v)));
+
+      const [codeHits, emailHits, nameHits, ...phoneHitSets] = await Promise.all([
+        code ? runEquality('code', candidate.code!.trim()) : Promise.resolve([]),
+        email ? runEquality('lowercaseEmail', email) : Promise.resolve([]),
+        nameKey ? runEquality('lowercaseName', (candidate.name || '').toLowerCase().trim()) : Promise.resolve([]),
+        ...phoneValues.map(v => runEquality('phone', v)),
+      ]);
+
+      record(nameHits, 'name');
+      record(emailHits, 'email');
+      phoneHitSets.forEach(hits => record(hits, 'phone'));
+      record(codeHits, 'code');
+
+      /*
+       * The name query is an exact match on `lowercaseName`, which misses the
+       * reordered and punctuated variants the health module normalises away
+       * ("Imam Bello" against "Bello Imam"). Re-check every hit through
+       * `normalizeName` so a name reported as a match really is one under the
+       * same rule the Health tab uses — one definition of "same name", not two.
+       */
+      const matches = Array.from(byId.values()).filter(m => {
+        if (m.on !== 'name') return true;
+        return normalizeName(m.customer.name) === nameKey;
+      });
+
+      return matches.sort((a, b) => rank[b.on] - rank[a.on]);
+    } catch {
+      return [];
+    }
+  }, [businessId, firestore, user, isRealOnline]);
 
   const searchProducts = useCallback(async (term: string) => {
     if (!term.trim()) return [];
@@ -2556,9 +3021,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
           }
           reclaim('pos_synced_products', rows.length > 0);
         }),
-        getCachedCustomers(businessId).then(c => {
-          if (c.length > 0) setSyncedCustomers(c);
-          reclaim('pos_synced_customers', c.length > 0);
+        getCachedCustomersResult(businessId).then(({ ok, rows }) => {
+          if (rows.length > 0) setSyncedCustomers(rows);
+          /*
+           * Same reasoning as products just above: on desktop this table is the
+           * only place the customer book lives once `reclaim` has dropped the
+           * localStorage blob, so an unreadable store has to be distinguishable
+           * from an empty one. `reclaim` is deliberately skipped on failure —
+           * throwing away the blob because SQLite happened to be locked is how a
+           * shop loses its customers outright rather than for one session.
+           */
+          if (!ok) {
+            customerCacheUnreadableRef.current = true;
+            reportAnomaly(
+              'customer_cache_unreadable',
+              'The local SQLite customer mirror could not be read. Staff will not find existing customers at the till and may create duplicates until a re-sync lands.',
+              { userId: user?.uid, businessId }
+            );
+          } else {
+            reclaim('pos_synced_customers', rows.length > 0);
+          }
         }),
         getCachedReceipts(businessId, 10000).then(r => {
           if (r.length > 0) setSyncedReceipts(r);
@@ -2578,7 +3060,45 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }),
         getCachedBusiness(businessId).then(b => { if (b) setOfflineBusiness(b); }),
         getCachedStats(businessId).then(s => { if (s) setOfflineStats(s); }),
-      ]).finally(() => setIsCacheHydrated(true));
+      ])
+        .then(async () => {
+          /*
+           * SQLite could not be opened at all, so none of the reads above
+           * hydrated anything — fall back to the IndexedDB mirror.
+           *
+           * This is the branch that was missing, and its absence is why a desktop
+           * till came up with an empty catalogue: the shell had no working store
+           * of any kind (SQLite built with no driver, localStorage gated on
+           * `!isDesktopApp`, IndexedDB gated on `!isNativeApp()`), so relaunching
+           * offline showed "couldn't load your products" with no way back short of
+           * a reconnect. IndexedDB is the right fallback rather than localStorage:
+           * it has no 5MB cliff to fall off with a 12,000-product catalogue.
+           *
+           * `cacheWasForeign` gates it for the same reason it gates the web branch
+           * — these keys carry no businessId, and `purgeOwnedCaches` is async for
+           * IndexedDB so a foreign blob may still be sitting there.
+           *
+           * Each setter keeps whatever is already in state: a partially readable
+           * SQLite store is still better evidence than a mirror of unknown age.
+           */
+          if (offlineDbUsable() === false && !cacheWasForeign) {
+            const [p, c, r] = await Promise.all([
+              idb.get<Product[]>('pos_synced_products').catch(() => null),
+              idb.get<Customer[]>('pos_synced_customers').catch(() => null),
+              idb.get<Receipt[]>('pos_synced_receipts').catch(() => null),
+            ]);
+            if (p && p.length > 0) setSyncedProducts(prev => (prev.length > 0 ? prev : p));
+            if (c && c.length > 0) setSyncedCustomers(prev => (prev.length > 0 ? prev : c));
+            if (r && r.length > 0) setSyncedReceipts(prev => (prev.length > 0 ? prev : r));
+          }
+        })
+        .finally(() => {
+          // Now that the store has actually been tried, the write effects can
+          // stop mirroring to IndexedDB — or keep doing so, permanently, if
+          // SQLite turned out to be unavailable on this install.
+          setSqliteOk(offlineDbUsable());
+          setIsCacheHydrated(true);
+        });
     } else {
       // 2. Hydrate POS from IndexedDB for instant startup on Web/PWA (Evades 5MB LocalStorage Cap)
       //
@@ -2673,6 +3193,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (Number.isFinite(known) && known > 0) expectedProductCountRef.current = known;
   }, [syncedProducts, stats]);
 
+  /*
+   * The same three facts for customers, and for the same reason: the sync-status
+   * check needs the current count without re-arming every time a sale bumps one
+   * customer's `totalSpent`.
+   *
+   * `expectedCustomerCountRef` comes from the `getAggregateFromServer` count that
+   * maintains `stats.totalCustomers` — a server-side `count()` over the whole
+   * collection, so it is independent evidence of how big the book really is and
+   * the only way to notice that a *partial* sync is standing behind a full-sync
+   * stamp. A shop with 4,000 customers on file and 1,000 in hand looks perfectly
+   * healthy to a check that only asks "is the cache empty".
+   */
+  const syncedCustomerCountRef = useRef(0);
+  const expectedCustomerCountRef = useRef(0);
+  const customerCacheUnreadableRef = useRef(false);
+  const forcedCustomerResyncRef = useRef(false);
+  useEffect(() => {
+    syncedCustomerCountRef.current = syncedCustomers.length;
+    const known = Number((stats as any)?.totalCustomers ?? 0);
+    if (Number.isFinite(known) && known > 0) expectedCustomerCountRef.current = known;
+  }, [syncedCustomers, stats]);
+
   useEffect(() => {
     if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user) return;
 
@@ -2693,6 +3235,55 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
       if (now - lastCustSync > dayInterval && !isFullSyncingCustomers) {
         fetchFullCustomers();
+      } else if (!isFullSyncingCustomers && !forcedCustomerResyncRef.current && isCacheHydrated) {
+        /*
+         * The customer-book equivalent of `cacheContradictsStamp` below, which
+         * exists for products and had no counterpart here.
+         *
+         * A `full_customers_sync` stamp is a claim about what the store holds, and
+         * the stamp outlives what it certifies: it is written to localStorage
+         * (with a SQLite copy), while on desktop the customers themselves live in
+         * SQLite alone once the localStorage blob has been reclaimed. So a locked,
+         * deleted or half-written database leaves a fresh timestamp standing over
+         * a table that is empty or short, the 24-hour gate above skips the
+         * re-fetch, and staff spend the day unable to find customers who are
+         * plainly in Firestore — then create duplicates for them.
+         *
+         * Two contradictions are worth one re-sync, and neither can be detected
+         * by asking "is the cache empty":
+         *
+         *  - the store could not be read at all (`ok: false` at hydration), or
+         *  - it was read and holds materially fewer customers than the server-side
+         *    count says exist.
+         *
+         * `SHORTFALL_TOLERANCE` keeps the second from firing on ordinary drift:
+         * `stats.totalCustomers` is an aggregate recounted periodically and
+         * adjusted by increments, so it runs a few ahead or behind the synced
+         * array all the time. Only a real shortfall — a tenth of the book missing
+         * — is evidence of a broken sync rather than of a recent write.
+         *
+         * Latched to once per session by `forcedCustomerResyncRef`: the re-sync
+         * cannot fix a genuinely unwritable database, and without the latch it
+         * would re-run on every pass forever, paying for the whole book each time.
+         */
+        const expected = expectedCustomerCountRef.current;
+        const inHand = syncedCustomerCountRef.current;
+        const SHORTFALL_TOLERANCE = 0.9;
+
+        const unreadable = customerCacheUnreadableRef.current;
+        const short = lastCustSync > 0 && expected > 0 && inHand < Math.floor(expected * SHORTFALL_TOLERANCE);
+
+        if (unreadable || short) {
+          forcedCustomerResyncRef.current = true;
+          reportAnomaly(
+            unreadable ? 'customer_cache_lost' : 'customer_cache_short',
+            unreadable
+              ? 'A full-customer-sync stamp is standing over a customer store that could not be read; forcing one re-sync this session.'
+              : `A full-customer-sync stamp is standing over ${inHand} customers where the server count says ${expected}; forcing one re-sync this session.`,
+            { userId: user?.uid, businessId, details: { inHand, expected } },
+          );
+          fetchFullCustomers();
+        }
       }
 
       /*
@@ -2771,11 +3362,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [isMounted, businessId, firestore, isRealOnline, user, isCacheHydrated]);
   
   // Initial Delta Sync (Silent Catch-up on mount)
-  // Runs once per online session. The "no-op → reconnect → effect re-fires"
+  // Runs once on becoming online. The "no-op → reconnect → effect re-fires"
   // dance is all this needs: a per-mount latch would break the legitimate
   // retry after a lost connection, while keeping `refreshData` out of the deps
   // stops the setLastSyncedTimestamp → new identity → re-arm cycle that used to
   // re-query every ~2.5s for the lifetime of the session.
+  //
+  // This used to be the *only* thing that ever ran a delta sync. The foreground
+  // poll below is what keeps a long-open till current; see `DELTA_POLL_MS`.
   useEffect(() => {
     if (!businessId || !isRealOnline || !firestore) return;
 
@@ -2790,6 +3384,75 @@ export function POSProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId, isRealOnline, firestore]);
+
+  /*
+   * Keep the two refs the foreground poll reads current.
+   *
+   * The poll cannot list `refreshData` or `isRealOnline` in its own dependencies
+   * without tearing down and re-arming its interval on every sync — which is the
+   * shape of the bug the `lastSyncedTimestampRef` comment describes, and it
+   * billed reads all day. So it reads both through refs, and this effect is what
+   * keeps them pointing at the latest values.
+   */
+  useEffect(() => {
+    refreshDataRef.current = refreshData;
+  }, [refreshData]);
+
+  useEffect(() => {
+    isRealOnlineRef.current = isRealOnline;
+  }, [isRealOnline]);
+
+  /**
+   * Foreground delta poll — what makes one till see what another till just did.
+   *
+   * Four triggers, all funnelled through one throttled entry point:
+   *
+   *  - `visibilitychange` to visible — the shop switched back to Zeneva, which is
+   *    the moment they are about to look something up. The single most valuable
+   *    trigger of the four and the cheapest, because it costs nothing while the
+   *    app is not being used.
+   *  - `focus` — the window regained focus without the document ever having been
+   *    hidden (a second window, an OS-level app switch on the desktop shell).
+   *  - `online` — the browser thinks connectivity is back. `verifyConnectivity`
+   *    may still disagree, and `refreshData` re-checks, so this is a prompt, not
+   *    an assertion.
+   *  - the interval — for the case the reports were actually about: a till that
+   *    is open, visible and in use all day, never backgrounded, never refocused.
+   *    Nothing else here would ever fire on that device.
+   *
+   * Hidden documents are skipped rather than throttled, so a backgrounded tab or
+   * a pocketed phone costs zero reads no matter how long it sits there. See
+   * `DELTA_POLL_MS` for the read arithmetic and why it is worth paying.
+   */
+  useEffect(() => {
+    if (!businessId || !firestore || !user) return;
+    if (typeof window === 'undefined') return;
+
+    const maybeSync = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (!isRealOnlineRef.current) return;
+      if (Date.now() - lastDeltaAttemptRef.current < DELTA_MIN_GAP_MS) return;
+      // `refreshData` stamps `lastDeltaAttemptRef` itself, and also refuses to
+      // overlap via `syncInFlightRef` — this is the throttle, not the guard.
+      refreshDataRef.current?.(true);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') maybeSync();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', maybeSync);
+    window.addEventListener('online', maybeSync);
+    const interval = setInterval(maybeSync, DELTA_POLL_MS);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', maybeSync);
+      window.removeEventListener('online', maybeSync);
+      clearInterval(interval);
+    };
+  }, [businessId, firestore, user]);
 
 
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0), [cart]);
@@ -3157,7 +3820,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isProductCatalogPending, productSyncError, isCatalogUnverified, retryProductSync,
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
-    searchCustomers, searchCustomersByField, searchReceipts: async () => [],
+    searchCustomers, searchCustomersByField, findExistingCustomer, allCustomersUnfiltered: allCustomers, searchReceipts: async () => [],
     fetchReceiptsInRange, searchProducts, searchProductsByField, findProductBySku,
     fetchDetailedAnalytics, 
     fetchMonthlyAnalytics,

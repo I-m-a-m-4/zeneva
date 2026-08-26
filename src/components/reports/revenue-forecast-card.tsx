@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Refe
 import { Target, TrendingUp, TrendingDown, Sparkles } from 'lucide-react';
 import type { Receipt } from '@/types';
 import { safeToDate } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import { startOfDay, endOfDay, differenceInDays, subDays, format, isAfter, isBefore } from 'date-fns';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
@@ -15,6 +16,7 @@ interface RevenueForecastCardProps {
 }
 
 export default function RevenueForecastCard({ receipts, currencySymbol }: RevenueForecastCardProps) {
+    const { t } = useI18n();
     const forecastData = React.useMemo(() => {
         if (!receipts || receipts.length === 0) return null;
 
@@ -123,7 +125,7 @@ export default function RevenueForecastCard({ receipts, currencySymbol }: Revenu
         return (
             <Card className="h-full flex flex-col justify-center items-center p-6 text-center text-muted-foreground">
                 <Target className="h-10 w-10 opacity-20 mb-3" />
-                <p>Not enough data to generate a forecast.</p>
+                <p>{t('reports.rfNotEnough')}</p>
             </Card>
         );
     }
@@ -137,34 +139,34 @@ export default function RevenueForecastCard({ receipts, currencySymbol }: Revenu
             </div>
             <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                    <Sparkles className="h-5 w-5 text-indigo-500" /> Revenue Forecast
+                    <Sparkles className="h-5 w-5 text-indigo-500" /> {t('reports.rfTitle')}
                 </CardTitle>
-                <CardDescription>AI-powered 30-day projection based on your current run rate.</CardDescription>
+                <CardDescription>{t('reports.rfSubtitle')}</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col md:flex-row gap-6 mt-2">
                     <div className="flex flex-col justify-center space-y-4 md:w-1/3">
                         <div>
-                            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">30-Day Projection</p>
+                            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('reports.rfProjection')}</p>
                             <p className="text-3xl font-black text-foreground mt-1">
                                 {currencySymbol}{projected30Days.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </p>
                             <div className={`flex items-center gap-1 mt-2 text-sm font-semibold ${isPositiveTrend ? 'text-emerald-500' : 'text-rose-500'}`}>
                                 {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                                <span>{Math.abs(trendPercent).toFixed(1)}% vs previous 7 days</span>
+                                <span>{t('reports.rfVsPrevious7', { pct: Math.abs(trendPercent).toFixed(1) })}</span>
                             </div>
                         </div>
                         
                         <div className="bg-muted/30 p-3 rounded-lg border border-border/50">
-                            <p className="text-xs text-muted-foreground">Current Daily Run Rate</p>
-                            <p className="font-semibold text-lg">{currencySymbol}{dailyRunRate.toLocaleString(undefined, { maximumFractionDigits: 0 })} / day</p>
+                            <p className="text-xs text-muted-foreground">{t('reports.rfRunRate')}</p>
+                            <p className="font-semibold text-lg">{currencySymbol}{dailyRunRate.toLocaleString(undefined, { maximumFractionDigits: 0 })} {t('reports.rfPerDay')}</p>
                         </div>
                     </div>
                     
                     <div className="md:w-2/3 h-[180px]">
                         <ChartContainer config={{ 
-                            historical: { label: "Historical", color: "hsl(var(--primary))" },
-                            projected: { label: "Forecast", color: "hsl(var(--chart-3))" }
+                            historical: { label: t('reports.rfHistorical'), color: "hsl(var(--primary))" },
+                            projected: { label: t('reports.rfForecast'), color: "hsl(var(--chart-3))" }
                         }} className="h-full w-full">
                             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                 <defs>

@@ -14,59 +14,38 @@ import { AppConfig } from "@/lib/config";
 import Image from "next/image";
 
 import { cn } from "@/lib/utils";
+import { trackLaunchStage } from "@/lib/launch-telemetry";
 import { motion, AnimatePresence } from 'framer-motion';
+import { useI18n } from "@/context/i18n-context";
 
-const loginSlides = [
-  {
-    src: "/zeneva-login.png?v=2",
-    alt: "Modern retail store interior with minimalist design and warm lighting.",
-    title: "Operating System for Business",
-    description: "Streamline your inventory, maximize your profit, and build lasting customer relationships."
-  },
-  {
-    src: "/zeneva-login-2.png",
-    alt: "Elite dashboard on a black marble counter.",
-    title: "Precision Analytics",
-    description: "Real-time insights tailored for high-growth retail environments."
-  },
-  {
-    src: "/zeneva-login-3.png",
-    alt: "Organized luxury retail storage room.",
-    title: "Inventory Mastery",
-    description: "Never lose track of a single item with our intelligent stock management system."
-  },
-  {
-    src: "/zeneva-login-4.png",
-    alt: "Minimalist cafe interior.",
-    title: "Work From Anywhere",
-    description: "Secure, cloud-based access that puts your business in the palm of your hand."
-  }
-];
-
+// Titles and descriptions are keys resolved at render — the array is module-level
+// and cannot reach `t()`. The word-highlight below still matches on English, so
+// other locales draw the headline plain rather than part-italic.
 const loginVideoSlides = [
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053655/zeneva/zeneva_welcome_signup_video_6.mp4',
     poster: '/signup-video-6-poster.jpg',
-    title: "Operating System for Business",
-    description: "Streamline your inventory, maximize your profit, and build lasting customer relationships."
+    titleKey: 'auth.loginSlide1Title',
+    descKey: 'auth.loginSlide1Desc',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053651/zeneva/zeneva_welcome_signup_video_5.mp4',
     poster: '/signup-video-5-poster.jpg',
-    title: "Precision Analytics",
-    description: "Real-time insights tailored for high-growth retail environments."
+    titleKey: 'auth.loginSlide2Title',
+    descKey: 'auth.loginSlide2Desc',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053621/zeneva/zeneva_welcome_signup_video_2.mp4',
     poster: '/signup-video-2-poster.jpg',
-    title: "Work From Anywhere",
-    description: "Secure, cloud-based access that puts your business in the palm of your hand."
+    titleKey: 'auth.loginSlide3Title',
+    descKey: 'auth.loginSlide3Desc',
   }
 ];
 
 export default function LoginPage() {
   const auth = useAuth();
   const { toast } = useToast();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -96,44 +75,58 @@ export default function LoginPage() {
       })
       .catch((error: any) => {
         console.error("Redirect auth error:", error);
-        const isCancellation = 
-          error?.code === 'auth/popup-closed-by-user' || 
-          error?.code === 'auth/cancelled-popup-request' || 
-          error?.code === 'auth/user-cancelled' || 
+        const isCancellation =
+          error?.code === 'auth/popup-closed-by-user' ||
+          error?.code === 'auth/cancelled-popup-request' ||
+          error?.code === 'auth/user-cancelled' ||
           error?.code === 'auth/redirect-cancelled-by-user';
+
+        // Recorded even when it is a cancellation: on the desktop shell a
+        // "cancelled" redirect is indistinguishable from a webview that could
+        // never have completed one, and telling those apart is the point.
+        void trackLaunchStage('login_failed', `redirect:${error?.code ?? 'unknown'}`);
 
         if (!isCancellation) {
           toast({
             variant: "destructive",
-            title: "Authentication Failed",
-            description: error.message || "Failed to complete redirect sign-in.",
+            title: t('auth.authFailedTitle'),
+            description: error.message || t('auth.redirectSignInFailed'),
           });
         }
       });
-      
+
     return () => {
       isMounted = false;
     };
-  }, [auth, toast]);
+  }, [auth, toast, t]);
 
   const handleGoogleLogin = async () => {
     if (!auth) return;
     setIsGoogleLoading(true);
+    void trackLaunchStage('login_attempted', 'google');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      
+
 
       try {
         await signInWithPopup(auth, provider);
         // AuthLayout handles the redirection once auth state changes
+        void trackLaunchStage('login_succeeded', 'google-popup');
       } catch (popupError: any) {
         if (
-          popupError?.code === 'auth/popup-blocked' || 
+          popupError?.code === 'auth/popup-blocked' ||
           popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
           popupError?.code === 'auth/internal-error' ||
           popupError?.code === 'auth/network-request-failed'
         ) {
+          // The webview cannot host a popup. This branch navigates the whole
+          // shell away, so the event is recorded *before* the call — nothing
+          // after it is guaranteed to run.
+          void trackLaunchStage(
+            'login_failed',
+            `popup-fallback:${popupError?.code ?? 'unknown'}`,
+          );
           await signInWithRedirect(auth, provider);
         } else {
           throw popupError;
@@ -141,19 +134,21 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error("Google auth error:", error);
-      const isCancellation = 
-        error?.code === 'auth/popup-closed-by-user' || 
-        error?.code === 'auth/cancelled-popup-request' || 
-        error?.code === 'auth/user-cancelled' || 
+      const isCancellation =
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.code === 'auth/user-cancelled' ||
         error?.code === 'auth/redirect-cancelled-by-user';
+
+      void trackLaunchStage('login_failed', `google:${error?.code ?? 'unknown'}`);
 
       if (!isCancellation) {
         const errorDesc = error?.code === 'auth/internal-error'
-          ? "Google Authentication encountered a temporary system issue. Switching to redirect auth..."
-          : (error.message || "Please try again.");
+          ? t('auth.googleTemporaryIssue')
+          : (error.message || t('auth.tryAgainShort'));
         toast({
           variant: "destructive",
-          title: "Google Authentication Failed",
+          title: t('auth.googleAuthFailedTitle'),
           description: errorDesc,
         });
       }
@@ -179,15 +174,17 @@ export default function LoginPage() {
     e.preventDefault();
     if (!auth) {
       toast({
-        title: "Authentication service not available.",
+        title: t('auth.serviceUnavailable'),
         variant: "destructive"
       });
       return;
     }
     setIsLoading(true);
+    void trackLaunchStage('login_attempted', 'password');
     signInWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
         const user = userCredential.user;
+        void trackLaunchStage('login_succeeded', 'password');
         const isSuperAdmin = user.email === 'belloimam431@gmail.com';
         
         // Check for MFA enrollment if Super Admin
@@ -200,13 +197,19 @@ export default function LoginPage() {
         }
       })
       .catch((error) => {
-        let description = "Invalid email or password. Please try again.";
+        let description = t('auth.invalidCredentials');
         if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-          description = "Invalid email or password. Please check your credentials and try again.";
+          description = t('auth.invalidCredentialsDetailed');
         }
+        // The code, never the email or password. This endpoint is
+        // unauthenticated, so nothing identifying may leave the device — and
+        // `auth/invalid-api-key` versus `auth/invalid-credential` is the whole
+        // difference between a broken build and a genuine wrong password, which
+        // the toast above shows identically.
+        void trackLaunchStage('login_failed', `password:${error?.code ?? 'unknown'}`);
         toast({
           variant: 'destructive',
-          title: 'Login Failed',
+          title: t('auth.loginFailedTitle'),
           description: description,
         });
         setIsLoading(false); // Only set loading to false on failure.
@@ -219,7 +222,7 @@ export default function LoginPage() {
         <div className="absolute top-8 left-4 sm:left-8 z-20">
           <Button variant="ghost" asChild>
             <Link href="/signup">
-              Create Account
+              {t('auth.createAccountLink')}
             </Link>
           </Button>
         </div>
@@ -227,20 +230,20 @@ export default function LoginPage() {
           <div className="mx-auto grid w-full max-w-[350px] gap-6">
             <div className="grid gap-2 text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
-                <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
+                <img src={AppConfig.logoUrl} alt={t('auth.logoAlt')} className="h-16 w-auto" />
               </div>
-              <h1 className="text-3xl font-bold">Login</h1>
+              <h1 className="text-3xl font-bold">{t('auth.loginTitle')}</h1>
               <p className="text-balance text-muted-foreground">
-                Enter your email below to login to your account
+                {t('auth.loginSubtitle')}
               </p>
             </div>
             <form onSubmit={handleLogin} className="grid gap-4">
               <div className="grid gap-2 focus-within-glow rounded-md">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('common.email')}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                   autoComplete="username"
                   required
                   value={email}
@@ -249,12 +252,12 @@ export default function LoginPage() {
               </div>
               <div className="grid gap-2 focus-within-glow rounded-md">
                 <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t('auth.password')}</Label>
                   <Link
                     href="/forgot-password"
                     className="ml-auto inline-block text-sm underline"
                   >
-                    Forgot your password?
+                    {t('auth.forgotPasswordLink')}
                   </Link>
                 </div>
                 <div className="relative">
@@ -277,7 +280,7 @@ export default function LoginPage() {
               </div>
               <Button type="submit" className="w-full button-glow" disabled={isLoading || isGoogleLoading}>
                 {isLoading && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                Login
+                {t('auth.loginButton')}
               </Button>
             </form>
 
@@ -286,7 +289,7 @@ export default function LoginPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-background px-2 text-muted-foreground">{t('auth.orContinueWith')}</span>
               </div>
             </div>
 
@@ -324,22 +327,22 @@ export default function LoginPage() {
               )}
             </Button>
             <div className="mt-4 text-center text-sm">
-              Don&apos;t have an account?{" "}
+              {t('auth.noAccountPrompt')}{" "}
               <Link href="/signup" className="underline">
-                Sign up
+                {t('auth.signUpLink')}
               </Link>
             </div>
           </div>
         </div>
         <div className="w-full text-center mt-auto pb-4">
           <p className="text-[10px] text-muted-foreground/50 leading-relaxed max-w-[340px] mx-auto">
-            Zeneva is a registered business application. Corporate Affairs Commission (CAC) Registration — BN: 9673520. All rights reserved. By signing in, you agree to our{' '}
+            {t('auth.legalSignIn')}{' '}
             <Link href="/legal/terms-of-service" className="text-primary underline hover:opacity-80" target="_blank">
-              Terms of Service
+              {t('footer.linkTerms')}
             </Link>{' '}
-            and{' '}
+            {t('auth.legalAnd')}{' '}
             <Link href="/legal/privacy-policy" className="text-primary underline hover:opacity-80" target="_blank">
-              Privacy Policy
+              {t('footer.linkPrivacyPolicy')}
             </Link>.
           </p>
         </div>
@@ -381,14 +384,14 @@ export default function LoginPage() {
               transition={{ duration: 0.8, delay: 0.5 }}
             >
               <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">
-                {loginVideoSlides[currentSlide].title.split(" ").map((word, i) => (
+                {t(loginVideoSlides[currentSlide].titleKey).split(" ").map((word, i) => (
                   <React.Fragment key={i}>
                     {word === "for" || word === "Galaxy" || word === "System" ? <span className="text-primary italic"> {word} </span> : word + " "}
                   </React.Fragment>
                 ))}
               </h2>
               <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">
-                {loginVideoSlides[currentSlide].description}
+                {t(loginVideoSlides[currentSlide].descKey)}
               </p>
             </motion.div>
           </AnimatePresence>

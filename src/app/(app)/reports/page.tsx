@@ -50,6 +50,7 @@ import {
 } from '@/lib/reports-aggregates';
 import { downloadCsv } from '@/lib/csv';
 import { trackFeature } from '@/lib/product-telemetry';
+import { useI18n } from '@/context/i18n-context';
 
 /**
  * A KPI figure with, where we have one, its comparison against the equivalent
@@ -62,13 +63,14 @@ import { trackFeature } from '@/lib/product-telemetry';
  * rather than a misleading 0%).
  */
 function DeltaChip({ delta }: { delta: KpiDelta | null | undefined }) {
+    const { t } = useI18n();
     if (!delta || delta.direction === 'unknown') return null;
 
     if (delta.direction === 'new') {
         return (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                 <Sparkles className="h-3 w-3" />
-                new this period
+                {t('reports.deltaNewThisPeriod')}
             </span>
         );
     }
@@ -76,7 +78,7 @@ function DeltaChip({ delta }: { delta: KpiDelta | null | undefined }) {
         return (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
                 <Minus className="h-3 w-3" />
-                flat
+                {t('reports.deltaFlat')}
             </span>
         );
     }
@@ -89,7 +91,7 @@ function DeltaChip({ delta }: { delta: KpiDelta | null | undefined }) {
             )}
         >
             {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-            {Math.abs(delta.deltaPct ?? 0).toFixed(1)}% vs previous
+            {t('reports.deltaVsPrevious', { pct: Math.abs(delta.deltaPct ?? 0).toFixed(1) })}
         </span>
     );
 }
@@ -135,6 +137,7 @@ function ReportStatCard({ title, value, icon: Icon, description, delta }: { titl
 export default function ReportsDashboard() {
     const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange, users } = usePOS();
     const { activeBranchId } = useBranch();
+    const { t } = useI18n();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const [reportBatchReceipts, setReportBatchReceipts] = React.useState<Receipt[]>([]);
@@ -192,7 +195,7 @@ export default function ReportsDashboard() {
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
-        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0, totalCost: 0 };
+        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, buyersInRange: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0, totalCost: 0 };
 
         const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
         const totalSales = targetReceipts.length;
@@ -252,7 +255,34 @@ export default function ReportsDashboard() {
             totalSales,
             averageOrderValue,
             inventoryValue,
-            totalCustomers: uniqueCustomerIds.size || (activeBranchId && activeBranchId !== 'all' ? customers.length : Math.max(stats?.totalCustomers || 0, customers.length)),
+            /*
+             * The size of the customer book — everybody on file, not everybody who
+             * bought in this window.
+             *
+             * This used to read `uniqueCustomerIds.size || <the total below>`, so a
+             * card titled "Customers" showed the number of distinct people who
+             * appeared on a receipt inside the report range, and only fell back to
+             * the real total when no receipt in range had a customer attached. One
+             * card meant two different things depending on the data, and a shop with
+             * 4,000 customers on file was shown the ~1,000 of them who happened to
+             * buy that month. Both figures are worth knowing, so both are returned
+             * and the card shows the total with the in-range count underneath.
+             *
+             * `stats.totalCustomers` is a `getAggregateFromServer` count over the
+             * whole collection (pos-context.tsx:718), so it stays right even when
+             * the locally synced array is short — which is exactly the case this
+             * card has to survive. `Math.max` against `customers.length` covers the
+             * other direction: a customer created moments ago is in the array
+             * before the aggregate is recounted.
+             *
+             * With a single branch selected the aggregate is the wrong number —
+             * it counts the whole business — so the branch-filtered array is the
+             * only honest answer there.
+             */
+            totalCustomers: activeBranchId && activeBranchId !== 'all'
+                ? customers.length
+                : Math.max(stats?.totalCustomers || 0, customers.length),
+            buyersInRange: uniqueCustomerIds.size,
             totalProductsSold,
             totalServicesSold,
             totalItemsSold: totalProductsSold + totalServicesSold,
@@ -302,8 +332,8 @@ export default function ReportsDashboard() {
                 const timeout = setTimeout(() => {
                     if (isFetchingBatch) {
                         toast({
-                            title: 'Loading Data...',
-                            description: 'It is taking a bit longer. If you are offline, we are showing your local synchronized data.',
+                            title: t('reports.loadingDataTitle'),
+                            description: t('reports.loadingDataBody'),
                             variant: 'default'
                         });
                     }
@@ -406,7 +436,7 @@ export default function ReportsDashboard() {
     const handleDownloadImage = async () => {
         const element = dashboardRef.current;
         if (!element) return;
-        toast({ title: 'Generating Report...', description: 'Please wait while we capture your dashboard.' });
+        toast({ title: t('reports.generatingTitle'), description: t('reports.generatingBody') });
         try {
             const canvas = await html2canvas(element, {
                 scale: 4,
@@ -419,9 +449,10 @@ export default function ReportsDashboard() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            toast({ variant: 'success', title: 'Report Downloaded', description: 'Your dashboard image has been saved.' });
+            // The body, and both failure strings below, are dashboard's: same widget, same words.
+            toast({ variant: 'success', title: t('reports.downloadedTitle'), description: t('dashboard.downloadedDescription') });
         } catch (err) {
-            toast({ variant: 'destructive', title: 'Download Failed', description: 'Could not capture the dashboard image.' });
+            toast({ variant: 'destructive', title: t('dashboard.downloadFailed'), description: t('dashboard.downloadFailedDescription') });
         }
     };
 
@@ -569,20 +600,20 @@ export default function ReportsDashboard() {
 
         downloadCsv(`zeneva-analytics-${new Date().toISOString().slice(0, 10)}.csv`, rows);
         trackFeature('reports_exported');
-        toast({ variant: 'success', title: 'Analytics exported', description: 'Your CSV has been saved.' });
-    }, [deepReceipts, products, users, finalReportData, comparison, currencySymbol, business, date, toast]);
+        toast({ variant: 'success', title: t('reports.exportedTitle'), description: t('reports.exportedBody') });
+    }, [deepReceipts, products, users, finalReportData, comparison, currencySymbol, business, date, toast, t]);
 
     return (
         <div ref={dashboardRef} className="flex flex-col gap-6 bg-background p-1">
-            <PageTitle title="Reports" subtitle="Deep dive into your business performance." />
+            <PageTitle title={t('reports.title')} subtitle={t('reports.subtitle')} />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
                 <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
                     <TabsList className="flex flex-col md:grid md:grid-cols-4 w-full md:w-[650px] h-auto gap-1">
-                        <TabsTrigger value="analytics" className="text-sm font-semibold w-full">Analytics Dashboard</TabsTrigger>
-                        <TabsTrigger value="profit-loss" className="text-sm font-semibold w-full">Profit & Loss</TabsTrigger>
-                        <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">Daily Sales Items</TabsTrigger>
-                        <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">Business Rating</TabsTrigger>
+                        <TabsTrigger value="analytics" className="text-sm font-semibold w-full">{t('reports.tabAnalytics')}</TabsTrigger>
+                        <TabsTrigger value="profit-loss" className="text-sm font-semibold w-full">{t('reports.tabProfitLoss')}</TabsTrigger>
+                        <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">{t('reports.tabDailySales')}</TabsTrigger>
+                        <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">{t('reports.tabBusinessRating')}</TabsTrigger>
                     </TabsList>
                     <div className="flex flex-wrap items-center gap-4">
                         {(activeTab === 'analytics' || activeTab === 'profit-loss') && (
@@ -591,7 +622,7 @@ export default function ReportsDashboard() {
                                 {isFetchingBatch && (
                                     <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm border rounded-lg py-1.5 px-3 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
                                         <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                        <span>Updating metrics...</span>
+                                        <span>{t('reports.updatingMetrics')}</span>
                                     </div>
                                 )}
                             </>
@@ -599,21 +630,21 @@ export default function ReportsDashboard() {
                         <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="h-9">
-                                    <Download className="mr-2 h-4 w-4" />Export Report
+                                    <Download className="mr-2 h-4 w-4" />{t('reports.exportReport')}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={handleExportAnalyticsCsv}>
                                     <FileText className="h-4 w-4 mr-2" />
-                                    Export data as CSV
+                                    {t('reports.exportCsv')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={handleDownloadImage}>
                                     <ImageIcon className="h-4 w-4 mr-2" />
-                                    Export as High-Res Image
+                                    {t('reports.exportImage')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => window.print()}>
                                     <Printer className="h-4 w-4 mr-2" />
-                                    Export as PDF (Print)
+                                    {t('reports.exportPdf')}
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -624,7 +655,7 @@ export default function ReportsDashboard() {
                     <div className="flex h-64 items-center justify-center animate-pulse">
                         <div className="flex flex-col items-center gap-3">
                             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                            <span className="text-sm font-medium text-muted-foreground">Loading analytical dashboard...</span>
+                            <span className="text-sm font-medium text-muted-foreground">{t('reports.loadingDashboard')}</span>
                         </div>
                     </div>
                 ) : (
@@ -632,87 +663,94 @@ export default function ReportsDashboard() {
                         <TabsContent value="analytics" className="space-y-6 mt-0">
                             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
                                 <ReportStatCard
-                                    title="Revenue"
+                                    title={t('reports.kpiRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
-                                    description="Total earnings"
+                                    description={t('reports.kpiRevenueHint')}
                                     delta={comparison?.revenue}
                                 />
                                 <ReportStatCard
-                                    title="Net Cost"
+                                    title={t('reports.kpiNetCost')}
                                     value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={FileText}
-                                    description="Total cost of sales"
+                                    description={t('reports.kpiNetCostHint')}
                                 />
                                 <ReportStatCard
-                                    title="Net Profit"
+                                    title={t('reports.kpiNetProfit')}
                                     value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={Coins}
-                                    description="Earnings minus costs"
+                                    description={t('reports.kpiNetProfitHint')}
                                     delta={comparison?.profit}
                                 />
                                 <ReportStatCard
-                                    title="Product Revenue"
+                                    title={t('reports.kpiProductRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={Package}
-                                    description="Revenue from physical goods"
+                                    description={t('reports.kpiProductRevenueHint')}
                                 />
                                 <ReportStatCard
-                                    title="Service Revenue"
+                                    title={t('reports.kpiServiceRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={TrendingUp}
-                                    description="Revenue from services"
+                                    description={t('reports.kpiServiceRevenueHint')}
                                 />
                                 <ReportStatCard
-                                    title="Sales"
+                                    title={t('reports.kpiSales')}
                                     value={finalReportData?.totalSales.toLocaleString() || '0'}
                                     icon={ShoppingCart}
-                                    description="Total transactions"
+                                    description={t('reports.kpiSalesHint')}
                                     delta={comparison?.sales}
                                 />
                                 <ReportStatCard
-                                    title="Unique Products"
+                                    title={t('reports.kpiUniqueProducts')}
                                     value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
                                     icon={Package}
-                                    description="Different products sold"
+                                    description={t('reports.kpiUniqueProductsHint')}
                                 />
                                 <ReportStatCard
-                                    title="Units Sold"
+                                    title={t('reports.kpiUnitsSold')}
                                     value={finalReportData?.totalItemsSold.toLocaleString() || '0'}
                                     icon={Layers}
-                                    description="Total pieces moved"
+                                    description={t('reports.kpiUnitsSoldHint')}
                                     delta={comparison?.units}
                                 />
                                 <ReportStatCard
-                                    title="Daily Velocity"
+                                    title={t('reports.kpiDailyVelocity')}
                                     value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
                                     icon={TrendingUp}
-                                    description="Sales per day"
+                                    description={t('reports.kpiDailyVelocityHint')}
                                 />
                                 <ReportStatCard
-                                    title="Daily Revenue"
+                                    title={t('reports.kpiDailyRevenue')}
                                     value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
-                                    description="Average revenue per day"
+                                    description={t('reports.kpiDailyRevenueHint')}
                                 />
                                 <ReportStatCard
-                                    title="Catalog Size"
+                                    title={t('reports.kpiCatalogSize')}
                                     value={finalReportData?.catalogSize?.toLocaleString() || '0'}
                                     icon={Package}
-                                    description="Total unique products in inventory"
+                                    description={t('reports.kpiCatalogSizeHint')}
                                 />
                                 <ReportStatCard
-                                    title="Avg Order"
+                                    title={t('reports.kpiAvgOrder')}
                                     value={`${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={FileText}
-                                    description="Revenue per sale"
+                                    description={t('reports.kpiAvgOrderHint')}
                                     delta={comparison?.avgBasket}
                                 />
                                 <ReportStatCard
-                                    title="Customers"
+                                    title={t('reports.kpiCustomers')}
                                     value={finalReportData?.totalCustomers.toLocaleString() || '0'}
                                     icon={Users}
-                                    description="Total unique buyers"
+                                    description={
+                                        finalReportData
+                                            ? t('reports.kpiCustomersBought', {
+                                                count: finalReportData.buyersInRange,
+                                                formatted: finalReportData.buyersInRange.toLocaleString(),
+                                            })
+                                            : t('reports.kpiCustomersHint')
+                                    }
                                 />
                             </div>
                             <FeatureGate
@@ -720,8 +758,8 @@ export default function ReportsDashboard() {
                                 currentPlan={business?.plan}
                                 hasLifetimeAccess={hasLifetimeAccess}
                                 bypass={isTodayOnlyRange}
-                                featureName="Advanced Visual Analytics"
-                                featureDescription="Unlock deep dive visual charts, sales trends, and profit margins to truly understand your business."
+                                featureName={t('reports.gateVisualName')}
+                                featureDescription={t('reports.gateVisualBody')}
                             >
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                                     <RevenueForecastCard receipts={deepReceipts} currencySymbol={currencySymbol} />
@@ -796,15 +834,15 @@ export default function ReportsDashboard() {
                                     requiredPlan="business"
                                     currentPlan={business?.plan}
                                     hasLifetimeAccess={hasLifetimeAccess}
-                                    featureName="Customer Intelligence & Inventory Velocity"
-                                    featureDescription="Unlock advanced CRM analytics, customer lifetime value, and optimize stock levels with data-driven ABC analysis."
+                                    featureName={t('reports.gateCustomerName')}
+                                    featureDescription={t('reports.gateCustomerBody')}
                                 >
                                     <div className="grid grid-cols-1 gap-6 mt-6">
                                         <CustomerAnalytics
                                             customers={customers || []}
                                             receipts={deepReceipts}
                                             currencySymbol={currencySymbol}
-                                            totalBusinessCustomers={activeBranchId && activeBranchId !== 'all' ? customers.length : stats?.totalCustomers}
+                                            totalBusinessCustomers={finalReportData?.totalCustomers}
                                         />
                                         <AbcAnalysis receipts={deepReceipts} products={products || []} currencySymbol={currencySymbol} />
                                     </div>
@@ -817,8 +855,8 @@ export default function ReportsDashboard() {
                                 currentPlan={business?.plan}
                                 hasLifetimeAccess={hasLifetimeAccess}
                                 bypass={isTodayOnlyRange}
-                                featureName="Profit & Loss Statement"
-                                featureDescription="Unlock detailed profit & loss statements to analyze your store's margins."
+                                featureName={t('reports.gateProfitLossName')}
+                                featureDescription={t('reports.gateProfitLossBody')}
                             >
                                 <ProfitLossStatement 
                                     receipts={deepReceipts} 
@@ -833,8 +871,8 @@ export default function ReportsDashboard() {
                                 currentPlan={business?.plan}
                                 hasLifetimeAccess={hasLifetimeAccess}
                                 bypass={isTodayOnlyRange}
-                                featureName="Daily Sales Items"
-                                featureDescription="Unlock daily item sales tracking and inventory audit logs."
+                                featureName={t('reports.tabDailySales')}
+                                featureDescription={t('reports.gateDailySalesBody')}
                             >
                                 <DailySalesItemsTable receipts={widestReceipts} products={products || []} currencySymbol={currencySymbol} />
                             </FeatureGate>

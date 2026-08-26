@@ -18,6 +18,16 @@ import {
 
 type Vars = Record<string, string | number>;
 
+/**
+ * The signature of `t`, exported so a pure helper can take it as a parameter.
+ *
+ * Needed because plenty of copy is assembled outside a component — a code-to-sentence
+ * mapper, a table's column definitions, a chart's axis formatter. Those want `t` passed
+ * in rather than a hook they cannot call, and writing the signature out at each one
+ * invites a drifted copy that quietly loses the `vars` argument.
+ */
+export type TranslateFn = (key: string, vars?: Vars) => string;
+
 interface I18nContextValue {
   locale: LocaleCode;
   /** Persists to localStorage and loads the catalog. Does not write Firestore. */
@@ -27,7 +37,7 @@ interface I18nContextValue {
    * explicit local choice. Used by <LocaleSync />.
    */
   adoptLocale: (raw: unknown) => void;
-  t: (key: string, vars?: Vars) => string;
+  t: TranslateFn;
   dir: LocaleDir;
   /** False until the active catalog has loaded. English renders meanwhile. */
   isReady: boolean;

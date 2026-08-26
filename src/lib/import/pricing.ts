@@ -44,7 +44,21 @@ export type ImportAiAction =
   /** Decide which existing product an ambiguous row refers to. */
   | 'match'
   /** Turn "raise all my drink costs 8%" into a checked bulk operation. */
-  | 'bulk-op';
+  | 'bulk-op'
+  /**
+   * The customer-book equivalents of the three above.
+   *
+   * Separate actions rather than a `kind` on the product ones, for two reasons
+   * that are not stylistic. The route gates on permission per action, and
+   * importing customers needs `view_customers` where importing stock needs
+   * `manage_inventory` — folding them together would let a cashier who cannot
+   * touch inventory be refused a customer import, or worse, the reverse. And the
+   * admin usage board buckets spend by action name, so a shop asking "what is the
+   * AI costing me" can see reading ledgers apart from reading shelves.
+   */
+  | 'map-customer-columns'
+  | 'parse-customer-text'
+  | 'parse-customer-photo';
 
 /**
  * Minimum charge per operation, in credits.
@@ -76,6 +90,15 @@ export const IMPORT_CREDIT_FLOORS: Record<ImportAiAction, number> = {
   'parse-invoice': 3,
   match: 1,
   'bulk-op': 1,
+  /*
+   * The customer actions mirror their product counterparts. A photograph of a
+   * ledger page or a page of a visitors' book is the same kind of operation as a
+   * shelf photo — highest value, highest retry rate, arbitrarily large input — so
+   * it carries the same floor rather than a cheaper one.
+   */
+  'map-customer-columns': 1,
+  'parse-customer-text': 1,
+  'parse-customer-photo': 3,
 };
 
 /**
@@ -90,19 +113,22 @@ export function estimateCredits(action: ImportAiAction, size = 0): number {
 
   switch (action) {
     case 'map-columns':
+    case 'map-customer-columns':
       // Headers plus a handful of sample rows. Bounded by construction — the
       // route sends `SAMPLE_ROWS` rows and no more, whatever the file's size.
       return floor;
 
     case 'parse-text':
+    case 'parse-customer-text':
       // Output dominates, and output is weighted 8×. About 40 tokens of JSON per
       // row against a 20,000-token credit puts the crossover near 60 rows.
       return Math.max(floor, Math.ceil(size / 60));
 
     case 'parse-photo':
     case 'parse-invoice':
+    case 'parse-customer-photo':
       // One image, plus its line items back out. An invoice with 40 lines is the
-      // large end of realistic.
+      // large end of realistic; a page of a customer ledger is comparable.
       return Math.max(floor, Math.ceil(size / 50));
 
     case 'match':

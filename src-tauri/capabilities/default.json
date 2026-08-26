@@ -23,6 +23,7 @@
     "core:event:default",
     "fs:default",
     "sql:default",
+    "sql:allow-execute",
     "updater:default",
     "shell:default",
     "log:default",

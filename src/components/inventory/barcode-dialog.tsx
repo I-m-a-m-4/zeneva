@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import type { Product } from '@/types';
 import { Printer } from 'lucide-react';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 
 interface BarcodeDialogProps {
   product: Product | null;
@@ -31,13 +32,14 @@ BarcodePrintContent.displayName = 'BarcodePrintContent';
 export default function BarcodeDialog({ product, isOpen, onOpenChange }: BarcodeDialogProps) {
   const printRef = React.useRef<HTMLDivElement>(null);
   const { currencySymbol } = usePOS();
+  const { t } = useI18n();
 
   const handlePrint = () => {
     const printContent = printRef.current;
     if (printContent) {
         const printWindow = window.open('', '_blank', 'height=600,width=800');
         if (printWindow) {
-            printWindow.document.write('<html><head><title>Print Barcode</title>');
+            printWindow.document.write(`<html><head><title>${t('inventory.printBarcode')}</title>`);
             printWindow.document.write('<style>@media print { @page { size: auto; margin: 10mm; } body { font-family: sans-serif; text-align: center; } .barcode-container { display: inline-block; padding: 20px; border: 1px dashed #ccc; margin: 10px; page-break-inside: avoid; } }</style>');
             printWindow.document.write('</head><body>');
             printWindow.document.write('<div class="barcode-container">');
@@ -58,15 +60,15 @@ export default function BarcodeDialog({ product, isOpen, onOpenChange }: Barcode
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Product Barcode</DialogTitle>
+          <DialogTitle>{t('inventory.productBarcodeTitle')}</DialogTitle>
           <DialogDescription>
-            Print this barcode to use for scanning during stock-taking or at checkout.
+            {t('inventory.barcodePrintHint')}
           </DialogDescription>
         </DialogHeader>
         <BarcodePrintContent ref={printRef} product={product} currencySymbol={currencySymbol}/>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.close')}</Button>
+          <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> {t('common.print')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

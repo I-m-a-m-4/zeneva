@@ -3,6 +3,7 @@ import { useUser } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader } from 'lucide-react';
+import { useI18n } from '@/context/i18n-context';
 
 function FullScreenLoader({ text, dark }: { text?: string; dark?: boolean }) {
   return (
@@ -17,6 +18,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useI18n();
 
   useEffect(() => {
     // If the user is authenticated and is no longer loading, redirect to the dashboard.
@@ -39,7 +41,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   // Exception: For the /welcome page, we want it to render immediately so the video starts playing
   // and the user doesn't see a flash of a white loading screen.
   if (isUserLoading && pathname !== '/welcome') {
-    return <FullScreenLoader text="Authenticating..." />;
+    return <FullScreenLoader text={t('auth.authenticating')} />;
   }
 
   // For the welcome page while loading, show a black screen to match the dark video feel
@@ -52,7 +54,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   // We exclude the signup page from this logic as it handles its own post-signup redirect.
   const isSignupPage = pathname === '/signup' || pathname.startsWith('/signup?');
   if (user && !isSignupPage) {
-    return <FullScreenLoader text="Loading your workspace..." />;
+    return <FullScreenLoader text={t('auth.loadingWorkspace')} />;
   }
 
   // If no user is logged in and we are not loading, it's safe to render the auth pages.

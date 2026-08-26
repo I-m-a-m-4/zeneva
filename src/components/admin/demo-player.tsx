@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Play, Pause, SkipBack, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { STAGE, FPS, ensureFonts, type Demo, type Theme } from '@/lib/marketing/anim';
+import { FPS, ensureFonts, stageOf, type Demo, type Theme } from '@/lib/marketing/anim';
 
 /**
  * Preview player for a `Demo`.
@@ -35,6 +35,10 @@ export function DemoPlayer({
   const [loop, setLoop] = React.useState(true);
   const [fontsReady, setFontsReady] = React.useState(false);
 
+  // The demo's own design space, not the landscape default — a vertical reel
+  // has to preview in 9:16 or the scrub is not what the export will be.
+  const stage = stageOf(demo);
+
   // Keep the latest values in refs so the rAF loop never needs re-subscribing.
   const frameRef = React.useRef(frame);
   frameRef.current = frame;
@@ -56,7 +60,7 @@ export function DemoPlayer({
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = canvas.clientWidth;
-    const cssH = Math.round((cssW * STAGE.h) / STAGE.w);
+    const cssH = Math.round((cssW * stage.h) / stage.w);
     const pxW = Math.round(cssW * dpr);
     const pxH = Math.round(cssH * dpr);
     if (canvas.width !== pxW || canvas.height !== pxH) {
@@ -66,9 +70,9 @@ export function DemoPlayer({
     }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(pxW / STAGE.w, pxH / STAGE.h);
+    ctx.scale(pxW / stage.w, pxH / stage.h);
     demo.draw(ctx, f, theme);
-  }, [demo, theme]);
+  }, [demo, theme, stage.w, stage.h]);
 
   // Repaint on scrub, demo swap, font load and container resize.
   React.useEffect(() => { paint(frame); }, [paint, frame, fontsReady]);
@@ -120,7 +124,7 @@ export function DemoPlayer({
         <canvas
           ref={canvasRef}
           className="block w-full cursor-pointer"
-          style={{ aspectRatio: `${STAGE.w} / ${STAGE.h}` }}
+          style={{ aspectRatio: `${stage.w} / ${stage.h}` }}
           onClick={() => onPlayingChange(!playing)}
           role="img"
           aria-label={`${demo.title} preview, frame ${frame} of ${demo.frames}`}

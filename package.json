@@ -19,7 +19,14 @@
     "test:zen-cost": "tsx scripts/check-zen-cost.ts",
     "announce-release": "node scripts/announce-release.mjs",
     "record": "node scripts/record/record.mjs",
-    "record:audio": "node scripts/record/add-audio.mjs"
+    "record:audio": "node scripts/record/add-audio.mjs",
+    "trailer": "node scripts/record/record.mjs --flow trailer --store --narrate --url https://zeneva.space",
+    "trailer:assets": "node scripts/record/store.mjs",
+    "test:customer-health": "tsx scripts/check-customer-health.ts",
+    "test:customer-import": "tsx scripts/check-customer-import.ts",
+    "test:launch-funnel": "tsx scripts/check-launch-funnel.ts",
+    "test:catalog-state": "tsx scripts/check-catalog-state.ts",
+    "test:i18n": "tsx scripts/check-i18n.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.36",

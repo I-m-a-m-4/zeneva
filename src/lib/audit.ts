@@ -3,10 +3,22 @@
 import { collection, addDoc, serverTimestamp, type Firestore } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 
+/**
+ * `customer.merge` is deliberately its own action rather than a `customer.delete`
+ * per record retired.
+ *
+ * The loss-prevention scan buckets `customer.delete` as a deletion signal
+ * (`src/lib/forensics.ts`), which is right — a member of staff quietly removing
+ * customer records is worth noticing. A merge produces one delete per duplicate,
+ * so a manager tidying a hundred duplicated records through the Health tab would
+ * light up that detector as the worst offender in the shop. The detectors match
+ * on exact action strings, so a distinct name keeps a legitimate consolidation
+ * out of a theft report while still recording exactly what happened.
+ */
 type AuditAction =
     | 'product.create' | 'product.update' | 'product.delete' | 'product.bulk_update' | 'product.stock_adjustment'
     | 'sale.create' | 'sale.void'
-    | 'customer.create' | 'customer.update' | 'customer.delete'
+    | 'customer.create' | 'customer.update' | 'customer.delete' | 'customer.merge'
     | 'user.invite' | 'user.update_status' | 'user.impersonate' | 'user.stop_impersonate'
     | 'settings.update'
     | 'billing.grant_lifetime' | 'billing.extend_trial' | 'billing.assign_plan';

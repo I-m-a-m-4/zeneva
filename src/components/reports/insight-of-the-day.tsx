@@ -34,6 +34,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Lightbulb, TrendingDown, TrendingUp } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import { useCountUp } from '@/hooks/use-count-up';
 import type { RatingInsight } from '@/lib/rating-insights';
 
@@ -120,7 +121,7 @@ function Compare({
                 : 'text-muted-foreground',
           )}
         >
-          {diff > 0 ? `+${diff}` : diff} vs median
+          {diff > 0 ? `+${diff}` : diff} {t('reports.iotdVsMedian')}
         </span>
       </div>
       {rows.map((row, i) => (
@@ -193,11 +194,11 @@ export default function InsightOfTheDay({
           <div className="mb-3 flex items-center justify-between gap-3">
             <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5', a.chip)}>
               <Lightbulb className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Insight of the day</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest">{t('reports.iotdTitle')}</span>
             </span>
             {total > 1 && (
               <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
-                1 of {total} · new one tomorrow
+                {t('reports.iotdRotation', { total })}
               </span>
             )}
           </div>
@@ -235,7 +236,7 @@ export default function InsightOfTheDay({
               {insight.money !== undefined && insight.money > 0 && (
                 <div className="sm:text-right">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    At stake
+                    {t('reports.iotdAtStake')}
                   </p>
                   <p className="text-3xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                     {money(currencySymbol, counted)}

@@ -63,11 +63,47 @@ import {
   type CostGap,
   type CostRow,
 } from '@/lib/import/cost-prices';
-import { describeBulkOp, groupWrites, previewBulkOp, type BulkOp } from '@/lib/import/bulk-ops';
+import {
+  bulkOpClauses,
+  describeBulkOp,
+  groupWrites,
+  previewBulkOp,
+  type BulkOp,
+  type BulkSkip,
+} from '@/lib/import/bulk-ops';
 import { aiMatchProducts, AiCreditsError, ImportAiError } from '@/lib/import/client';
 import { estimateCredits } from '@/lib/import/pricing';
+import { bulkSkipKey, matchExplanationKey } from '@/lib/i18n/import-labels';
+import { useI18n, type TranslateFn } from '@/context/i18n-context';
 
 type Mode = 'sweep' | 'queue' | 'list';
+
+/**
+ * The preview sentence, translated where a key exists.
+ *
+ * `bulkOpClauses` covers only the two cost-derivation modes this dialog can produce, and
+ * returns `null` for anything else — the other 29 action shapes are reachable from the
+ * bulk-edit dialog and would cost ~300 translations for a screen this pass has not
+ * reached. So the fallback is the English `describeBulkOp`, which is what the whole app
+ * showed until now: a missing translation is not a regression here.
+ *
+ * Two slots rather than one concatenation because the scope carries its own preposition
+ * ("for every product") and a translation may need it first.
+ */
+function bulkOpSentence(op: BulkOp, t: TranslateFn, currencySymbol: string): string {
+  const clauses = bulkOpClauses(op);
+  if (!clauses) return describeBulkOp(op, currencySymbol);
+  return t('inventory.bulkOpSentence', {
+    action: t(clauses.action.key, clauses.action.vars),
+    scope: t(clauses.scope.key, clauses.scope.vars),
+  });
+}
+
+/** The first skip reason, translated from its code. */
+function firstSkipReason(skipped: BulkSkip[], t: TranslateFn): string {
+  const first = skipped[0];
+  return first ? t(bulkSkipKey(first.code)) : '';
+}
 
 export default function CostPriceDialog({
   isOpen,
@@ -77,6 +113,7 @@ export default function CostPriceDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
+  const { t } = useI18n();
   const { products, receipts, currencySymbol, addToQueue, triggerRefresh } = usePOS();
 
   const [mode, setMode] = React.useState<Mode>('queue');
@@ -112,48 +149,45 @@ export default function CostPriceDialog({
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Coins className="h-4 w-4 text-primary" />
-            Cost prices
+            {t('inventory.costPricesTitle')}
           </DialogTitle>
-          <DialogDescription>
-            Zeneva needs what you paid for something to tell you what you made on it.
-          </DialogDescription>
+          <DialogDescription>{t('inventory.costPricesDesc')}</DialogDescription>
         </DialogHeader>
 
         {/* The number that makes this worth starting. */}
         <div className="shrink-0 rounded-lg border bg-muted/30 p-3">
           <div className="flex items-baseline justify-between gap-2">
             <p className="text-sm font-medium">
-              {cover.percentKnown}% of your sales have a real cost price behind them
+              {t('inventory.costCoverage', { percent: cover.percentKnown })}
             </p>
             <span className="text-xs text-muted-foreground">
               {currencySymbol}
-              {Math.round(cover.missing).toLocaleString()} unexplained
+              {Math.round(cover.missing).toLocaleString()} {t('inventory.costUnexplained')}
             </span>
           </div>
           <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-muted">
             <div
               className="bg-emerald-500"
               style={{ width: `${pct(cover.known, cover)}%` }}
-              title="Known"
+              title={t('inventory.costBarKnown')}
             />
             <div
               className="bg-amber-400"
               style={{ width: `${pct(cover.estimated, cover)}%` }}
-              title="Estimated"
+              title={t('inventory.costBarEstimated')}
             />
           </div>
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Green is known, amber is estimated. Anything you photograph a waybill for
-            replaces an estimate automatically.
+            {t('inventory.costBarLegend')}
           </p>
         </div>
 
         <div className="flex shrink-0 gap-1 rounded-lg bg-muted p-1">
           {(
             [
-              { id: 'queue' as const, label: 'The ones that matter', icon: ListChecks },
-              { id: 'sweep' as const, label: 'Estimate from margin', icon: Calculator },
-              { id: 'list' as const, label: 'Paste a list', icon: ClipboardPaste },
+              { id: 'queue' as const, label: t('inventory.costTabQueue'), icon: ListChecks },
+              { id: 'sweep' as const, label: t('inventory.costTabSweep'), icon: Calculator },
+              { id: 'list' as const, label: t('inventory.costTabList'), icon: ClipboardPaste },
             ]
           ).map((tab) => (
             <button
@@ -203,14 +237,14 @@ export default function CostPriceDialog({
                   if (id) queued++;
                 }
                 if (queued === 0) {
-                  setError('Those changes could not be queued — you may not have permission to change inventory.');
+                  setError(t('inventory.costQueueNoPermission'));
                   return;
                 }
                 triggerRefresh();
                 toast({
                   variant: 'success',
-                  title: 'Cost prices saved',
-                  description: `${queued} product${queued === 1 ? '' : 's'} updated.`,
+                  title: t('inventory.costSavedTitle'),
+                  description: t('inventory.costSavedBody', { count: queued }),
                 });
               }}
             />
@@ -225,8 +259,11 @@ export default function CostPriceDialog({
                 if (preview.changes.length === 0) {
                   setError(
                     preview.skipped.length > 0
-                      ? `Nothing to fill. ${preview.skipped.length} product${preview.skipped.length === 1 ? ' was' : 's were'} left alone — ${preview.skipped[0].reason}`
-                      : 'No products match that.',
+                      ? t('inventory.costNothingToFill', {
+                          count: preview.skipped.length,
+                          reason: firstSkipReason(preview.skipped, t),
+                        })
+                      : t('inventory.costNoMatch'),
                   );
                   return null;
                 }
@@ -235,6 +272,11 @@ export default function CostPriceDialog({
               onCommit={(preview) => {
                 let queued = 0;
                 for (const group of groupWrites(preview)) {
+                  // `describeBulkOp` stays English here on purpose: this string is the
+                  // queued action's description and the audit-log entry, read later —
+                  // possibly by the owner rather than whoever ran the sweep, and after
+                  // either of them may have switched language. The on-screen copy above
+                  // is translated; the record is not.
                   const id =
                     group.productIds.length === 1
                       ? addToQueue(
@@ -248,14 +290,16 @@ export default function CostPriceDialog({
                   if (id) queued++;
                 }
                 if (queued === 0) {
-                  setError('Those changes could not be queued — check your permissions.');
+                  setError(t('inventory.costQueueFailed'));
                   return;
                 }
                 triggerRefresh();
                 toast({
                   variant: 'success',
-                  title: 'Estimates applied',
-                  description: `${preview.changes.length.toLocaleString()} cost prices estimated. They are marked as estimates until a waybill replaces them.`,
+                  title: t('inventory.costEstimatesAppliedTitle'),
+                  description: t('inventory.costEstimatesAppliedBody', {
+                    count: preview.changes.length.toLocaleString(),
+                  }),
                 });
                 onOpenChange(false);
               }}
@@ -270,7 +314,7 @@ export default function CostPriceDialog({
               onCommit={(rows) => {
                 const writes = buildCostWrites(rows, catalogue);
                 if (writes.length === 0) {
-                  setError('Nothing to change — every matched product already has that cost price.');
+                  setError(t('inventory.costNothingToChange'));
                   return;
                 }
                 let queued = 0;
@@ -283,19 +327,21 @@ export default function CostPriceDialog({
                         values: { costPrice: write.after, costPriceEstimated: false },
                       },
                     },
+                    // English for the same reason as the sweep above — this is the record,
+                    // not the screen.
                     `Cost price for ${write.productName}`,
                   );
                   if (id) queued++;
                 }
                 if (queued === 0) {
-                  setError('Those changes could not be queued — check your permissions.');
+                  setError(t('inventory.costQueueFailed'));
                   return;
                 }
                 triggerRefresh();
                 toast({
                   variant: 'success',
-                  title: 'Cost prices saved',
-                  description: `${queued} product${queued === 1 ? '' : 's'} updated from your list.`,
+                  title: t('inventory.costSavedTitle'),
+                  description: t('inventory.costSavedFromListBody', { count: queued }),
                 });
                 onOpenChange(false);
               }}
@@ -332,6 +378,7 @@ function FillQueue({
   currencySymbol: string;
   onSave: (entries: [string, number][]) => void;
 }) {
+  const { t } = useI18n();
   const [values, setValues] = React.useState<Record<string, string>>({});
 
   const filled = React.useMemo(
@@ -346,9 +393,9 @@ function FillQueue({
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center">
         <Check className="h-8 w-8 text-emerald-500" />
-        <p className="text-sm font-medium">Every product has a cost price</p>
+        <p className="text-sm font-medium">{t('inventory.costAllCovered')}</p>
         <p className="max-w-sm text-xs text-muted-foreground">
-          Nothing to fill in. New products picked up from a waybill will already have theirs.
+          {t('inventory.costAllCoveredHint')}
         </p>
       </div>
     );
@@ -356,19 +403,16 @@ function FillQueue({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        Ranked by how much money has moved through each one, so the top of this list fixes
-        most of your margin figures. You do not have to finish it.
-      </p>
+      <p className="text-xs text-muted-foreground">{t('inventory.costQueueHint')}</p>
 
       <div className="overflow-hidden rounded-lg border">
         <ScrollArea className="max-h-[46vh]">
           <Table>
             <TableHeader className="sticky top-0 bg-background">
               <TableRow>
-                <TableHead className="text-xs">Product</TableHead>
-                <TableHead className="w-24 text-xs">Sells for</TableHead>
-                <TableHead className="w-32 text-xs">You paid</TableHead>
+                <TableHead className="text-xs">{t('inventory.costColProduct')}</TableHead>
+                <TableHead className="w-24 text-xs">{t('inventory.costColSellsFor')}</TableHead>
+                <TableHead className="w-32 text-xs">{t('inventory.costColYouPaid')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -378,9 +422,14 @@ function FillQueue({
                     <p className="text-xs font-medium leading-tight">{gap.product.name}</p>
                     <p className="text-[11px] text-muted-foreground">
                       {gap.unitsSold > 0
-                        ? `${gap.unitsSold.toLocaleString()} sold · ${currencySymbol}${Math.round(gap.revenueAtStake).toLocaleString()} of sales unexplained`
-                        : `Not sold recently · ${(Number(gap.product.stock) || 0).toLocaleString()} in stock`}
-                      {gap.estimated ? ' · currently an estimate' : ''}
+                        ? t('inventory.costWhySold', {
+                            units: gap.unitsSold.toLocaleString(),
+                            amount: `${currencySymbol}${Math.round(gap.revenueAtStake).toLocaleString()}`,
+                          })
+                        : t('inventory.costWhyUnsold', {
+                            count: (Number(gap.product.stock) || 0).toLocaleString(),
+                          })}
+                      {gap.estimated ? ` · ${t('inventory.costWhyEstimate')}` : ''}
                     </p>
                   </TableCell>
                   <TableCell className="py-1.5 text-xs text-muted-foreground">
@@ -420,11 +469,13 @@ function FillQueue({
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           {filled.length > 0
-            ? `${filled.length} filled in`
-            : 'Type what you paid for each one'}
+            ? t('inventory.costFilledIn', { count: filled.length })
+            : t('inventory.costTypeEach')}
         </p>
         <Button disabled={filled.length === 0} onClick={() => onSave(filled)}>
-          Save {filled.length > 0 ? filled.length : ''} cost price{filled.length === 1 ? '' : 's'}
+          {filled.length > 0
+            ? t('inventory.costSaveSome', { count: filled.length })
+            : t('inventory.costSaveNone')}
         </Button>
       </div>
     </div>
@@ -454,6 +505,7 @@ function MarginSweep({
   onApply: (op: BulkOp) => ReturnType<typeof previewBulkOp> | null;
   onCommit: (preview: ReturnType<typeof previewBulkOp>) => void;
 }) {
+  const { t } = useI18n();
   const ALL = '__all__';
   const [percent, setPercent] = React.useState('25');
   const [basis, setBasis] = React.useState<'margin' | 'markup'>('margin');
@@ -471,22 +523,23 @@ function MarginSweep({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        If you know roughly what you make on a group of products, Zeneva can work the cost
-        backwards from the selling price. Every value it writes is marked as an{' '}
-        <strong>estimate</strong>, and products that already have a real cost price are left
-        alone.
-      </p>
+      {/* The inline <strong> around "estimate" is dropped on purpose: `t()` returns a
+          string and cannot carry a React node, and splitting the sentence into three
+          keys to keep one bold word would force every translator to reproduce an
+          English clause boundary. The word "estimate" appears twice more on this panel. */}
+      <p className="text-xs text-muted-foreground">{t('inventory.costSweepHint')}</p>
 
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="space-y-1">
-          <label className="text-[11px] font-medium text-muted-foreground">On</label>
+          <label className="text-[11px] font-medium text-muted-foreground">
+            {t('inventory.costSweepOn')}
+          </label>
           <Select value={category} onValueChange={(v) => { setCategory(v); setPreview(null); }}>
             <SelectTrigger className="h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>Every product</SelectItem>
+              <SelectItem value={ALL}>{t('inventory.costSweepEveryProduct')}</SelectItem>
               {categories.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
@@ -497,7 +550,9 @@ function MarginSweep({
         </div>
 
         <div className="space-y-1">
-          <label className="text-[11px] font-medium text-muted-foreground">I make about</label>
+          <label className="text-[11px] font-medium text-muted-foreground">
+            {t('inventory.costSweepIMakeAbout')}
+          </label>
           <div className="relative">
             <Input
               type="number"
@@ -514,14 +569,16 @@ function MarginSweep({
         </div>
 
         <div className="space-y-1">
-          <label className="text-[11px] font-medium text-muted-foreground">Measured as</label>
+          <label className="text-[11px] font-medium text-muted-foreground">
+            {t('inventory.costSweepMeasuredAs')}
+          </label>
           <Select value={basis} onValueChange={(v) => { setBasis(v as 'margin' | 'markup'); setPreview(null); }}>
             <SelectTrigger className="h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="margin">of the selling price</SelectItem>
-              <SelectItem value="markup">on top of the cost</SelectItem>
+              <SelectItem value="margin">{t('inventory.costSweepOfPrice')}</SelectItem>
+              <SelectItem value="markup">{t('inventory.costSweepOnCost')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -530,34 +587,36 @@ function MarginSweep({
       {/* Both readings of "25%" spelled out, because shopkeepers say it for both and the
           two give different costs. Showing the arithmetic is cheaper than explaining it. */}
       <p className="rounded-md bg-muted/50 p-2 text-[11px] text-muted-foreground">
-        On something selling for {currencySymbol}1,000 that means a cost of{' '}
-        <strong>
-          {currencySymbol}
-          {basis === 'margin'
-            ? Math.round(1000 * (1 - (Number(percent) || 0) / 100)).toLocaleString()
-            : Math.round(1000 / (1 + (Number(percent) || 0) / 100)).toLocaleString()}
-        </strong>
-        .
+        {t('inventory.costSweepExample', {
+          price: `${currencySymbol}1,000`,
+          cost: `${currencySymbol}${(basis === 'margin'
+            ? Math.round(1000 * (1 - (Number(percent) || 0) / 100))
+            : Math.round(1000 / (1 + (Number(percent) || 0) / 100))
+          ).toLocaleString()}`,
+        })}
       </p>
 
       {!preview ? (
         <Button className="w-full" onClick={() => setPreview(onApply(build()))}>
-          Show me what that would do
+          {t('inventory.costSweepShowMe')}
           <ArrowRight className="ms-2 h-4 w-4" />
         </Button>
       ) : (
         <div className="space-y-2 rounded-lg border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium">{describeBulkOp(preview.op, currencySymbol)}</p>
+            <p className="text-sm font-medium">{bulkOpSentence(preview.op, t, currencySymbol)}</p>
             <Badge variant="secondary" className="text-[10px]">
-              {preview.changes.length.toLocaleString()} will be estimated
+              {t('inventory.costWillEstimate', { count: preview.changes.length.toLocaleString() })}
             </Badge>
           </div>
 
           {preview.skipped.length > 0 && (
             <p className="flex items-start gap-1 text-[11px] text-muted-foreground">
               <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
-              {preview.skipped.length.toLocaleString()} left alone — {preview.skipped[0].reason}
+              {t('inventory.costLeftAlone', {
+                count: preview.skipped.length.toLocaleString(),
+                reason: firstSkipReason(preview.skipped, t),
+              })}
             </p>
           )}
 
@@ -581,10 +640,10 @@ function MarginSweep({
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPreview(null)}>
-              Change it
+              {t('inventory.costChangeIt')}
             </Button>
             <Button onClick={() => onCommit(preview)}>
-              Apply to {preview.changes.length.toLocaleString()}
+              {t('inventory.costApplyTo', { count: preview.changes.length.toLocaleString() })}
             </Button>
           </div>
         </div>
@@ -615,6 +674,7 @@ function PasteList({
   onError: (message: string | null) => void;
   onCommit: (rows: CostRow[]) => void;
 }) {
+  const { t } = useI18n();
   const [text, setText] = React.useState('');
   const [rows, setRows] = React.useState<CostRow[] | null>(null);
   const [unreadable, setUnreadable] = React.useState<string[]>([]);
@@ -625,7 +685,7 @@ function PasteList({
     onError(null);
     const { lines, unreadable: bad } = parseCostList(text);
     if (lines.length === 0) {
-      onError('No "product then cost" pairs could be read from that. One product per line, with the cost after it.');
+      onError(t('inventory.costNoPairsRead'));
       return;
     }
     setUnreadable(bad);
@@ -658,7 +718,7 @@ function PasteList({
     } catch (err) {
       if (err instanceof AiCreditsError) onError(`${err.message}${err.hint ? ` ${err.hint}` : ''}`);
       else if (err instanceof ImportAiError) onError(err.message);
-      else onError('Something went wrong. Please try again.');
+      else onError(t('inventory.costAiFailed'));
     } finally {
       setBusy(false);
     }
@@ -667,10 +727,7 @@ function PasteList({
   if (!rows) {
     return (
       <div className="space-y-3">
-        <p className="text-xs text-muted-foreground">
-          Paste what your supplier sent you, or what is in your notebook. Zeneva matches each
-          line to a product you already have — it will not create anything new here.
-        </p>
+        <p className="text-xs text-muted-foreground">{t('inventory.costPasteHint')}</p>
         <Textarea
           autoFocus
           value={text}
@@ -678,12 +735,14 @@ function PasteList({
           rows={10}
           spellCheck={false}
           className="font-mono text-xs"
+          // i18n-exempt — brand names and a "name - price" shape that reads the same
+          // in every language; there is nothing here to translate.
           placeholder={'Coca-Cola 50cl - 380\nIndomie Chicken 70g - 190\nPeak Milk 400g - 3,600'}
         />
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">Reading the list is free.</p>
+          <p className="text-xs text-muted-foreground">{t('inventory.costReadingIsFree')}</p>
           <Button disabled={!text.trim()} onClick={read}>
-            Match to my products
+            {t('inventory.costMatchToProducts')}
             <ArrowRight className="ms-2 h-4 w-4" />
           </Button>
         </div>
@@ -695,32 +754,29 @@ function PasteList({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary" className="text-[10px]">
-          {willSet} matched
+          {t('inventory.costCountMatched', { count: willSet })}
         </Badge>
         {open.length > 0 && (
           <Badge variant="outline" className="border-amber-500/50 text-[10px] text-amber-600 dark:text-amber-500">
-            {open.length} unsure
+            {t('inventory.costCountUnsure', { count: open.length })}
           </Badge>
         )}
         {unreadable.length > 0 && (
           <Badge variant="outline" className="text-[10px]">
-            {unreadable.length} unreadable
+            {t('inventory.costCountUnreadable', { count: unreadable.length })}
           </Badge>
         )}
         <Button variant="ghost" size="sm" className="ms-auto h-7 text-xs" onClick={() => setRows(null)}>
-          Start again
+          {t('inventory.costStartAgain')}
         </Button>
       </div>
 
       {open.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5">
-          <p className="text-xs">
-            {open.length} line{open.length === 1 ? '' : 's'} could be more than one product. Unmatched
-            lines are skipped, never guessed.
-          </p>
+          <p className="text-xs">{t('inventory.costAmbiguous', { count: open.length })}</p>
           <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={runAi} disabled={busy}>
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            Let AI decide
+            {t('inventory.costLetAiDecide')}
             <span className="ms-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">
               ~{estimateCredits('match', open.length)}
             </span>
@@ -728,7 +784,9 @@ function PasteList({
         </div>
       )}
       {creditsLeft != null && (
-        <p className="text-[11px] text-muted-foreground">{creditsLeft.toLocaleString()} credits left.</p>
+        <p className="text-[11px] text-muted-foreground">
+          {t('inventory.costCreditsLeft', { count: creditsLeft.toLocaleString() })}
+        </p>
       )}
 
       <div className="overflow-hidden rounded-lg border">
@@ -736,9 +794,9 @@ function PasteList({
           <Table>
             <TableHeader className="sticky top-0 bg-background">
               <TableRow>
-                <TableHead className="text-xs">Your line</TableHead>
-                <TableHead className="text-xs">Matched to</TableHead>
-                <TableHead className="w-32 text-xs">Cost</TableHead>
+                <TableHead className="text-xs">{t('inventory.costColYourLine')}</TableHead>
+                <TableHead className="text-xs">{t('inventory.costColMatchedTo')}</TableHead>
+                <TableHead className="w-32 text-xs">{t('inventory.costColCost')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -783,13 +841,15 @@ function PasteList({
                                 className="block w-full rounded border bg-background px-1.5 py-1 text-start text-[11px] hover:border-primary/60"
                               >
                                 {c.productName}
-                                <span className="ms-1 text-muted-foreground">· {c.explanation}</span>
+                                <span className="ms-1 text-muted-foreground">
+                                  · {t(matchExplanationKey(c.explanationCode), c.explanationVars)}
+                                </span>
                               </button>
                             ))}
                           </div>
                         ) : (
                           <span className="text-[11px] text-muted-foreground">
-                            No match — skipped
+                            {t('inventory.costNoMatchSkipped')}
                           </span>
                         )
                       ) : (
@@ -797,9 +857,10 @@ function PasteList({
                           <p className="text-xs">{target?.productName ?? '—'}</p>
                           {row.currentCost != null && (
                             <p className="text-[11px] text-muted-foreground">
-                              was {currencySymbol}
-                              {row.currentCost.toLocaleString()}
-                              {row.currentIsEstimate ? ' (estimate)' : ''}
+                              {t('inventory.costWasAmount', {
+                                amount: `${currencySymbol}${row.currentCost.toLocaleString()}`,
+                              })}
+                              {row.currentIsEstimate ? ` ${t('inventory.costIsEstimate')}` : ''}
                             </p>
                           )}
                         </div>
@@ -814,8 +875,9 @@ function PasteList({
                         row.line.cost != null &&
                         row.line.cost >= row.currentPrice && (
                           <p className="text-[11px] text-amber-600 dark:text-amber-500">
-                            not below the {currencySymbol}
-                            {row.currentPrice.toLocaleString()} selling price
+                            {t('inventory.costNotBelowPrice', {
+                              price: `${currencySymbol}${row.currentPrice.toLocaleString()}`,
+                            })}
                           </p>
                         )}
                     </TableCell>
@@ -828,9 +890,9 @@ function PasteList({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">Nothing is saved until you press below.</p>
+        <p className="text-xs text-muted-foreground">{t('inventory.costNothingSavedYet')}</p>
         <Button disabled={willSet === 0} onClick={() => onCommit(rows)}>
-          Set {willSet} cost price{willSet === 1 ? '' : 's'}
+          {willSet > 0 ? t('inventory.costSetSome', { count: willSet }) : t('inventory.costSetNone')}
         </Button>
       </div>
     </div>

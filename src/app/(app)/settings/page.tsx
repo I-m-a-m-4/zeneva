@@ -136,7 +136,7 @@ function SettingsPageSkeleton() {
 }
 
 import { useFCM } from '@/hooks/use-fcm';
-import { apiBase } from '@/lib/platform';
+import { apiBase, openStoreReview } from '@/lib/platform';
 
 function SettingsPageContent() {
     const { business, currentUserProfile, triggerRefresh, addToQueue, mutateBusiness } = usePOS();
@@ -904,10 +904,15 @@ function SettingsPageContent() {
                                 <div className="grid sm:grid-cols-2 gap-4">
                                     <div>
                                         <Label htmlFor="businessPhone">{t('settings.businessPhone')}</Label>
+                                        {/* `country` is the shop's own settings.country, hydrated
+                                            from the business doc. Without it the selector falls
+                                            back to the first pinned entry - Nigeria - so a Ghanaian
+                                            shop saw +234 and saved Nigerian numbers. */}
                                         <PhoneInput
                                             id="businessPhone"
                                             value={businessPhone}
                                             onChange={setBusinessPhone}
+                                            defaultCountry={country}
                                             className="mt-1"
                                         />
                                     </div>
@@ -997,24 +1002,20 @@ function SettingsPageContent() {
                         <CardDescription>{t('settings.reviewDescription')}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <a 
-                            href={(isTauri && !isMobile) ? "ms-windows-store://review/?ProductId=9nvn0f8njwmj" : "market://details?id=com.zeneva.app"}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        {/* Deliberately a button, not an anchor. The href used to carry
+                            the `ms-windows-store:` / `market:` deep link, but both
+                            onClick branches called preventDefault() and then
+                            window.open() — which is a no-op inside the Tauri webview,
+                            so this did nothing at all on desktop and Android.
+                            openStoreReview goes through plugin:shell|open. */}
+                        <button
+                            type="button"
+                            onClick={() => { void openStoreReview((isTauri && !isMobile) ? 'microsoft' : 'play'); }}
                             className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-primary text-primary bg-background hover:bg-primary hover:text-white h-10 py-2 px-4 w-full"
-                            onClick={(e) => {
-                                if (isTauri && !isMobile) {
-                                    e.preventDefault();
-                                    window.open('https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare', '_blank');
-                                } else {
-                                    e.preventDefault();
-                                    window.open('https://play.google.com/store/apps/details?id=com.zeneva.app', '_blank');
-                                }
-                            }}
                         >
                             <Star className="me-2 h-4 w-4" />
                             {(isTauri && !isMobile) ? "Rate Zeneva on Microsoft Store" : "Rate Zeneva on Playstore"}
-                        </a>
+                        </button>
                     </CardContent>
                 </Card>
 

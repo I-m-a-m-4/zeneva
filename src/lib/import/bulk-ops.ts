@@ -153,11 +153,45 @@ export type BulkChange = {
   after: number | string;
 };
 
+/**
+ * Why a product was left alone, as a code rather than a sentence.
+ *
+ * `reason` below is English prose and stays that way: it is written into the audit
+ * log and into a queued action's description, both of which are read later — the
+ * audit log possibly by the owner rather than by whoever performed the sweep, and a
+ * queued description after the reader may have switched language. A stored sentence
+ * in the performer's language is a record nobody else can read.
+ *
+ * The screen is the opposite case: it is read now, by the person looking at it, and
+ * must be in their language. So the code is what the UI translates and the prose is
+ * what gets stored. Both come out of the same `switch`, so they cannot describe
+ * different things.
+ */
+export type BulkSkipCode =
+  | 'category-set-only'
+  | 'no-category-name'
+  | 'not-a-number'
+  | 'margin-price-only'
+  | 'no-cost-price'
+  | 'margin-impossible'
+  | 'cost-fill-only'
+  | 'already-has-real-cost'
+  | 'no-selling-price'
+  | 'markup-unusable'
+  | 'margin-would-zero-cost'
+  | 'nothing-to-round-to'
+  | 'nothing-to-round'
+  | 'no-cost-for-percent'
+  | 'nothing-to-adjust'
+  | 'unrecognised';
+
 export type BulkSkip = {
   productId: string;
   productName: string;
   /** A sentence, shown in the preview. Skipped rows are never hidden. */
   reason: string;
+  /** The same fact as `reason`, for a caller that needs to translate it. */
+  code: BulkSkipCode;
 };
 
 export type BulkPreview = {
@@ -191,7 +225,7 @@ export function previewBulkOp(products: Product[], op: BulkOp): BulkPreview {
     const outcome = applyMode(product, op.field, op.mode);
 
     if ('reason' in outcome) {
-      skipped.push({ productId: product.id, productName: product.name, reason: outcome.reason });
+      skipped.push({ productId: product.id, productName: product.name, reason: outcome.reason, code: outcome.code });
       continue;
     }
 
@@ -226,7 +260,7 @@ function sameValue(before: number | string | undefined, after: number | string):
   return String(before ?? '') === String(after);
 }
 
-type ModeOutcome = { value: number | string } | { reason: string };
+type ModeOutcome = { value: number | string } | { reason: string; code: BulkSkipCode };
 
 /**
  * Apply one mode to one product.
@@ -246,15 +280,15 @@ type ModeOutcome = { value: number | string } | { reason: string };
  */
 function applyMode(product: Product, field: BulkField, mode: BulkMode): ModeOutcome {
   if (field === 'category') {
-    if (mode.kind !== 'set') return { reason: 'Category can only be set to a value, not adjusted.' };
+    if (mode.kind !== 'set') return { reason: 'Category can only be set to a value, not adjusted.', code: 'category-set-only' };
     const value = String(mode.value ?? '').trim();
-    if (!value) return { reason: 'No category name given.' };
+    if (!value) return { reason: 'No category name given.', code: 'no-category-name' };
     return { value };
   }
 
   if (mode.kind === 'set') {
     const value = Number(mode.value);
-    if (!Number.isFinite(value) || value < 0) return { reason: 'Not a usable number.' };
+    if (!Number.isFinite(value) || value < 0) return { reason: 'Not a usable number.', code: 'not-a-number' };
     return { value: field === 'price' || field === 'costPrice' ? money(value) : Math.round(value) };
   }
 
@@ -263,15 +297,15 @@ function applyMode(product: Product, field: BulkField, mode: BulkMode): ModeOutc
 
   if (mode.kind === 'margin' || mode.kind === 'markup') {
     if (field !== 'price') {
-      return { reason: 'A margin or markup can only set the selling price.' };
+      return { reason: 'A margin or markup can only set the selling price.', code: 'margin-price-only' };
     }
     const cost = Number(product.costPrice) || 0;
     if (cost <= 0) {
-      return { reason: 'No cost price on record, so a margin cannot be worked out.' };
+      return { reason: 'No cost price on record, so a margin cannot be worked out.', code: 'no-cost-price' };
     }
     const share = mode.percent / 100;
     if (mode.kind === 'markup') return { value: money(cost * (1 + share)) };
-    if (share >= 1) return { reason: 'A margin of 100% or more is not possible.' };
+    if (share >= 1) return { reason: 'A margin of 100% or more is not possible.', code: 'margin-impossible' };
     return { value: money(cost / (1 - share)) };
   }
 
@@ -285,7 +319,7 @@ function applyMode(product: Product, field: BulkField, mode: BulkMode): ModeOutc
    */
   if (mode.kind === 'cost-from-margin' || mode.kind === 'cost-from-markup') {
     if (field !== 'costPrice') {
-      return { reason: 'That only works when filling in cost prices.' };
+      return { reason: 'That only works when filling in cost prices.', code: 'cost-fill-only' };
     }
     /*
      * An estimate must never overwrite a real cost.
@@ -298,18 +332,18 @@ function applyMode(product: Product, field: BulkField, mode: BulkMode): ModeOutc
      */
     const existing = Number(product.costPrice) || 0;
     if (existing > 0 && !product.costPriceEstimated) {
-      return { reason: 'Already has a real cost price, so it was left alone.' };
+      return { reason: 'Already has a real cost price, so it was left alone.', code: 'already-has-real-cost' };
     }
     const price = Number(product.price) || 0;
     if (price <= 0) {
-      return { reason: 'No selling price on record, so the cost cannot be worked back.' };
+      return { reason: 'No selling price on record, so the cost cannot be worked back.', code: 'no-selling-price' };
     }
     const share = mode.percent / 100;
     if (mode.kind === 'cost-from-markup') {
-      if (share <= -1) return { reason: 'That markup is not a usable number.' };
+      if (share <= -1) return { reason: 'That markup is not a usable number.', code: 'markup-unusable' };
       return { value: money(price / (1 + share)) };
     }
-    if (share >= 1) return { reason: 'A margin of 100% or more would make the cost zero.' };
+    if (share >= 1) return { reason: 'A margin of 100% or more would make the cost zero.', code: 'margin-would-zero-cost' };
     return { value: money(price * (1 - share)) };
   }
 
@@ -317,19 +351,19 @@ function applyMode(product: Product, field: BulkField, mode: BulkMode): ModeOutc
 
   if (mode.kind === 'round') {
     const nearest = mode.nearest;
-    if (!Number.isFinite(nearest) || nearest <= 0) return { reason: 'Nothing to round to.' };
-    if (current <= 0) return { reason: 'Nothing recorded to round.' };
+    if (!Number.isFinite(nearest) || nearest <= 0) return { reason: 'Nothing to round to.', code: 'nothing-to-round-to' };
+    if (current <= 0) return { reason: 'Nothing recorded to round.', code: 'nothing-to-round' };
     return { value: round(Math.round(current / nearest) * nearest) };
   }
 
   if (mode.kind === 'increase-percent' || mode.kind === 'decrease-percent') {
     if (current <= 0) {
-      return {
-        reason:
-          field === 'costPrice'
-            ? 'No cost price on record, so a percentage change has nothing to work from.'
-            : 'Nothing recorded to adjust by a percentage.',
-      };
+      return field === 'costPrice'
+        ? {
+            reason: 'No cost price on record, so a percentage change has nothing to work from.',
+            code: 'no-cost-for-percent',
+          }
+        : { reason: 'Nothing recorded to adjust by a percentage.', code: 'nothing-to-adjust' };
     }
     const factor = mode.kind === 'increase-percent'
       ? 1 + mode.percent / 100
@@ -340,7 +374,7 @@ function applyMode(product: Product, field: BulkField, mode: BulkMode): ModeOutc
   if (mode.kind === 'increase-amount') return { value: round(current + mode.amount) };
   if (mode.kind === 'decrease-amount') return { value: round(Math.max(0, current - mode.amount)) };
 
-  return { reason: 'Unrecognised operation.' };
+  return { reason: 'Unrecognised operation.', code: 'unrecognised' };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -411,6 +445,70 @@ function describeFilter(filter: BulkFilter): string {
 
   if (parts.length === 0) return ' for every product';
   return ` for ${parts.join(' and ')}`;
+}
+
+/** One translatable fragment: a catalog key plus whatever it interpolates. */
+export type BulkClause = { key: string; vars: Record<string, string | number> };
+
+/**
+ * The same description as `describeBulkOp`, as catalog keys instead of English.
+ *
+ * Two clauses rather than one string because the sentence is "do X to Y", and the
+ * eleven languages disagree about the order. `interpolate` substitutes `{action}`
+ * and `{scope}` wherever the catalog puts them and leaves an unknown placeholder
+ * verbatim, so a translation is free to reorder or drop either — which is what makes
+ * a two-slot sentence safe here where interpolating a bare *noun* would not be. The
+ * field name is never a variable for exactly that reason: `Set {field} to …` needs
+ * agreement German and Arabic would get wrong, so each field would get its own key.
+ *
+ * **Returns `null` for anything it does not yet have keys for**, and the caller falls
+ * back to `describeBulkOp`. That is deliberate: only the two cost-derivation modes are
+ * rendered on a translated surface today (the cost-price dialog), and inventing 29
+ * action keys across eleven catalogs for the modes only `ai-bulk-edit.tsx` can reach
+ * would be 300 translations for a screen this pass has not reached. A later batch
+ * extends the map; until then the fallback is exactly today's behaviour, so nothing
+ * regresses and nothing is half-translated.
+ */
+export function bulkOpClauses(op: BulkOp): { action: BulkClause; scope: BulkClause } | null {
+  let action: BulkClause | null = null;
+  if (op.mode.kind === 'cost-from-margin') {
+    action = { key: 'inventory.bulkActionCostFromMargin', vars: { percent: op.mode.percent } };
+  } else if (op.mode.kind === 'cost-from-markup') {
+    action = { key: 'inventory.bulkActionCostFromMarkup', vars: { percent: op.mode.percent } };
+  }
+  if (!action) return null;
+
+  const f = op.filter;
+  const onlyCategories =
+    f.categories?.length &&
+    !f.productIds?.length &&
+    !f.nameContains &&
+    f.stockBelow == null &&
+    f.stockAbove == null &&
+    f.priceBelow == null &&
+    f.priceAbove == null &&
+    !f.missingCostPrice &&
+    !f.missingPrice;
+
+  const empty =
+    !f.categories?.length &&
+    !f.productIds?.length &&
+    !f.nameContains &&
+    f.stockBelow == null &&
+    f.stockAbove == null &&
+    f.priceBelow == null &&
+    f.priceAbove == null &&
+    !f.missingCostPrice &&
+    !f.missingPrice;
+
+  if (empty) return { action, scope: { key: 'inventory.bulkScopeEveryProduct', vars: {} } };
+  if (onlyCategories) {
+    return {
+      action,
+      scope: { key: 'inventory.bulkScopeCategories', vars: { categories: f.categories!.join(', ') } },
+    };
+  }
+  return null;
 }
 
 /**

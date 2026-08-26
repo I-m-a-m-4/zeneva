@@ -10,6 +10,7 @@ import { useFirestore } from '@/firebase';
 import { writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
 import { logAuditEvent } from '@/lib/audit';
@@ -29,6 +30,7 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
   const { products, currentUserProfile, currencySymbol, triggerRefresh } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { t } = useI18n();
   const [isSaving, setIsSaving] = React.useState(false);
   const [editedProducts, setEditedProducts] = React.useState<Record<string, { stock: number; price: number }>>({});
 
@@ -78,7 +80,7 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
     // Safety check
     const canManage = currentUserProfile.role === 'admin' || currentUserProfile.role === 'manager';
     if (!canManage) {
-      toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to bulk edit products.' });
+      toast({ variant: 'destructive', title: t('inventory.permissionDeniedTitle'), description: t('inventory.permissionBulkEdit') });
       return;
     }
 
@@ -111,14 +113,14 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
 
       toast({
         variant: 'success',
-        title: 'Products Updated',
-        description: `${productsToEdit.length} products have been updated successfully.`,
+        title: t('inventory.bulkUpdatedTitle'),
+        description: t('inventory.bulkUpdatedBody', { count: productsToEdit.length }),
       });
       onSuccess();
       onOpenChange(false);
       triggerRefresh();
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not save changes.' });
+      toast({ variant: 'destructive', title: t('inventory.updateFailedTitle'), description: t('inventory.bulkSaveFailedBody') });
     } finally {
       setIsSaving(false);
     }
@@ -128,18 +130,18 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Bulk Edit Products</DialogTitle>
+          <DialogTitle>{t('inventory.bulkEditTitle')}</DialogTitle>
           <DialogDescription>
             {mode === 'grid'
-              ? `Quickly edit the price and stock for ${productIds.length} selected products.`
-              : 'Describe a change and Zeneva works out which products it affects.'}
+              ? t('inventory.bulkEditGridHint', { count: productIds.length })
+              : t('inventory.bulkEditAiHint')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex gap-1 rounded-lg bg-muted p-1">
           {([
-            { id: 'grid' as const, label: `Edit ${productIds.length} selected`, icon: Table2 },
-            { id: 'ai' as const, label: 'Change many at once', icon: Sparkles },
+            { id: 'grid' as const, label: t('inventory.bulkEditTabGrid', { count: productIds.length }), icon: Table2 },
+            { id: 'ai' as const, label: t('inventory.bulkEditTabAi'), icon: Sparkles },
           ]).map((tab) => (
             <button
               key={tab.id}
@@ -176,9 +178,9 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="w-40">Price</TableHead>
-                  <TableHead className="w-32">Stock</TableHead>
+                  <TableHead>{t('inventory.colProduct')}</TableHead>
+                  <TableHead className="w-40">{t('common.price')}</TableHead>
+                  <TableHead className="w-32">{t('inventory.stock')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -210,10 +212,10 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
           </ScrollArea>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleSaveChanges} disabled={isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Changes
+            {t('common.saveChanges')}
           </Button>
         </DialogFooter>
           </>

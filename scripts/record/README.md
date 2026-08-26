@@ -42,7 +42,7 @@ which also gives you `ffprobe`.
 ```
 npm run record -- [options]
 
-  --flow      pos | inventory | zen | all        (default: pos)
+  --flow      pos | inventory | zen | trailer | all   (default: pos)
   --device    desktop | mobile | both            (default: desktop)
   --theme     light | dark | both                (default: light)
   --url       app to record                      (default: $ZENEVA_RECORD_URL)
@@ -50,6 +50,7 @@ npm run record -- [options]
   --fps       output frame rate                  (default: 30)
   --quality   capture JPEG quality 1-100         (default: 85)
   --format    mp4 | webm                         (default: mp4)
+  --store     encode to the Microsoft Store spec
   --commit    let the flow actually save
   --headed    show the browser while recording
   --keep-frames  keep the raw JPEG sequence
@@ -109,7 +110,38 @@ flags. Set `ZENEVA_RECORD_MUSIC` in `.env.recorder` to stop typing it at all.
   --no-click-sfx        skip click ticks
   --no-typing-sfx       skip keystroke ticks
   --silent              no audio at all
+
+  --narrate             speak every caption
+  --voice-engine <e>    gemini | windows
+  --voice <name>        gemini: Charon | Kore | Puck | Aoede | Fenrir | Leda
+                        windows: David | Zira
+  --voice-style "..."   reading direction, gemini only
+  --voice-rate <n>      SAPI rate -10..10, windows only  (default: -1)
 ```
+
+### The voice
+
+`--narrate` speaks the captions, because the captions are already the script — the
+same sentences the flow was going to put on screen, landing on the frames they were
+written for. With music, the bed ducks under the voice on its own.
+
+Two engines. **`gemini`** needs `GEMINI_API_KEY` and is the good one. **`windows`**
+speaks through the SAPI voices already installed on any Windows box and needs nothing
+at all — audibly more robotic, and it exists because a machine with no key should
+still get a voice-over, and because the **audio description** a store listing asks for
+is a spoken file that has to exist either way.
+
+With no `--voice-engine`, Gemini is used if a key is present and SAPI otherwise, and
+the recorder logs which one it picked *before* the take. An engine that downgraded
+itself silently would hand back a robotic read on footage somebody expected Gemini to
+do, and the only symptom would be the finished audio.
+
+Lines are cached by what they sound like — model or engine, voice, reading, rate and
+text — so a second take of the same captions costs nothing, and switching engines is
+not a silent no-op. SAPI pads about 0.87s of silence onto every line, which is trimmed
+once into the cache: it is inaudible in the mix, but the file's length is what a `.vtt`
+cue is built from, and a caption sitting on screen for 4.0s to read four words looks
+like a bug in the captions.
 
 The ticks are synthesised, not sampled — a click is described to ffmpeg as an
 equation (two decaying sine partials: a body and a snap), so there are no binary
@@ -156,6 +188,95 @@ take where the app stalled, and `videoTimeFor` had to replay that transform
 exactly. Constant-rate sampling deleted the problem rather than solving it.
 
 </details>
+
+---
+
+## The Microsoft Store trailer
+
+```bash
+npm run trailer                                    # records the take
+npm run trailer:assets -- marketing-out/zeneva-trailer-desktop-light.mp4
+```
+
+Partner Center does not accept a video on its own. A trailer is **five files and a
+string**, and it rejects the set for any one of them:
+
+| file | requirement |
+|---|---|
+| `.mp4` | MOV or MP4, **exactly 1920x1080**, H.264 High, ≤ 2 GB |
+| `-thumb.png` | PNG, **exactly 1920x1080** |
+| `.vtt` | **WebVTT only**, < 50 MB |
+| `-audio-description.mp3` | **MP3 only**, < 500 MB |
+| `-hero.png` | 16:9 super hero art — optional, but without it trailers do not appear at the *top* of the listing |
+| title | ≤ 255 characters |
+
+`--store` encodes to their published MP4 spec rather than the default crf 18: 50
+Mbps, closed GOP of half the frame rate, exactly 2 consecutive B frames, CABAC,
+limited-range 4:2:0, AAC-LC 384 kbps stereo at 48 kHz. It is a *delivery* format —
+bigger and no better. The default take is the one to keep for everything else.
+
+`store.mjs` builds the other four files and then prints every published requirement
+with a tick or a cross against the actual file, so "will this pass" is a table
+rather than an upload attempt.
+
+**Two of the numbers cannot be met and are reported as recommendations.** The spec
+names 50 Mbps video and 384 kbps audio; both are *requested* at encode and neither
+is reached, because a UI trailer is three quarters held frames and no encoder can
+spend that many bits on skip frames or on silence. What is enforced is that the file
+was asked for the spec — profile, GOP, B-frames, codec, sample rate and channels are
+all exact — and Microsoft re-encodes every trailer to Smooth Streaming on ingest
+anyway.
+
+### Writing the audio description
+
+Closed captions need no writing: the caption track the flow already shows *is* the
+script, and `store.mjs` reads it out of the marks sidecar with the measured length of
+each spoken line, so a cue ends when its sentence stops rather than at a guess.
+
+An audio description is different content and is written by hand, in
+`describe.mjs`. Captions are the audio in text for someone who cannot hear it; a
+description is the picture in audio for someone who cannot see it. So "Tap to add" is
+a caption and "a grid of product cards fills the screen" is a description, and the
+one thing a description must never do is repeat the narration — it is playing at the
+same time.
+
+The times are seconds into the finished film, which means they have to fit in the
+silences:
+
+```bash
+npm run trailer:assets -- marketing-out/zeneva-trailer-desktop-light.mp4 --scaffold
+```
+
+prints the caption track and every gap between spoken lines. `store.mjs` then
+re-checks each description against the take it is building for and **reports** a
+clash — naming the line it would have talked over — rather than shifting it. A
+description moved to where it fits is a description of the wrong shot, which for
+somebody relying on it is worse than a gap.
+
+### Three things that cost takes here
+
+**The achievement modal.** Every take runs in a throwaway Chrome profile, so
+`zeneva_ach_seen_<businessId>` is always empty and `<AchievementCelebration />` —
+mounted in `(app)/layout.tsx`, so it can appear over any page — fires real milestones
+as fresh unlocks. It killed two takes: "₦1 Million in Sales" over the product grid,
+then later over the cart's own Next button, *after* the flow had dismissed it at
+startup. It is a race, so it is handled where the symptom appears:
+`Page.clearBlocker` now presses Escape when the thing covering a target is a
+`[role="dialog"]`. Safe to press blindly, because a flow working *inside* a dialog is
+not blocked by it.
+
+**A hold shorter than its own sentence.** A caption is also a voice-over line, placed
+at the instant the caption appeared — so two captions closer together than the first
+takes to *say* produce two voices at once. The `.vtt` clamp hides it; the audio does
+not. When you edit a caption, check the measured length with `--scaffold`.
+
+**Film length is wall-clock, so machine load is a creative constraint.** Frames are
+written at a constant rate, so the finished film is exactly as long as the flow took
+to run. The same flow measured **63.9s at 24 fps painted and 72.2s at 15 fps** — the
+difference was other things running on the machine. Shoot the trailer on a quiet
+machine, and against a production build (`next build` + `next start`), not the dev
+server: on dev a single navigation was measured at **13.4 seconds** of finished
+trailer because the route compiled on demand mid-flow.
 
 ---
 

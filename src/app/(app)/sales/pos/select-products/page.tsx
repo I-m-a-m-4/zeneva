@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock, CloudOff, Lock, RefreshCw } from "lucide-react";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock } from "lucide-react";
 import { CachedImage } from "@/components/shared/cached-image";
 import Link from "next/link";
 import *as React from "react";
@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner";
 import { QrCode } from "lucide-react";
 import { ImageDialog } from "@/components/shared/image-dialog";
+import { CatalogUnavailable } from "@/components/shared/catalog-unavailable";
 import HeldSalesDrawer from "@/components/pos/held-sales-drawer";
 import { useI18n } from "@/context/i18n-context";
 
@@ -305,7 +306,12 @@ export default function SelectProductsPage() {
      * users: a shell pinned offline by a bad OS connectivity flag has no *recorded*
      * error — it simply never got to sync — so the till fell through to "No products
      * found" with a cashier standing at it. `isCatalogUnverified` covers both, and
-     * `productSyncError` still selects the wording below.
+     * `productSyncError` is passed on to `<CatalogUnavailable />` to pick the wording.
+     *
+     * Note that `isCatalogUnverified` is now false once the server has answered
+     * "no products" for this shop, so a shop that genuinely has none gets the
+     * empty state below rather than this one — which is what a brand-new shop
+     * should see, and what it was not seeing.
      */
     const isCatalogUnavailable = !isLoading && isCatalogUnverified && (!products || products.length === 0);
 
@@ -514,27 +520,18 @@ export default function SelectProductsPage() {
                                  * empty and offered them an Add Product button they may not
                                  * even have permission to use. Name the actual reason and
                                  * give them the one action that helps.
+                                 *
+                                 * The drawing itself lives in `<CatalogUnavailable />`,
+                                 * shared with the Inventory page. It was duplicated here,
+                                 * and the copy in both copies told owners they lacked a
+                                 * permission that does not exist — see
+                                 * `src/lib/product-catalog-state.ts`.
                                  */
-                                <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-destructive/30 bg-destructive/5 rounded-lg min-h-[400px]">
-                                    {productSyncError === 'permission'
-                                        ? <Lock className="h-16 w-16 text-destructive/40 mb-4" />
-                                        : <CloudOff className="h-16 w-16 text-destructive/40 mb-4" />}
-                                    <h3 className="text-xl font-semibold">{t('pos.catalogUnavailableTitle')}</h3>
-                                    <p className="text-muted-foreground mt-2 mb-6 max-w-[320px] mx-auto">
-                                        {productSyncError === 'permission'
-                                            ? t('pos.catalogUnavailablePermission')
-                                            : productSyncError === 'cache'
-                                                ? t('pos.catalogUnavailableCache')
-                                                : t('pos.catalogUnavailableNetwork')}
-                                    </p>
-                                    {/* A rules refusal is not something a retry fixes — only the
-                                        owner granting access does, so don't offer a dead button. */}
-                                    {productSyncError !== 'permission' && (
-                                        <Button size="sm" onClick={retryProductSync}>
-                                            <RefreshCw className="h-4 w-4 me-2" /> {t('pos.retryLoadingProducts')}
-                                        </Button>
-                                    )}
-                                </div>
+                                <CatalogUnavailable
+                                    kind={productSyncError}
+                                    onRetry={retryProductSync}
+                                    messageClassName="max-w-[320px]"
+                                />
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-lg min-h-[400px]">
                                     <Package className="h-16 w-16 text-muted-foreground opacity-30 mb-4" />

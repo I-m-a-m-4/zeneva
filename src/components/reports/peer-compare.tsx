@@ -34,6 +34,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import type { RatingPillar } from '@/lib/business-rating';
 import type { RatingBenchmark } from '@/lib/rating-benchmark';
 
@@ -53,6 +54,7 @@ export default function PeerCompare({
   pillars: RatingPillar[];
   benchmark: RatingBenchmark | null;
 }) {
+  const { t } = useI18n();
   const reduce = useReducedMotion();
   const animate = !reduce;
 
@@ -86,10 +88,9 @@ export default function PeerCompare({
       <Card className="flex items-center gap-3 border-dashed p-5">
         <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">No comparison available yet</p>
+          <p className="text-sm font-semibold text-foreground">{t('reports.pcEmptyTitle')}</p>
           <p className="text-xs text-muted-foreground">
-            Zeneva compares you against the median shop once enough shops have traded to make the figure
-            meaningful. Nothing here is ever estimated.
+            {t('reports.pcEmptyBody')}
           </p>
         </div>
       </Card>
@@ -105,7 +106,7 @@ export default function PeerCompare({
     <Card className="p-5">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-          How you compare
+          {t('reports.pcTitle')}
         </span>
         {overallDiff !== null && (
           <span className="flex items-baseline gap-1.5">
@@ -121,7 +122,7 @@ export default function PeerCompare({
             >
               {overallDiff > 0 ? `+${overallDiff}` : overallDiff}
             </span>
-            <span className="text-xs font-medium text-muted-foreground">vs median shop</span>
+            <span className="text-xs font-medium text-muted-foreground">{t('reports.pcVsMedianShop')}</span>
           </span>
         )}
       </div>
@@ -174,9 +175,18 @@ export default function PeerCompare({
       </div>
 
       <p className="mt-4 border-t border-border/40 pt-2.5 text-[11px] leading-relaxed text-muted-foreground">
-        Median of {benchmark.cohort} Zeneva shops with {benchmark.minSales}+ sales in the last{' '}
-        {benchmark.windowDays} days
-        {benchmarkDate ? `, as of ${benchmarkDate}` : ''}. Shops are never named and no shop can see yours.
+        {benchmarkDate
+          ? t('reports.pcFootnoteAsOf', {
+              shops: benchmark.cohort,
+              sales: benchmark.minSales,
+              days: benchmark.windowDays,
+              asOf: benchmarkDate,
+            })
+          : t('reports.pcFootnote', {
+              shops: benchmark.cohort,
+              sales: benchmark.minSales,
+              days: benchmark.windowDays,
+            })}
       </p>
     </Card>
   );

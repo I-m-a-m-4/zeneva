@@ -54,14 +54,22 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
+import { useI18n } from '@/context/i18n-context';
 
 import { Combobox } from '@/components/ui/combobox';
-const productSchema = z.object({
-  name: z.string().min(3, "Product name must be at least 3 characters."),
+
+/**
+ * Built per render rather than at module scope because every message here is
+ * user-visible and has to come from the active catalogue. `t` is memoised on
+ * `[messages]` (`i18n-context.tsx`), so the caller's `useMemo` rebuilds the
+ * schema only when the locale actually changes.
+ */
+const makeProductSchema = (t: (key: string) => string) => z.object({
+  name: z.string().min(3, t('inventory.valNameMin')),
   description: z.string().optional(),
-  price: z.coerce.number().min(0.01, "Price is required and must be greater than 0."),
+  price: z.coerce.number().min(0.01, t('inventory.valPriceRequired')),
   costPrice: z.coerce.number().optional(),
-  stock: z.coerce.number().int("Stock must be a whole number.").optional(),
+  stock: z.coerce.number().int(t('inventory.valStockWhole')).optional(),
   sku: z.string().optional(),
   category: z.string().optional(),
   expiryDate: z.date().optional(),
@@ -71,22 +79,24 @@ const productSchema = z.object({
   type: z.enum(['single', 'variant', 'composite']).default('single'),
   baseUnit: z.string().optional(),
   uomConversions: z.array(z.object({
-    unitName: z.string().min(1, "Unit name required"),
-    multiplier: z.coerce.number().min(1, "Multiplier must be at least 1"),
+    unitName: z.string().min(1, t('inventory.valUnitNameRequired')),
+    multiplier: z.coerce.number().min(1, t('inventory.valMultiplierMin')),
     price: z.coerce.number().optional()
   })).optional(),
   components: z.array(z.object({
-    productId: z.string().min(1, "Product required"),
-    quantity: z.coerce.number().min(1, "Quantity required")
+    productId: z.string().min(1, t('inventory.valProductRequired')),
+    quantity: z.coerce.number().min(1, t('inventory.valQuantityRequired'))
   })).optional(),
 });
 
-type ProductFormValues = z.infer<typeof productSchema>;
+type ProductFormValues = z.infer<ReturnType<typeof makeProductSchema>>;
 
 
 export default function AddProductPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useI18n();
+  const productSchema = React.useMemo(() => makeProductSchema(t), [t]);
   const { business, products, currentUserProfile, isLoading, addToQueue, addProductWithImage } = usePOS();
   const firestore = useFirestore();
   const [isSaving, setIsSaving] = React.useState(false);
@@ -112,11 +122,11 @@ export default function AddProductPage() {
     if (userProfile) {
       const hasPermission = userProfile.permissions?.manage_inventory ?? (userProfile.role === 'admin' || userProfile.role === 'manager');
       if (!hasPermission) {
-        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to add products.' });
+        toast({ variant: 'destructive', title: t('inventory.permissionDeniedTitle'), description: t('inventory.permissionAddProducts') });
         router.push('/inventory');
       }
     }
-  }, [userProfile, router, toast]);
+  }, [userProfile, router, toast, t]);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -239,8 +249,8 @@ export default function AddProductPage() {
     if (file.size > MAX_FILE_SIZE) {
       toast({
         variant: 'destructive',
-        title: 'Image Too Large',
-        description: 'Please select an image smaller than 5MB.',
+        title: t('inventory.imageTooLargeTitle'),
+        description: t('inventory.imageTooLargeBody'),
       });
       return;
     }
@@ -266,9 +276,9 @@ export default function AddProductPage() {
       });
       form.setValue('category', newCategoryName.trim());
       setNewCategoryName("");
-      toast({ title: 'Category Created', description: `Added "${newCategoryName.trim()}" to your categories.`, variant: 'success' });
+      toast({ title: t('inventory.categoryCreatedTitle'), description: t('inventory.categoryCreatedBody', { name: newCategoryName.trim() }), variant: 'success' });
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to create category.', variant: 'destructive' });
+      toast({ title: t('common.error'), description: t('inventory.categoryCreateFailed'), variant: 'destructive' });
     } finally {
       setIsAddingCategory(false);
     }
@@ -284,9 +294,9 @@ export default function AddProductPage() {
       if (form.getValues('category') === catToDelete) {
         form.setValue('category', '');
       }
-      toast({ title: 'Category Deleted', description: `Removed "${catToDelete}".`, variant: 'success' });
+      toast({ title: t('inventory.categoryDeletedTitle'), description: t('inventory.categoryDeletedBody', { name: catToDelete }), variant: 'success' });
     } catch (err) {
-      toast({ title: 'Error', description: 'Failed to delete category.', variant: 'destructive' });
+      toast({ title: t('common.error'), description: t('inventory.categoryDeleteFailed'), variant: 'destructive' });
     }
   };
 
@@ -321,7 +331,7 @@ export default function AddProductPage() {
     setIsSaving(true);
 
     if (!userProfile || !firestore || !business || !products) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Session data not found. Please refresh.' });
+      toast({ variant: 'destructive', title: t('common.error'), description: t('inventory.sessionMissing') });
       isSubmitting.current = false;
       setIsSaving(false);
       return;
@@ -329,7 +339,7 @@ export default function AddProductPage() {
 
     const hasInventoryPermission = userProfile.permissions?.manage_inventory ?? (userProfile.role === 'admin' || userProfile.role === 'manager');
     if (!hasInventoryPermission) {
-      toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to add products.' });
+      toast({ variant: 'destructive', title: t('inventory.permissionDeniedTitle'), description: t('inventory.permissionAddProducts') });
       isSubmitting.current = false;
       setIsSaving(false);
       router.push('/inventory');
@@ -342,8 +352,8 @@ export default function AddProductPage() {
     if (limit !== Infinity && products.length >= limit) {
       toast({
         variant: 'destructive',
-        title: 'Product Limit Reached',
-        description: `You have reached your limit of ${limit} products for the ${currentPlan} plan. Please upgrade to add more.`,
+        title: t('inventory.productLimitTitle'),
+        description: t('inventory.productLimitBody', { limit, plan: currentPlan }),
       });
       isSubmitting.current = false;
       setIsSaving(false);
@@ -358,7 +368,7 @@ export default function AddProductPage() {
         if (parsedDate) {
           values.expiryDate = parsedDate;
         } else {
-          toast({ variant: "destructive", title: "Invalid Date", description: "Please use DD/MM/YY format." });
+          toast({ variant: "destructive", title: t('inventory.invalidDateTitle'), description: t('inventory.invalidDateBody') });
           isSubmitting.current = false;
           setIsSaving(false);
           return;
@@ -405,7 +415,7 @@ export default function AddProductPage() {
           addToQueue({
             type: 'add-product',
             payload: { ...childData, createdAt: Date.now(), updatedAt: Date.now() }
-          }, `Added variant: ${childData.name}`);
+          }, t('inventory.queueAddedVariant', { name: childData.name }));
         });
       } else {
         // 2. Call context function (Fast/Sync initial queueing)
@@ -423,7 +433,7 @@ export default function AddProductPage() {
       }).catch(err => console.warn("Audit log background failed:", err));
 
       // 4. Navigate immediately
-      toast({ title: 'Product Added', description: `${values.name} has been added successfully.` });
+      toast({ title: t('inventory.productSavedTitle'), description: t('inventory.productSavedBody', { name: values.name }) });
       
       // We intentionally do NOT reset `isSubmitting` and `isSaving` to false here.
       // Resetting them would allow double-clicks to trigger another submission 
@@ -433,7 +443,7 @@ export default function AddProductPage() {
 
     } catch (error: any) {
       console.error("Failed to prepare product:", error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: error.message || "Could not save the product." });
+      toast({ variant: 'destructive', title: t('inventory.saveFailedTitle'), description: error.message || t('inventory.saveFailedBody') });
       isSubmitting.current = false;
       setIsSaving(false);
     }
@@ -446,19 +456,19 @@ export default function AddProductPage() {
           <Button variant="outline" size="icon" className="h-7 w-7" asChild>
             <Link href="/inventory">
               <ChevronLeft className="h-4 w-4" />
-              <span className="sr-only">Back</span>
+              <span className="sr-only">{t('common.back')}</span>
             </Link>
           </Button>
           <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words leading-normal md:leading-relaxed">
-            Add New {categoryType === 'service' ? 'Service' : 'Product'}
+            {categoryType === 'service' ? t('inventory.addNewService') : t('inventory.addNewProduct')}
           </h1>
           <div className="hidden items-center gap-2 md:ml-auto md:flex">
             <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
-              Discard
+              {t('common.discard')}
             </Button>
             <Button size="default" type="submit" disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save {categoryType === 'service' ? 'Service' : 'Product'}
+              {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
             </Button>
           </div>
         </div>
@@ -466,9 +476,9 @@ export default function AddProductPage() {
           <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
             <Card>
               <CardHeader>
-                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Details</CardTitle>
+                <CardTitle>{categoryType === 'service' ? t('inventory.serviceDetails') : t('inventory.productDetails')}</CardTitle>
                 <CardDescription>
-                  Provide the core details for your new {categoryType === 'service' ? 'service' : 'product'}.
+                  {categoryType === 'service' ? t('inventory.serviceDetailsHint') : t('inventory.productDetailsHint')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -478,9 +488,9 @@ export default function AddProductPage() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name</FormLabel>
+                        <FormLabel>{t('common.name')}</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Quantum HD Monitor" {...field} />
+                          <Input placeholder={t('inventory.namePlaceholder')} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -491,9 +501,9 @@ export default function AddProductPage() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel>{t('common.description')}</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="A detailed description of the product." className="min-h-32" {...field} />
+                          <Textarea placeholder={t('inventory.descriptionPlaceholder')} className="min-h-32" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -506,8 +516,8 @@ export default function AddProductPage() {
             {categoryType === 'product' && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Inventory Configuration</CardTitle>
-                  <CardDescription>Configure how this item is organized and sold.</CardDescription>
+                  <CardTitle>{t('inventory.inventoryConfig')}</CardTitle>
+                  <CardDescription>{t('inventory.inventoryConfigHint')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <FormField
@@ -515,7 +525,7 @@ export default function AddProductPage() {
                     name="type"
                     render={({ field }) => (
                       <FormItem className="space-y-3">
-                        <FormLabel>Product Type</FormLabel>
+                        <FormLabel>{t('inventory.productType')}</FormLabel>
                         <FormControl>
                           <RadioGroup
                             onValueChange={field.onChange}
@@ -526,21 +536,21 @@ export default function AddProductPage() {
                               <FormControl>
                                 <RadioGroupItem value="single" />
                               </FormControl>
-                              <FormLabel className="font-normal">Standard Item</FormLabel>
+                              <FormLabel className="font-normal">{t('inventory.standardItem')}</FormLabel>
                             </FormItem>
                             <FormItem className="flex items-center space-x-3 space-y-0">
                               <FormControl>
                                 <RadioGroupItem value="variant" />
                               </FormControl>
                               <FormLabel className="font-normal flex items-center gap-1.5">
-                                Variant 
+                                {t('inventory.variant')}
                                 <TooltipProvider>
                                   <Tooltip delayDuration={300}>
                                     <TooltipTrigger asChild>
                                       <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-[250px]">
-                                      <p>A single product with different options like size, color, or material. Each variant has its own stock, price, and SKU.</p>
+                                      <p>{t('inventory.variantTooltip')}</p>
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
@@ -549,7 +559,7 @@ export default function AddProductPage() {
                           </RadioGroup>
                         </FormControl>
                         <FormDescription>
-                          {productType === 'variant' ? "A product with options like size or color." : "Standard individual product with its own stock."}
+                          {productType === 'variant' ? t('inventory.variantTypeHint') : t('inventory.singleTypeHint')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -561,20 +571,20 @@ export default function AddProductPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <FormLabel className="flex items-center gap-1.5">
-                        Units of Measure (UoM)
+                        {t('inventory.uomTitle')}
                         <TooltipProvider>
                           <Tooltip delayDuration={300}>
                             <TooltipTrigger asChild>
                               <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-[250px]">
-                              <p>Allows selling the same item in different quantities. For example, sell by the Piece, or sell a Carton of 12 for a different price.</p>
+                              <p>{t('inventory.uomTooltip')}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       </FormLabel>
                       <Button type="button" variant="outline" size="sm" onClick={() => appendUom({ unitName: "", multiplier: 1 })}>
-                        <Plus className="h-4 w-4 mr-2" /> Add UoM
+                        <Plus className="h-4 w-4 mr-2" /> {t('inventory.addUom')}
                       </Button>
                     </div>
 
@@ -584,9 +594,9 @@ export default function AddProductPage() {
                         name="baseUnit"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Base Unit</FormLabel>
+                            <FormLabel className="text-xs">{t('inventory.baseUnit')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g. Piece" {...field} />
+                              <Input placeholder={t('inventory.baseUnitPlaceholder')} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -601,8 +611,8 @@ export default function AddProductPage() {
                           name={`uomConversions.${index}.unitName`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">Unit Name</FormLabel>
-                              <FormControl><Input placeholder="e.g. Carton" {...field} /></FormControl>
+                              <FormLabel className="text-xs">{t('inventory.unitName')}</FormLabel>
+                              <FormControl><Input placeholder={t('inventory.unitNamePlaceholder')} {...field} /></FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -612,7 +622,7 @@ export default function AddProductPage() {
                           name={`uomConversions.${index}.multiplier`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">Contains (multiplier)</FormLabel>
+                              <FormLabel className="text-xs">{t('inventory.uomMultiplier')}</FormLabel>
                               <FormControl><Input type="number" {...field} /></FormControl>
                               <FormMessage />
                             </FormItem>
@@ -624,8 +634,8 @@ export default function AddProductPage() {
                             name={`uomConversions.${index}.price`}
                             render={({ field }) => (
                               <FormItem className="flex-1">
-                                <FormLabel className="text-xs">Price (Opt.)</FormLabel>
-                                <FormControl><Input type="number" placeholder="Override" {...field} /></FormControl>
+                                <FormLabel className="text-xs">{t('inventory.priceOptional')}</FormLabel>
+                                <FormControl><Input type="number" placeholder={t('inventory.priceOverride')} {...field} /></FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -641,37 +651,37 @@ export default function AddProductPage() {
                         <Separator />
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
-                            <FormLabel>Variant Attributes</FormLabel>
+                            <FormLabel>{t('inventory.variantAttributes')}</FormLabel>
                             <Button type="button" variant="outline" size="sm" onClick={() => setVariantAttributes([...variantAttributes, { name: '', values: '' }])}>
-                              <Plus className="h-4 w-4 mr-2" /> Add Attribute
+                              <Plus className="h-4 w-4 mr-2" /> {t('inventory.addAttribute')}
                             </Button>
                           </div>
-                          <FormDescription>Define attributes like Size and Color (comma separated values).</FormDescription>
+                          <FormDescription>{t('inventory.variantAttributesHint')}</FormDescription>
 
                           {variantAttributes.map((attr, index) => (
                             <div key={index} className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end p-3 border rounded-lg bg-muted/30">
                               <div className="sm:col-span-2">
-                                <Label className="text-xs">Attribute Name</Label>
-                                <Input 
-                                  placeholder="e.g. Size" 
-                                  value={attr.name} 
+                                <Label className="text-xs">{t('inventory.attributeName')}</Label>
+                                <Input
+                                  placeholder={t('inventory.attributeNamePlaceholder')}
+                                  value={attr.name}
                                   onChange={(e) => {
                                     const newAttrs = [...variantAttributes];
                                     newAttrs[index].name = e.target.value;
                                     setVariantAttributes(newAttrs);
-                                  }} 
+                                  }}
                                 />
                               </div>
                               <div className="sm:col-span-2">
-                                <Label className="text-xs">Values (comma separated)</Label>
-                                <Input 
-                                  placeholder="e.g. S, M, L" 
-                                  value={attr.values} 
+                                <Label className="text-xs">{t('inventory.attributeValues')}</Label>
+                                <Input
+                                  placeholder={t('inventory.attributeValuesPlaceholder')}
+                                  value={attr.values}
                                   onChange={(e) => {
                                     const newAttrs = [...variantAttributes];
                                     newAttrs[index].values = e.target.value;
                                     setVariantAttributes(newAttrs);
-                                  }} 
+                                  }}
                                 />
                               </div>
                               <Button type="button" variant="ghost" size="icon" onClick={() => setVariantAttributes(variantAttributes.filter((_, i) => i !== index))} className="text-destructive"><Trash className="h-4 w-4" /></Button>
@@ -680,17 +690,17 @@ export default function AddProductPage() {
 
                           {variantMatrix.length > 0 && (
                             <div className="mt-4">
-                              <Label className="mb-2 block font-semibold text-base">Variant Image, Pricing & Stock</Label>
+                              <Label className="mb-2 block font-semibold text-base">{t('inventory.variantMatrixTitle')}</Label>
                               <div className="border rounded-xl overflow-hidden shadow-sm bg-card">
                                 <table className="w-full text-sm text-left">
                                   <thead className="bg-muted/80 text-muted-foreground uppercase text-[10px] tracking-wider">
                                     <tr>
-                                      <th className="px-3 py-3 w-20">Photo</th>
-                                      <th className="px-3 py-3">Variant Option</th>
-                                      <th className="px-3 py-3 w-28">SKU</th>
-                                      <th className="px-3 py-3 w-24">Price</th>
-                                      <th className="px-3 py-3 w-24">Cost</th>
-                                      <th className="px-3 py-3 w-20">Stock</th>
+                                      <th className="px-3 py-3 w-20">{t('inventory.colPhoto')}</th>
+                                      <th className="px-3 py-3">{t('inventory.colVariantOption')}</th>
+                                      <th className="px-3 py-3 w-28">{t('inventory.sku')}</th>
+                                      <th className="px-3 py-3 w-24">{t('common.price')}</th>
+                                      <th className="px-3 py-3 w-24">{t('inventory.colCost')}</th>
+                                      <th className="px-3 py-3 w-20">{t('inventory.stock')}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -710,13 +720,13 @@ export default function AddProductPage() {
                                                   }}
                                                   className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
                                                 >
-                                                  Remove
+                                                  {t('common.remove')}
                                                 </button>
                                               </div>
                                             ) : (
                                               <label className="h-12 w-12 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary flex flex-col items-center justify-center cursor-pointer bg-muted/20 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary">
                                                 <Upload className="h-4 w-4" />
-                                                <span className="text-[9px] font-medium mt-0.5">Upload</span>
+                                                <span className="text-[9px] font-medium mt-0.5">{t('common.upload')}</span>
                                                 <input
                                                   type="file"
                                                   accept="image/*"
@@ -774,9 +784,9 @@ export default function AddProductPage() {
             )}
             <Card>
               <CardHeader>
-                <CardTitle>Pricing{categoryType === 'product' && ' & Stock'}</CardTitle>
+                <CardTitle>{categoryType === 'product' ? t('inventory.pricingAndStockTitle') : t('inventory.pricingTitle')}</CardTitle>
                 <CardDescription>
-                  Manage {categoryType === 'service' ? 'pricing information for this service' : 'inventory and pricing information for this product'}.
+                  {categoryType === 'service' ? t('inventory.pricingServiceHint') : t('inventory.pricingProductHint')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -787,10 +797,10 @@ export default function AddProductPage() {
                       name="sku"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Barcode (SKU)</FormLabel>
+                          <FormLabel>{t('inventory.barcodeSku')}</FormLabel>
                           <div className="flex gap-2">
                             <FormControl>
-                              <Input placeholder="QHDM-001" {...field} />
+                              <Input placeholder={t('inventory.skuPlaceholder')} {...field} />
                             </FormControl>
                             <Button
                               type="button"
@@ -803,7 +813,7 @@ export default function AddProductPage() {
                             </Button>
                           </div>
                           <FormDescription>
-                            This unique code generates the barcode. <Link href="/support#how-barcodes-work" className="text-primary underline">Learn more</Link>.
+                            {t('inventory.barcodeHint')} <Link href="/support#how-barcodes-work" className="text-primary underline">{t('common.learnMore')}</Link>.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -816,7 +826,7 @@ export default function AddProductPage() {
                       name="stock"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Stock</FormLabel>
+                          <FormLabel>{t('inventory.stock')}</FormLabel>
                           <FormControl>
                             <Input type="number" placeholder="25" {...field} value={field.value ?? ''} />
                           </FormControl>
@@ -830,7 +840,7 @@ export default function AddProductPage() {
                     name="price"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price</FormLabel>
+                        <FormLabel>{t('common.price')}</FormLabel>
                         <FormControl>
                           <Input type="number" step="0.01" placeholder="349.99" {...field} value={field.value ?? ''} />
                         </FormControl>
@@ -844,14 +854,14 @@ export default function AddProductPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center gap-1.5">
-                          Cost Price
+                          {t('inventory.costPrice')}
                           <TooltipProvider>
                             <Tooltip delayDuration={300}>
                               <TooltipTrigger asChild>
                                 <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
                               </TooltipTrigger>
                               <TooltipContent className="max-w-[250px]">
-                                <p>Entering the cost price allows Zeneva to accurately calculate and display your profit margins in Reports.</p>
+                                <p>{t('inventory.costPriceTooltip')}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -867,16 +877,16 @@ export default function AddProductPage() {
                 {categoryType === 'product' && (
                   <div className="mt-6">
                     <div className="space-y-2">
-                      <FormLabel>Expiry Date (Optional)</FormLabel>
+                      <FormLabel>{t('inventory.expiryDate')}</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="DD/MM/YY"
+                          placeholder={t('inventory.expiryPlaceholder')}
                           value={expiryDateInput}
                           onChange={(e) => setExpiryDateInput(e.target.value)}
                           maxLength={10}
                         />
                       </FormControl>
-                      <p className="text-[0.8rem] text-muted-foreground">Format: DD/MM/YY or DD/MM/YYYY</p>
+                      <p className="text-[0.8rem] text-muted-foreground">{t('inventory.expiryFormatHint')}</p>
                     </div>
                   </div>
                 )}
@@ -887,7 +897,7 @@ export default function AddProductPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                  <CardTitle>{categoryType === 'service' ? t('inventory.serviceCategory') : t('inventory.productCategory')}</CardTitle>
                   {typeof window !== 'undefined' && isNewCategoryModalOpen && createPortal(
                     <div 
                       className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[1px] transition-opacity animate-in fade-in-0" 
@@ -898,22 +908,22 @@ export default function AddProductPage() {
                   <Dialog open={isNewCategoryModalOpen} onOpenChange={setIsNewCategoryModalOpen} modal={false}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm" type="button" className="h-7 text-xs">
-                        <Plus className="h-3 w-3 mr-1" /> Manage Categories
+                        <Plus className="h-3 w-3 mr-1" /> {t('inventory.manageCategories')}
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[480px]">
                       <DialogHeader>
-                        <DialogTitle>Manage Categories</DialogTitle>
+                        <DialogTitle>{t('inventory.manageCategories')}</DialogTitle>
                         <DialogDescription className="text-xs text-muted-foreground">
-                          Create new categories or manage/delete existing ones.
+                          {t('inventory.manageCategoriesHint')}
                         </DialogDescription>
                       </DialogHeader>
 
                       <div className="space-y-3 py-2 border-b pb-4">
-                        <Label className="text-xs font-semibold">Add New Category</Label>
+                        <Label className="text-xs font-semibold">{t('inventory.addNewCategory')}</Label>
                         <div className="flex gap-2">
                           <Input
-                            placeholder="e.g. Electronics, Bakery..."
+                            placeholder={t('inventory.newCategoryPlaceholder')}
                             value={newCategoryName}
                             onChange={(e) => setNewCategoryName(e.target.value)}
                             onKeyDown={(e) => {
@@ -925,13 +935,13 @@ export default function AddProductPage() {
                           />
                           <Button type="button" onClick={handleAddCategory} disabled={!newCategoryName.trim() || isAddingCategory} className="shrink-0">
                             {isAddingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
-                            Add
+                            {t('common.add')}
                           </Button>
                         </div>
                       </div>
 
                       <div className="space-y-3 pt-2">
-                        <Label className="text-xs font-semibold">Existing Categories</Label>
+                        <Label className="text-xs font-semibold">{t('inventory.existingCategories')}</Label>
                         <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                           {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
                             business.settings.productCategories.map((cat: string) => (
@@ -945,18 +955,18 @@ export default function AddProductPage() {
                                   onClick={() => handleDeleteCategory(cat)}
                                 >
                                   <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Delete {cat}</span>
+                                  <span className="sr-only">{t('inventory.deleteCategoryAria', { name: cat })}</span>
                                 </Button>
                               </div>
                             ))
                           ) : (
-                            <p className="text-xs text-muted-foreground italic py-2">No categories defined yet.</p>
+                            <p className="text-xs text-muted-foreground italic py-2">{t('inventory.noCategoriesYet')}</p>
                           )}
                         </div>
                       </div>
 
                       <DialogFooter className="pt-2">
-                        <Button type="button" variant="outline" onClick={() => setIsNewCategoryModalOpen(false)}>Done</Button>
+                        <Button type="button" variant="outline" onClick={() => setIsNewCategoryModalOpen(false)}>{t('common.done')}</Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
@@ -967,7 +977,7 @@ export default function AddProductPage() {
                     name="categoryType"
                     render={({ field }) => (
                       <FormItem className="space-y-1">
-                        <FormLabel className="text-xs">Type</FormLabel>
+                        <FormLabel className="text-xs">{t('common.type')}</FormLabel>
                         <FormControl>
                           <RadioGroup
                             onValueChange={field.onChange}
@@ -978,13 +988,13 @@ export default function AddProductPage() {
                               <FormControl>
                                 <RadioGroupItem value="product" />
                               </FormControl>
-                              <FormLabel className="font-normal text-xs">Product</FormLabel>
+                              <FormLabel className="font-normal text-xs">{t('inventory.typeProduct')}</FormLabel>
                             </FormItem>
                             <FormItem className="flex items-center space-x-2 space-y-0">
                               <FormControl>
                                 <RadioGroupItem value="service" />
                               </FormControl>
-                              <FormLabel className="font-normal text-xs">Service</FormLabel>
+                              <FormLabel className="font-normal text-xs">{t('inventory.typeService')}</FormLabel>
                             </FormItem>
                           </RadioGroup>
                         </FormControl>
@@ -1003,7 +1013,7 @@ export default function AddProductPage() {
                       <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button type="button" variant="outline" className="w-full justify-between font-normal h-10 px-3 bg-background border-input">
-                            {field.value || 'Select a category'}
+                            {field.value || t('inventory.selectCategory')}
                             <ChevronDown className="h-4 w-4 opacity-50" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -1014,9 +1024,9 @@ export default function AddProductPage() {
                             ))
                           ) : (
                             <div className="p-4 text-center text-sm text-muted-foreground">
-                              No categories defined.
+                              {t('inventory.noCategoriesDefined')}
                               <Button variant="link" asChild className="p-0 h-auto ml-1">
-                                <Link href="/settings">Create one now</Link>
+                                <Link href="/settings">{t('inventory.createOneNow')}</Link>
                               </Button>
                             </div>
                           )}
@@ -1030,23 +1040,23 @@ export default function AddProductPage() {
             </Card>
             <Card className="overflow-hidden">
               <CardHeader>
-                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Image</CardTitle>
+                <CardTitle>{categoryType === 'service' ? t('inventory.serviceImage') : t('inventory.productImage')}</CardTitle>
                 <CardDescription>
-                  Upload an image (max 5MB) for your {categoryType === 'service' ? 'service' : 'product'}.
+                  {categoryType === 'service' ? t('inventory.serviceImageHint') : t('inventory.productImageHint')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-2">
-                  <div 
+                  <div
                     className="w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden group hover:border-primary/50 transition-colors"
                     onClick={() => isTauri && handleNativeImageUpload()}
                   >
                     {imagePreview ? (
-                      <Image src={imagePreview} alt="Product preview" fill style={{ objectFit: "cover" }} />
+                      <Image src={imagePreview} alt={t('inventory.productPreviewAlt')} fill style={{ objectFit: "cover" }} />
                     ) : (
                       <div className="text-center text-muted-foreground">
                         <Upload className="mx-auto h-8 w-8" />
-                        <p className="mt-2 text-sm">Click to upload</p>
+                        <p className="mt-2 text-sm">{t('inventory.clickToUpload')}</p>
                       </div>
                     )}
                     {!isTauri && (
@@ -1060,7 +1070,7 @@ export default function AddProductPage() {
                     )}
                     {isTauri && (
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-                        <span className="text-white text-xs font-bold">Pick Image</span>
+                        <span className="text-white text-xs font-bold">{t('inventory.pickImage')}</span>
                       </div>
                     )}
                   </div>
@@ -1071,11 +1081,11 @@ export default function AddProductPage() {
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 w-full px-4 md:hidden">
           <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
-            Discard
+            {t('common.discard')}
           </Button>
           <Button size="default" type="submit" disabled={isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save {categoryType === 'service' ? 'Service' : 'Product'}
+            {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
           </Button>
         </div>
       </form>
@@ -1086,8 +1096,8 @@ export default function AddProductPage() {
           form.setValue('sku', code);
           setIsScannerOpen(false);
           toast({
-            title: "Barcode Scanned",
-            description: `SKU set to: ${code}`,
+            title: t('inventory.barcodeScannedTitle'),
+            description: t('inventory.barcodeScannedBody', { code }),
           });
         }}
       />

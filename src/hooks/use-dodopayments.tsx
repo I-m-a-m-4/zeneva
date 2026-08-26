@@ -37,7 +37,20 @@ export default function useDodoPayments() {
         }
         
         // Handle checkout closed or cancelled
-        if (data && (data.event_type === 'checkout.closed' || data.event === 'checkout.closed' || data.event_type === 'checkout.close')) {
+        const isCloseEvent = 
+          data === 'checkout.closed' || 
+          data === 'close' || 
+          data === 'checkout.cancel' ||
+          (data && (
+            data.event_type === 'checkout.closed' || 
+            data.event === 'checkout.closed' || 
+            data.event_type === 'checkout.close' ||
+            data.event_type === 'checkout.cancel' ||
+            data.type === 'checkout.closed' ||
+            data.type === 'close'
+          ));
+          
+        if (isCloseEvent) {
           console.log("Dodo Checkout Closed message received. Forcing close.");
           
           // 1. Call SDK close if available
@@ -76,9 +89,26 @@ export default function useDodoPayments() {
       }
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+          if (iframe.src && iframe.src.includes('dodopayments.com')) {
+            let parent = iframe.parentElement;
+            iframe.remove();
+            if (parent && (parent.id.includes('dodo') || parent.className.includes('dodo') || parent.style.position === 'fixed' || parent.style.zIndex === '99999' || parent.style.zIndex === '100000')) {
+              parent.remove();
+            }
+          }
+        });
+      }
+    };
+
     window.addEventListener('message', handleMessage);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('message', handleMessage);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -102,7 +132,14 @@ export default function useDodoPayments() {
           mode: process.env.NEXT_PUBLIC_DODO_MODE === 'live' ? 'live' : 'test',
           displayType: 'overlay',
           onEvent: (event) => {
-            if (event && event.event_type === 'checkout.closed') {
+            const isClose = event && (
+              event.event_type === 'checkout.closed' || 
+              event.event_type === 'checkout.cancel' || 
+              event.type === 'checkout.closed' || 
+              event.type === 'close'
+            );
+            
+            if (isClose) {
               console.log("SDK Event: Checkout closed.");
               const iframes = document.querySelectorAll('iframe');
               iframes.forEach(iframe => {

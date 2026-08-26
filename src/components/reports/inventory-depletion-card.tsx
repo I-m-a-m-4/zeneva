@@ -8,6 +8,7 @@ import { safeToDate } from '@/lib/utils';
 import { isService } from '@/lib/product-kind';
 import { subDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/context/i18n-context';
 
 interface InventoryDepletionCardProps {
     receipts: Receipt[];
@@ -94,10 +95,10 @@ export default function InventoryDepletionCard({ receipts, products }: Inventory
         <Card className="border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-950/10">
             <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
-                    <AlertTriangle className="h-5 w-5" /> Inventory Depletion Warning
+                    <AlertTriangle className="h-5 w-5" /> {t('reports.depTitle')}
                 </CardTitle>
                 <CardDescription className="mt-1">
-                    Predictive alerts for products likely to run out soon based on their 30-day sales velocity.
+                    {t('reports.depSubtitle')}
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -111,12 +112,14 @@ export default function InventoryDepletionCard({ receipts, products }: Inventory
                                 <div>
                                     <p className="font-semibold text-sm">{alert.product.name}</p>
                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                        Stock: {alert.currentStock} <ArrowRight className="h-3 w-3 mx-1" /> Selling ~{alert.velocity}/day
+                                        {t('reports.depStock')} {alert.currentStock} <ArrowRight className="h-3 w-3 mx-1" /> {t('reports.depSelling')}{alert.velocity}{t('reports.depPerDay')}
                                     </p>
                                 </div>
                             </div>
                             <Badge variant={alert.daysRemaining <= 3 ? "destructive" : "secondary"} className={alert.daysRemaining > 3 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" : ""}>
-                                {alert.daysRemaining === 0 ? 'Out of Stock' : `Runs out in ${alert.daysRemaining} ${alert.daysRemaining === 1 ? 'day' : 'days'}`}
+                                {alert.daysRemaining === 0
+                                    ? t('inventory.statusOutOfStock')
+                                    : t('reports.depRunsOut', { count: alert.daysRemaining })}
                             </Badge>
                         </div>
                     ))}

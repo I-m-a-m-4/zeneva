@@ -4,11 +4,13 @@
  * Two callers need it and they must not drift apart: `loading.tsx` (route chunk)
  * and the `!business` branch in `page.tsx`, which is the longer wait.
  *
- * The old in-page version predated the AI credits rail — it drew one card of two
- * `h-96` blocks and a second card holding a single `h-40` bar, when the page is
- * now `PageTitle` → subscription card (status block + a two-up plan rail) → the
- * credits card (three packs across) → payment history. Nothing about it lined up
- * any more, which is how a skeleton quietly becomes a different page.
+ * The page is `PageTitle` → subscription card (status block + a two-up plan rail)
+ * → payment history, and this has to be that and nothing else. It has been wrong
+ * in both directions already: it once predated the AI credits rail and drew a
+ * single `h-40` bar where a whole card belonged, and then outlived that rail and
+ * drew three pack cards for a section the page no longer mounts. Either way the
+ * page resizes the moment data arrives, which is how a skeleton quietly becomes a
+ * different page.
  *
  * No `'use client'` and no hooks: `loading.tsx` renders this on the server.
  */
@@ -50,29 +52,6 @@ export function BillingBodySkeleton({ className }: { className?: string }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
             {Array.from({ length: 2 }).map((_, i) => (
               <Skeleton key={i} className="h-96 w-full rounded-lg" />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/*
-        AI credits. A sibling of the plans card rather than a section inside it,
-        because `subscription-section.tsx` early-returns for lifetime access and
-        would take the credit rail down with it.
-
-        A balance block over three pack cards — again the heights from the
-        `AiCreditsSection` fallback in `page.tsx`.
-      */}
-      <div className="rounded-lg border bg-card shadow-sm">
-        <div className="p-6 space-y-1.5">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-72 max-w-full" />
-        </div>
-        <div className="px-6 pb-6 space-y-6">
-          <Skeleton className="h-24 w-full" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-52 w-full rounded-lg" />
             ))}
           </div>
         </div>

@@ -29,9 +29,6 @@ import {
   Activity,
   ChevronDown,
   Coins,
-  CloudOff,
-  Lock,
-  RefreshCw,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +94,7 @@ import BarcodeDialog from '@/components/inventory/barcode-dialog';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { QrCode } from 'lucide-react';
 import { ImageDialog } from "@/components/shared/image-dialog";
+import { CatalogUnavailable } from "@/components/shared/catalog-unavailable";
 import { InventoryBodySkeleton } from './skeleton';
 
 
@@ -1294,27 +1292,16 @@ function InventoryPageContent() {
                * the branch below is withheld here for the same reason — offering
                * "add your first product" to a shop whose catalogue merely failed
                * to download is what made this bug so hard to recognise.
+               *
+               * The drawing is shared with the POS grid — see
+               * `<CatalogUnavailable />` and `src/lib/product-catalog-state.ts`
+               * for why it no longer claims a missing permission.
                */
-              <div className="flex flex-col items-center justify-center h-full text-center p-12 min-h-[400px] m-4 border-2 border-dashed border-destructive/30 bg-destructive/5 rounded-lg">
-                {productSyncError === 'permission'
-                  ? <Lock className="h-16 w-16 text-destructive/40 mb-4" />
-                  : <CloudOff className="h-16 w-16 text-destructive/40 mb-4" />}
-                <h3 className="text-xl font-semibold">{t('pos.catalogUnavailableTitle')}</h3>
-                <p className="text-muted-foreground mt-2 mb-6 max-w-sm mx-auto">
-                  {productSyncError === 'permission'
-                    ? t('pos.catalogUnavailablePermission')
-                    : productSyncError === 'cache'
-                      ? t('pos.catalogUnavailableCache')
-                      : t('pos.catalogUnavailableNetwork')}
-                </p>
-                {/* A rules refusal is not something a retry fixes — only the owner
-                    granting access does, so don't offer a dead button. */}
-                {productSyncError !== 'permission' && (
-                  <Button size="sm" onClick={retryProductSync}>
-                    <RefreshCw className="h-4 w-4 me-2" /> {t('pos.retryLoadingProducts')}
-                  </Button>
-                )}
-              </div>
+              <CatalogUnavailable
+                kind={productSyncError}
+                onRetry={retryProductSync}
+                className="h-full m-4"
+              />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-12 min-h-[400px]">
                 <PackageOpen className="h-24 w-24 text-muted-foreground/30 mb-4" />

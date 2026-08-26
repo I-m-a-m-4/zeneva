@@ -7,6 +7,7 @@ import { Receipt } from '@/types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Wallet, CreditCard, Landmark, FileText, PieChart as PieChartIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
@@ -20,6 +21,7 @@ interface PaymentMethodDistributionProps {
 const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 export default function PaymentMethodDistribution({ receipts, currencySymbol }: PaymentMethodDistributionProps) {
+    const { t } = useI18n();
     const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
 
     const data = React.useMemo(() => {
@@ -83,9 +85,9 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
                 <div>
                     <CardTitle className="flex items-center gap-2">
                         <PieChartIcon className="h-5 w-5 text-primary" />
-                        Payment Method Reconciliation
+                        {t('reports.pmTitle')}
                     </CardTitle>
-                    <CardDescription>Breakdown of revenue collection by payment channel.</CardDescription>
+                    <CardDescription>{t('reports.pmSubtitle')}</CardDescription>
                 </div>
                 <div className="flex justify-end">
                     <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
@@ -126,7 +128,7 @@ export default function PaymentMethodDistribution({ receipts, currencySymbol }: 
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium">{item.name}</p>
-                                        <p className="text-[10px] text-muted-foreground">{item.count} Transactions</p>
+                                        <p className="text-[10px] text-muted-foreground">{item.count} {t('reports.pmTransactions')}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">

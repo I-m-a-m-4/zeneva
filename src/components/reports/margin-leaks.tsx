@@ -38,6 +38,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { aggregateItems, findMarginLeaks } from '@/lib/reports-aggregates';
+import { useI18n } from '@/context/i18n-context';
 import type { Product, Receipt } from '@/types';
 
 /** Rows shown per list before scrolling. The scroll area carries the rest. */
@@ -54,6 +55,7 @@ export default function MarginLeaksPanel({
   products,
   currencySymbol = '',
 }: MarginLeaksPanelProps) {
+  const { t } = useI18n();
   const money = (n: number) =>
     `${currencySymbol}${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
@@ -74,20 +76,12 @@ export default function MarginLeaksPanel({
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
             <TrendingDown className="h-5 w-5 text-primary" />
-            Margin leaks
+            {t('reports.mlTitle')}
           </CardTitle>
           <CardDescription>
-            No items sold below cost, no manual price overrides and no discounts in this
-            period.
-            {leaks.uncostedItems > 0 && (
-              <>
-                {' '}
-                {leaks.uncostedItems}{' '}
-                {leaks.uncostedItems === 1 ? 'item has' : 'items have'} no cost price, so
-                below-cost selling could not be checked for{' '}
-                {leaks.uncostedItems === 1 ? 'it' : 'them'}.
-              </>
-            )}
+            {t('reports.mlCleanBody')}
+            {leaks.uncostedItems > 0 &&
+              ` ${t('reports.mlCleanUncosted', { count: leaks.uncostedItems })}`}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -101,15 +95,15 @@ export default function MarginLeaksPanel({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <TrendingDown className="h-5 w-5 text-primary" />
-          Margin leaks
+          {t('reports.mlTitle')}
         </CardTitle>
         <CardDescription>
-          Money that left without a decision behind it.
+          {t('reports.mlSubtitle')}
           {totalLeak > 0 && (
             <>
               {' '}
-              <strong className="text-foreground">{money(totalLeak)}</strong> across
-              below-cost sales and manual price overrides in this period.
+              <strong className="text-foreground">{money(totalLeak)}</strong>{' '}
+              {t('reports.mlAcross')}
             </>
           )}
         </CardDescription>
@@ -120,7 +114,7 @@ export default function MarginLeaksPanel({
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="flex items-center gap-1.5 text-sm font-semibold">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
-                Sold below cost
+                {t('reports.mlSoldBelowCost')}
               </h4>
               <Badge variant="outline" className="border-destructive/30 text-destructive">
                 −{money(leaks.totalBelowCostLoss)}
@@ -130,11 +124,11 @@ export default function MarginLeaksPanel({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="text-end">Units</TableHead>
-                    <TableHead className="text-end">Sold for</TableHead>
-                    <TableHead className="text-end">Cost</TableHead>
-                    <TableHead className="text-end">Lost</TableHead>
+                    <TableHead>{t('reports.colItem')}</TableHead>
+                    <TableHead className="text-end">{t('reports.colUnits')}</TableHead>
+                    <TableHead className="text-end">{t('reports.mlColSoldFor')}</TableHead>
+                    <TableHead className="text-end">{t('reports.colCost')}</TableHead>
+                    <TableHead className="text-end">{t('reports.mlColLost')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -171,7 +165,7 @@ export default function MarginLeaksPanel({
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="flex items-center gap-1.5 text-sm font-semibold">
                 <Tag className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                Given away by manual price overrides
+                {t('reports.mlOverridesTitle')}
               </h4>
               <Badge variant="outline">{money(leaks.totalOverrideGiveaway)}</Badge>
             </div>
@@ -179,9 +173,9 @@ export default function MarginLeaksPanel({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="text-end">Units at a typed price</TableHead>
-                    <TableHead className="text-end">Below shelf price by</TableHead>
+                    <TableHead>{t('reports.colItem')}</TableHead>
+                    <TableHead className="text-end">{t('reports.mlColUnitsTyped')}</TableHead>
+                    <TableHead className="text-end">{t('reports.mlColBelowShelf')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -205,9 +199,7 @@ export default function MarginLeaksPanel({
               </Table>
             </ScrollArea>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Measured against what the shelf price was at the moment of sale, not
-              today&apos;s price — so an honest price rise never shows up here. Overrides are
-              often legitimate; this is the bill for them, not an allegation.
+              {t('reports.mlOverridesFootnote')}
             </p>
           </section>
         )}
@@ -216,26 +208,21 @@ export default function MarginLeaksPanel({
           <section className="space-y-1 rounded-md border border-dashed bg-muted/30 p-3">
             <h4 className="flex items-center gap-1.5 text-sm font-semibold">
               <PercentCircle className="h-4 w-4 text-muted-foreground" />
-              Discounts given
+              {t('reports.mlDiscountsTitle')}
             </h4>
             <p className="text-2xl font-bold tabular-nums">{money(leaks.discountTotal)}</p>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Across {leaks.discountedSales.toLocaleString()}{' '}
-              {leaks.discountedSales === 1 ? 'sale' : 'sales'}. Discounts are recorded on
-              the sale as a whole, with no per-item breakdown, so this figure is
-              deliberately not split across products — doing so would be guesswork. Who
-              applied them is in the Team performance panel below.
+              {t('reports.mlDiscountsFootnote', {
+                count: leaks.discountedSales,
+                formatted: leaks.discountedSales.toLocaleString(),
+              })}
             </p>
           </section>
         )}
 
         {leaks.uncostedItems > 0 && (
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            {leaks.uncostedItems} {leaks.uncostedItems === 1 ? 'item' : 'items'} sold in
-            this period {leaks.uncostedItems === 1 ? 'has' : 'have'} no cost price, so{' '}
-            {leaks.uncostedItems === 1 ? 'it was' : 'they were'} left out of the
-            below-cost check entirely rather than assumed profitable. Adding cost prices
-            in Inventory is what makes that check complete.
+            {t('reports.mlUncostedFootnote', { count: leaks.uncostedItems })}
           </p>
         )}
       </CardContent>

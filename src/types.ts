@@ -627,11 +627,16 @@ export interface Purchase {
      * subscription rows.
      */
     plan: string;
-    /** Missing on every row written before AI credit packs shipped. */
+    /**
+     * Missing on every row written before AI credit packs shipped, and on every row
+     * written since they were scrapped — nothing writes `'credits'` any more.
+     * `purchaseKind` reads a missing value as `'subscription'`, which is what those
+     * rows are.
+     */
     kind?: 'subscription' | 'credits';
-    /** Credit rows only — the `CreditPackId` that was bought. */
+    /** Historical credit rows only — the pack that was bought. Never written now. */
     packId?: string;
-    /** Credit rows only — credits granted, re-derived server-side from the pack id. */
+    /** Historical credit rows only — credits granted by that purchase. */
     credits?: number;
     amount: number;
     currency: 'NGN' | 'USD';

@@ -5,7 +5,7 @@ import { useUser, useFirestore } from '@/firebase';
 import { terminalListenerErrorHandler } from '@/firebase/retry';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap, Clapperboard, PieChart, MoreHorizontal, Mail, Smartphone } from 'lucide-react';
+import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap, Clapperboard, PieChart, MoreHorizontal, Mail, Smartphone, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
@@ -41,6 +41,7 @@ const navLinks = [
   { href: '/admin-imamshaffy/ai-usage', label: 'AI Usage', icon: Zap },
   { href: '/admin-imamshaffy/updates', label: 'App Updates', icon: Smartphone },
   { href: '/admin-imamshaffy/developer-logs', label: 'Dev Logs', icon: Bug },
+  { href: '/admin-imamshaffy/backups', label: 'Backups', icon: Database },
 ];
 
 const primaryNavLinks = navLinks.filter((link) => link.primary);

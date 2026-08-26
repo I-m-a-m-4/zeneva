@@ -12,10 +12,12 @@ import React, { useState } from "react";
 import { AppConfig } from "@/lib/config";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { useI18n } from "@/context/i18n-context";
 
 export default function ForgotPasswordPage() {
   const auth = useAuth();
   const { toast } = useToast();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
@@ -23,15 +25,15 @@ export default function ForgotPasswordPage() {
   const handleReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth) {
-      toast({ title: "Authentication service not available.", variant: "destructive" });
+      toast({ title: t('auth.serviceUnavailable'), variant: "destructive" });
       return;
     }
     setIsLoading(true);
     sendPasswordResetEmail(auth, email)
       .then(() => {
         toast({
-          title: 'Password Reset Email Sent',
-          description: `An email has been sent to ${email} with instructions.`,
+          title: t('auth.resetSentTitle'),
+          description: t('auth.resetSentBody', { email }),
           variant: 'success'
         });
         console.log(`Password reset email sent successfully to ${email}`);
@@ -42,8 +44,8 @@ export default function ForgotPasswordPage() {
         console.error("Error sending password reset email:", error);
         toast({
           variant: 'destructive',
-          title: 'Request Failed',
-          description: error.code === 'auth/invalid-email' ? 'Please enter a valid email address.' : 'Could not send reset email. Please try again.',
+          title: t('auth.resetFailedTitle'),
+          description: error.code === 'auth/invalid-email' ? t('auth.invalidEmailAddress') : t('auth.resetSendFailed'),
         });
         setIsLoading(false);
       });
@@ -55,24 +57,24 @@ export default function ForgotPasswordPage() {
         <div className="mx-auto grid w-full max-w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-              <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
+              <img src={AppConfig.logoUrl} alt={t('auth.logoAlt')} className="h-16 w-auto" />
             </Link>
-            <h1 className="text-3xl font-bold">Forgot Password</h1>
+            <h1 className="text-3xl font-bold">{t('auth.forgotPasswordTitle')}</h1>
             <p className="text-balance text-muted-foreground">
               {isSent
-                ? "Check your inbox (and Spam/Promotions folder) for the reset link."
-                : "Enter your email to receive a password reset link."}
+                ? t('auth.forgotPasswordSentSubtitle')
+                : t('auth.forgotPasswordSubtitle')}
             </p>
 
           </div>
           {!isSent ? (
             <form onSubmit={handleReset} className="grid gap-4">
               <div className="grid gap-2 focus-within-glow rounded-md">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('common.email')}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -80,17 +82,17 @@ export default function ForgotPasswordPage() {
               </div>
               <Button type="submit" className="w-full button-glow" disabled={isLoading}>
                 {isLoading && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                Send Reset Link
+                {t('auth.sendResetLink')}
               </Button>
             </form>
           ) : (
             <div className="space-y-4">
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-4 text-sm text-amber-800 dark:text-amber-200">
-                <p className="font-medium">Can't find the email?</p>
+                <p className="font-medium">{t('auth.cantFindEmail')}</p>
                 <ul className="list-disc pl-5 mt-2 space-y-1">
-                  <li>Check your Spam or Junk folder</li>
-                  <li>Check the Promotions tab (if using Gmail)</li>
-                  <li>Wait a few minutes, as delivery can be delayed</li>
+                  <li>{t('auth.checkSpamFolder')}</li>
+                  <li>{t('auth.checkPromotionsTab')}</li>
+                  <li>{t('auth.deliveryDelayed')}</li>
                 </ul>
               </div>
 
@@ -104,18 +106,18 @@ export default function ForgotPasswordPage() {
                   // but resetting isSent to false brings back the form.
                 }}
               >
-                Resend Email
+                {t('auth.resendEmail')}
               </Button>
 
               <Button className="w-full" asChild>
-                <Link href="/login">Back to Login</Link>
+                <Link href="/login">{t('auth.backToLogin')}</Link>
               </Button>
             </div>
           )}
           <div className="mt-4 text-center text-sm">
-            Remember your password?{" "}
+            {t('auth.rememberPasswordPrompt')}{" "}
             <Link href="/login" className="underline">
-              Login
+              {t('auth.loginLink')}
             </Link>
           </div>
         </div>
@@ -123,7 +125,7 @@ export default function ForgotPasswordPage() {
       <div className="hidden bg-slate-900 lg:block relative overflow-hidden">
         <Image
           src="/zeneva-forgot-password-premium.png"
-          alt="Tactical Intelligence Background"
+          alt={t('auth.backgroundAlt')}
           width="1920"
           height="1080"
           className="h-full w-full object-cover opacity-90 transition-transform [transition-duration:20s] hover:scale-110"
@@ -136,13 +138,13 @@ export default function ForgotPasswordPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <h2 className="text-white text-5xl font-medium tracking-tighter font-display">Security First.</h2>
+            <h2 className="text-white text-5xl font-medium tracking-tighter font-display">{t('auth.securityFirstTitle')}</h2>
             <p className="text-white/60 mt-6 text-xl font-dm-sans leading-relaxed max-w-lg">
-              Protecting your business data is our primary mission. Follow the reset instructions sent to your email to regain secure access to your Command Center.
+              {t('auth.securityFirstBody')}
             </p>
             <div className="mt-8 flex items-center gap-3 text-orange-500 text-sm font-bold uppercase tracking-[0.2em] bg-orange-500/10 w-fit px-4 py-2 rounded-full border border-orange-500/20">
                <ShieldCheck className="h-5 w-5" />
-               Tactical Vault Locked
+               {t('auth.tacticalVaultLocked')}
             </div>
           </motion.div>
         </div>

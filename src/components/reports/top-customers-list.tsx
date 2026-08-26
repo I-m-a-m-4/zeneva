@@ -13,6 +13,7 @@ import { Button } from '../ui/button';
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 
 interface TopCustomersListProps {
   receipts: Receipt[];
@@ -20,6 +21,7 @@ interface TopCustomersListProps {
 }
 
 export default function TopCustomersList({ receipts, currencySymbol }: TopCustomersListProps) {
+  const { t } = useI18n();
   const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
 
   const customerData = React.useMemo(() => {
@@ -62,8 +64,8 @@ export default function TopCustomersList({ receipts, currencySymbol }: TopCustom
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
-            <CardTitle>Top Customers</CardTitle>
-            <CardDescription>Customers with the highest spending in this period.</CardDescription>
+            <CardTitle>{t('reports.tcTitle')}</CardTitle>
+            <CardDescription>{t('reports.tcSubtitle')}</CardDescription>
         </div>
         <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
       </CardHeader>
@@ -91,8 +93,8 @@ export default function TopCustomersList({ receipts, currencySymbol }: TopCustom
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground">
                 <Award className="h-16 w-16 opacity-50 mb-4" />
-                <p className="font-medium">No Customer Data</p>
-                <p className="text-sm">Link sales to customers to see this report.</p>
+                <p className="font-medium">{t('reports.tcEmptyTitle')}</p>
+                <p className="text-sm">{t('reports.tcEmptyBody')}</p>
             </div>
           )}
         </ScrollArea>

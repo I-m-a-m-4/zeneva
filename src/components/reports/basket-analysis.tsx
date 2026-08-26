@@ -7,6 +7,7 @@ import { Receipt } from '@/types';
 import { ShoppingBag, Plus, ArrowRight, Zap, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/context/i18n-context';
 
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
@@ -18,6 +19,7 @@ interface BasketAnalysisProps {
 }
 
 export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
+    const { t } = useI18n();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
 
@@ -85,16 +87,16 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
                         <ShoppingBag className="h-5 w-5 text-primary" />
-                        Market Basket Analysis
+                        {t('reports.baTitle')}
                     </CardTitle>
-                    <CardDescription>Discover which products are frequently bought together.</CardDescription>
+                    <CardDescription>{t('reports.baSubtitle')}</CardDescription>
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             type="search"
-                            placeholder="Search products..."
+                            placeholder={t('inventory.searchProducts')}
                             className="pl-9 h-9 text-xs bg-muted/20 w-full"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -111,7 +113,7 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                         <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-center gap-3">
                             <Zap className="h-5 w-5 text-primary animate-pulse" />
                             <p className="text-xs text-muted-foreground">
-                                Use these insights to create **bundle deals** or optimize your store layout for cross-selling.
+                                {t('reports.baHint')}
                             </p>
                         </div>
 
@@ -132,7 +134,7 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                                             </div>
                                             <div className="flex-shrink-0 text-right">
                                                 <p className="text-lg font-bold text-primary leading-none">{set.count}</p>
-                                                <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-1">Joint Sales</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-1">{t('reports.baJointSales')}</p>
                                             </div>
                                         </div>
                                         <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
@@ -150,12 +152,11 @@ export default function BasketAnalysis({ receipts }: BasketAnalysisProps) {
                     <div className="text-center py-12 text-muted-foreground">
                         <ShoppingBag className="mx-auto h-12 w-12 opacity-20 mb-3" />
                         <p className="text-sm">
-                            {searchTerm 
-                                ? "No product pairings found matching your search." 
-                                : "Not enough multi-item sales yet to detect significant product pairings."
-                            }
+                            {searchTerm
+                                ? t('reports.baEmptySearch')
+                                : t('reports.baEmptyNoPairs')}
                         </p>
-                        <p className="text-xs mt-1">Only sets with more than 1 joint sale are shown.</p>
+                        <p className="text-xs mt-1">{t('reports.baFootnote')}</p>
                     </div>
                 )}
             </CardContent>

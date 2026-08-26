@@ -104,6 +104,7 @@ export default function BranchesSettingsPage() {
   };
 
   const isBusinessPlan = hasBusinessFeatures(business);
+  const hasBranchAccess = isBusinessPlan || business?.plan === 'pro';
 
   const displayedBranches = branches;
   const displayedActiveBranchId = activeBranchId;
@@ -140,7 +141,7 @@ export default function BranchesSettingsPage() {
   const [confirmBranchName, setConfirmBranchName] = useState('');
 
   const handleAddNewBranchClick = () => {
-    if (isBusinessPlan) {
+    if (isBusinessPlan || (business?.plan === 'pro' && branches.length < 3)) {
       setIsDialogOpen(true);
     } else {
       setIsUpgradeOpen(true);
@@ -251,9 +252,11 @@ export default function BranchesSettingsPage() {
     }
   };
 
+  const showUpgradeOverlay = !hasBranchAccess || isUpgradeOpen;
+
   return (
     <>
-      <div className={cn("space-y-6 w-full max-w-full transition-all duration-500", !isBusinessPlan && "blur-[3px] pointer-events-none select-none opacity-40")}>
+      <div className={cn("space-y-6 w-full max-w-full transition-all duration-500", showUpgradeOverlay && "blur-[3px] pointer-events-none select-none opacity-40")}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Branch Management</h1>
@@ -262,7 +265,7 @@ export default function BranchesSettingsPage() {
             </p>
           </div>
 
-          <Button size="lg" className="shrink-0 gap-2" onClick={() => setIsDialogOpen(true)}>
+          <Button size="lg" className="shrink-0 gap-2" onClick={handleAddNewBranchClick}>
             <Plus className="h-4 w-4" />
             Add New Branch
           </Button>
@@ -282,7 +285,7 @@ export default function BranchesSettingsPage() {
                 <p className="text-muted-foreground max-w-sm mb-6">
                   You are currently operating as a single-location business. Add a branch to enable multi-location features.
                 </p>
-                <Button onClick={() => setIsDialogOpen(true)} variant="outline">
+                <Button onClick={handleAddNewBranchClick} variant="outline">
                   Get Started
                 </Button>
               </CardContent>
@@ -294,7 +297,7 @@ export default function BranchesSettingsPage() {
               return (
                 <Card
                   key={branch.id}
-                  onClick={() => { if (isBusinessPlan) handleSelectBranch(branch.id); }}
+                  onClick={() => { if (hasBranchAccess) handleSelectBranch(branch.id); }}
                   className={`relative overflow-hidden group border-2 border-dashed shadow-sm cursor-pointer transition-all duration-300 w-full ${
                     isCurrentlySelected
                       ? "border-orange-500/40 bg-gradient-to-b from-orange-500/10 via-background to-background shadow-md border-2"
@@ -399,7 +402,7 @@ export default function BranchesSettingsPage() {
                         </Button>
                       )}
                     </div>
-                    {!branch.isPrimary && isBusinessPlan && (
+                    {!branch.isPrimary && hasBranchAccess && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -421,7 +424,7 @@ export default function BranchesSettingsPage() {
 
       </div>{/* end blur wrapper */}
 
-      {!isBusinessPlan && (
+      {showUpgradeOverlay && (
         <div className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-background/5 backdrop-blur-[2px] pointer-events-auto">
           <Card className="w-full max-w-lg border border-dashed border-orange-500/40 shadow-md bg-gradient-to-b from-orange-500/10 via-background to-background backdrop-blur-md overflow-hidden relative">
             {/* Close button that redirects back to settings */}
@@ -429,7 +432,13 @@ export default function BranchesSettingsPage() {
               variant="ghost"
               size="icon"
               className="absolute right-4 top-4 rounded-full h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 z-20"
-              onClick={() => router.push('/settings')}
+              onClick={() => {
+                if (!hasBranchAccess) {
+                  router.push('/settings');
+                } else {
+                  setIsUpgradeOpen(false);
+                }
+              }}
             >
               <X className="h-4 w-4" />
             </Button>

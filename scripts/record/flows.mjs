@@ -54,6 +54,25 @@ export const FLOW_CARDS = {
       ms: 2600,
     },
   },
+  /*
+   * The store trailer's own bookends.
+   *
+   * Shorter than the single-feature cards above, because this take has three more
+   * of them inside it and a 60-second film cannot spend nine seconds on title
+   * screens. The close is the only place in any of this footage that names a price
+   * position — "Free to start" — and it is here because a store listing is the one
+   * context where the viewer's next action is a decision about installing.
+   */
+  trailer: {
+    open: { title: 'Sell anywhere.', subtitle: 'Even offline.', ms: 1200, motion: 'rise' },
+    end: {
+      title: 'Zeneva',
+      subtitle: 'Retail, handled.',
+      cta: 'Free to start',
+      ms: 2200,
+      motion: 'zoom',
+    },
+  },
 };
 
 
@@ -182,6 +201,13 @@ export const FLOW_ROUTES = {
   ],
   inventory: ['/inventory'],
   zen: ['/ai-insights'],
+  trailer: [
+    '/sales/pos/select-products',
+    '/sales/pos/customer',
+    '/sales/pos/payment',
+    '/inventory',
+    '/ai-insights',
+  ],
 };
 
 /**
@@ -290,4 +316,221 @@ export async function zenFlow(page) {
   await page.caption('');
 }
 
-export const FLOWS = { pos: posFlow, inventory: inventoryFlow, zen: zenFlow };
+/**
+ * Close anything the app decided to celebrate.
+ *
+ * `<AchievementCelebration />` is mounted in `(app)/layout.tsx`, so it can appear
+ * over *any* page — and the recorder is the worst case for it. Every take runs in a
+ * throwaway Chrome profile, so `zeneva_ach_seen_<businessId>` is always empty; the
+ * first-run seeding that normally keeps an existing shop quiet is racing the data
+ * it seeds from, and when it loses, real milestones arrive as fresh unlocks. This
+ * take hit "₦1 Million in Sales" over the product grid on the second run of an
+ * otherwise identical flow, and the click failed with "covered by div (pinned)".
+ *
+ * Escape rather than a button: the card is a Radix `<Dialog open onOpenChange>`, so
+ * Escape resolves to the same `onDismiss` the close button calls, and it needs to
+ * know nothing about the copy on it — which is i18n'd into eleven languages and
+ * would make this a translation-dependent selector.
+ *
+ * Pressed more than once because the unlock queue holds one card per ladder, and a
+ * fresh profile can have several ready at once. Cheap and idempotent: with no
+ * dialog open, Escape does nothing at all.
+ */
+export async function dismissCelebrations(page, times = 2) {
+  for (let i = 0; i < times; i++) {
+    await page.press('Escape');
+    await page.hold(140);
+  }
+}
+
+/**
+ * The Microsoft Store trailer: one continuous 60-second take across three features.
+ *
+ * ## Why this is a coded flow and not a recipe
+ *
+ * Recipes exist so a new video does not need new code, and most videos should be
+ * recipes. This one cannot be. It needs `clickAny` — the POS finalise button is
+ * named by a business setting, and a recipe has no way to say "whichever of these
+ * two exists" — and it needs to cross four routes while holding a time budget,
+ * which is exactly the domain knowledge the top of this file says stays coded.
+ *
+ * ## The budget is the design constraint
+ *
+ * Microsoft recommends 60 seconds or less, and the runner plays a title card at
+ * each end of whatever this function does, so the body has about 52 seconds. Three
+ * features and two interstitial slides fit in that only if every hold is deliberate,
+ * which is why the numbers below are small and odd rather than round. The single
+ * biggest cost is the Zen AI answer — a real model call against real data takes as
+ * long as it takes — so it is last, where a long tail can be cut without losing a
+ * transition.
+ *
+ * Two things are deliberately *not* in the film. There is no review-and-complete
+ * step: it is the most convincing shot in the POS flow and it costs four seconds
+ * plus a conditional, and this take needs the seconds more than it needs the shot.
+ * And nothing here writes — the flow takes no `ctx.commit`, so the trailer is
+ * repeatable and its captions never claim a sale was rung up. A store listing is
+ * the wrong place to find out that the demo shop's stock drifts every time
+ * marketing re-shoots.
+ *
+ * ## The captions are three scripts at once
+ *
+ * Each `page.caption()` here becomes the on-screen subtitle, the voice-over line
+ * (`--narrate` speaks the caption track), and a cue in the `.vtt` closed-caption
+ * file Partner Center asks for. So they are written to be *spoken* — short clauses,
+ * no parentheses, no slashes — and not just to be read.
+ */
+export async function trailerFlow(page) {
+  const ADD = 'button[class*="h-11"][class*="w-11"][class*="rounded-lg"]';
+
+  /* ---- Sell: three taps, a customer, a payment. ---------------------------- */
+
+  await page.goto('/sales/pos/select-products');
+  // Before the caption, so a milestone card cannot be the trailer's opening shot.
+  await dismissCelebrations(page);
+  await page.caption('Ring up a sale in seconds.', 3000);
+
+  // Wait for the grid before framing it, exactly as posFlow does: `punch` gives an
+  // anchor 1.5s and then gives up, and on a cold production route the products are
+  // still arriving. The first click needs this element anyway.
+  await page.find({ css: ADD, nth: 0 });
+  await page.punch({ css: ADD, nth: 0 }, { to: 1.28, ms: 620 });
+
+  // 240ms between taps rather than posFlow's 200-500. Fast enough to read as one
+  // gesture, slow enough that three separate cart animations are visible — at a
+  // shorter interval they overlap and it looks like one item was added.
+  await page.click({ css: ADD, nth: 0 }, { settle: 240 });
+  await page.click({ css: ADD, nth: 1 }, { settle: 240 });
+  await page.click({ css: ADD, nth: 2 }, { settle: 300 });
+
+  // No second punch out to the cart before this click. Measured: every click in
+  // this flow carries about 1.2s of its own overhead — find, scroll-into-view,
+  // hit-test, cursor travel — so a camera move whose only job is to frame the
+  // button about to be pressed costs more of the 60s budget than it earns.
+  await page.caption('');
+  await page.clickTo({ text: 'Next: Customer', exact: true }, '/sales/pos/customer', { settle: 900 });
+
+  /*
+   * The customer step gets a beat, not a caption.
+   *
+   * It had one, and the hidden navigation below is why it cannot: `goto` keeps a
+   * page load out of the film, which compresses the finished timeline while the
+   * caption marks are stamped in wall clock. The customer line landed at 18.16s and
+   * the payment line at 18.67s — a 2.6s overlap, two subtitles stacked, and two
+   * `.vtt` cues the clamp had to throw away.
+   *
+   * So one caption covers both screens, and it is written to be true of the one it
+   * is actually over: the payment step is where "with or without a customer" is a
+   * visible fact rather than a claim.
+   */
+  await page.hold(600);
+
+  /*
+   * Routed rather than clicked, and this one is measured.
+   *
+   * `clickTo` films the wait: the click lands, the payment step mounts, and the film
+   * sits on it. On this account that navigation took **13.4 seconds** of finished
+   * trailer — a fifth of the whole budget spent watching a page arrive, because the
+   * payment step loads its own chunk and reads before it is interactive.
+   *
+   * `goto` performs the same navigation, but the recorder holds the camera through a
+   * page load and keeps it out of the film, so the cut goes from the customer step to
+   * a payment screen that is already up. Nothing is faked — same route, same data,
+   * same screen a cashier reaches by pressing the button. What is removed is the
+   * loading, which no trailer should sell.
+   */
+  await page.goto('/sales/pos/payment');
+
+  await page.caption('Cash, card, transfer or invoice — with or without a customer.', 3200);
+  // Each payment tile is <Label htmlFor="cash|card|bank|invoice"> wrapping a Card
+  // whose RadioGroupItem is sr-only, so the label is the real click target.
+  await page.punch({ css: 'label[for="cash"]' }, { to: 1.26, ms: 480 });
+  await page.click({ css: 'label[for="cash"]' }, { settle: 380 });
+  await page.hold(420);
+  await page.caption('');
+
+  /* ---- Slide, then stock. ------------------------------------------------- */
+
+  // No `wide` before the card: the card is full-screen, so pulling the camera back
+  // first is a move nobody sees. The punch is released by the next `goto` anyway.
+  await page.card({
+    title: 'Know what you have.',
+    subtitle: 'Down to the last unit.',
+    ms: 1500,
+    motion: 'wipe',
+  });
+  // The card covers the route change, which is the point of putting it here rather
+  // than between two shots of the same page: the inventory page mounts behind it.
+  await page.goto('/inventory');
+  await page.clearCard();
+
+  /*
+   * The search box is deliberately not filmed.
+   *
+   * `inventoryFlow` types into it, deletes two characters and waits — six seconds
+   * for "the list filters as you type", which every app on the store also does. It
+   * was the first thing cut when this came in at 78s: the Inventory Health tab is
+   * the shot nobody else has, and it needed the room.
+   */
+  await page.caption('Inventory Health finds the problems first.', 3000);
+  await page.click({ text: 'Inventory Health', exact: false, tag: 'button' }, { settle: 800 });
+  // The four health tiles come from i18n (`inventory.healthLowStock` = "Low Stock
+  // (≤5)"), so match the stable English prefix, not the parenthetical. They are
+  // small — at 1080p the number on a tile is barely legible on a phone, which is
+  // where most of this footage gets watched.
+  await page.punch({ text: 'Low Stock', exact: false }, { to: 1.32, ms: 620 });
+  await page.hold(300);
+  await page.click({ text: 'Low Stock', exact: false }, { settle: 800 });
+  await page.hold(250);
+  await page.caption('');
+
+  /* ---- Slide, then the differentiator. ------------------------------------ */
+
+  await page.card({
+    title: 'Zen AI',
+    subtitle: 'Reads everything. Writes nothing without you.',
+    ms: 1500,
+    motion: 'split',
+  });
+  await page.goto('/ai-insights');
+  await page.clearCard();
+
+  await page.caption('Ask about your own shop, in your own words.', 3000);
+  // In on the composer while the question is typed. This is the one moment in the
+  // take where the words on screen are the whole content of the shot.
+  await page.punch({ placeholder: 'Ask anything about your business' }, { to: 1.24, ms: 560 });
+  await page.fill(
+    { placeholder: 'Ask anything about your business' },
+    'Which products are about to run out?',
+    { enter: true, delay: 46, settle: 600 },
+  );
+
+  // The composer's placeholder swaps once the thread opens ("Ask anything about
+  // your business..." → "Ask Zen AI..."), which is the one reliable signal that the
+  // message was actually sent — the status line cycles generic copy until a tool
+  // starts, so waiting on any particular status text is a coin flip.
+  await page.find({ placeholder: 'Ask Zen AI' }, { timeoutMs: 30_000 });
+  // Back out for the answer: the reply streams top-down with the tool-status line
+  // above it, and anything tighter than the full frame loses half the shot.
+  await page.wide({ ms: 560 });
+  await page.caption('It reads your live data. Never a guess.', 3200);
+  /*
+   * 3700, and it is the spoken length that sets it, not the pacing.
+   *
+   * A caption is also a voice-over line, and `narrate.mjs` places each line at the
+   * instant its caption appeared — so two captions closer together than the first
+   * one takes to *say* produce two voices talking at once. This pair did: measured
+   * 63.64→67.06 against a next line starting at 66.33, a 0.73s double-take that the
+   * `.vtt` clamp hid and the audio did not.
+   *
+   * The line runs 3.42s in SAPI's David. Any hold under that is a bug you can only
+   * hear, so when a caption is edited, check the measured length with
+   * `store.mjs --scaffold` rather than guessing from the word count.
+   */
+  await page.hold(3700);
+
+  await page.caption('It proposes. You approve. Then it happens.', 3200);
+  await page.hold(900);
+  await page.caption('');
+}
+
+export const FLOWS = { pos: posFlow, inventory: inventoryFlow, zen: zenFlow, trailer: trailerFlow };

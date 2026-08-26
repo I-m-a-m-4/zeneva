@@ -629,6 +629,18 @@ export type Demo = {
   /** Total length in frames. */
   frames: number;
   /**
+   * Design space this demo draws in. Absent means the landscape {@link STAGE},
+   * which is what every demo written before the reels existed assumes — so
+   * omitting it keeps those three playing and exporting exactly as they did.
+   *
+   * It exists because a vertical demo must be *drawn* vertical, not letterboxed
+   * into 16:9 by the recorder. Cropping a 1600×900 composition into 1080×1920
+   * leaves the picture in a 1080×608 band with brand bars above and below it,
+   * which is the shape of a landscape video posted to Reels — the exact thing
+   * the reels format exists to avoid.
+   */
+  stage?: { w: number; h: number };
+  /**
    * Pure: the same (frame, theme) always paints the same pixels. Implementations
    * must call `applyTheme(theme)` before drawing anything.
    */
@@ -636,5 +648,8 @@ export type Demo = {
   /** Scrubber markers — label plus the frame the beat starts on. */
   chapters: { label: string; at: number }[];
 };
+
+/** The design space a demo draws in. The player and the recorder must agree. */
+export const stageOf = (demo: Pick<Demo, 'stage'>) => demo.stage ?? STAGE;
 
 

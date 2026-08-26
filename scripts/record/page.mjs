@@ -700,6 +700,42 @@ export class Page {
       // also be involved, and waiting is cheap next to losing the take.
     }
 
+    /*
+     * A modal is a blocker that waiting cannot fix.
+     *
+     * The loop below exists for toasts: something transient is over the target and
+     * it will leave on its own. A dialog will not — it waits for a person. The
+     * recorder meets one because it runs in a throwaway Chrome profile, so
+     * `zeneva_ach_seen_<businessId>` is always empty and `<AchievementCelebration />`
+     * (mounted in `(app)/layout.tsx`, so it can appear over any page) fires real
+     * milestones as fresh unlocks. It took out two takes: "₦1 Million in Sales"
+     * over the product grid, and later over the cart's own Next button — the second
+     * one *after* the flow had already dismissed it at startup, which is what makes
+     * this a race rather than something a flow can pre-empt.
+     *
+     * Escape rather than a close button: every dialog in the app is Radix, which
+     * resolves Escape to the same handler the button calls, and it needs to know
+     * nothing about copy that exists in eleven languages.
+     *
+     * Only reached when the target is *covered*, which is what makes it safe to
+     * press blindly: a flow working inside a dialog is not blocked by it, so the
+     * only dialog this can close is one that is already in the way. Logged, because
+     * a take that silently closed a modal is a take nobody can explain later.
+     */
+    if (rect.covered) {
+      const modal = await this.find({ css: '[role="dialog"]' }, { timeoutMs: 300, required: false });
+      if (modal) {
+        this.log?.(`  (dismissing a dialog that covered ${describe(spec)})`);
+        for (let i = 0; i < 3; i++) {
+          await this.press('Escape');
+          await sleep(260);
+          const next = await this.find(spec, { required: false });
+          if (next) rect = next;
+          if (!rect.covered) return rect;
+        }
+      }
+    }
+
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
       await sleep(250);

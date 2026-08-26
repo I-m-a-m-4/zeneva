@@ -15,18 +15,20 @@
  *    pure functions in this folder — `applyAiMapping`, `applyAiMatches`,
  *    `previewBulkOp` — which constrain it to what the deterministic pass already
  *    established. The model is a suggestion engine, not an authority.
- * 2. **Every call spends the shop's money.** So each one is triggered by an explicit
+ * 2. **Every call spends the shop's credits.** So each one is triggered by an explicit
  *    press with a quote next to it, never by an effect. `AiCreditsError` carries the
- *    balance back so the UI can offer a top-up instead of a stack trace.
+ *    balance back so the UI can say what is left and name the free paths that still
+ *    work, rather than showing a stack trace.
  */
 
 import { apiBase } from '@/lib/platform';
 import { idToken } from '@/lib/id-token';
 import type { ImportAiAction } from './pricing';
 import type { ImportField } from './types';
+import type { CustomerImportField } from './customers';
 import type { BulkFilter, BulkField, BulkMode } from './bulk-ops';
 
-/** Raised on 402, so a caller can show a balance and a top-up rather than an error. */
+/** Raised on 402, so a caller can show the balance and what still works, not an error. */
 export class AiCreditsError extends Error {
   readonly code = 'credits_exhausted' as const;
   readonly remaining: number;
@@ -214,6 +216,97 @@ export function aiRowsToTable(rows: AiRow[], label: string) {
       row.stock ?? '',
       row.unit ?? '',
       row.expiryDate ?? '',
+    ]),
+    hasHeaderRow: true,
+    label,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A customer exactly as the model described them — all values still raw text. */
+export type AiCustomerRow = {
+  name: string;
+  phone?: string;
+  email?: string;
+  code?: string;
+  tags?: string;
+  notes?: string;
+  totalSpent?: string;
+  loyaltyPoints?: string;
+};
+
+export type AiCustomerRowsResponse = {
+  rows: AiCustomerRow[];
+  note?: string | null;
+  credits?: CreditReceipt;
+};
+
+export function aiMapCustomerColumns(
+  columns: { index: number; header: string }[],
+  samples: string[][],
+): Promise<{ mappings: { index: number; field: CustomerImportField | null }[]; credits?: CreditReceipt }> {
+  return call('map-customer-columns', { columns, samples });
+}
+
+export function aiParseCustomerText(text: string, currency?: string): Promise<AiCustomerRowsResponse> {
+  return call('parse-customer-text', { text, currency });
+}
+
+/**
+ * Read customers off a photograph of a ledger page, a visitors' book or a list.
+ *
+ * `tags` plays the part `categories` plays for a shelf photo: it lets the model
+ * reuse a label the shop already has rather than founding a second spelling of it.
+ * A tag that differs only in case is a segment that silently stops matching, and
+ * nothing in the app would ever flag it.
+ *
+ * There is no `kind` here, unlike `aiParseImage`. A ledger page, a visitors' book
+ * and a printed list all mean the same thing — these are the shop's customers —
+ * where a shelf photo and a supplier invoice disagree about whose money the figures
+ * on them are. One prompt is the honest answer, not a missing feature.
+ */
+export function aiParseCustomerImage(
+  imageBase64: string,
+  opts: { mimeType?: string; currency?: string; tags?: string[] } = {},
+): Promise<AiCustomerRowsResponse> {
+  return call('parse-customer-photo', {
+    imageBase64,
+    mimeType: opts.mimeType,
+    currency: opts.currency,
+    tags: opts.tags,
+  });
+}
+
+/**
+ * Turn model customer rows into a `RawTable`, so they meet the same coercion a
+ * spreadsheet does.
+ *
+ * The counterpart of `aiRowsToTable` and load-bearing for the same reason: a phone
+ * number read off a handwritten page is normalised by `normalizePhone` through
+ * `buildCustomerDrafts`, exactly as one from Excel is, so `0803 123 4567` and
+ * `+2348031234567` collapse to the same customer whichever source they arrived
+ * from. Duplicate detection is only as good as that being true.
+ *
+ * The headers are literal aliases from `CUSTOMER_HEADER_ALIASES`, so the mapping
+ * step that follows is a map hit and cannot ask for AI a second time — which would
+ * charge the shop twice for one photograph.
+ */
+export function aiCustomerRowsToTable(rows: AiCustomerRow[], label: string) {
+  const headers = ['Name', 'Phone', 'Email', 'Customer Code', 'Tags', 'Notes', 'Total Spent', 'Loyalty Points'];
+  return {
+    headers,
+    rows: rows.map((row) => [
+      row.name ?? '',
+      row.phone ?? '',
+      row.email ?? '',
+      row.code ?? '',
+      row.tags ?? '',
+      row.notes ?? '',
+      row.totalSpent ?? '',
+      row.loyaltyPoints ?? '',
     ]),
     hasHeaderRow: true,
     label,

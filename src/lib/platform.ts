@@ -41,15 +41,84 @@ export function isMobileApp(): boolean {
   return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+/** Set the first time this install renders anything. See isFirstLaunchEver. */
+const FIRST_LAUNCH_KEY = 'zeneva_first_launch_at';
+
+/**
+ * Memoised so every caller in a session gets the same answer regardless of who
+ * reads first. `markLaunched()` primes this before it writes, which is what
+ * makes the flag safe to read *after* it has been set — see the note there.
+ */
+let firstLaunchCache: boolean | null = null;
+
+/**
+ * True when this device has never opened the app before.
+ *
+ * Deliberately a pure read: the marking is `markLaunched()`, called once from
+ * the launch-telemetry component. `claimFirstSession` in
+ * `components/UserActivityTracker.tsx` fuses the two and is documented as
+ * unsafe to call twice for exactly that reason — here the routing decision and
+ * the telemetry both need the answer, on the same tick, in an order React does
+ * not promise.
+ *
+ * Storage being unavailable reports `true`. A returning user then sees the
+ * welcome carousel with a "Sign in" button on it, which is recoverable; the
+ * other way round hides the signup route from the person who needs it.
+ */
+export function isFirstLaunchEver(): boolean {
+  // Not memoised during a server render: the answer there is meaningless and
+  // caching it would only matter if module state leaked, which it does not.
+  if (typeof window === 'undefined') return true;
+  if (firstLaunchCache !== null) return firstLaunchCache;
+  try {
+    firstLaunchCache = window.localStorage.getItem(FIRST_LAUNCH_KEY) === null;
+  } catch {
+    firstLaunchCache = true;
+  }
+  return firstLaunchCache;
+}
+
+/**
+ * Records that this install has now been opened.
+ *
+ * Reads through `isFirstLaunchEver()` first so the memo holds the pre-write
+ * answer. Without that, whichever of the root-page redirect and the telemetry
+ * effect happened to run second would see `false` on a genuine first launch and
+ * send a brand new user to the login form.
+ */
+export function markLaunched(): void {
+  isFirstLaunchEver();
+  try {
+    window.localStorage.setItem(FIRST_LAUNCH_KEY, new Date().toISOString());
+  } catch {
+    // Private mode or quota. The in-memory memo still holds for this session.
+  }
+}
+
 /**
  * Where a signed-out visitor should land.
  *
  * Mobile opens on the /welcome carousel, which has its own route through to
- * /login and /signup. Desktop and web go straight to /login, where the
- * split-screen layout already carries the marketing content.
+ * /login and /signup.
+ *
+ * The desktop shell used to go straight to /login on every launch, including
+ * the very first one. That is the wrong screen for a store install: a Microsoft
+ * Store or Play install is, by definition, someone who has never had an
+ * account, and /login leads with "Enter your email below to login to your
+ * account" and carries signup as a ghost button in the corner. So a *first*
+ * desktop launch gets the same carousel mobile does, where "Create account" is
+ * the primary button; every launch after that goes to /login as before.
+ *
+ * Web is untouched — a browser visitor arrives through the marketing site,
+ * which has already done this job.
+ *
+ * Signing out of the app also routes through here (`(app)/layout.tsx`), and by
+ * then the install is marked, so it lands on /login rather than the carousel.
  */
 export function signedOutLandingRoute(): string {
-  return isMobileApp() ? '/welcome' : '/login';
+  if (isMobileApp()) return '/welcome';
+  if (isFirstLaunchEver()) return '/signup';
+  return '/login';
 }
 
 /** Where this install gets its updates from. */
@@ -160,6 +229,55 @@ export async function openExternal(url: string): Promise<void> {
   }
 
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/**
+ * Deep link that opens the Store's *review* prompt rather than the listing.
+ * There is no Play equivalent — `market://details` is as close as it gets, and
+ * the in-app review API is not reachable from the webview.
+ */
+const MS_STORE_REVIEW_PROTOCOL =
+  'ms-windows-store://review/?ProductId=9nvn0f8njwmj';
+
+/** Which store this install is rated on. */
+export type ReviewStore = 'play' | 'microsoft';
+
+/**
+ * Opens the rating prompt for one of our store listings.
+ *
+ * Separate from `openExternal` only because `storeProtocol` maps a Microsoft
+ * listing to the *product page* deep link, and a Rate button wants the review
+ * one. Everything else is the same, and the important half is the same: a bare
+ * `window.open` is a no-op in the Tauri webview and an `href` to a non-http
+ * scheme is dropped by the CSP, which is why the Settings "Rate Zeneva" button
+ * did nothing at all on desktop and Android. Anything leaving the app has to go
+ * through `plugin:shell|open`.
+ *
+ * `shell:default` scopes http(s) only, so the deep-link attempt is expected to
+ * reject on some installs — the https listing is the fallback, not an error path.
+ */
+export async function openStoreReview(store: ReviewStore): Promise<void> {
+  const deepLink =
+    store === 'microsoft' ? MS_STORE_REVIEW_PROTOCOL : PLAY_STORE_PROTOCOL;
+  const listing = store === 'microsoft' ? MS_STORE_URL : PLAY_STORE_URL;
+
+  if (isNativeApp()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      try {
+        await invoke('plugin:shell|open', { path: deepLink });
+        return;
+      } catch {
+        // scope rejects non-http schemes - use the web listing below
+      }
+      await invoke('plugin:shell|open', { path: listing });
+      return;
+    } catch {
+      // plugin unavailable - let the webview try
+    }
+  }
+
+  window.open(listing, '_blank', 'noopener,noreferrer');
 }
 
 /**

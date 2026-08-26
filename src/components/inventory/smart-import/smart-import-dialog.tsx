@@ -31,6 +31,8 @@ import ReviewStep from './review-step';
 import { DesktopPanel, PastePanel, PhotoPanel, SheetPicker, TextPanel } from './input-panels';
 import { estimateCredits } from '@/lib/import/pricing';
 import type { ImportSource } from '@/lib/import/types';
+import { FeatureGateUpgradeCard } from '@/components/shared/feature-gate';
+import { Sparkles as SparklesIcon } from 'lucide-react';
 
 export default function SmartImportDialog({
   isOpen,
@@ -53,6 +55,7 @@ export default function SmartImportDialog({
   /** A file dropped on the picker that belongs to a panel not yet mounted. */
   const [handoff, setHandoff] = React.useState<File | null>(null);
 
+  const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
@@ -86,7 +89,14 @@ export default function SmartImportDialog({
         )}
 
       <Dialog open={isOpen} onOpenChange={close} modal={false}>
-        <DialogContent className="flex max-h-[92vh] flex-col sm:max-w-4xl">
+        <DialogContent 
+          className="flex max-h-[92vh] flex-col sm:max-w-4xl"
+          onInteractOutside={(e) => {
+            if (showUpgradeModal) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               {showBack && (
@@ -202,7 +212,13 @@ export default function SmartImportDialog({
                 onEdit={importer.editDraft}
                 onRemove={importer.removeRow}
                 onRunAiMatching={importer.runAiMatching}
-                onCommit={importer.commit}
+                onCommit={() => {
+                  if (!importer.limitCheck.ok) {
+                    setShowUpgradeModal(true);
+                  } else {
+                    importer.commit();
+                  }
+                }}
               />
             )}
 
@@ -266,6 +282,25 @@ export default function SmartImportDialog({
               <DesktopPanel busy={importer.busy} onDone={importer.loadCaptured} />
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
+        <DialogContent className="max-w-lg p-0 border-none bg-transparent shadow-none">
+          <DialogTitle className="sr-only">Upgrade to Pro</DialogTitle>
+          <FeatureGateUpgradeCard 
+            featureName="Bulk Product Import"
+            featureDescription="Import hundreds of products, categories, and stock counts at once with our smart scanner."
+            requiredPlan="pro"
+            icon={SparklesIcon}
+            currency={importer.currencySymbol === '₦' ? 'NGN' : 'USD'}
+            featurePoints={[
+              { title: "Increase Product Limits", description: "Expand your catalogue capacity beyond the Starter limit." },
+              { title: "Bulk Smart Import", description: "Upload unlimited rows from Excel, photos, invoices or text." },
+              { title: "Sync Everywhere", description: "Updated stock instantly propagates to your till and team." }
+            ]}
+            onUpgradeClick={() => setShowUpgradeModal(false)}
+          />
         </DialogContent>
       </Dialog>
     </>

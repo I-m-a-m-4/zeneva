@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -6,6 +5,7 @@ import { ImageManager } from '@/lib/image-manager';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageOff } from 'lucide-react';
+import Image from 'next/image';
 
 interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallback?: React.ReactNode;
@@ -13,17 +13,12 @@ interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 
 /**
  * A wrapper around standard <img> that automatically caches
- * the source image locally for offline access.
+ * the source image locally for offline access in Tauri.
  *
- * URLs whose host is unreachable are skipped for a while (see
- * ImageManager) instead of being handed to the webview, which would stall
- * the layout and spam the console with connection timeouts for every
- * broken product photo.
+ * In standard web browsers, it utilizes Next.js <Image /> for built-in
+ * proxying, optimization, and avoiding CORS/hotlinking issues.
  */
 export function CachedImage({ src, className, alt, fallback, ...props }: CachedImageProps) {
-  // If the user pasted multiple URLs separated by commas, only use the first one.
-  // IMPORTANT: data: URIs contain a comma as part of their format (e.g. "data:image/svg+xml;base64,PHN2...")
-  // so we must NOT split them. Only split plain http/https URLs.
   const sanitizedSrc = typeof src === 'string' && !src.startsWith('data:') && !src.startsWith('blob:') && src.includes(',')
     ? src.split(',')[0].trim()
     : src;
@@ -32,6 +27,13 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [useFallbackUrl, setUseFallbackUrl] = useState(false);
+  const [isTauri, setIsTauri] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+      setIsTauri(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!sanitizedSrc) {
@@ -43,7 +45,6 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
     setUseFallbackUrl(false);
     setDisplaySrc(sanitizedSrc);
 
-    // data: and blob: URIs are self-contained — no network fetch needed
     if (sanitizedSrc.startsWith('data:') || sanitizedSrc.startsWith('blob:')) {
       return;
     }
@@ -51,6 +52,9 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
     let isMounted = true;
 
     async function load() {
+      // Only do native Tauri caching if we are actually in Tauri
+      if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return;
+
       if (ImageManager.isKnownUnreachable(sanitizedSrc as string)) {
         return;
       }
@@ -61,7 +65,6 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
           setDisplaySrc(localUri);
         }
       } catch (err) {
-        // Local cache resolution failed; keep using the original raw src URL.
         if (isMounted) {
           setDisplaySrc(sanitizedSrc);
         }
@@ -77,11 +80,9 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
 
   const handleError = useCallback(() => {
     if (!useFallbackUrl && displaySrc !== sanitizedSrc && sanitizedSrc) {
-      // If the local cached URI failed to load, fallback to the original HTTP src URL
       setUseFallbackUrl(true);
       setDisplaySrc(sanitizedSrc);
     } else {
-      // Both local cache and raw src failed
       setError(true);
       if (sanitizedSrc) ImageManager.markUnreachable(sanitizedSrc);
     }
@@ -95,6 +96,21 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
     );
   }
 
+  // Use Next.js Image on the web to bypass CORS and optimize images.
+  if (!isTauri && sanitizedSrc.startsWith('http')) {
+    return (
+      <Image
+        src={sanitizedSrc}
+        alt={alt || ''}
+        fill
+        sizes={props.sizes || "(max-width: 768px) 100vw, 33vw"}
+        className={cn("transition-opacity duration-300", className)}
+        onError={() => setError(true)}
+      />
+    );
+  }
+
+  // Fallback for Tauri or Data URIs
   return (
     <img
       src={displaySrc || sanitizedSrc}

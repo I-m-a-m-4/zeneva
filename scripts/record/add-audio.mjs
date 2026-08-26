@@ -29,7 +29,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { mixAudio, resolveMusic, synthBed } from './audio.mjs';
 import { hasFfmpeg, probe } from './capture.mjs';
-import { synthNarration, DEFAULT_VOICE, VOICES } from './narrate.mjs';
+import { synthNarration, DEFAULT_VOICE, VOICES, ENGINES, pickEngine, voicesFor, defaultVoiceFor } from './narrate.mjs';
+import { STORE } from './store.mjs';
 
 const HELP = `
 Add music and interaction sound to an existing recording.
@@ -62,7 +63,8 @@ function parseArgs(argv) {
   const out = {
     video: null, music: null, musicVolume: 0.28,
     outPath: null, marks: null, clickSfx: true, typingSfx: true,
-    narrate: false, voice: DEFAULT_VOICE, voiceStyle: null,
+    narrate: false, voice: null, voiceEngine: null, voiceStyle: null, voiceRate: null,
+    store: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -79,6 +81,17 @@ function parseArgs(argv) {
       case '--narrate': out.narrate = true; break;
       case '--voice': out.voice = next(); out.narrate = true; break;
       case '--voice-style': out.voiceStyle = next(); out.narrate = true; break;
+      case '--voice-engine': {
+        const v = String(next() ?? '');
+        if (!ENGINES.includes(v)) {
+          throw new Error(`--voice-engine must be one of ${ENGINES.join(', ')}, got ${JSON.stringify(v)}`);
+        }
+        out.voiceEngine = v;
+        out.narrate = true;
+        break;
+      }
+      case '--voice-rate': out.voiceRate = Number(next()); out.narrate = true; break;
+      case '--store': out.store = true; break;
       case '-h': case '--help': out.help = true; break;
       default:
         if (a.startsWith('--')) throw new Error(`unknown flag ${a}`);
@@ -96,11 +109,18 @@ async function main() {
   }
   if (!existsSync(o.video)) throw new Error(`no such file: ${o.video}`);
   if (!(await hasFfmpeg())) throw new Error('ffmpeg is not on PATH');
-  // Before anything is read or synthesised, for the same reason the recorder
-  // checks it before launching Chrome: a mistyped voice would otherwise fail once
-  // per line, and six identical API errors is a worse answer than "no such voice".
-  if (o.narrate && !VOICES.some((v) => v.id === o.voice)) {
-    throw new Error(`unknown voice "${o.voice}" — try: ${VOICES.map((v) => v.id).join(', ')}`);
+  // Resolved before anything is read or synthesised, and validated against the
+  // engine that will actually speak — for the same reason the recorder checks it
+  // before launching Chrome: a mistyped voice would otherwise fail once per line,
+  // and six identical errors is a worse answer than "no such voice".
+  if (o.narrate) {
+    o.voiceEngine ??= pickEngine();
+    o.voice ??= defaultVoiceFor(o.voiceEngine);
+    const catalog = voicesFor(o.voiceEngine);
+    if (!catalog.some((v) => v.id === o.voice)) {
+      throw new Error(`unknown ${o.voiceEngine} voice "${o.voice}" — `
+        + `try: ${catalog.map((v) => v.id).join(', ')}`);
+    }
   }
 
   const ext = path.extname(o.video);
@@ -150,22 +170,24 @@ async function main() {
    * recorder's own, which is what makes the second voice on the same footage — or
    * the same voice on the next re-score — cost nothing.
    */
-  let narrationFile = null;
+  let narration = null;
   if (o.narrate) {
     const lines = Array.isArray(marks.narration) ? marks.narration : [];
     if (!lines.length && hasMarks) {
       console.log(`   ${path.basename(marksPath)} carries no script`
         + ' — re-record the take with --narrate to get one');
     } else if (lines.length) {
-      narrationFile = await synthNarration({
+      narration = await synthNarration({
         lines,
         dir: path.dirname(outPath),
         // Named after the output, not the clock: re-scoring the same file
         // overwrites its own mixdown instead of leaving a folder per attempt,
         // and two voices written to two --out paths stay out of each other's way.
         stamp: path.basename(outPath, ext),
+        engine: o.voiceEngine,
         voice: o.voice,
         style: o.voiceStyle,
+        rate: o.voiceRate,
         duration,
         log: (m) => console.log(`   ${m}`),
       });
@@ -180,7 +202,8 @@ async function main() {
     musicVolume: o.musicVolume,
     clicks: o.clickSfx ? (marks.clicks ?? []) : [],
     keys: o.typingSfx ? (marks.keys ?? []) : [],
-    narration: narrationFile,
+    narration: narration?.file ?? null,
+    audioBitrate: o.store ? STORE.audioBitrate : null,
   });
 
   if (!res.scored) {

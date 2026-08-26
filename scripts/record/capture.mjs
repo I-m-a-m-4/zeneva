@@ -501,7 +501,7 @@ export class Recorder {
     if (this.emitted < 2) {
       throw new Error(`only ${this.emitted} frame(s) captured — nothing to encode`);
     }
-    const { crf = 18, preset = 'veryfast', phone = null, zooms = [] } = opts;
+    const { crf = 18, preset = 'veryfast', phone = null, zooms = [], store = null } = opts;
 
     mkdirSync(path.dirname(outPath), { recursive: true });
     const webm = outPath.endsWith('.webm');
@@ -542,8 +542,43 @@ export class Recorder {
     const codec = webm
       ? ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', String(crf + 12), '-row-mt', '1',
          '-deadline', 'realtime', '-cpu-used', '4']
-      : ['-c:v', 'libx264', '-preset', preset, '-crf', String(crf),
-         '-profile:v', 'high', '-movflags', '+faststart'];
+      /*
+       * Microsoft Store delivery, encoded to the letter of the published spec.
+       *
+       * Every value here is quoted from Microsoft's own MP4 requirements rather
+       * than chosen — see STORE in store.mjs for the source. That matters because
+       * three of them are things this encoder deliberately does *not* do
+       * otherwise, and the note above about keyframe spacing explains why: a
+       * closed GOP of half the frame rate costs about 2.6x the bitrate on screen
+       * content. Here that is irrelevant, because the same spec asks for 50 Mbps,
+       * which is roughly two hundred times what crf 18 chooses for this material.
+       *
+       * The bitrate is the one number that looks absurd and is correct anyway. It
+       * is a *ceiling* Microsoft wants headroom under, and the listing re-encodes
+       * everything to Smooth Streaming on ingest regardless — so paying it buys
+       * certification, not picture. A 60s trailer lands near 375 MB, well inside
+       * the 2 GB cap.
+       *
+       * `-b_strategy 0` is what makes "2 consecutive B frames" literally true.
+       * Left adaptive, x264 decides per-frame how many B-frames to use and the
+       * count varies through the film; with the strategy off, `-bf 2` means
+       * exactly two, everywhere. `-coder 1` is CABAC, `-flags +cgop` closes the
+       * GOP, and `-sc_threshold 0` stops a scene cut inserting an unscheduled
+       * keyframe, which would break the fixed GOP the spec asks for.
+       */
+      : store
+        ? ['-c:v', 'libx264', '-preset', preset,
+           '-b:v', store.bitrate, '-maxrate', store.bitrate, '-bufsize', store.bufsize,
+           '-profile:v', 'high', '-level', '4.2',
+           '-bf', String(store.bFrames), '-b_strategy', '0',
+           '-g', String(store.gop(this.fps)), '-keyint_min', String(store.gop(this.fps)),
+           '-sc_threshold', '0', '-flags', '+cgop',
+           '-coder', '1',
+           '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+           '-color_range', 'tv',
+           '-movflags', '+faststart']
+        : ['-c:v', 'libx264', '-preset', preset, '-crf', String(crf),
+           '-profile:v', 'high', '-movflags', '+faststart'];
 
     /*
      * Mobile takes are composited into a phone chassis here rather than drawn
@@ -619,6 +654,22 @@ export class Recorder {
     // replaces the fit rather than stacking with it.
     const screen = camera || fitTo(zoomTo.w, zoomTo.h);
 
+    /*
+     * Full range in, limited range out — for Store delivery only.
+     *
+     * The capture arrives as MJPEG, which is full-range YUV: ffprobe reports the
+     * finished file as `yuvj420p`, and the `j` is the whole problem. Microsoft's
+     * spec says "Color Space: 4.2.0", meaning broadcast-range 4:2:0, and a
+     * full-range file handed to a player that assumes limited range renders with
+     * crushed blacks and clipped whites. Converting the range is what makes the
+     * pixel format plain `yuv420p` rather than merely relabelling it.
+     *
+     * A separate `scale` with no dimensions rather than range arguments on the
+     * existing one: the camera path replaces `fitTo` entirely, so parameters added
+     * there would silently not apply to any take with a zoom in it.
+     */
+    const range = store ? ',scale=w=iw:h=ih:in_range=full:out_range=tv' : '';
+
     const filter = frame
       // Three steps, and the order is the whole trick. Scale the footage into the
       // cut-out; `pad` it onto a full-size canvas at the cut-out's offset — which
@@ -631,10 +682,10 @@ export class Recorder {
       // The camera move belongs on the screen content, before the chassis goes
       // on. Zooming the composite would zoom the phone, which is a different and
       // much worse idea.
-      ? `[0:v]${screen},`
+      ? `[0:v]${screen}${range},`
         + `pad=${this.maxWidth}:${this.maxHeight}:${frame.screen.x}:${frame.screen.y}:black[scr];`
         + `[scr][1:v]overlay=0:0:shortest=1[v]`
-      : `[0:v]${screen}[v]`;
+      : `[0:v]${screen}${range}[v]`;
 
     await run('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y',

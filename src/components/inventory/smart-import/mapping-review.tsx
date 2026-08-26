@@ -30,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
   AI_MAPPING_THRESHOLD,
@@ -117,7 +116,7 @@ export default function MappingReview({
           <span>Zeneva</span>
         </div>
 
-        <ScrollArea className="max-h-[42vh]">
+        <div className="max-h-[42vh] overflow-y-auto">
           <div className="divide-y">
             {mapping.columns.map((column) => (
               <MappingRow
@@ -129,7 +128,7 @@ export default function MappingReview({
               />
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {mapping.uncertain.length > 0 && (

@@ -56,6 +56,7 @@ import type { Product, UserProfile, AuditLog } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import {
     Table,
@@ -94,12 +95,12 @@ import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 
-const productSchema = z.object({
-    name: z.string().min(3, "Product name must be at least 3 characters."),
+const makeProductSchema = (t: (key: string) => string) => z.object({
+    name: z.string().min(3, t('inventory.valNameMin')),
     description: z.string().optional(),
-    price: z.coerce.number().min(0, "Price must be a positive number."),
-    costPrice: z.coerce.number().min(0, "Cost price must be a positive number.").optional(),
-    stock: z.coerce.number().int("Stock must be a whole number."),
+    price: z.coerce.number().min(0, t('inventory.valPricePositive')),
+    costPrice: z.coerce.number().min(0, t('inventory.valCostPositive')).optional(),
+    stock: z.coerce.number().int(t('inventory.valStockWhole')),
     sku: z.string().optional(),
     category: z.string().optional(),
     categoryType: z.enum(['product', 'service']).default('product'),
@@ -108,17 +109,17 @@ const productSchema = z.object({
     type: z.enum(['single', 'variant', 'composite']).default('single'),
     baseUnit: z.string().optional(),
     uomConversions: z.array(z.object({
-        unitName: z.string().min(1, "Unit name required"),
-        multiplier: z.coerce.number().min(1, "Multiplier must be at least 1"),
+        unitName: z.string().min(1, t('inventory.valUnitNameRequired')),
+        multiplier: z.coerce.number().min(1, t('inventory.valMultiplierMin')),
         price: z.coerce.number().optional()
     })).optional(),
     components: z.array(z.object({
-        productId: z.string().min(1, "Product required"),
-        quantity: z.coerce.number().min(1, "Quantity required")
+        productId: z.string().min(1, t('inventory.valProductRequired')),
+        quantity: z.coerce.number().min(1, t('inventory.valQuantityRequired'))
     })).optional(),
 });
 
-type ProductFormValues = z.infer<typeof productSchema>;
+type ProductFormValues = z.infer<ReturnType<typeof makeProductSchema>>;
 
 function useCurrentUserProfile() {
     const { user } = useUser();
@@ -143,7 +144,10 @@ function EditProductContent() {
 
     const { toast } = useToast();
     const { currentUserProfile, business, queuedActions, addToQueue, products } = usePOS();
+    const { t } = useI18n();
     const firestore = useFirestore();
+
+    const productSchema = React.useMemo(() => makeProductSchema(t), [t]);
 
     const productDocRef = useMemoFirebase(() => (firestore && productId ? doc(firestore, 'products', productId) : null), [firestore, productId]);
     const { data: remoteProduct, isLoading: isRemoteProductLoading } = useDoc<Product>(productDocRef);
@@ -184,9 +188,9 @@ function EditProductContent() {
             });
             form.setValue('category', newCategoryName.trim());
             setNewCategoryName("");
-            toast({ title: 'Category Created', description: `Added "${newCategoryName.trim()}" to categories.`, variant: 'success' });
+            toast({ title: t('inventory.categoryCreatedTitle'), description: t('inventory.categoryCreatedBody', { name: newCategoryName.trim() }), variant: 'success' });
         } catch (err) {
-            toast({ title: 'Error', description: 'Failed to create category.', variant: 'destructive' });
+            toast({ title: t('common.error'), description: t('inventory.categoryCreateFailed'), variant: 'destructive' });
         } finally {
             setIsAddingCategory(false);
         }
@@ -202,9 +206,9 @@ function EditProductContent() {
             if (form.getValues('category') === catToDelete) {
                 form.setValue('category', '');
             }
-            toast({ title: 'Category Deleted', description: `Removed "${catToDelete}".`, variant: 'success' });
+            toast({ title: t('inventory.categoryDeletedTitle'), description: t('inventory.categoryDeletedBody', { name: catToDelete }), variant: 'success' });
         } catch (err) {
-            toast({ title: 'Error', description: 'Failed to delete category.', variant: 'destructive' });
+            toast({ title: t('common.error'), description: t('inventory.categoryDeleteFailed'), variant: 'destructive' });
         }
     };
 
@@ -334,8 +338,8 @@ function EditProductContent() {
             if (file.size > MAX_FILE_SIZE) {
                 toast({
                     variant: 'destructive',
-                    title: 'Image Too Large',
-                    description: 'Please select an image smaller than 5MB.',
+                    title: t('inventory.imageTooLargeTitle'),
+                    description: t('inventory.imageTooLargeBody'),
                 });
                 event.target.value = '';
                 return;
@@ -366,12 +370,17 @@ function EditProductContent() {
             // but for simplicity here we'll do it sequentially if online.
             if (imageFile && navigator.onLine) {
                 const formData = new FormData();
-                formData.append('image', imageFile);
-                const apiKey = '2ec1d17c7ad748bbb605eda60a54a896';
-                const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
-                    imageUrl = result.data.url;
+                formData.append('file', imageFile);
+                try {
+                    const response = await fetch(`/api/upload`, { method: 'POST', body: formData });
+                    const result = await response.json();
+                    if (response.ok && result.url) {
+                        imageUrl = result.url;
+                    } else {
+                        console.error("Image upload failed:", result.error);
+                    }
+                } catch (error) {
+                    console.error("Failed to upload image:", error);
                 }
             }
 
@@ -447,19 +456,21 @@ function EditProductContent() {
             }
 
             toast({
-                variant: 'success', 
-                title: 'Changes Queued', 
-                description: `${values.name} will be updated ${navigator.onLine ? 'momentarily' : 'when connection is restored'}.` 
+                variant: 'success',
+                title: t('inventory.changesQueuedTitle'),
+                description: navigator.onLine
+                    ? t('inventory.changesQueuedOnline', { name: values.name })
+                    : t('inventory.changesQueuedOffline', { name: values.name }),
             });
-            
+
             isSubmitting.current = false;
             setIsSaving(false);
-            
+
             router.push('/inventory');
 
         } catch (error: any) {
             console.error("Failed to queue product update:", error);
-            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
+            toast({ variant: 'destructive', title: t('inventory.updateFailedTitle'), description: error.message || t('inventory.unexpectedError') });
             isSubmitting.current = false;
             setIsSaving(false);
         }
@@ -503,7 +514,7 @@ function EditProductContent() {
             }
         }, `Logging deletion of ${product?.name}`);
 
-        toast({ variant: 'default', title: 'Deletion Queued', description: `${product?.name} will be deleted.` });
+        toast({ variant: 'default', title: t('inventory.deletionQueuedTitle'), description: t('inventory.deletionQueuedNamed', { name: product?.name ?? '' }) });
         router.push('/inventory');
     };
 
@@ -515,7 +526,7 @@ function EditProductContent() {
     }
 
     if (!product) {
-        return <div>Product not found.</div>;
+        return <div>{t('inventory.productNotFound')}</div>;
     }
 
     return (
@@ -525,26 +536,28 @@ function EditProductContent() {
                     <Button variant="outline" size="icon" className="h-7 w-7" asChild>
                         <Link href="/inventory">
                             <ChevronLeft className="h-4 w-4" />
-                            <span className="sr-only">Back</span>
+                            <span className="sr-only">{t('common.back')}</span>
                         </Link>
                     </Button>
                     <h1 className="flex-1 min-w-0 text-xl font-semibold tracking-tight break-words leading-normal md:leading-relaxed">
-                        Edit {categoryType === 'service' ? 'Service' : 'Product'}: {product.name}
+                        {categoryType === 'service'
+                            ? t('inventory.editServiceTitle', { name: product.name })
+                            : t('inventory.editProductTitle', { name: product.name })}
                     </h1>
                     <div className="hidden items-center gap-2 md:ml-auto md:flex">
                         <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
-                            Discard
+                            {t('common.discard')}
                         </Button>
                         {canManageProduct && (
                             <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
                                 <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
+                                {t('common.delete')}
                             </Button>
                         )}
                         {canManageProduct && (
                             <Button size="lg" type="submit" disabled={isSaving}>
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save {categoryType === 'service' ? 'Service' : 'Product'}
+                                {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
                             </Button>
                         )}
                     </div>
@@ -553,9 +566,9 @@ function EditProductContent() {
                     <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
                         <Card>
                             <CardHeader>
-                                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Details</CardTitle>
+                                <CardTitle>{categoryType === 'service' ? t('inventory.serviceDetails') : t('inventory.productDetails')}</CardTitle>
                                 <CardDescription>
-                                    Update the core details for your {categoryType === 'service' ? 'service' : 'product'}.
+                                    {categoryType === 'service' ? t('inventory.serviceDetailsUpdateHint') : t('inventory.productDetailsUpdateHint')}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -565,9 +578,9 @@ function EditProductContent() {
                                         name="name"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Name</FormLabel>
+                                                <FormLabel>{t('common.name')}</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="e.g. Quantum HD Monitor" {...field} disabled={!canManageProduct} />
+                                                    <Input placeholder={t('inventory.namePlaceholder')} {...field} disabled={!canManageProduct} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -578,9 +591,9 @@ function EditProductContent() {
                                         name="description"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Description</FormLabel>
+                                                <FormLabel>{t('common.description')}</FormLabel>
                                                 <FormControl>
-                                                    <Textarea placeholder="A detailed description of the product." className="min-h-32" {...field} disabled={!canManageProduct} />
+                                                    <Textarea placeholder={t('inventory.descriptionPlaceholder')} className="min-h-32" {...field} disabled={!canManageProduct} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -593,8 +606,8 @@ function EditProductContent() {
                         {categoryType === 'product' && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Inventory Configuration</CardTitle>
-                                    <CardDescription>Configure how this item is organized and sold.</CardDescription>
+                                    <CardTitle>{t('inventory.inventoryConfig')}</CardTitle>
+                                    <CardDescription>{t('inventory.inventoryConfigHint')}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
                                     <FormField
@@ -602,7 +615,7 @@ function EditProductContent() {
                                         name="type"
                                         render={({ field }) => (
                                             <FormItem className="space-y-3">
-                                                <FormLabel>Product Type</FormLabel>
+                                                <FormLabel>{t('inventory.productType')}</FormLabel>
                                                 <FormControl>
                                                     <RadioGroup
                                                         onValueChange={field.onChange}
@@ -614,18 +627,18 @@ function EditProductContent() {
                                                             <FormControl>
                                                                 <RadioGroupItem value="single" />
                                                             </FormControl>
-                                                            <FormLabel className="font-normal">Standard Item</FormLabel>
+                                                            <FormLabel className="font-normal">{t('inventory.standardItem')}</FormLabel>
                                                         </FormItem>
                                                             <FormItem className="flex items-center space-x-3 space-y-0">
                                                                 <FormControl>
                                                                     <RadioGroupItem value="variant" />
                                                                 </FormControl>
-                                                                <FormLabel className="font-normal">Variant</FormLabel>
+                                                                <FormLabel className="font-normal">{t('inventory.variant')}</FormLabel>
                                                             </FormItem>
                                                         </RadioGroup>
                                                     </FormControl>
                                                     <FormDescription>
-                                                        {productType === 'variant' ? "A product with options like size or color." : "Standard individual product with its own stock."}
+                                                        {productType === 'variant' ? t('inventory.variantTypeHint') : t('inventory.singleTypeHint')}
                                                     </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
@@ -637,20 +650,20 @@ function EditProductContent() {
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
                                             <FormLabel className="flex items-center gap-1.5">
-                                                Units of Measure (UoM)
+                                                {t('inventory.uomTitle')}
                                                 <TooltipProvider>
                                                     <Tooltip delayDuration={300}>
                                                         <TooltipTrigger asChild>
                                                             <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
                                                         </TooltipTrigger>
                                                         <TooltipContent className="max-w-[250px]">
-                                                            <p>Allows selling the same item in different quantities. For example, sell by the Piece, or sell a Carton of 12 for a different price.</p>
+                                                            <p>{t('inventory.uomTooltip')}</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
                                             </FormLabel>
                                             <Button type="button" variant="outline" size="sm" onClick={() => appendUom({ unitName: "", multiplier: 1 })} disabled={!canManageProduct}>
-                                                <Plus className="h-4 w-4 mr-2" /> Add UoM
+                                                <Plus className="h-4 w-4 mr-2" /> {t('inventory.addUom')}
                                             </Button>
                                         </div>
 
@@ -660,9 +673,9 @@ function EditProductContent() {
                                                 name="baseUnit"
                                                 render={({ field }) => (
                                                     <FormItem>
-                                                        <FormLabel className="text-xs">Base Unit</FormLabel>
+                                                        <FormLabel className="text-xs">{t('inventory.baseUnit')}</FormLabel>
                                                         <FormControl>
-                                                            <Input placeholder="e.g. Piece" {...field} disabled={!canManageProduct} />
+                                                            <Input placeholder={t('inventory.baseUnitPlaceholder')} {...field} disabled={!canManageProduct} />
                                                         </FormControl>
                                                         <FormMessage />
                                                     </FormItem>
@@ -677,8 +690,8 @@ function EditProductContent() {
                                                     name={`uomConversions.${index}.unitName`}
                                                     render={({ field }) => (
                                                         <FormItem>
-                                                            <FormLabel className="text-xs">Unit Name</FormLabel>
-                                                            <FormControl><Input placeholder="e.g. Carton" {...field} disabled={!canManageProduct} /></FormControl>
+                                                            <FormLabel className="text-xs">{t('inventory.unitName')}</FormLabel>
+                                                            <FormControl><Input placeholder={t('inventory.unitNamePlaceholder')} {...field} disabled={!canManageProduct} /></FormControl>
                                                             <FormMessage />
                                                         </FormItem>
                                                     )}
@@ -688,7 +701,7 @@ function EditProductContent() {
                                                     name={`uomConversions.${index}.multiplier`}
                                                     render={({ field }) => (
                                                         <FormItem>
-                                                            <FormLabel className="text-xs">Contains (multiplier)</FormLabel>
+                                                            <FormLabel className="text-xs">{t('inventory.uomMultiplier')}</FormLabel>
                                                             <FormControl><Input type="number" {...field} disabled={!canManageProduct} /></FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -700,8 +713,8 @@ function EditProductContent() {
                                                         name={`uomConversions.${index}.price`}
                                                         render={({ field }) => (
                                                             <FormItem className="flex-1">
-                                                                <FormLabel className="text-xs">Price (Opt.)</FormLabel>
-                                                                <FormControl><Input type="number" placeholder="Override" {...field} disabled={!canManageProduct} /></FormControl>
+                                                                <FormLabel className="text-xs">{t('inventory.priceOptional')}</FormLabel>
+                                                                <FormControl><Input type="number" placeholder={t('inventory.priceOverride')} {...field} disabled={!canManageProduct} /></FormControl>
                                                                 <FormMessage />
                                                             </FormItem>
                                                         )}
@@ -717,9 +730,9 @@ function EditProductContent() {
                         )}
                         <Card>
                             <CardHeader>
-                                <CardTitle>Pricing{categoryType === 'product' && ' & Stock'}</CardTitle>
+                                <CardTitle>{categoryType === 'product' ? t('inventory.pricingAndStockTitle') : t('inventory.pricingTitle')}</CardTitle>
                                 <CardDescription>
-                                    Manage {categoryType === 'service' ? 'pricing information for this service' : 'inventory and pricing information for this product'}.
+                                    {categoryType === 'service' ? t('inventory.pricingServiceHint') : t('inventory.pricingProductHint')}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -730,10 +743,10 @@ function EditProductContent() {
                                             name="sku"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>Barcode (SKU)</FormLabel>
+                                                    <FormLabel>{t('inventory.barcodeSku')}</FormLabel>
                                                     <div className="flex gap-2">
                                                         <FormControl>
-                                                            <Input placeholder="QHDM-001" {...field} disabled={!canManageProduct} />
+                                                            <Input placeholder={t('inventory.skuPlaceholder')} {...field} disabled={!canManageProduct} />
                                                         </FormControl>
                                                         {canManageProduct && (
                                                             <Button
@@ -758,7 +771,7 @@ function EditProductContent() {
                                             name="stock"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>Stock</FormLabel>
+                                                    <FormLabel>{t('inventory.stock')}</FormLabel>
                                                     <FormControl>
                                                         <Input type="number" placeholder="25" {...field} disabled={!canManageProduct} />
                                                     </FormControl>
@@ -772,7 +785,7 @@ function EditProductContent() {
                                         name="price"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Price</FormLabel>
+                                                <FormLabel>{t('common.price')}</FormLabel>
                                                 <FormControl>
                                                     <Input type="number" step="0.01" placeholder="349.99" {...field} disabled={!canManageProduct} />
                                                 </FormControl>
@@ -786,14 +799,14 @@ function EditProductContent() {
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel className="flex items-center gap-1.5">
-                                                    Cost Price
+                                                    {t('inventory.costPrice')}
                                                     <TooltipProvider>
                                                         <Tooltip delayDuration={300}>
                                                             <TooltipTrigger asChild>
                                                                 <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
                                                             </TooltipTrigger>
                                                             <TooltipContent className="max-w-[250px]">
-                                                                <p>Entering the cost price allows Zeneva to accurately calculate and display your profit margins in Reports.</p>
+                                                                <p>{t('inventory.costPriceTooltip')}</p>
                                                             </TooltipContent>
                                                         </Tooltip>
                                                     </TooltipProvider>
@@ -815,7 +828,7 @@ function EditProductContent() {
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
-                                    <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Category</CardTitle>
+                                    <CardTitle>{categoryType === 'service' ? t('inventory.serviceCategory') : t('inventory.productCategory')}</CardTitle>
                                     {canManageProduct && (
                                         <>
                                             {isMounted && isNewCategoryModalOpen && createPortal(
@@ -828,22 +841,22 @@ function EditProductContent() {
                                             <Dialog open={isNewCategoryModalOpen} onOpenChange={setIsNewCategoryModalOpen} modal={false}>
                                                 <DialogTrigger asChild>
                                                     <Button variant="outline" size="sm" type="button" className="h-7 text-xs">
-                                                        <Plus className="h-3 w-3 mr-1" /> Manage Categories
+                                                        <Plus className="h-3 w-3 mr-1" /> {t('inventory.manageCategories')}
                                                     </Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="sm:max-w-[480px]">
                                                     <DialogHeader>
-                                                        <DialogTitle>Manage Categories</DialogTitle>
+                                                        <DialogTitle>{t('inventory.manageCategories')}</DialogTitle>
                                                         <DialogDescription className="text-xs text-muted-foreground">
-                                                            Create new categories or manage/delete existing ones.
+                                                            {t('inventory.manageCategoriesHint')}
                                                         </DialogDescription>
                                                     </DialogHeader>
-                                                    
+
                                                     <div className="space-y-3 py-2 border-b pb-4">
-                                                        <Label className="text-xs font-semibold">Add New Category</Label>
+                                                        <Label className="text-xs font-semibold">{t('inventory.addNewCategory')}</Label>
                                                         <div className="flex gap-2">
                                                             <Input
-                                                                placeholder="e.g. Electronics, Bakery..."
+                                                                placeholder={t('inventory.newCategoryPlaceholder')}
                                                                 value={newCategoryName}
                                                                 onChange={(e) => setNewCategoryName(e.target.value)}
                                                                 onKeyDown={(e) => {
@@ -855,13 +868,13 @@ function EditProductContent() {
                                                             />
                                                             <Button type="button" onClick={handleAddCategory} disabled={!newCategoryName.trim() || isAddingCategory} className="shrink-0">
                                                                 {isAddingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
-                                                                Add
+                                                                {t('common.add')}
                                                             </Button>
                                                         </div>
                                                     </div>
 
                                                     <div className="space-y-3 pt-2">
-                                                        <Label className="text-xs font-semibold">Existing Categories</Label>
+                                                        <Label className="text-xs font-semibold">{t('inventory.existingCategories')}</Label>
                                                         <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                                                             {business?.settings?.productCategories && business.settings.productCategories.length > 0 ? (
                                                                 business.settings.productCategories.map((cat: string) => (
@@ -875,18 +888,18 @@ function EditProductContent() {
                                                                             onClick={() => handleDeleteCategory(cat)}
                                                                         >
                                                                             <Trash2 className="h-4 w-4" />
-                                                                            <span className="sr-only">Delete {cat}</span>
+                                                                            <span className="sr-only">{t('inventory.deleteCategoryAria', { name: cat })}</span>
                                                                         </Button>
                                                                     </div>
                                                                 ))
                                                             ) : (
-                                                                <p className="text-xs text-muted-foreground italic py-2">No categories defined yet.</p>
+                                                                <p className="text-xs text-muted-foreground italic py-2">{t('inventory.noCategoriesYet')}</p>
                                                             )}
                                                         </div>
                                                     </div>
 
                                                     <DialogFooter className="pt-2">
-                                                        <Button type="button" variant="outline" onClick={() => setIsNewCategoryModalOpen(false)}>Done</Button>
+                                                        <Button type="button" variant="outline" onClick={() => setIsNewCategoryModalOpen(false)}>{t('common.done')}</Button>
                                                     </DialogFooter>
                                                 </DialogContent>
                                             </Dialog>
@@ -899,7 +912,7 @@ function EditProductContent() {
                                         name="categoryType"
                                         render={({ field }) => (
                                             <FormItem className="space-y-1">
-                                                <FormLabel className="text-xs">Type</FormLabel>
+                                                <FormLabel className="text-xs">{t('common.type')}</FormLabel>
                                                 <FormControl>
                                                     <RadioGroup
                                                         onValueChange={field.onChange}
@@ -911,13 +924,13 @@ function EditProductContent() {
                                                             <FormControl>
                                                                 <RadioGroupItem value="product" />
                                                             </FormControl>
-                                                            <FormLabel className="font-normal text-xs">Product</FormLabel>
+                                                            <FormLabel className="font-normal text-xs">{t('inventory.typeProduct')}</FormLabel>
                                                         </FormItem>
                                                         <FormItem className="flex items-center space-x-2 space-y-0">
                                                             <FormControl>
                                                                 <RadioGroupItem value="service" />
                                                             </FormControl>
-                                                            <FormLabel className="font-normal text-xs">Service</FormLabel>
+                                                            <FormLabel className="font-normal text-xs">{t('inventory.typeService')}</FormLabel>
                                                         </FormItem>
                                                     </RadioGroup>
                                                 </FormControl>
@@ -936,7 +949,7 @@ function EditProductContent() {
                                              <DropdownMenu modal={false}>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="outline" type="button" className="w-full justify-between font-normal bg-background h-10 px-3 border-input" disabled={!canManageProduct}>
-                                                        <span>{field.value || "Select a category"}</span>
+                                                        <span>{field.value || t('inventory.selectCategory')}</span>
                                                         <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -949,7 +962,7 @@ function EditProductContent() {
                                                         ))
                                                     ) : (
                                                         <div className="p-4 text-center text-sm text-muted-foreground">
-                                                            No categories defined.
+                                                            {t('inventory.noCategoriesDefined')}
                                                         </div>
                                                     )}
                                                 </DropdownMenuContent>
@@ -962,20 +975,20 @@ function EditProductContent() {
                         </Card>
                         <Card className="overflow-hidden">
                             <CardHeader>
-                                <CardTitle>{categoryType === 'service' ? 'Service' : 'Product'} Image</CardTitle>
+                                <CardTitle>{categoryType === 'service' ? t('inventory.serviceImage') : t('inventory.productImage')}</CardTitle>
                                 <CardDescription>
-                                    Upload an image (max 5MB) for your {categoryType === 'service' ? 'service' : 'product'}.
+                                    {categoryType === 'service' ? t('inventory.serviceImageHint') : t('inventory.productImageHint')}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid gap-2">
                                     <div className="w-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/50 flex items-center justify-center relative overflow-hidden">
                                         {imagePreview ? (
-                                            <Image src={imagePreview} alt={categoryType === 'service' ? 'Service preview' : 'Product preview'} fill style={{ objectFit: "cover" }} />
+                                            <Image src={imagePreview} alt={categoryType === 'service' ? t('inventory.servicePreviewAlt') : t('inventory.productPreviewAlt')} fill style={{ objectFit: "cover" }} />
                                         ) : (
                                             <div className="text-center text-muted-foreground">
                                                 <Upload className="mx-auto h-8 w-8" />
-                                                <p className="mt-2 text-sm">Click to upload</p>
+                                                <p className="mt-2 text-sm">{t('inventory.clickToUpload')}</p>
                                             </div>
                                         )}
                                         <Input
@@ -993,9 +1006,9 @@ function EditProductContent() {
                         {categoryType === 'product' && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Barcode</CardTitle>
+                                    <CardTitle>{t('inventory.barcode')}</CardTitle>
                                     <CardDescription>
-                                        This barcode is generated from the product's SKU.
+                                        {t('inventory.barcodeGeneratedHint')}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
@@ -1005,7 +1018,7 @@ function EditProductContent() {
                                         </div>
                                     ) : (
                                         <p className="text-sm text-muted-foreground text-center">
-                                            Add an SKU to generate a barcode for this product.
+                                            {t('inventory.addSkuForBarcode')}
                                         </p>
                                     )}
                                 </CardContent>
@@ -1023,28 +1036,28 @@ function EditProductContent() {
                                 <div className="space-y-1">
                                     <CardTitle className="text-base flex items-center gap-2">
                                         <HistoryIcon className="h-4 w-4 text-primary" />
-                                        {categoryType === 'service' ? 'Service Activity & Sales History' : 'Stock Adjustment & Sales History'}
+                                        {categoryType === 'service' ? t('inventory.serviceHistoryTitle') : t('inventory.stockHistoryTitle')}
                                     </CardTitle>
                                     <CardDescription className="text-xs">
-                                        {categoryType === 'service' 
-                                            ? 'Track sales, creations, and updates for this service. Changes made offline will appear as "Syncing".'
-                                            : 'Track manual additions, sales, and changes to stock quantity. Changes made offline will appear as "Syncing".'}
+                                        {categoryType === 'service'
+                                            ? t('inventory.serviceHistoryHint')
+                                            : t('inventory.stockHistoryHint')}
                                     </CardDescription>
                                 </div>
                                 <DropdownMenu modal={false}>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" size="sm" className="w-[150px] h-8 text-[11px] justify-between bg-background font-normal">
                                             <span>
-                                                {logFilter === 'all' ? 'All Activities' : logFilter === 'sale' ? 'Sales Only' : logFilter === 'stock_adjustment' ? 'Adjustments Only' : 'Updates & Cre. Only'}
+                                                {logFilter === 'all' ? t('inventory.logFilterAll') : logFilter === 'sale' ? t('inventory.logFilterSales') : logFilter === 'stock_adjustment' ? t('inventory.logFilterAdjustments') : t('inventory.logFilterUpdates')}
                                             </span>
                                             <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-1" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-[150px]">
-                                        <DropdownMenuItem onClick={() => setLogFilter('all')}>All Activities</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setLogFilter('sale')}>Sales Only</DropdownMenuItem>
-                                        {categoryType === 'product' && <DropdownMenuItem onClick={() => setLogFilter('stock_adjustment')}>Adjustments Only</DropdownMenuItem>}
-                                        <DropdownMenuItem onClick={() => setLogFilter('update')}>Updates & Cre. Only</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLogFilter('all')}>{t('inventory.logFilterAll')}</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLogFilter('sale')}>{t('inventory.logFilterSales')}</DropdownMenuItem>
+                                        {categoryType === 'product' && <DropdownMenuItem onClick={() => setLogFilter('stock_adjustment')}>{t('inventory.logFilterAdjustments')}</DropdownMenuItem>}
+                                        <DropdownMenuItem onClick={() => setLogFilter('update')}>{t('inventory.logFilterUpdates')}</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
@@ -1053,10 +1066,10 @@ function EditProductContent() {
                             <Table>
                                 <TableHeader className="bg-muted/30">
                                     <TableRow>
-                                        <TableHead className="text-[10px] uppercase font-bold py-2 px-4">Action</TableHead>
-                                        <TableHead className="text-[10px] uppercase font-bold py-2">Change</TableHead>
-                                        <TableHead className="text-[10px] uppercase font-bold py-2">User</TableHead>
-                                        <TableHead className="text-[10px] uppercase font-bold py-2 text-right px-4">Date</TableHead>
+                                        <TableHead className="text-[10px] uppercase font-bold py-2 px-4">{t('inventory.colAction')}</TableHead>
+                                        <TableHead className="text-[10px] uppercase font-bold py-2">{t('inventory.colChange')}</TableHead>
+                                        <TableHead className="text-[10px] uppercase font-bold py-2">{t('inventory.colUser')}</TableHead>
+                                        <TableHead className="text-[10px] uppercase font-bold py-2 text-right px-4">{t('common.date')}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1069,7 +1082,7 @@ function EditProductContent() {
                                     ) : filteredLogs.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground">
-                                                No activity or sales logs found matching the filter.
+                                                {t('inventory.noLogsFound')}
                                             </TableCell>
                                         </TableRow>
                                     ) : (
@@ -1089,7 +1102,7 @@ function EditProductContent() {
                                                                 </span>
                                                                 {log.isPending && (
                                                                     <Badge variant="outline" className="text-[8px] h-3.5 bg-yellow-500/10 text-yellow-600 border-yellow-500/20 px-1 animate-pulse">
-                                                                        Syncing
+                                                                        {t('inventory.syncingBadge')}
                                                                     </Badge>
                                                                 )}
                                                             </div>
@@ -1128,7 +1141,7 @@ function EditProductContent() {
                                                                 {isAddition ? '+' : ''}{adjustment}
                                                             </Badge>
                                                         ) : (
-                                                            <span className="text-xs text-muted-foreground">Updated</span>
+                                                            <span className="text-xs text-muted-foreground">{t('inventory.updatedLabel')}</span>
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
@@ -1138,7 +1151,7 @@ function EditProductContent() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right text-[10px] text-muted-foreground px-4">
-                                                        {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : 'Just now'}
+                                                        {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : t('inventory.justNow')}
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -1151,18 +1164,18 @@ function EditProductContent() {
                 )}
                 <div className="flex flex-wrap items-center justify-center gap-2 w-full px-4 md:hidden">
                     <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
-                        Discard
+                        {t('common.discard')}
                     </Button>
                     {canManageProduct && (
                         <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            {t('common.delete')}
                         </Button>
                     )}
                     {canManageProduct && (
                         <Button size="lg" type="submit" disabled={isSaving}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save {categoryType === 'service' ? 'Service' : 'Product'}
+                            {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
                         </Button>
                     )}
                 </div>
@@ -1174,23 +1187,23 @@ function EditProductContent() {
                     form.setValue('sku', code);
                     setIsScannerOpen(false);
                     toast({
-                        title: "Barcode Scanned",
-                        description: `SKU updated to: ${code}`,
+                        title: t('inventory.barcodeScannedTitle'),
+                        description: t('inventory.barcodeScannedBody', { code }),
                     });
                 }}
             />
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogTitle>{t('inventory.deleteConfirmTitle')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete <strong>{product.name}</strong>. This action cannot be undone and will remove all associated data.
+                            {t('inventory.deleteOneConfirmBody', { name: product.name })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                            Delete Product
+                            {t('inventory.deleteProductButton')}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

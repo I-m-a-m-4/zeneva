@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { creditPack } from '@/lib/credit-packs';
 
 /**
  * POST /api/dodo/checkout — create a Dodo Payments checkout session (USD).
@@ -55,24 +54,14 @@ const DODO_PRODUCT_IDS: Record<string, Record<string, string>> = {
 };
 
 /**
- * One-off Zen AI credit packs, by pack id from `@/lib/credit-packs`.
+ * Subscriptions only — this endpoint sells plans and nothing else.
  *
- * **No hardcoded fallbacks, deliberately.** The plan ids above carry literal
- * defaults from before they were env-driven; copying that pattern here would mean
- * a typo in an env name silently checks out against whatever product that literal
- * happens to be, and the customer is charged for the wrong thing. An unset id has
- * to be a clean refusal instead.
- *
- * Dodo has no generic price/quantity path for this, so each pack needs its own
- * product in the Dodo dashboard. Adding a pack to `CREDIT_PACKS` without one here
- * leaves the naira rail selling something the dollar rail refuses.
+ * It used to carry a second branch for one-off Zen AI credit packs, keyed on a
+ * `packId` in the body and a `DODO_CREDITS_*_PRODUCT_ID` per pack. Credits are now
+ * an allowance of the plan and are not sold separately, so that branch and its
+ * three env vars are gone. Nothing sends `packId` any more; a body carrying one
+ * falls through to the missing-plan refusal below, which is the correct answer.
  */
-const DODO_CREDIT_PRODUCT_IDS: Record<string, string | undefined> = {
-  credits_250: process.env.DODO_CREDITS_250_PRODUCT_ID,
-  credits_1000: process.env.DODO_CREDITS_1000_PRODUCT_ID,
-  credits_5000: process.env.DODO_CREDITS_5000_PRODUCT_ID,
-};
-
 export async function POST(req: NextRequest) {
   // Every exit below carries `corsHeaders`. A response the browser rejects for
   // a missing CORS header reaches the client as an opaque network failure, so
@@ -81,8 +70,8 @@ export async function POST(req: NextRequest) {
     NextResponse.json({ error, ...extra }, { status, headers: corsHeaders });
 
   try {
-    const { planId, email, businessId, cycleMonths, packId } = await req.json();
-    console.log('Dodo Checkout Request:', { planId, packId, email, businessId, cycleMonths });
+    const { planId, email, businessId, cycleMonths } = await req.json();
+    console.log('Dodo Checkout Request:', { planId, email, businessId, cycleMonths });
 
     if (!DODO_API_KEY) {
       console.error('Dodo API key is missing from environment variables');
@@ -93,66 +82,38 @@ export async function POST(req: NextRequest) {
       return fail('Missing email or business.', 400);
     }
 
-    let productId: string | undefined;
-    let metadata: Record<string, string>;
-
-    if (packId) {
-      /*
-       * A one-off credit pack. No cycle, no plan, and the webhook must not treat
-       * it as either — `metadata.kind` is what tells it apart, and the webhook
-       * branches on that *before* its `businessId && planId` check. Without the
-       * marker a pack payment succeeds and grants nothing.
-       */
-      const pack = creditPack(packId);
-      if (!pack) {
-        return fail('Unknown credit pack.', 400);
-      }
-
-      productId = DODO_CREDIT_PRODUCT_IDS[pack.id];
-      if (!productId) {
-        console.error(`Dodo product id not configured for credit pack: ${pack.id}`);
-        return fail('Credit top-ups in USD are not available yet. Please contact support.', 400);
-      }
-
-      metadata = {
-        businessId: businessId,
-        kind: 'credits',
-        packId: pack.id,
-        // For reading a payment in the Dodo dashboard. The webhook re-derives the
-        // real figure from `CREDIT_PACKS` and ignores this — metadata is not a
-        // price list.
-        credits: String(pack.credits),
-      };
-    } else {
-      if (!planId) {
-        return fail('Missing plan, email or business.', 400);
-      }
-
-      const cycleKey = cycleMonths ? cycleMonths.toString() : '1';
-      const planProducts = DODO_PRODUCT_IDS[planId];
-
-      if (!planProducts) {
-        console.error('Dodo Product mapping not found for plan:', planId);
-        return fail('Invalid plan ID', 400);
-      }
-
-      productId = planProducts[cycleKey];
-      console.log(`Target Product ID for plan ${planId} (${cycleKey} months):`, productId);
-
-      if (!productId || productId.includes('placeholder')) {
-        console.error(`Dodo Product ID not configured for plan: ${planId}, cycle: ${cycleKey}`);
-        return fail(`This plan is not available for a ${cycleKey}-month cycle yet.`, 400);
-      }
-
-      metadata = {
-        businessId: businessId,
-        planId: planId,
-        cycleMonths: cycleKey,
-        // Explicit, though the webhook also accepts a missing `kind` as a
-        // subscription — checkouts created before this existed are still in flight.
-        kind: 'subscription',
-      };
+    if (!planId) {
+      return fail('Missing plan, email or business.', 400);
     }
+
+    const cycleKey = cycleMonths ? cycleMonths.toString() : '1';
+    const planProducts = DODO_PRODUCT_IDS[planId];
+
+    if (!planProducts) {
+      console.error('Dodo Product mapping not found for plan:', planId);
+      return fail('Invalid plan ID', 400);
+    }
+
+    const productId = planProducts[cycleKey];
+    console.log(`Target Product ID for plan ${planId} (${cycleKey} months):`, productId);
+
+    if (!productId || productId.includes('placeholder')) {
+      console.error(`Dodo Product ID not configured for plan: ${planId}, cycle: ${cycleKey}`);
+      return fail(`This plan is not available for a ${cycleKey}-month cycle yet.`, 400);
+    }
+
+    const metadata: Record<string, string> = {
+      businessId: businessId,
+      planId: planId,
+      cycleMonths: cycleKey,
+      /*
+       * Explicit, though the webhook also accepts a missing `kind` as a
+       * subscription — checkouts created before this existed are still in flight.
+       * It is the only value this endpoint produces now that credit packs are
+       * gone, but the webhook still branches on it, so keep sending it.
+       */
+      kind: 'subscription',
+    };
 
     const body = {
       product_cart: [

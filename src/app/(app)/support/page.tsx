@@ -595,6 +595,36 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     const audioChunksRef = React.useRef<Blob[]>([]);
     const prevMessageCountRef = React.useRef(0);
 
+    /**
+     * Object URLs handed to an <img>, released only when this page unmounts.
+     *
+     * Revoking a blob URL is only safe once React has *committed* the removal of
+     * the element showing it, and a `setState` does not do that synchronously. Both
+     * revoke sites here used to sit on the line directly after the state update
+     * that dropped the image — so the blob died while its `<img>` was still
+     * mounted, and the next paint or reconcile re-requested a URL that no longer
+     * resolved. Chrome reports that as `(blocked:other)` with 0 bytes, which is a
+     * broken image with no error event and nothing in the console.
+     *
+     * It showed up on the image-send path in particular because the Firestore
+     * listener delivers the real message at roughly the same moment, so the list
+     * re-renders and the doomed optimistic node gets asked for its src again —
+     * which is why one blob appeared blocked several times over in the network log.
+     *
+     * Deferring to unmount trades a few kilobytes per image touched in a session
+     * for an ordering guarantee, which is the right way round: the volume is one
+     * blob per image the user actually picks or sends, and the page is not
+     * long-lived.
+     */
+    const blobUrlsRef = React.useRef<string[]>([]);
+    const trackBlobUrl = React.useCallback((url: string) => {
+        blobUrlsRef.current.push(url);
+    }, []);
+    React.useEffect(() => () => {
+        blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        blobUrlsRef.current = [];
+    }, []);
+
     const threadQuery = useMemoFirebase(
         () => (firestore && userProfile?.id) ? query(collection(firestore, 'supportThreads'), where('userId', '==', userProfile.id)) : null,
         [firestore, userProfile?.id]
@@ -693,6 +723,28 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         }
     }, [thread, firestore, messages]);
 
+    const uploadImage = async (file: File): Promise<string> => {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const resData = await response.json();
+                if (resData.url) {
+                    return resData.url;
+                }
+            }
+        } catch (e) {
+            console.warn("ImageKit upload failed, falling back to ImgBB:", e);
+        }
+        return uploadImageToImgBB(file);
+    };
+
     const uploadImageToImgBB = async (file: File): Promise<string> => {
         const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY || '2ec1d17c7ad748bbb605eda60a54a896';
         const formData = new FormData();
@@ -714,6 +766,11 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Replacing an un-sent preview. The old blob's <img> is still mounted until
+        // the state update below commits, so this goes to the registry too — the
+        // rule is only useful if it holds everywhere.
+        if (previewUrl) trackBlobUrl(previewUrl);
 
         // Generate local Object URL for immediate preview display
         const localUrl = URL.createObjectURL(file);
@@ -749,8 +806,8 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         setOptimisticMessages(prev => [...prev, tempMessage]);
 
         try {
-            // Upload to ImgBB
-            const remoteUrl = await uploadImageToImgBB(fileToUpload);
+            // Upload to ImageKit (fallback to ImgBB)
+            const remoteUrl = await uploadImage(fileToUpload);
 
             // Ensure support thread exists
             let currentThread = thread;
@@ -795,9 +852,17 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             console.error("Failed to upload/send image:", err);
             toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('support.imageSendFailed') });
         } finally {
-            // Remove optimistic message and free local Object URL memory
+            /*
+             * Drop the optimistic row, but do NOT revoke its blob here.
+             *
+             * `setOptimisticMessages` is asynchronous: the `<img src="blob:…">` is
+             * still mounted on the line below, and the real message is arriving from
+             * the Firestore listener at the same time, so the list re-renders and
+             * re-requests that src. Revoking synchronously here is what produced the
+             * `(blocked:other)` 0-byte image requests. Released on unmount instead.
+             */
             setOptimisticMessages(prev => prev.filter(m => m.id !== tempId));
-            if (localUrl) URL.revokeObjectURL(localUrl);
+            if (localUrl) trackBlobUrl(localUrl);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
@@ -1232,7 +1297,12 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     <div className="flex items-center justify-between p-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border-b border-slate-200/60 dark:border-white/5">
                         <button 
                             onClick={() => {
-                                if (previewUrl) URL.revokeObjectURL(previewUrl);
+                                // Same ordering trap as the send path: the preview
+                                // <img> is unmounted by the state updates below, which
+                                // have not been committed yet. Hand it to the unmount
+                                // registry rather than revoking it out from under a
+                                // live element.
+                                if (previewUrl) trackBlobUrl(previewUrl);
                                 setPreviewFile(null);
                                 setPreviewUrl(null);
                                 setCaption('');

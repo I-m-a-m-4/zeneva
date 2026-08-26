@@ -202,7 +202,7 @@ function CustomerDetailContent() {
     const [isDeleting, setIsDeleting] = React.useState(false);
 
     const unpaidReceipts = React.useMemo(() => {
-        return receipts.filter(r => r.status === 'unpaid');
+        return receipts.filter(r => r.paymentMethod === 'Invoice' && r.status === 'unpaid');
     }, [receipts]);
 
     const totalDebt = React.useMemo(() => {
@@ -582,28 +582,39 @@ function CustomerDetailContent() {
                     <CardContent>
                         {receipts && receipts.length > 0 ? (
                             <div className="space-y-4">
-                                {receipts.slice(0, 5).map(receipt => (
-                                    <div key={receipt.id} className="flex items-center justify-between p-3 rounded-md bg-muted/30 border border-transparent hover:border-primary/30 transition-all">
-                                        <div className="flex flex-col">
-                                            <span className="font-semibold text-sm">{receipt.receiptNumber || `REC-${receipt.id.substring(0, 5).toUpperCase()}`}</span>
-                                            <span className="text-[10px] text-muted-foreground">{format(safeToDate(receipt.createdAt), 'PPp')}</span>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                                <span className="font-bold text-primary">{currencySymbol}{(receipt.total || 0).toLocaleString()}</span>
-                                                <div className={cn(
-                                                    "text-[10px] px-1 rounded inline-block ml-1 uppercase font-bold",
-                                                    receipt.status === 'unpaid' ? "bg-destructive/10 text-destructive" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                                )}>
-                                                    {receipt.status === 'unpaid' ? 'unpaid' : 'paid'}
-                                                </div>
+                                {receipts.slice(0, 5).map(receipt => {
+                                    const isUnpaid = receipt.paymentMethod === 'Invoice' && receipt.status === 'unpaid';
+                                    const isPending = (receipt.paymentMethod === 'Invoice' || receipt.paymentMethod === 'Bank Transfer') && receipt.status === 'pending';
+                                    const badgeText = isUnpaid ? 'unpaid' : (isPending ? 'pending' : 'paid');
+                                    const badgeClass = isUnpaid 
+                                        ? "bg-destructive/10 text-destructive" 
+                                        : (isPending 
+                                            ? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" 
+                                            : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400");
+                                    
+                                    return (
+                                        <div key={receipt.id} className="flex items-center justify-between p-3 rounded-md bg-muted/30 border border-transparent hover:border-primary/30 transition-all">
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold text-sm">{receipt.receiptNumber || `REC-${receipt.id.substring(0, 5).toUpperCase()}`}</span>
+                                                <span className="text-[10px] text-muted-foreground">{format(safeToDate(receipt.createdAt), 'PPp')}</span>
                                             </div>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                                <Link href={`/receipts/details?id=${receipt.id}`}><ChevronRight className="h-4 w-4" /></Link>
-                                            </Button>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <span className="font-bold text-primary">{currencySymbol}{(receipt.total || 0).toLocaleString()}</span>
+                                                    <div className={cn(
+                                                        "text-[10px] px-1 rounded inline-block ml-1 uppercase font-bold",
+                                                        badgeClass
+                                                    )}>
+                                                        {badgeText}
+                                                    </div>
+                                                </div>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                    <Link href={`/receipts/details?id=${receipt.id}`}><ChevronRight className="h-4 w-4" /></Link>
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
                                     <Link href={`/receipts?customerId=${displayCustomer.id}`}>View All Transactions</Link>
                                 </Button>

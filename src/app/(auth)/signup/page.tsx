@@ -21,81 +21,59 @@ import { AppConfig } from '@/lib/config';
 import Image from 'next/image';
 import { doc, getDoc } from 'firebase/firestore';
 
-const signupSchema = z.object({
+const makeSignupSchema = (t: (key: string) => string) => z.object({
   email: z.string()
-    .email({ message: 'Invalid email address.' })
+    .email({ message: t('auth.valInvalidEmail') })
     .refine((email) => {
       const localPart = email.split('@')[0];
       return !localPart.includes('+');
-    }, { message: 'Email aliases (plus addressing like name+alias@gmail.com) are not allowed.' })
+    }, { message: t('auth.valNoAliases') })
     .refine((email) => {
       const domain = email.split('@')[1]?.toLowerCase();
       const disposableDomains = [
-        'wshu.net', 'tempmail.com', 'mailinator.com', 'yopmail.com', 
-        'guerrillamail.com', 'dispostable.com', '10minutemail.com', 
+        'wshu.net', 'tempmail.com', 'mailinator.com', 'yopmail.com',
+        'guerrillamail.com', 'dispostable.com', '10minutemail.com',
         'burnermail.io', 'trashmail.com', 'getairmail.com'
       ];
       return !disposableDomains.includes(domain);
-    }, { message: 'Temporary/disposable email addresses are not allowed.' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+    }, { message: t('auth.valNoDisposable') }),
+  password: z.string().min(6, { message: t('auth.valPasswordMin') }),
 });
 
-type SignupFormValues = z.infer<typeof signupSchema>;
+type SignupFormValues = z.infer<ReturnType<typeof makeSignupSchema>>;
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { trackLaunchStage } from '@/lib/launch-telemetry';
+import { useI18n } from '@/context/i18n-context';
 
-const signupSlides = [
-  {
-    src: "/zeneva-signup-v3.png",
-    alt: "Luxury boutique storefront at night.",
-    title: "Scale Your Business Operations",
-    description: "Join a network of thriving businesses and unlock premium tools designed for exponential growth."
-  },
-  {
-    src: "/zeneva-signup-2.png",
-    alt: "Modern high-end shopping street at twilight.",
-    title: "Thriving Ecosystem",
-    description: "Place your business in the spotlight with an infrastructure built for success."
-  },
-  {
-    src: "/zeneva-signup-3.png",
-    alt: "Minimalist glass boutique entrance.",
-    title: "Seamless Entry",
-    description: "Launch your business in minutes with our intuitive onboarding and management suite."
-  },
-  {
-    src: "/zeneva-signup-4.png",
-    alt: "Futuristic modern marketplace visualization.",
-    title: "Global Reach",
-    description: "Scale from a single location to a global franchise with Zeneva's multi-store intelligence."
-  }
-];
-
+// Titles and descriptions are keys resolved at render — the array is module-level
+// and cannot reach `t()`. The word-highlight below still matches on English, so
+// other locales draw the headline plain rather than part-italic.
 const signupVideoSlides = [
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053655/zeneva/zeneva_welcome_signup_video_6.mp4',
     poster: '/signup-video-6-poster.jpg',
-    title: "Scale Your Business Operations",
-    description: "Join a network of thriving businesses and unlock premium tools designed for exponential growth."
+    titleKey: 'auth.signupSlide1Title',
+    descKey: 'auth.signupSlide1Desc',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053651/zeneva/zeneva_welcome_signup_video_5.mp4',
     poster: '/signup-video-5-poster.jpg',
-    title: "Thriving Ecosystem",
-    description: "Place your business in the spotlight with an infrastructure built for success."
+    titleKey: 'auth.signupSlide2Title',
+    descKey: 'auth.signupSlide2Desc',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053621/zeneva/zeneva_welcome_signup_video_2.mp4',
     poster: '/signup-video-2-poster.jpg',
-    title: "Global Reach",
-    description: "Scale from a single location to a global franchise with Zeneva's multi-store intelligence."
+    titleKey: 'auth.signupSlide3Title',
+    descKey: 'auth.signupSlide3Desc',
   },
   {
     video: 'https://res.cloudinary.com/dd1czj85j/video/upload/v1786053615/zeneva/zeneva_welcome_signup_video_1.mp4',
     poster: '/signup-video-1-poster.jpg',
-    title: "One Point of Sale",
-    description: "Manage your inventory with absolute ease and grow without boundaries."
+    titleKey: 'auth.signupSlide4Title',
+    descKey: 'auth.signupSlide4Desc',
   }
 ];
 
@@ -108,6 +86,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const { t } = useI18n();
   const [currentSlide, setCurrentSlide] = useState(0);
   const videoRefs = React.useRef<(HTMLVideoElement | null)[]>([]);
 
@@ -155,6 +134,10 @@ export default function SignupPage() {
 
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  // `t` is referentially stable until the active catalog changes, so the resolver
+  // is rebuilt exactly once per locale switch rather than on every render.
+  const signupSchema = React.useMemo(() => makeSignupSchema(t), [t]);
+
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: { email: '', password: '' },
@@ -181,11 +164,11 @@ export default function SignupPage() {
               throw new Error("Associated business not found.");
             }
           } else {
-            toast({ variant: "destructive", title: "Invalid Invitation", description: "This invitation link is either invalid or has already been used." });
+            toast({ variant: "destructive", title: t('auth.invalidInvitationTitle'), description: t('auth.invalidInvitationBody') });
             router.replace('/signup');
           }
         } catch (error) {
-          toast({ variant: "destructive", title: "Error", description: "Could not retrieve invitation details." });
+          toast({ variant: "destructive", title: t('common.error'), description: t('auth.invitationLookupFailed') });
           router.replace('/signup');
         } finally {
           setIsLoadingInvitation(false);
@@ -199,7 +182,7 @@ export default function SignupPage() {
         form.setValue('email', emailFromQuery);
       }
     }
-  }, [invitationCode, firestore, router, form, toast]);
+  }, [invitationCode, firestore, router, form, toast, t]);
 
   // Handle getRedirectResult only for Tauri/WebView clients that used redirect
   useEffect(() => {
@@ -216,6 +199,7 @@ export default function SignupPage() {
       .then(async (result) => {
         if (!result || !isMounted) return;
         const user = result.user;
+        void trackLaunchStage('signup_succeeded', 'google-redirect');
 
         setIsGoogleLoading(true);
         try {
@@ -240,10 +224,17 @@ export default function SignupPage() {
           }
         } catch (profileErr: any) {
           console.error("Failed to create profile after redirect:", profileErr);
+          // Signed in with no usable profile — the account exists and the app is
+          // unusable, which is the single worst outcome in this funnel and was
+          // previously only a toast.
+          void trackLaunchStage(
+            'signup_failed',
+            `profile:${profileErr?.code ?? 'unknown'}`,
+          );
           toast({
             variant: "destructive",
-            title: "Profile Setup Failed",
-            description: "We logged you in but couldn't create your profile. Please try again.",
+            title: t('auth.profileSetupFailedTitle'),
+            description: t('auth.profileSetupFailedBody'),
           });
         } finally {
           if (isMounted) setIsGoogleLoading(false);
@@ -256,11 +247,12 @@ export default function SignupPage() {
     return () => {
       isMounted = false;
     };
-  }, [auth, firestore, router, invitationCode, triggerRefresh, toast]);
+  }, [auth, firestore, router, invitationCode, triggerRefresh, toast, t]);
 
   const handleGoogleSignup = async () => {
     if (!auth || !firestore) return;
     setIsGoogleLoading(true);
+    void trackLaunchStage('signup_started', 'google');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
@@ -274,7 +266,12 @@ export default function SignupPage() {
           popupError?.code === 'auth/popup-blocked' ||
           popupError?.code === 'auth/operation-not-supported-in-this-environment'
         ) {
-          // Browser blocked the popup — fall back to redirect silently
+          // Browser blocked the popup — fall back to redirect silently.
+          // Recorded before the call, which navigates the whole shell away.
+          void trackLaunchStage(
+            'signup_failed',
+            `popup-fallback:${popupError?.code ?? 'unknown'}`,
+          );
           await signInWithRedirect(auth, provider);
           return;
         } else if (popupError?.code === 'auth/internal-error') {
@@ -287,6 +284,7 @@ export default function SignupPage() {
       }
 
       const user = result.user;
+      void trackLaunchStage('signup_succeeded', 'google');
 
       // Create profile document if this is a brand-new Google sign-in
       const userDocRef = doc(firestore, `users/${user.uid}`);
@@ -317,6 +315,8 @@ export default function SignupPage() {
         error?.code === 'auth/cancelled-popup-request' ||
         error?.code === 'auth/user-cancelled';
 
+      void trackLaunchStage('signup_failed', `google:${error?.code ?? 'unknown'}`);
+
       if (isCancellation) {
         // User closed the popup — silently reset loading, no error toast
         setIsGoogleLoading(false);
@@ -324,13 +324,13 @@ export default function SignupPage() {
       } else {
         toast({
           variant: "destructive",
-          title: "Google Sign-In Failed",
+          title: t('auth.googleSignInFailedTitle'),
           description:
             error?.code === 'auth/popup-blocked'
-              ? "Your browser blocked the sign-in popup. Please allow popups for this site and try again."
+              ? t('auth.popupBlocked')
               : error?.code === 'auth/internal-error'
-              ? "Google Authentication is temporarily unavailable. Please try again in a moment."
-              : (error.message || "Please try again."),
+              ? t('auth.googleUnavailable')
+              : (error.message || t('auth.tryAgainShort')),
         });
       }
       setIsGoogleLoading(false);
@@ -341,8 +341,14 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupFormValues) => {
     if (!auth || !firestore) return;
     setIsLoading(true);
+    void trackLaunchStage('signup_started', 'password');
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      // The account now exists, so the signup itself has succeeded even if the
+      // profile write below does not. Recorded here rather than at the end so a
+      // `signup_succeeded` *and* a `signup_failed: profile:*` on the same install
+      // reads as what it is: an account that exists but cannot be used.
+      void trackLaunchStage('signup_succeeded', 'password');
       await updateProfile(userCredential.user, { displayName: '' });
 
       // Pass invitation code to the creation function with empty strings for name and phone
@@ -354,13 +360,16 @@ export default function SignupPage() {
       router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
 
     } catch (error: any) {
-      let description = "Please try again.";
+      let description = t('auth.tryAgainShort');
       if (error.code === 'auth/email-already-in-use') {
-        description = "This email is already registered. Please log in instead.";
+        description = t('auth.emailAlreadyRegistered');
       } else {
         description = error.message;
       }
-      toast({ variant: "destructive", title: "Signup Failed", description });
+      // Code only — never `error.message`, which on some Firebase errors embeds
+      // the email that was typed, and this endpoint is unauthenticated.
+      void trackLaunchStage('signup_failed', `password:${error?.code ?? 'unknown'}`);
+      toast({ variant: "destructive", title: t('auth.signupFailedTitle'), description });
       setIsLoading(false);
     }
   };
@@ -371,7 +380,7 @@ export default function SignupPage() {
         <div className="absolute top-8 left-4 sm:left-8 z-20">
           <Button variant="ghost" asChild>
             <Link href="/login">
-              Already have an account?
+              {t('auth.haveAccountPrompt')}
             </Link>
           </Button>
         </div>
@@ -379,11 +388,11 @@ export default function SignupPage() {
           <div className="mx-auto grid w-full max-w-[380px] gap-4 sm:gap-6">
             <div className="grid gap-2 text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
-                <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-12 sm:h-16 w-auto" />
+                <img src={AppConfig.logoUrl} alt={t('auth.logoAlt')} className="h-12 sm:h-16 w-auto" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold">Create an account</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">{t('auth.signupTitle')}</h1>
               <p className="text-balance text-sm sm:text-base text-muted-foreground">
-                Join growing retail brands on Zeneva.
+                {t('auth.signupSubtitle')}
               </p>
             </div>
 
@@ -395,8 +404,19 @@ export default function SignupPage() {
                   <Building className="h-5 w-5 text-primary" />
                   <UserCheck className="h-5 w-5 text-primary" />
                 </div>
+                {/*
+                  One key, not a split sentence. `translate()` returns a string and
+                  cannot embed React nodes, and splitting on the two values to keep
+                  the inline <strong>s would fix English word order — German puts the
+                  verb particle last, Japanese puts both values before the verb. So
+                  the two bolds and the CSS `capitalize` on the role are given up in
+                  exchange for a sentence that reads correctly in all eleven locales.
+                */}
                 <p className="text-sm text-muted-foreground mt-2">
-                  You are joining <strong className="text-primary">{invitationDetails.businessName}</strong> as a <strong className="capitalize text-primary">{invitationDetails.role}</strong>.
+                  {t('auth.joiningBusiness', {
+                    business: invitationDetails.businessName,
+                    role: invitationDetails.role,
+                  })}
                 </p>
               </div>
             ) : null}
@@ -430,7 +450,7 @@ export default function SignupPage() {
                   />
                 </svg>
               )}
-              Continue with Google
+              {t('auth.continueWithGoogle')}
             </Button>
 
             <div className="relative my-2">
@@ -438,7 +458,7 @@ export default function SignupPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or signup with email</span>
+                <span className="bg-background px-2 text-muted-foreground">{t('auth.orSignupWithEmail')}</span>
               </div>
             </div>
 
@@ -449,9 +469,9 @@ export default function SignupPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <Label>Email</Label>
+                      <Label>{t('common.email')}</Label>
                       <FormControl>
-                        <Input type="email" placeholder="m@example.com" {...field} disabled={!!invitationCode} />
+                        <Input type="email" placeholder={t('auth.emailPlaceholder')} {...field} disabled={!!invitationCode} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -462,7 +482,7 @@ export default function SignupPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <Label>Password</Label>
+                      <Label>{t('auth.password')}</Label>
                       <FormControl>
                         <div className="relative">
                           <Input type={showPassword ? 'text' : 'password'} {...field} />
@@ -480,29 +500,29 @@ export default function SignupPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={isLoading || isLoadingInvitation || isGoogleLoading}>
-                  {isLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : 'Create an account'}
+                  {isLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : t('auth.createAccountSubmit')}
                 </Button>
               </form>
             </Form>
 
 
             <div className="mt-4 text-center text-sm">
-              Already have an account?{" "}
+              {t('auth.haveAccountPrompt')}{" "}
               <Link href="/login" className="underline">
-                Login
+                {t('auth.loginLink')}
               </Link>
             </div>
           </div>
         </div>
         <div className="w-full text-center mt-auto pb-4">
           <p className="text-[10px] text-muted-foreground/50 leading-relaxed max-w-[340px] mx-auto">
-            Zeneva is a registered business application. Corporate Affairs Commission (CAC) Registration — BN: 9673520. All rights reserved. By signing up, you agree to our{' '}
+            {t('auth.legalSignUp')}{' '}
             <Link href="/legal/terms-of-service" className="text-primary underline hover:opacity-80" target="_blank">
-              Terms of Service
+              {t('footer.linkTerms')}
             </Link>{' '}
-            and{' '}
+            {t('auth.legalAnd')}{' '}
             <Link href="/legal/privacy-policy" className="text-primary underline hover:opacity-80" target="_blank">
-              Privacy Policy
+              {t('footer.linkPrivacyPolicy')}
             </Link>.
           </p>
         </div>
@@ -544,7 +564,7 @@ export default function SignupPage() {
             className="bg-black/50 border-white/20 text-white backdrop-blur-md hover:bg-black/80 hover:text-white rounded-full text-xs font-semibold px-3 py-1.5 flex items-center gap-2 transition-all shadow-lg"
           >
             {isPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
-            {isPlaying ? 'Pause Video' : 'Play Video'}
+            {isPlaying ? t('auth.pauseVideoButton') : t('auth.playVideoButton')}
           </Button>
 
           <div className="flex items-center gap-1 bg-black/50 border border-white/20 backdrop-blur-md rounded-full p-1 shadow-lg">
@@ -583,11 +603,11 @@ export default function SignupPage() {
             >
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 border border-primary/40 text-primary text-xs font-bold uppercase tracking-wider mb-4 backdrop-blur-md shadow-md">
                 <Sparkles className="h-3.5 w-3.5" />
-                Featured Experience
+                {t('auth.featuredExperience')}
               </div>
 
               <h2 className="text-white text-4xl font-bold font-headline leading-tight tracking-tight drop-shadow-lg">
-                {signupVideoSlides[currentSlide].title.split(" ").map((word, i) => (
+                {t(signupVideoSlides[currentSlide].titleKey).split(" ").map((word, i) => (
                   <React.Fragment key={i}>
                     {word === "Operations" || word === "Ecosystem" || word === "Entry" || word === "Reach" || word === "Point" ? (
                       <span className="text-primary italic"> {word} </span>
@@ -598,7 +618,7 @@ export default function SignupPage() {
                 ))}
               </h2>
               <p className="text-white/90 mt-4 text-xl font-light leading-relaxed drop-shadow-md max-w-[600px]">
-                {signupVideoSlides[currentSlide].description}
+                {t(signupVideoSlides[currentSlide].descKey)}
               </p>
             </motion.div>
           </AnimatePresence>
@@ -618,7 +638,7 @@ export default function SignupPage() {
                 )}
               >
                 <span className={cn("w-1.5 h-1.5 rounded-full", currentSlide === i ? "bg-primary-foreground" : "bg-primary")} />
-                {slide.title}
+                {t(slide.titleKey)}
               </button>
             ))}
           </div>
@@ -630,7 +650,7 @@ export default function SignupPage() {
                 key={i}
                 type="button"
                 onClick={() => setCurrentSlide(i)}
-                aria-label={`Go to slide ${i + 1}`}
+                aria-label={t('auth.goToSlide', { number: i + 1 })}
                 className={cn(
                   "h-1.5 transition-all duration-500 rounded-full cursor-pointer shadow-[0_0_10px_rgba(255,165,0,0.5)] border-none p-0",
                   currentSlide === i ? "w-12 bg-primary" : "w-2 bg-white/30 hover:bg-white/60"

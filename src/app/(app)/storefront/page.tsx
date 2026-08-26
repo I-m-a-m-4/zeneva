@@ -528,17 +528,17 @@ function StorefrontCustomizationPage() {
 
             if (imageFile) {
                 const formData = new FormData();
-                formData.append('image', imageFile);
-                const apiKey = '2ec1d17c7ad748bbb605eda60a54a896';
-                if (!apiKey) {
-                    throw new Error("ImgBB API key is not configured.");
+                formData.append('file', imageFile);
+                try {
+                    const response = await fetch(`/api/upload`, { method: 'POST', body: formData });
+                    const result = await response.json();
+                    if (!response.ok || !result.url) {
+                        throw new Error(result.error || 'Image upload failed.');
+                    }
+                    finalSettings.bannerImageUrl = result.url;
+                } catch (error: any) {
+                    throw new Error(error.message || 'Image upload failed.');
                 }
-                const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, { method: 'POST', body: formData });
-                const result = await response.json();
-                if (!result.success) {
-                    throw new Error(result.error?.message || 'Image upload failed.');
-                }
-                finalSettings.bannerImageUrl = result.data.url;
             }
 
             const businessDocRef = doc(firestore, 'businessInstances', business.id);

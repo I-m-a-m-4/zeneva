@@ -42,7 +42,7 @@ export const NGN_PER_USD = 1500;
  * money — the one error class here that flatters rather than understates, which
  * is exactly the kind to guard against.
  */
-export const INTERNAL_ACCOUNT_EMAILS = ['belloimam431@gmail.com', 'bimex4@gmail.com'];
+export const INTERNAL_ACCOUNT_EMAILS = ['belloimam431@gmail.com', 'bimex4@gmail.com', 'safewayderma@gmail.com'];
 
 /** Case-insensitive, because a stored address may not match the list's casing. */
 export function isInternalEmail(email: string | null | undefined): boolean {

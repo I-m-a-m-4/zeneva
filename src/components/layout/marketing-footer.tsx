@@ -161,8 +161,8 @@ export default function MarketingFooter() {
                         <rect x="5.8" y="5.8" width="4.2" height="4.2" fill="#FFB900" />
                       </g>
                     </g>
-                    <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1">Download from the</text>
-                    <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2">Microsoft Store</text>
+                    <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="400" letterSpacing="0.1">{t('landing.downloadFrom')}</text>
+                    <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="16" fontWeight="600" letterSpacing="-0.2">{t('landing.microsoftStore')}</text>
                   </svg>
                 </a>
               </div>
@@ -188,8 +188,8 @@ export default function MarketingFooter() {
                       <path d="M13.57 15.69l3.52-3.52L3.08 1.68c-.69-.39-1.56-.31-2.12.25l12.61 12.61v1.15z" fill="#55ea47" />
                       <path d="M13.57 16.31l-12.61 12.61c.56.56 1.43.64 2.12.25l13.98-8.01-3.52-3.52-3.52 3.52v-4.85z" fill="#ff3349" />
                     </g>
-                    <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em">GET IT ON</text>
-                    <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="19" fontWeight="600" letterSpacing="-0.2px">Google Play</text>
+                    <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em">{t('landing.getItOn')}</text>
+                    <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="19" fontWeight="600" letterSpacing="-0.2px">{t('landing.googlePlay')}</text>
                   </svg>
                 </a>
               </div>

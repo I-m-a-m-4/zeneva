@@ -16,12 +16,12 @@
  * remux once with ffmpeg (`-c copy` won't do it, `-c:v libx264` will).
  */
 
-import { STAGE, FPS, ensureFonts, type Demo, type Theme } from './anim';
+import { FPS, ensureFonts, stageOf, type Demo, type Theme } from './anim';
 
 export type Preset = {
   id: string;
   label: string;
-  /** Width in px; height follows STAGE's aspect unless `h` is given. */
+  /** Width in px; height follows the demo's own stage aspect unless `h` is given. */
   w: number;
   h?: number;
   note: string;
@@ -53,18 +53,23 @@ function pickMime() {
 export const canRecord = () => pickMime() !== null;
 
 /**
- * Fit the 16:9 stage into an arbitrary output box. Landscape presets are a
- * straight scale; square and vertical letterbox the stage and fill the rest
- * with the brand backdrop plus a wordmark, so a vertical export doesn't just
- * crop the UI in half.
+ * Fit a demo's stage into an arbitrary output box. A matching aspect is a
+ * straight scale; a mismatch letterboxes the stage and fills the rest with the
+ * brand backdrop plus a wordmark, so a vertical export of a landscape demo
+ * doesn't just crop the UI in half.
+ *
+ * `stage` is the demo's own design space, not the module-level `STAGE`: a
+ * vertical-native demo paired with the vertical preset must land here as a
+ * straight 1:1 scale with no bars, and it only does that if the aspect being
+ * compared is the one the demo actually drew in.
  */
-function layout(w: number, h: number) {
-  const scale = Math.min(w / STAGE.w, h / STAGE.h);
+function layout(w: number, h: number, stage: { w: number; h: number }) {
+  const scale = Math.min(w / stage.w, h / stage.h);
   return {
     scale,
-    dx: (w - STAGE.w * scale) / 2,
-    dy: (h - STAGE.h * scale) / 2,
-    letterboxed: Math.abs(w / h - STAGE.w / STAGE.h) > 0.02,
+    dx: (w - stage.w * scale) / 2,
+    dy: (h - stage.h * scale) / 2,
+    letterboxed: Math.abs(w / h - stage.w / stage.h) > 0.02,
   };
 }
 
@@ -86,8 +91,9 @@ export async function recordDemo({
 
   await ensureFonts();
 
+  const stage = stageOf(demo);
   const w = preset.w;
-  const h = preset.h ?? Math.round((preset.w * STAGE.h) / STAGE.w);
+  const h = preset.h ?? Math.round((preset.w * stage.h) / stage.w);
 
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -108,7 +114,7 @@ export async function recordDemo({
     recorder.onerror = () => reject(new Error('Recording failed partway through.'));
   });
 
-  const L = layout(w, h);
+  const L = layout(w, h, stage);
   const paint = (frame: number) => {
     ctx.save();
     ctx.fillStyle = theme.id === 'light' ? '#f4f1ee' : '#050506';
@@ -166,14 +172,15 @@ export async function stillFrame(
   demo: Demo, frame: number, preset: Preset, theme: Theme,
 ): Promise<Blob> {
   await ensureFonts();
+  const stage = stageOf(demo);
   const w = preset.w;
-  const h = preset.h ?? Math.round((preset.w * STAGE.h) / STAGE.w);
+  const h = preset.h ?? Math.round((preset.w * stage.h) / stage.w);
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Could not get a 2D context.');
-  const L = layout(w, h);
+  const L = layout(w, h, stage);
   ctx.fillStyle = theme.id === 'light' ? '#f4f1ee' : '#050506';
   ctx.fillRect(0, 0, w, h);
   ctx.save();

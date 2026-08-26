@@ -10,21 +10,7 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
-
-const chartConfig = {
-  revenue: {
-    label: "Revenue",
-    color: "hsl(var(--chart-2))",
-  },
-  profit: {
-    label: "Profit",
-    color: "hsl(var(--chart-1))",
-  },
-  cost: {
-    label: "Cost",
-    color: "hsl(var(--chart-5))",
-  },
-} satisfies ChartConfig;
+import { useI18n } from '@/context/i18n-context';
 
 interface ProfitLossChartProps {
     receipts: Receipt[];
@@ -32,7 +18,15 @@ interface ProfitLossChartProps {
 }
 
 export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLossChartProps) {
+    const { t } = useI18n();
     const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
+    // Inside the component: the three series labels are translated, and there is no `t`
+    // at module scope.
+    const chartConfig = {
+      revenue: { label: t('reports.colRevenue'), color: "hsl(var(--chart-2))" },
+      profit: { label: t('reports.colProfit'), color: "hsl(var(--chart-1))" },
+      cost: { label: t('reports.colCost'), color: "hsl(var(--chart-5))" },
+    } satisfies ChartConfig;
 
     const chartData = React.useMemo(() => {
         let filteredReceipts = [...receipts];
@@ -92,23 +86,23 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div>
-                   <CardTitle>Profit & Loss</CardTitle>
-                   <CardDescription>Financial health overview.</CardDescription>
+                   <CardTitle>{t('reports.tabProfitLoss')}</CardTitle>
+                   <CardDescription>{t('reports.plcSubtitle')}</CardDescription>
                 </div>
                 <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-3 gap-4 mb-6 pt-2">
                     <div className="space-y-1">
-                        <p className="text-[10px] uppercase text-muted-foreground font-semibold">Total Revenue</p>
+                        <p className="text-[10px] uppercase text-muted-foreground font-semibold">{t('dashboard.totalRevenue')}</p>
                         <p className="text-sm font-bold truncate">{currencySymbol}{totals.revenue.toLocaleString()}</p>
                     </div>
                     <div className="space-y-1">
-                        <p className="text-[10px] uppercase text-muted-foreground font-semibold">Total Cost</p>
+                        <p className="text-[10px] uppercase text-muted-foreground font-semibold">{t('reports.plcTotalCost')}</p>
                         <p className="text-sm font-bold truncate text-destructive/80">{currencySymbol}{totals.cost.toLocaleString()}</p>
                     </div>
                     <div className="space-y-1">
-                        <p className="text-[10px] uppercase text-muted-foreground font-semibold font-bold text-primary">Net Profit</p>
+                        <p className="text-[10px] uppercase text-muted-foreground font-semibold font-bold text-primary">{t('reports.kpiNetProfit')}</p>
                         <p className="text-sm font-bold truncate text-primary">{currencySymbol}{totals.profit.toLocaleString()}</p>
                     </div>
                 </div>
@@ -118,7 +112,7 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
                         <TrendingUp className="h-16 w-16 opacity-50 mb-4" />
                          <div className="text-sm p-2 rounded-md bg-muted/50 max-w-sm">
                              <p className="font-semibold flex items-center gap-2 justify-center"><Bot className="h-4 w-4 text-primary"/> Zen AI</p>
-                            <p>No sales recorded in this period. Add 'Cost Prices' to your products to track true profitability.</p>
+                            <p>{t('reports.plcEmpty')}</p>
                         </div>
                     </div>
                 ) : (

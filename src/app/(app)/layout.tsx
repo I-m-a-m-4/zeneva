@@ -1121,9 +1121,9 @@ export default function AuthenticatedLayout({
   // --- End of Checks ---
 
   // Allow the full layout to render behind the onboarding modal
-  // if (pathname === '/onboarding') {
-  //   return <main className="p-4 sm:p-6">{children}</main>;
-  // }
+  if (pathname === '/onboarding') {
+    return <main className="min-h-screen bg-background">{children}</main>;
+  }
 
 
   // --- Subscription Guard Configuration ---

@@ -9,15 +9,34 @@ import { Clock, Users, Calendar, TrendingUp } from 'lucide-react';
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface HourlySalesHeatmapProps {
     receipts: Receipt[];
 }
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_KEYS = [
+    'reports.hhDaySunday',
+    'reports.hhDayMonday',
+    'reports.hhDayTuesday',
+    'reports.hhDayWednesday',
+    'reports.hhDayThursday',
+    'reports.hhDayFriday',
+    'reports.hhDaySaturday',
+];
+const DAY_SHORT_KEYS = [
+    'reports.hhDayShortSunday',
+    'reports.hhDayShortMonday',
+    'reports.hhDayShortTuesday',
+    'reports.hhDayShortWednesday',
+    'reports.hhDayShortThursday',
+    'reports.hhDayShortFriday',
+    'reports.hhDayShortSaturday',
+];
 
 export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps) {
+    const { t } = useI18n();
     const [timeframe, setTimeframe] = React.useState<Timeframe>('all');
 
     const filteredReceipts = React.useMemo(() => {
@@ -73,10 +92,10 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
 
         return Object.entries(days).map(([day, count]) => ({
             day: parseInt(day),
-            name: DAYS[parseInt(day)],
+            name: t(DAY_KEYS[parseInt(day)]),
             count
         }));
-    }, [filteredReceipts]);
+    }, [filteredReceipts, t]);
 
     const peakHour = React.useMemo(() => {
         return [...hourlyData].sort((a, b) => b.count - a.count)[0];
@@ -92,9 +111,9 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                 <div>
                     <CardTitle className="flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-primary" />
-                        Business Traffic Insights
+                        {t('reports.hhTitle')}
                     </CardTitle>
-                    <CardDescription>Peak times and days for your business.</CardDescription>
+                    <CardDescription>{t('reports.hhSubtitle')}</CardDescription>
                 </div>
                 <div className="flex justify-end">
                     <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
@@ -103,8 +122,8 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
             <CardContent>
                 <Tabs defaultValue="hourly" className="w-full">
                     <TabsList className="grid w-full grid-cols-2 mb-4">
-                        <TabsTrigger value="hourly" className="text-xs">Peak Hours</TabsTrigger>
-                        <TabsTrigger value="daily" className="text-xs">Peak Days</TabsTrigger>
+                        <TabsTrigger value="hourly" className="text-xs">{t('reports.hhPeakHours')}</TabsTrigger>
+                        <TabsTrigger value="daily" className="text-xs">{t('reports.hhPeakDays')}</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="hourly" className="space-y-4">
@@ -114,8 +133,10 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                                     <Clock className="h-4 w-4 text-primary" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Peak Traffic Window</p>
-                                    <p className="text-sm font-bold">{peakHour.display} — {peakHour.count} sales</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">{t('reports.hhPeakWindow')}</p>
+                                    <p className="text-sm font-bold">
+                                        {t('reports.hhPeakLine', { label: peakHour.display, count: peakHour.count })}
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -146,7 +167,7 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                                                 return (
                                                     <div className="bg-background border rounded-lg p-2 shadow-xl text-xs">
                                                         <p className="font-bold">{data.display}</p>
-                                                        <p className="text-primary">{data.count} Sales</p>
+                                                        <p className="text-primary">{t('reports.hhSalesCount', { count: data.count })}</p>
                                                     </div>
                                                 );
                                             }
@@ -173,8 +194,10 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                                     <Calendar className="h-4 w-4 text-emerald-500" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Busiest Day of Week</p>
-                                    <p className="text-sm font-bold">{peakDay.name} — {peakDay.count} sales</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">{t('reports.hhBusiestDay')}</p>
+                                    <p className="text-sm font-bold">
+                                        {t('reports.hhPeakLine', { label: peakDay.name, count: peakDay.count })}
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -184,8 +207,8 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                                 <BarChart data={dailyData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
                                     <XAxis 
-                                        dataKey="name" 
-                                        tickFormatter={(val) => val.substring(0, 3)}
+                                        dataKey="day"
+                                        tickFormatter={(d) => t(DAY_SHORT_KEYS[Number(d)])}
                                         fontSize={10} 
                                         axisLine={false} 
                                         tickLine={false}
@@ -199,7 +222,7 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                                                 return (
                                                     <div className="bg-background border rounded-lg p-2 shadow-xl text-xs">
                                                         <p className="font-bold">{data.name}</p>
-                                                        <p className="text-emerald-500">{data.count} Sales</p>
+                                                        <p className="text-emerald-500">{t('reports.hhSalesCount', { count: data.count })}</p>
                                                     </div>
                                                 );
                                             }

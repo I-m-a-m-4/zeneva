@@ -29,8 +29,11 @@
  * **meaning has changed**, and so has `AI_MONTHLY_LIMITS`: the allowance is now a
  * monthly credit allowance. Anything that renders it must say "credits", never
  * "messages" — a shop told it has 400 messages and cut off after 90 heavy ones has
- * been lied to. `aiBonusCredits` is likewise historic; "bonus" is now "purchased or
- * granted".
+ * been lied to. `aiBonusCredits` is likewise historic; "bonus" is now simply
+ * "extra credits", and since credit packs were scrapped the only thing that adds to
+ * it is the super-admin grant on `/admin-imamshaffy/ai-usage`. The field stays and
+ * is still spent after the allowance — a shop holding a grant must not be refused a
+ * turn it can pay for.
  *
  * ## Reserve, then settle
  *
@@ -205,7 +208,7 @@ export type CreditQuote = {
   month: string;
   allowanceUsed: number;
   allowanceRemaining: number;
-  /** Purchased or admin-granted, non-expiring. The historic `aiBonusCredits`. */
+  /** Admin-granted, non-expiring. The historic `aiBonusCredits`. */
   balance: number;
   /** `allowanceRemaining + balance`. What a caller should show as "credits left". */
   remaining: number;
@@ -252,8 +255,9 @@ export type ReserveResult =
    *
    * Distinct from `exhausted` because the remedy is completely different and the
    * caller must not conflate them: this one clears by itself in seconds and the shop
-   * still has credits, whereas `exhausted` needs a top-up. Telling a shop with 300
-   * credits left to go and buy more would be a lie.
+   * still has credits, whereas `exhausted` clears at the start of next month or by
+   * upgrading. Telling a shop with 300 credits left that its allowance is spent
+   * would be a lie.
    */
   | { ok: false; reason: 'rate_limited'; retryAfterMs: number; quote: CreditQuote };
 
@@ -323,8 +327,9 @@ export async function reserveCredits(
      * Burst check before the balance check.
      *
      * Order matters: a runaway loop on a shop with an empty balance should be told it is
-     * going too fast, not told to buy credits it would then also burn in ninety seconds.
-     * And a caller hammering an exhausted account is the case most likely to be a script.
+     * going too fast, not told its allowance is gone when it will be back in ninety
+     * seconds. And a caller hammering an exhausted account is the case most likely to be
+     * a script.
      */
     const recent = recentCalls(data, nowMs);
     if (recent.length >= BURST_LIMIT) {
@@ -567,13 +572,13 @@ export class AiRateLimitedError extends Error {
 
 /** Thrown by `withCredits` when there is nothing left to spend. */
 export class AiCreditsExhaustedError extends Error {
-  /** Machine-readable, so a client can render a Top up button instead of prose. */
+  /** Machine-readable, so a client can render an Upgrade button instead of prose. */
   readonly code = 'credits_exhausted' as const;
   readonly quote: CreditQuote;
 
   constructor(quote: CreditQuote) {
     super(
-      `Out of AI credits. The ${quote.plan} plan includes ${quote.monthlyLimit.toLocaleString()} credits a month, and your top-up balance is empty.`,
+      `Out of AI credits. The ${quote.plan} plan includes ${quote.monthlyLimit.toLocaleString()} credits a month, and it is spent. It resets at the start of next month.`,
     );
     this.name = 'AiCreditsExhaustedError';
     this.quote = quote;

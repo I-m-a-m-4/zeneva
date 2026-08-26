@@ -13,6 +13,7 @@ import { BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { TimeframePicker, type Timeframe } from './timeframe-picker';
 import { subDays, startOfDay } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 
 interface CustomerAnalyticsProps {
   customers: Customer[];
@@ -22,6 +23,7 @@ interface CustomerAnalyticsProps {
 }
 
 export default function CustomerAnalytics({ customers, receipts, currencySymbol, totalBusinessCustomers }: CustomerAnalyticsProps) {
+  const { t } = useI18n();
   const [timeframe, setTimeframe] = React.useState<Timeframe>('90d');
 
   const analyticsData = React.useMemo(() => {
@@ -51,8 +53,8 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol,
       if (receipt.customer?.id) {
         if (!customerStats[receipt.customer.id]) {
             customerStats[receipt.customer.id] = {
-                name: receipt.customer.name || 'Anonymous Buyer',
-                email: receipt.customer.email || 'N/A',
+                name: receipt.customer.name || t('reports.caAnonymousBuyer'),
+                email: receipt.customer.email || t('inventory.notAvailable'),
                 totalSpent: 0,
                 orderCount: 0,
                 firstOrder: safeToDate(receipt.createdAt)
@@ -86,7 +88,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol,
       returningCustomers,
       topCustomersBySpend,
     };
-  }, [customers, receipts, totalBusinessCustomers]);
+  }, [customers, receipts, totalBusinessCustomers, t]);
 
   const acquisitionData = React.useMemo(() => {
     if (!customers) return [];
@@ -119,37 +121,40 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol,
         <CardHeader>
             <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                Customer Intelligence
+                {t('reports.caTitle')}
             </CardTitle>
             <CardDescription>
-                Gain deeper insights into your customer base growth and retention.
+                {t('reports.caSubtitle')}
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
             <div className="grid md:grid-cols-3 gap-6">
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardDescription>Total Customers</CardDescription>
+                        <CardDescription>{t('reports.caTotalCustomers')}</CardDescription>
                         <CardTitle className="text-4xl">{analyticsData.totalCustomers}</CardTitle>
                     </CardHeader>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardDescription>New Customers (Last 30d)</CardDescription>
+                        <CardDescription>{t('reports.caNewLast30')}</CardDescription>
                         <CardTitle className="text-4xl">{analyticsData.newCustomers}</CardTitle>
                     </CardHeader>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardDescription>Returning Customers</CardDescription>
+                        <CardDescription>{t('reports.caReturning')}</CardDescription>
                         <CardTitle className="text-4xl flex items-baseline gap-1">
                             {analyticsData.returningCustomers}
                             <span className="text-sm font-normal text-muted-foreground">/ {analyticsData.totalUniqueBuyers}</span>
                         </CardTitle>
                         <p className="text-[10px] text-muted-foreground mt-1">
-                            {analyticsData.totalUniqueBuyers > 0 
-                                ? ((analyticsData.returningCustomers / analyticsData.totalUniqueBuyers) * 100).toFixed(1) 
-                                : '0'}% retention rate
+                            {t('reports.caRetentionRate', {
+                                pct:
+                                    analyticsData.totalUniqueBuyers > 0
+                                        ? ((analyticsData.returningCustomers / analyticsData.totalUniqueBuyers) * 100).toFixed(1)
+                                        : '0',
+                            })}
                         </p>
                     </CardHeader>
                 </Card>
@@ -158,7 +163,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol,
             <div className="grid lg:grid-cols-2 gap-6">
                 <div>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                        <h4 className="font-semibold text-sm">Customer Acquisition</h4>
+                        <h4 className="font-semibold text-sm">{t('reports.caAcquisition')}</h4>
                         <div className="flex justify-end">
                             <TimeframePicker value={timeframe} onValueChange={setTimeframe} />
                         </div>
@@ -166,7 +171,7 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol,
                     <div className="overflow-x-auto border rounded-lg p-4 bg-muted/20">
                         <div className="min-w-[600px] md:min-w-full h-[400px] w-full">
                             {acquisitionData.length > 0 ? (
-                                <ChartContainer config={{ count: { label: "New Customers", color: "hsl(var(--primary))" } }} className="h-full w-full">
+                                <ChartContainer config={{ count: { label: t('reports.caNewCustomers'), color: "hsl(var(--primary))" } }} className="h-full w-full">
                                     <BarChart data={acquisitionData}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                         <XAxis 
@@ -194,21 +199,21 @@ export default function CustomerAnalytics({ customers, receipts, currencySymbol,
                                 </ChartContainer>
                             ) : (
                                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                                    No acquisition data for this period.
+                                    {t('reports.caNoAcquisition')}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
                 <div className="md:col-span-1">
-                    <h4 className="font-semibold mb-2 text-sm">Top 5 Customers by Spending</h4>
+                    <h4 className="font-semibold mb-2 text-sm">{t('reports.caTop5')}</h4>
                     <div className="border rounded-lg overflow-auto w-full">
                         <div className="min-w-[500px]">
                             <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Customer</TableHead>
-                                    <TableHead className="text-right">Total Spent</TableHead>
+                                    <TableHead>{t('reports.colCustomer')}</TableHead>
+                                    <TableHead className="text-right">{t('reports.colTotalSpent')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

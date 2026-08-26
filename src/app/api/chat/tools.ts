@@ -1169,7 +1169,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
             }
           }
           const topItems = [...byProduct.values()].sort((a, b) => b.units - a.units).slice(0, 3);
-          const debt = round2(receipts.filter((r) => r.status === 'unpaid' || r.status === 'pending').reduce((s, r) => s + (r.total ?? 0), 0));
+          const debt = round2(receipts.filter((r) => r.paymentMethod === 'Invoice' && (r.status === 'unpaid' || r.status === 'pending')).reduce((s, r) => s + (r.total ?? 0), 0));
 
           const methodRows = Object.entries(byMethod)
             .sort((a, b) => b[1] - a[1])
@@ -1684,7 +1684,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
       execute: async ({ days }) => {
         try {
           const rows = (await receiptsSince(days))
-            .filter((r) => r.status === 'unpaid' || r.status === 'pending')
+            .filter((r) => r.paymentMethod === 'Invoice' && (r.status === 'unpaid' || r.status === 'pending'))
             .sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt));
           const owed = rows.reduce((s, r) => s + (r.total ?? 0), 0);
           return {

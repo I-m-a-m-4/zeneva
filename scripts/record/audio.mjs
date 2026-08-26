@@ -264,13 +264,14 @@ function tidy(times, duration, minGap) {
  * @param {number[]} o.keys        keystroke times, in video-timeline seconds
  * @param {number}   o.fadeOut     seconds of music fade at the tail
  * @param {string?}  o.narration   path to a voice-over WAV, already time-aligned
+ * @param {string?}  o.audioBitrate  AAC bitrate, e.g. '384k' for Store delivery
  */
 export async function mixAudio(o) {
   const {
     videoPath, outPath, duration,
     music = null, musicVolume = 0.28,
     clicks = [], keys = [], fadeOut = 1.6,
-    narration = null,
+    narration = null, audioBitrate = null,
   } = o;
 
   const clickTimes = tidy(clicks, duration, 0.05);
@@ -387,7 +388,21 @@ export async function mixAudio(o) {
   const webm = outPath.endsWith('.webm');
   const codec = webm
     ? ['-c:a', 'libopus', '-b:a', '160k']
-    : ['-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart'];
+    /*
+     * `audioBitrate` exists for one caller: the Microsoft Store, whose published
+     * spec asks for AAC-LC 384 Kbps stereo at 48 KHz. Everything else keeps 192k,
+     * which is already transparent for a voice-over over a synth bed — the higher
+     * number buys compliance, not quality.
+     *
+     * `-ar`/`-ac`/`-profile:a` are stated rather than inherited even though the
+     * filter graph already resamples to 48000 and every stem is stereo. A spec is
+     * checked with `ffprobe` against the file, and a value that is only correct
+     * because of something three filters upstream is one refactor away from
+     * silently failing certification.
+     */
+    : ['-c:a', 'aac', '-profile:a', 'aac_low',
+       '-b:a', audioBitrate || '192k', '-ar', '48000', '-ac', '2',
+       '-movflags', '+faststart'];
 
   await run('ffmpeg', [
     '-hide_banner', '-loglevel', 'error', '-y',

@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
+import { useI18n } from "@/context/i18n-context";
 
 export function ProductTour() {
   const [hasSeenTour, setHasSeenTour] = useState(true);
   const pathname = usePathname();
+  const { t } = useI18n();
 
   useEffect(() => {
     // Only show tour on the dashboard
@@ -112,6 +114,7 @@ export function ProductTour() {
         color: #fff !important;
         box-shadow: 0 2px 8px rgba(234, 115, 50, 0.35) !important;
         margin-left: auto !important;
+        display: inline-block !important;
       }
       .driver-popover-next-btn:hover {
         background: var(--driver-brand-dark) !important;
@@ -120,6 +123,7 @@ export function ProductTour() {
       .driver-popover-prev-btn {
         background: rgba(0,0,0,0.04) !important;
         color: #09090b !important;
+        display: inline-block !important;
       }
       .driver-popover-prev-btn:hover {
         background: rgba(0,0,0,0.08) !important;
@@ -143,15 +147,15 @@ export function ProductTour() {
         showProgress: true,
         animate: true,
         allowClose: true,
-        closeBtnText: "Skip",
-        doneBtnText: "Let's Go!",
-        nextBtnText: "Next",
-        prevBtnText: "Back",
+        closeBtnText: t('tour.skip'),
+        doneBtnText: t('tour.done'),
+        nextBtnText: t('tour.next'),
+        prevBtnText: t('tour.back'),
         steps: [
           {
             popover: {
-              title: "Welcome to Zeneva",
-              description: "Your store is officially set up. Let's take a quick 3-step tour to help you get started.",
+              title: t('tour.welcomeTitle'),
+              description: t('tour.welcomeDesc'),
               side: "left",
               align: "start"
             }
@@ -159,8 +163,8 @@ export function ProductTour() {
           {
             element: isMobile ? "#tour-nav-mobile-inventory" : "#tour-nav-inventory",
             popover: {
-              title: "1. Manage Inventory",
-              description: "This is where you'll add your products, track stock levels, and organize categories.",
+              title: t('tour.inventoryTitle'),
+              description: t('tour.inventoryDesc'),
               side: isMobile ? "top" : "right",
               align: "start"
             }
@@ -168,8 +172,8 @@ export function ProductTour() {
           {
             element: isMobile ? "#tour-nav-mobile-pos" : "#tour-nav-pos",
             popover: {
-              title: "2. Point of Sale (POS)",
-              description: "Ready to sell? Use the POS to quickly ring up customers and print digital receipts.",
+              title: t('tour.posTitle'),
+              description: t('tour.posDesc'),
               side: isMobile ? "top" : "right",
               align: "start"
             }
@@ -177,8 +181,8 @@ export function ProductTour() {
           {
             element: isMobile ? "#tour-nav-mobile-dashboard" : "#tour-nav-dashboard",
             popover: {
-              title: "3. Track Analytics",
-              description: "Head back here anytime to see your daily sales, revenue growth, and store insights.",
+              title: t('tour.dashboardTitle'),
+              description: t('tour.dashboardDesc'),
               side: isMobile ? "top" : "right",
               align: "start"
             }
@@ -188,7 +192,7 @@ export function ProductTour() {
           localStorage.removeItem("zeneva_needs_tour");
           setHasSeenTour(true);
           driverObj.destroy();
-          document.head.removeChild(style);
+          if (document.head.contains(style)) document.head.removeChild(style);
         },
       });
 
@@ -203,7 +207,7 @@ export function ProductTour() {
       clearTimeout(timer);
       if (document.head.contains(style)) document.head.removeChild(style);
     };
-  }, [pathname]);
+  }, [pathname, t]);
 
   return null;
 }

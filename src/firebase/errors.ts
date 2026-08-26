@@ -113,11 +113,13 @@ ${JSON.stringify(requestObject, null, 2)}`;
  */
 export class FirestorePermissionError extends Error {
   public readonly request: SecurityRuleRequest;
+  public readonly path: string;
 
   constructor(context: SecurityRuleContext) {
     const requestObject = buildRequestObject(context);
     super(buildErrorMessage(requestObject));
     this.name = 'FirebaseError';
     this.request = requestObject;
+    this.path = context.path;
   }
 }

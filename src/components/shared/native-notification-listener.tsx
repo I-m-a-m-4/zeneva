@@ -57,50 +57,77 @@ export function NativeNotificationListener() {
   React.useEffect(() => {
     if (!user?.uid || !db) return;
 
-    // Reset when the account changes, or the first snapshot of the new account is
-    // treated as history belonging to the previous one.
-    initializedRef.current = false;
+    let unsubscribe: (() => void) | null = null;
+    let isCurrent = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+    let retryTimeoutId: any = null;
 
-    const notifRef = collection(db, 'users', user.uid, 'notifications');
-    const q = query(notifRef, orderBy('createdAt', 'desc'), limit(5));
+    const startListener = () => {
+      if (!isCurrent) return;
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        // Skip the initial load so a fresh start does not pop historical items.
-        if (!initializedRef.current) {
-          initializedRef.current = true;
-          return;
-        }
+      // Reset when the account changes, or the first snapshot of the new account is
+      // treated as history belonging to the previous one.
+      initializedRef.current = false;
 
-        snapshot.docChanges().forEach((change) => {
-          if (change.type !== 'added') return;
+      const notifRef = collection(db, 'users', user.uid, 'notifications');
+      const q = query(notifRef, orderBy('createdAt', 'desc'), limit(5));
 
-          const data = change.doc.data() as any;
-          if (!data?.title) return;
+      unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          retryCount = 0; // Reset retries on a successful connection
+          // Skip the initial load so a fresh start does not pop historical items.
+          if (!initializedRef.current) {
+            initializedRef.current = true;
+            return;
+          }
 
-          // A locally-written document arrives once with `createdAt: null` (the
-          // server timestamp has not resolved yet) and again once it has. Showing
-          // the first pass would use a null date; skipping it entirely would lose
-          // notifications this device wrote for itself, so treat a missing
-          // timestamp as "now" and let the dispatcher's de-dupe absorb the second.
-          const createdAt = data.createdAt ? safeToDate(data.createdAt).getTime() : Date.now();
-          if (Number.isFinite(createdAt) && Date.now() - createdAt > FRESHNESS_WINDOW_MS) return;
+          snapshot.docChanges().forEach((change) => {
+            if (change.type !== 'added') return;
 
-          void triggerNativeNotification({
-            key: change.doc.id,
-            title: data.title,
-            body: data.body || '',
-            url: resolveNotificationLink({ id: change.doc.id, ...data, isGlobal: false }),
+            const data = change.doc.data() as any;
+            if (!data?.title) return;
+
+            // A locally-written document arrives once with `createdAt: null` (the
+            // server timestamp has not resolved yet) and again once it has. Showing
+            // the first pass would use a null date; skipping it entirely would lose
+            // notifications this device wrote for itself, so treat a missing
+            // timestamp as "now" and let the dispatcher's de-dupe absorb the second.
+            const createdAt = data.createdAt ? safeToDate(data.createdAt).getTime() : Date.now();
+            if (Number.isFinite(createdAt) && Date.now() - createdAt > FRESHNESS_WINDOW_MS) return;
+
+            void triggerNativeNotification({
+              key: change.doc.id,
+              title: data.title,
+              body: data.body || '',
+              url: resolveNotificationLink({ id: change.doc.id, ...data, isGlobal: false }),
+            });
           });
-        });
-      },
-      (err) => {
-        console.warn('NativeNotificationListener error:', err);
-      },
-    );
+        },
+        (err: any) => {
+          if (!isCurrent) return;
+          console.warn('NativeNotificationListener error:', err);
 
-    return () => unsubscribe();
+          // If we encounter a permission-denied error, it might be transient during auth stabilization.
+          // Re-establish the listener after a progressive delay.
+          if (err.code === 'permission-denied' && retryCount < maxRetries) {
+            retryCount++;
+            const delay = 2000 * retryCount;
+            console.log(`[NativeNotificationListener] Retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+            retryTimeoutId = setTimeout(startListener, delay);
+          }
+        },
+      );
+    };
+
+    startListener();
+
+    return () => {
+      isCurrent = false;
+      if (unsubscribe) unsubscribe();
+      if (retryTimeoutId) clearTimeout(retryTimeoutId);
+    };
   }, [user?.uid, db]);
 
   return null;
