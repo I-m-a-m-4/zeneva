@@ -537,7 +537,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
         )}
 
         {/* ── Main Scrollable Area ── */}
-        <div className={`flex-1 min-h-0 flex flex-col ${isInitialState ? 'justify-between items-center py-6 sm:py-10' : ''} overflow-y-auto z-10`}>
+        <div className={`flex-1 min-h-0 flex flex-col ${isInitialState ? 'justify-center items-center' : ''} overflow-y-auto z-10`}>
 
           {/* ── Initial Empty State (Manus AI Redesign) ── */}
           <AnimatePresence>
@@ -547,34 +547,19 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.3 }}
-                className="w-full max-w-3xl px-4 flex flex-col items-center my-auto"
+                className="w-full max-w-3xl px-4 flex flex-col items-center"
               >
-                {/* 1. Top Plan Pill */}
-                <div className="flex items-center justify-center mb-6">
-                  <div className="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full border border-border/80 bg-muted/40 text-xs shadow-xs">
-                    <span className="text-muted-foreground font-medium capitalize">
-                      {plan ? `${plan} plan` : 'Free plan'}
-                    </span>
-                    <span className="h-3 w-px bg-border" />
-                    <Link
-                      href={UPGRADE_HREF}
-                      className="text-orange-600 dark:text-orange-500 font-semibold hover:underline flex items-center gap-1"
-                    >
-                      Upgrade
-                    </Link>
-                  </div>
-                </div>
-
-                {/* 2. Headline */}
-                <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-serif text-foreground font-normal tracking-tight text-center mb-8">
+                {/* ── MOBILE: just the headline, input is in the floating bar below ── */}
+                {/* Headline — always visible */}
+                <h1 className="text-[32px] sm:text-4xl lg:text-[44px] font-serif text-foreground font-normal tracking-tight text-center mb-8 sm:mb-10">
                   What can I do for you?
                 </h1>
 
-                {/* Credit wall notification if out of quota */}
+                {/* Credit wall — always visible */}
                 {creditWall && <div className="w-full mb-3">{creditWall}</div>}
 
-                {/* 3. Unified Manus-Style Chat Box */}
-                <div className="w-full bg-card border border-border/90 rounded-3xl shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col">
+                {/* ── DESKTOP ONLY: unified input box ── */}
+                <div className="hidden sm:flex w-full bg-card border border-border/90 rounded-3xl shadow-sm hover:shadow-md transition-all overflow-hidden flex-col">
                   {/* Prompt Text Input */}
                   <form onSubmit={handleSend} className="p-4 sm:p-5 flex flex-col gap-4">
                     <input
@@ -587,7 +572,6 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
                     {/* Inner Action Bar */}
                     <div className="flex items-center justify-between pt-2">
-                      {/* Left Controls & Badges (No plus button) */}
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -596,35 +580,28 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                         >
                           <SlidersHorizontal className="h-3.5 w-3.5" />
                         </button>
-
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-[11px] font-medium text-muted-foreground border border-border/60">
                           <Laptop className="h-3 w-3 text-orange-500" />
                           <span>Zeneva Store OS</span>
                         </div>
                       </div>
-
-                      {/* Right Submit & Dictation Controls */}
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={toggleListening}
                           className={cn(
-                            "h-8 w-8 rounded-full flex items-center justify-center transition-colors relative",
-                            isListening
-                              ? "bg-orange-500/20 text-orange-600 animate-pulse"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
+                            isListening ? "bg-orange-500/20 text-orange-600 animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                           )}
                           title={isListening ? "Stop listening" : "Voice dictation"}
                         >
                           <Mic className="h-4 w-4" />
                         </button>
-
                         {isLoading ? (
                           <button
                             type="button"
                             onClick={() => { try { stop(); } catch {} }}
-                            className="h-8.5 w-8.5 rounded-full bg-orange-600 text-white flex items-center justify-center hover:bg-orange-700 shadow-sm"
-                            title="Stop"
+                            className="h-8 w-8 rounded-full bg-orange-600 text-white flex items-center justify-center hover:bg-orange-700 shadow-sm"
                           >
                             <span className="h-3 w-3 bg-white rounded-xs" />
                           </button>
@@ -633,12 +610,9 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                             type="submit"
                             disabled={!localInput.trim() || !businessId}
                             className={cn(
-                              "h-8.5 w-8.5 rounded-full flex items-center justify-center transition-all",
-                              localInput.trim()
-                                ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer"
-                                : "bg-muted text-muted-foreground cursor-not-allowed"
+                              "h-8 w-8 rounded-full flex items-center justify-center transition-all",
+                              localInput.trim() ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed"
                             )}
-                            title="Send"
                           >
                             <ArrowUp className="h-4 w-4 stroke-[2.5]" />
                           </button>
@@ -647,49 +621,29 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                     </div>
                   </form>
 
-                  {/* 4. Integrated "Suggested for you" Section */}
+                  {/* Suggested for you — desktop only */}
                   {showSuggestions && (
                     <div className="border-t border-border/60 bg-muted/20 p-4 sm:p-5 flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-muted-foreground">Suggested for you</span>
                         <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setSuggestionIndex((prev) => (prev + 1) % SUGGESTION_POOLS.length)}
-                            className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
-                            title="Shuffle suggestions"
-                          >
+                          <button type="button" onClick={() => setSuggestionIndex((prev) => (prev + 1) % SUGGESTION_POOLS.length)} className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors">
                             <RotateCw className="h-3 w-3" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowSuggestions(false)}
-                            className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
-                            title="Hide suggestions"
-                          >
+                          <button type="button" onClick={() => setShowSuggestions(false)} className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors">
                             <X className="h-3 w-3" />
                           </button>
                         </div>
                       </div>
-
-                      {/* 3 Grid Cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-3 gap-2.5">
                         {SUGGESTION_POOLS[suggestionIndex].map((item, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => submitPrompt(item.prompt)}
-                            className="text-left p-3 rounded-2xl bg-card border border-border/80 hover:border-orange-500/40 hover:shadow-xs transition-all flex flex-col justify-between group h-24"
-                          >
+                          <button key={idx} type="button" onClick={() => submitPrompt(item.prompt)}
+                            className="text-left p-3 rounded-2xl bg-card border border-border/80 hover:border-orange-500/40 hover:shadow-xs transition-all flex flex-col justify-between group h-24">
                             <div className="flex items-start justify-between gap-1 w-full">
-                              <span className="text-xs font-semibold text-foreground line-clamp-1 group-hover:text-orange-600 transition-colors">
-                                {item.title}
-                              </span>
+                              <span className="text-xs font-semibold text-foreground line-clamp-1 group-hover:text-orange-600 transition-colors">{item.title}</span>
                               <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-orange-500 transition-colors shrink-0" />
                             </div>
-                            <span className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-                              {item.desc}
-                            </span>
+                            <span className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{item.desc}</span>
                           </button>
                         ))}
                       </div>
@@ -697,17 +651,13 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                   )}
                 </div>
 
-                {/* 5. Category Quick Chips */}
-                <div className="flex flex-wrap items-center justify-center gap-2 mt-6 max-w-2xl">
+                {/* ── DESKTOP ONLY: quick chips ── */}
+                <div className="hidden sm:flex flex-wrap items-center justify-center gap-2 mt-6 max-w-2xl">
                   {QUICK_CHIPS.map((chip, i) => {
                     const Icon = chip.icon;
                     return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => submitPrompt(chip.prompt)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/70 bg-card hover:bg-muted hover:border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-all shadow-2xs"
-                      >
+                      <button key={i} type="button" onClick={() => submitPrompt(chip.prompt)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/70 bg-card hover:bg-muted hover:border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-all shadow-2xs">
                         <Icon className="h-3.5 w-3.5 text-orange-500" />
                         <span>{chip.label}</span>
                       </button>
@@ -715,42 +665,25 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                   })}
                 </div>
 
-                {/* 6. Bottom Feature Carousel */}
-                <div className="w-full max-w-xl mt-10 sm:mt-12 flex flex-col items-center gap-3">
+                {/* ── DESKTOP ONLY: feature carousel ── */}
+                <div className="hidden sm:flex w-full max-w-xl mt-10 sm:mt-12 flex-col items-center gap-3">
                   <div className="w-full p-4 rounded-2xl bg-muted/40 border border-border/60 flex items-center justify-between gap-4 shadow-2xs">
                     <div className="flex items-center gap-3.5 min-w-0">
-                      {React.createElement(CAROUSEL_SLIDES[carouselIndex].icon, {
-                        className: "h-6 w-6 text-orange-500 shrink-0"
-                      })}
+                      {React.createElement(CAROUSEL_SLIDES[carouselIndex].icon, { className: "h-6 w-6 text-orange-500 shrink-0" })}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-foreground truncate">
-                            {CAROUSEL_SLIDES[carouselIndex].title}
-                          </p>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-orange-500/10 text-orange-600 border border-orange-500/20">
-                            {CAROUSEL_SLIDES[carouselIndex].badge}
-                          </span>
+                          <p className="text-xs font-bold text-foreground truncate">{CAROUSEL_SLIDES[carouselIndex].title}</p>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-orange-500/10 text-orange-600 border border-orange-500/20">{CAROUSEL_SLIDES[carouselIndex].badge}</span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                          {CAROUSEL_SLIDES[carouselIndex].desc}
-                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{CAROUSEL_SLIDES[carouselIndex].desc}</p>
                       </div>
                     </div>
                   </div>
-
-                  {/* Carousel Pagination Dots */}
                   <div className="flex items-center gap-1.5">
                     {CAROUSEL_SLIDES.map((_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setCarouselIndex(i)}
-                        className={cn(
-                          "h-1.5 rounded-full transition-all",
-                          carouselIndex === i ? "w-4 bg-orange-500" : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                        )}
-                        aria-label={`Go to slide ${i + 1}`}
-                      />
+                      <button key={i} type="button" onClick={() => setCarouselIndex(i)}
+                        className={cn("h-1.5 rounded-full transition-all", carouselIndex === i ? "w-4 bg-orange-500" : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50")}
+                        aria-label={`Go to slide ${i + 1}`} />
                     ))}
                   </div>
                 </div>
@@ -866,12 +799,17 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
           )}
         </div>
 
-        {/* ── Floating Bottom Input (Chat Mode) ── */}
-        {!isInitialState && (
+        {/* ── Floating Bottom Input (Chat Mode + Mobile Initial State) ── */}
+        {(
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="absolute bottom-0 left-0 right-0 p-4 pb-20 md:p-5 md:pb-8 bg-gradient-to-t from-background via-background/90 to-transparent z-20"
+            className={cn(
+              "absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-background via-background/90 to-transparent",
+              isInitialState
+                ? "sm:hidden p-4 pb-20" // mobile-only floating bar on initial state
+                : "p-4 pb-20 md:p-5 md:pb-8"
+            )}
           >
             <div className="max-w-3xl mx-auto">
               {creditWall && <div className="mb-3">{creditWall}</div>}
