@@ -38,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 import { cn } from '@/lib/utils';
 import SummaryCard from '@/components/dashboard/summary-card';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,6 +66,7 @@ export default function DebtsPage() {
         isLoading: isUserLoading
     } = usePOS();
     const router = useRouter();
+    const { t } = useI18n();
     const isLoading = isDataLoading || isUserLoading;
 
     React.useEffect(() => {
@@ -168,59 +170,59 @@ export default function DebtsPage() {
                         <ArrowLeft className="h-5 w-5" />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Debt & Backorder Management</h1>
-                        <p className="text-muted-foreground">Monitor products sold while out of stock and manage customer commitments.</p>
+                        <h1 className="text-3xl font-bold tracking-tight">{t('inventory.debtTitle')}</h1>
+                        <p className="text-muted-foreground">{t('inventory.debtSubtitle')}</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
                         <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        Refresh
+                        {t('common.refresh')}
                     </Button>
                     <Button size="sm" variant="outline" asChild>
-                        <Link href="/inventory">View All Inventory</Link>
+                        <Link href="/inventory">{t('inventory.debtViewAllInventory')}</Link>
                     </Button>
                 </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <SummaryCard
-                    title="Total Items Owed"
+                    title={t('inventory.debtTotalItemsOwed')}
                     value={totalDebtItems}
                     icon={Package}
-                    description="Units to be fulfilled"
+                    description={t('inventory.debtUnitsToFulfil')}
                     href="/inventory"
                 />
                 <SummaryCard
-                    title="Debt Value"
+                    title={t('inventory.debtValue')}
                     value={`${currencySymbol}${totalDebtValue.toLocaleString()}`}
                     icon={DollarSign}
-                    description="Value of backordered sales"
+                    description={t('inventory.debtValueDesc')}
                 />
                 <SummaryCard
-                    title="Potential Profit"
+                    title={t('inventory.debtPotentialProfit')}
                     value={`${currencySymbol}${potentialRevenue.toLocaleString()}`}
                     icon={TrendingUp}
-                    description="Est. profit once restocked"
+                    description={t('inventory.debtPotentialProfitDesc')}
                 />
                 <SummaryCard
-                    title="Demand Index"
-                    value="High"
+                    title={t('inventory.debtDemandIndex')}
+                    value={t('inventory.debtDemandHigh')}
                     icon={ShoppingCart}
-                    description={`Based on ${debtProducts.length} items`}
+                    description={t('inventory.debtDemandBasis', { count: debtProducts.length })}
                 />
             </div>
 
             <Card className="border-none shadow-premium bg-background/50 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between border-b pb-6">
                     <div className="space-y-1">
-                        <CardTitle>Backordered Products</CardTitle>
-                        <CardDescription>Products with negative stock balances</CardDescription>
+                        <CardTitle>{t('inventory.debtBackorderedProducts')}</CardTitle>
+                        <CardDescription>{t('inventory.debtBackorderedProductsDesc')}</CardDescription>
                     </div>
                     <div className="relative w-72">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search debts..."
+                            placeholder={t('inventory.debtSearchPlaceholder')}
                             className="pl-9 bg-muted/20 border-muted/50 focus:bg-background transition-all"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -231,12 +233,12 @@ export default function DebtsPage() {
                     <Table>
                         <TableHeader className="bg-muted/30">
                             <TableRow>
-                                <TableHead className="font-semibold">Product</TableHead>
+                                <TableHead className="font-semibold">{t('inventory.colProduct')}</TableHead>
                                 <TableHead className="font-semibold">SKU</TableHead>
-                                <TableHead className="font-semibold">Units Owed</TableHead>
-                                <TableHead className="font-semibold text-right">Debt Value</TableHead>
-                                <TableHead className="font-semibold text-center">Severity</TableHead>
-                                <TableHead className="font-semibold text-right">Actions</TableHead>
+                                <TableHead className="font-semibold">{t('inventory.debtColUnitsOwed')}</TableHead>
+                                <TableHead className="font-semibold text-right">{t('inventory.debtValue')}</TableHead>
+                                <TableHead className="font-semibold text-center">{t('inventory.debtColSeverity')}</TableHead>
+                                <TableHead className="font-semibold text-right">{t('common.actions')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -244,17 +246,21 @@ export default function DebtsPage() {
                                 debtProducts.map((product) => {
                                     const debtCount = Math.abs(product.stock || 0);
                                     const debtValue = debtCount * product.price;
-                                    let severity = "Low";
+                                    // The rung is picked here and translated at render — the four
+                                    // labels are adjectives, and several of the eleven languages
+                                    // inflect them, so each rung is its own key rather than one
+                                    // key with a word substituted in.
+                                    let severity = t('inventory.debtSeverityLow');
                                     let severityColor = "bg-blue-500/10 text-blue-500 border-blue-500/20";
 
                                     if (debtCount > 10) {
-                                        severity = "Critical";
+                                        severity = t('inventory.debtSeverityCritical');
                                         severityColor = "bg-red-500/10 text-red-500 border-red-500/20";
                                     } else if (debtCount > 5) {
-                                        severity = "High";
+                                        severity = t('inventory.debtSeverityHigh');
                                         severityColor = "bg-orange-500/10 text-orange-500 border-orange-500/20";
                                     } else if (debtCount > 2) {
-                                        severity = "Medium";
+                                        severity = t('inventory.debtSeverityMedium');
                                         severityColor = "bg-amber-500/10 text-amber-500 border-amber-500/20";
                                     }
 
@@ -270,7 +276,7 @@ export default function DebtsPage() {
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Badge variant="destructive" className="font-mono">{product.stock}</Badge>
-                                                    <span className="text-xs text-muted-foreground">({debtCount} units)</span>
+                                                    <span className="text-xs text-muted-foreground">{t('inventory.debtUnitsParen', { count: debtCount })}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
@@ -321,10 +327,10 @@ export default function DebtsPage() {
                                                     }}
                                                 >
                                                     <Receipt className="h-3.5 w-3.5 mr-1" />
-                                                    Details
+                                                    {t('inventory.debtDetails')}
                                                 </Button>
                                                 <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/inventory/details?id=${product.id}`}>Edit</Link>
+                                                    <Link href={`/inventory/details?id=${product.id}`}>{t('common.edit')}</Link>
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
@@ -337,8 +343,8 @@ export default function DebtsPage() {
                                             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                                                 <AlertCircle className="h-6 w-6 text-muted-foreground" />
                                             </div>
-                                            <p className="text-muted-foreground font-medium">No recorded debts or backorders found.</p>
-                                            <p className="text-sm text-muted-foreground max-w-xs">When you sell products while they are out of stock, they will appear here as debts to be fulfilled.</p>
+                                            <p className="text-muted-foreground font-medium">{t('inventory.debtNoneFound')}</p>
+                                            <p className="text-sm text-muted-foreground max-w-xs">{t('inventory.debtNoneFoundHint')}</p>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -350,7 +356,7 @@ export default function DebtsPage() {
                     <CardFooter className="py-4 border-t bg-muted/10 justify-center">
                         <p className="text-xs text-muted-foreground italic flex items-center gap-2">
                             <TrendingUp className="h-3 w-3" />
-                            These products show higher-than-normal demand despite being out of stock. Prioritize restocking.
+                            {t('inventory.debtFooterNote')}
                         </p>
                     </CardFooter>
                 )}
@@ -359,9 +365,9 @@ export default function DebtsPage() {
             <Dialog open={!!selectedProductOrders} onOpenChange={(open) => !open && setSelectedProductOrders(null)}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Backorder History: {viewingProductName}</DialogTitle>
+                        <DialogTitle>{t('inventory.debtHistoryTitle', { product: viewingProductName })}</DialogTitle>
                         <DialogDescription>
-                            Specific transactions that occurred after stock reached zero and require fulfillment.
+                            {t('inventory.debtHistoryDesc')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4">
@@ -374,10 +380,10 @@ export default function DebtsPage() {
                                             <div key={order.id || i} className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                                                 <div className="space-y-1">
                                                     <p className="font-semibold text-sm">
-                                                        {order.customer?.name || "Walk-in Customer"}
+                                                        {order.customer?.name || t('pos.walkIn')}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        {order.customer?.email || "No email provided"}
+                                                        {order.customer?.email || t('inventory.debtNoEmail')}
                                                     </p>
                                                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
                                                         {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'PPP p') : format(new Date(order.createdAt), 'PPP p')}
@@ -385,17 +391,21 @@ export default function DebtsPage() {
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="font-bold text-sm text-primary">
-                                                        {item?.quantity || 1} units
+                                                        {t('inventory.debtUnits', { count: item?.quantity || 1 })}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
                                                         {currencySymbol}{(item?.price * (item?.quantity || 1)).toLocaleString()}
                                                     </p>
                                                     <div className="flex flex-wrap gap-1 mt-1 justify-end">
                                                         <Badge variant="outline" className="text-[10px] h-4">
-                                                            {order.paymentMethod || (order.orderType === 'Online' ? 'Paystack' : 'Cash')}
+                                                            {order.paymentMethod || (order.orderType === 'Online' ? 'Paystack' : t('pos.cash'))}
                                                         </Badge>
+                                                        {/*
+                                                          * `orderType` is compared against above ('Online'), so the
+                                                          * stored value stays English and only the badge translates.
+                                                          */}
                                                         <Badge variant="secondary" className="text-[10px] h-4">
-                                                            {order.orderType}
+                                                            {order.orderType === 'Online' ? t('common.online') : t('inventory.debtOrderTypeInStore')}
                                                         </Badge>
                                                     </div>
                                                 </div>
@@ -404,7 +414,7 @@ export default function DebtsPage() {
                                     })
                                 ) : (
                                     <div className="text-center py-8">
-                                        <p className="text-muted-foreground">No recent orders found for this product.</p>
+                                        <p className="text-muted-foreground">{t('inventory.debtNoRecentOrders')}</p>
                                     </div>
                                 )}
                             </div>

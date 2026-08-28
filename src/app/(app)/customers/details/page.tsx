@@ -21,7 +21,7 @@ import { format } from 'date-fns';
 import { 
     ArrowLeft, Bot, Sparkles, BrainCircuit, Lightbulb, Package, Loader2, Trash2, Pencil, 
     Wallet, Scale, Ruler, History, AlertTriangle, CheckCircle2, MoreVertical, Plus, ChevronRight,
-    Receipt, FileText
+    Receipt, FileText, Clock, ShoppingBag, PlusCircle
 } from 'lucide-react';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { getCachedCustomerReceipts, syncCustomersToOffline } from '@/lib/sqlite-sync';
@@ -43,9 +43,10 @@ import { safeToDate, cn } from '@/lib/utils';
 import CustomerCrmPanel from '@/components/customers/customer-crm-panel';
 import {
     computeCustomerSegments,
-    SEGMENT_LABELS,
+    segmentLabelKey,
     type SegmentKey,
 } from '@/lib/customer-segments';
+import { useI18n } from '@/context/i18n-context';
 
 /**
  * The AI summary is generated from customer records, and a customer name is a
@@ -76,8 +77,9 @@ function CustomerDetailContent() {
     const router = useRouter();
     const customerId = searchParams.get('id') as string;
     const { toast } = useToast();
+    const { t } = useI18n();
 
-    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue, business } = usePOS();
+    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue, business, selectCustomer } = usePOS();
 
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     
@@ -209,6 +211,100 @@ function CustomerDetailContent() {
         return unpaidReceipts.reduce((sum, r) => sum + r.total, 0);
     }, [unpaidReceipts]);
 
+    // Calculate Purchase Frequency and Churn Risk
+    const behaviorInsights = React.useMemo(() => {
+        if (!receipts || receipts.length === 0) {
+            return {
+                frequencyText: 'No purchases yet',
+                daysSinceLast: 0,
+                churnRisk: 'low' as 'low' | 'medium' | 'high',
+                riskLabel: 'Low Risk',
+                riskColor: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+            };
+        }
+
+        const dates = receipts
+            .map(r => safeToDate(r.createdAt))
+            .sort((a, b) => a.getTime() - b.getTime()); // oldest to newest
+
+        const now = new Date();
+        const lastPurchaseDate = dates[dates.length - 1];
+        const daysSinceLast = Math.max(0, Math.ceil((now.getTime() - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+        if (dates.length < 2) {
+            let churnRisk: 'low' | 'medium' | 'high' = 'low';
+            if (daysSinceLast > 60) churnRisk = 'high';
+            else if (daysSinceLast > 30) churnRisk = 'medium';
+
+            const riskLabel = churnRisk === 'high' ? 'High Risk' : (churnRisk === 'medium' ? 'Medium Risk' : 'Low Risk');
+            const riskColor = churnRisk === 'high' 
+                ? 'bg-destructive/10 text-destructive' 
+                : (churnRisk === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400');
+
+            return {
+                frequencyText: 'N/A (Single Purchase)',
+                daysSinceLast,
+                churnRisk,
+                riskLabel,
+                riskColor,
+            };
+        }
+
+        let totalIntervalDays = 0;
+        for (let i = 1; i < dates.length; i++) {
+            const diffTime = dates[i].getTime() - dates[i - 1].getTime();
+            totalIntervalDays += diffTime / (1000 * 60 * 60 * 24);
+        }
+        const avgFrequency = Math.max(1, Math.round(totalIntervalDays / (dates.length - 1)));
+
+        let churnRisk: 'low' | 'medium' | 'high' = 'low';
+        if (daysSinceLast > avgFrequency * 2) {
+            churnRisk = 'high';
+        } else if (daysSinceLast > avgFrequency * 1.5) {
+            churnRisk = 'medium';
+        }
+
+        const riskLabel = churnRisk === 'high' ? 'High Risk' : (churnRisk === 'medium' ? 'Medium Risk' : 'Low Risk');
+        const riskColor = churnRisk === 'high' 
+            ? 'bg-destructive/10 text-destructive' 
+            : (churnRisk === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400');
+
+        return {
+            frequencyText: `Every ${avgFrequency} day${avgFrequency > 1 ? 's' : ''}`,
+            daysSinceLast,
+            churnRisk,
+            riskLabel,
+            riskColor,
+        };
+    }, [receipts]);
+
+    // Calculate Top Categories (visual progress bar breakdown)
+    const topCategories = React.useMemo(() => {
+        const categoryCounts: Record<string, number> = {};
+        let totalItemsCount = 0;
+
+        receipts.forEach(r => {
+            if (!r || !Array.isArray(r.items)) return;
+            r.items.forEach(item => {
+                const prod = allProducts?.find(p => p.id === item.productId);
+                const cat = prod?.category || 'Uncategorized';
+                const qty = item.quantity || 0;
+                categoryCounts[cat] = (categoryCounts[cat] || 0) + qty;
+                totalItemsCount += qty;
+            });
+        });
+
+        if (totalItemsCount === 0) return [];
+
+        return Object.entries(categoryCounts)
+            .map(([name, count]) => ({
+                name,
+                percentage: Math.round((count / totalItemsCount) * 100),
+            }))
+            .sort((a, b) => b.percentage - a.percentage)
+            .slice(0, 3);
+    }, [receipts, allProducts]);
+
     React.useEffect(() => {
         if (customer?.aiInsights) {
             setInsights(customer.aiInsights);
@@ -242,7 +338,7 @@ function CustomerDetailContent() {
                     summaryMap[productId] = {
                         product: productInfo || {
                             id: productId,
-                            name: item.name || 'Unknown Product',
+                            name: item.name || t('inventory.unknownProduct'),
                             price: item.price || 0,
                             imageUrl: (item as any).image || '',
                         },
@@ -261,15 +357,15 @@ function CustomerDetailContent() {
         });
 
         return Object.values(summaryMap).sort((a, b) => b.lastPurchase.getTime() - a.lastPurchase.getTime());
-    }, [receipts, allProducts]);
+    }, [receipts, allProducts, t]);
 
 
     const handleGenerateInsights = async () => {
         if (!customer || !receipts || !firestore || !currentUserProfile) {
             toast({
                 variant: "destructive",
-                title: "Unable to Generate Insights",
-                description: "Required customer or business data is missing. Please try refreshing the page."
+                title: t('customers.insightsUnavailableTitle'),
+                description: t('customers.insightsUnavailableBody')
             });
             return;
         }
@@ -313,11 +409,11 @@ function CustomerDetailContent() {
             // Optimistically update local state to avoid re-fetch
             setInsights(insightsWithTimestamp);
             // triggerRefresh(); // No need if we set state locally
-            toast({ variant: 'success', title: 'Insights Generated!', description: 'Intelligent customer analysis completed.' });
+            toast({ variant: 'success', title: t('customers.insightsDoneTitle'), description: t('customers.insightsDoneBody') });
 
         } catch (error) {
             console.error("Failed to generate insights:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate insights.' });
+            toast({ variant: 'destructive', title: t('common.error'), description: t('customers.insightsFailed') });
         } finally {
             setIsGeneratingInsights(false);
         }
@@ -375,9 +471,9 @@ function CustomerDetailContent() {
     if (!displayCustomer && !isLoading) {
         return (
             <div className="text-center p-8">
-                <p className="font-bold text-lg">Customer not found.</p>
+                <p className="font-bold text-lg">{t('customers.detailNotFound')}</p>
                 <Button variant="ghost" onClick={() => { NProgress.start(); router.push('/customers'); }} className="mt-4">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Customers
+                    <ArrowLeft className="mr-2 h-4 w-4" /> {t('customers.backToCustomers')}
                 </Button>
             </div>
         )
@@ -386,7 +482,7 @@ function CustomerDetailContent() {
     return (
         <div className="space-y-6">
             <Button variant="ghost" onClick={() => { NProgress.start(); router.push('/customers'); }} className="mb-4">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Customers
+                <ArrowLeft className="mr-2 h-4 w-4" /> {t('customers.backToCustomers')}
             </Button>
 
             <div className="grid md:grid-cols-3 gap-6">
@@ -405,7 +501,7 @@ function CustomerDetailContent() {
                         <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
                             {segmentBadges.length === 0 ? (
                                 <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                                    Regular
+                                    {t('customers.segmentRegular')}
                                 </span>
                             ) : (
                                 segmentBadges.map(key => (
@@ -422,7 +518,7 @@ function CustomerDetailContent() {
                                                         : "bg-primary/10 text-primary"
                                         )}
                                     >
-                                        {SEGMENT_LABELS[key]}
+                                        {t(segmentLabelKey(key))}
                                     </span>
                                 ))
                             )}
@@ -430,17 +526,17 @@ function CustomerDetailContent() {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <p className="text-2xl font-bold">{currencySymbol}{(totalSpent || 0).toLocaleString()}</p>
-                                <p className="text-xs text-muted-foreground">Total Spent</p>
+                                <p className="text-xs text-muted-foreground">{t('customers.totalSpent')}</p>
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{receipts?.length || 0}</p>
-                                <p className="text-xs text-muted-foreground">Total Orders</p>
+                                <p className="text-xs text-muted-foreground">{t('customers.totalOrders')}</p>
                             </div>
                             <div className="col-span-2 pt-2">
                                 <Separator className="my-2" />
                                 <div className={`p-3 rounded-lg flex items-center justify-between ${totalDebt > 0 ? 'bg-destructive/10 border border-destructive/20 text-destructive' : 'bg-primary/10 border border-primary/20 text-primary'}`}>
                                     <div className="text-left">
-                                        <p className="text-xs font-semibold uppercase tracking-wider">Outstanding Debt</p>
+                                        <p className="text-xs font-semibold uppercase tracking-wider">{t('customers.outstandingDebt')}</p>
                                         <p className="text-xl font-black">{currencySymbol}{(totalDebt || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                                     </div>
                                     <Wallet className="h-6 w-6 opacity-50" />
@@ -448,11 +544,16 @@ function CustomerDetailContent() {
                                 {displayCustomer.createdAt && (
                                     <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                                         <History className="h-3.5 w-3.5 shrink-0" />
+                                        {/*
+                                          * One key carrying the date, not "Member since" beside a
+                                          * bolded span: several of the eleven languages put the
+                                          * date first, and a split sentence cannot be reordered.
+                                          * The date loses its bold; the sentence stays correct.
+                                          */}
                                         <span>
-                                            Member since{' '}
-                                            <span className="font-medium text-foreground">
-                                                {format(safeToDate(displayCustomer.createdAt), 'dd MMM yyyy')}
-                                            </span>
+                                            {t('customers.memberSince', {
+                                                date: format(safeToDate(displayCustomer.createdAt), 'dd MMM yyyy'),
+                                            })}
                                         </span>
                                     </div>
                                 )}
@@ -461,13 +562,114 @@ function CustomerDetailContent() {
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
                         <Button variant="outline" className="w-full" onClick={() => setCustomerToEdit(displayCustomer)}>
-                            <Pencil className="mr-2 h-4 w-4" /> Edit Profile
+                            <Pencil className="mr-2 h-4 w-4" /> {t('customers.editProfile')}
                         </Button>
                         {canDelete && (
                             <Button variant="destructive" className="w-full" onClick={() => setCustomerToDelete(displayCustomer)} disabled={isDeleting}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Customer
+                                <Trash2 className="mr-2 h-4 w-4" /> {t('customers.deleteCustomer')}
                             </Button>
                         )}
+                    </CardFooter>
+                </Card>
+
+                {/* Insights and Quick Actions Card to fill the empty space next to the Profile Card */}
+                <Card className="md:col-span-2 bg-card border-border/60 shadow-sm flex flex-col justify-between">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-xl font-bold flex items-center gap-2">
+                            <Sparkles className="h-5 w-5 text-primary" />
+                            Insights & Quick Actions
+                        </CardTitle>
+                        <CardDescription>
+                            Real-time customer statistics, product preferences, and fast sale shortcuts.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                        {/* Behavioral Insights */}
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Behavioral Insights</h4>
+                            
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/40">
+                                    <div className="flex items-center gap-2.5">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">Purchase Frequency</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-foreground">
+                                        {behaviorInsights.frequencyText}
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/40">
+                                    <div className="flex items-center gap-2.5">
+                                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">Churn Risk Status</span>
+                                    </div>
+                                    <span className={cn(
+                                        "text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider",
+                                        behaviorInsights.riskColor
+                                    )}>
+                                        {behaviorInsights.riskLabel}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Top Categories */}
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Top Categories</h4>
+                            
+                            <div className="space-y-3">
+                                {topCategories.length > 0 ? (
+                                    topCategories.map(cat => (
+                                        <div key={cat.name} className="space-y-1">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="font-medium truncate max-w-[70%]">{cat.name}</span>
+                                                <span className="text-muted-foreground font-bold">{cat.percentage}%</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-primary rounded-full transition-all duration-500" 
+                                                    style={{ width: `${cat.percentage}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="flex items-center justify-center h-20 border border-dashed rounded-lg text-xs text-muted-foreground">
+                                        No purchase categories on record
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+
+                    <CardFooter className="border-t border-border/40 pt-4 flex flex-col sm:flex-row gap-3">
+                        <Button 
+                            className="w-full flex-1" 
+                            onClick={() => {
+                                if (selectCustomer) selectCustomer(displayCustomer);
+                                NProgress.start();
+                                router.push('/sales/pos/select-products');
+                            }}
+                        >
+                            <ShoppingBag className="mr-2 h-4 w-4" /> Start New Sale
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            className="w-full flex-1"
+                            onClick={() => {
+                                if (selectCustomer) selectCustomer(displayCustomer);
+                                toast({
+                                    variant: "success",
+                                    title: "Customer Selected",
+                                    description: `Pre-loaded ${displayCustomer.name} for the invoice. Proceed to select products.`
+                                });
+                                NProgress.start();
+                                router.push('/sales/pos/select-products');
+                            }}
+                        >
+                            <PlusCircle className="mr-2 h-4 w-4" /> Create Invoice
+                        </Button>
                     </CardFooter>
                 </Card>
 
@@ -487,17 +689,17 @@ function CustomerDetailContent() {
 
                 <Card className="md:col-span-2 bg-card border-border/60 shadow-sm">
                     <CardHeader>
-                        <CardTitle>Purchase History</CardTitle>
-                        <CardDescription>Products this customer has purchased, sorted by most recent.</CardDescription>
+                        <CardTitle>{t('customers.purchaseHistory')}</CardTitle>
+                        <CardDescription>{t('customers.purchaseHistoryDesc')}</CardDescription>
                     </CardHeader>
                     <CardContent className="max-h-[380px] overflow-y-auto pr-2 scrollbar-thin">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Product</TableHead>
-                                    <TableHead className="text-center">Total Quantity</TableHead>
-                                    <TableHead className="text-right">Total Spent</TableHead>
-                                    <TableHead className="text-right">Last Purchased</TableHead>
+                                    <TableHead>{t('inventory.colProduct')}</TableHead>
+                                    <TableHead className="text-center">{t('customers.colTotalQuantity')}</TableHead>
+                                    <TableHead className="text-right">{t('customers.totalSpent')}</TableHead>
+                                    <TableHead className="text-right">{t('customers.colLastPurchased')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -518,9 +720,9 @@ function CustomerDetailContent() {
                                         </TableCell>
                                         <TableCell className="text-center">{summary.totalQuantity || 0}</TableCell>
                                         <TableCell className="text-right">{currencySymbol}{(summary.totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                                        <TableCell className="text-right">{summary.lastPurchase ? format(summary.lastPurchase, 'PP') : 'N/A'}</TableCell>
+                                        <TableCell className="text-right">{summary.lastPurchase ? format(summary.lastPurchase, 'PP') : t('customers.notAvailable')}</TableCell>
                                     </TableRow>
-                                )) : <TableRow><TableCell colSpan={4} className="text-center h-24">No purchases yet.</TableCell></TableRow>}
+                                )) : <TableRow><TableCell colSpan={4} className="text-center h-24">{t('customers.noPurchases')}</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </CardContent>
@@ -532,8 +734,8 @@ function CustomerDetailContent() {
                 <Card className="border-destructive/20 bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div>
-                            <CardTitle className="flex items-center gap-2"><History className="text-destructive h-5 w-5" /> Debt Ledger</CardTitle>
-                            <CardDescription>Unpaid invoices and credit history.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><History className="text-destructive h-5 w-5" /> {t('customers.debtLedger')}</CardTitle>
+                            <CardDescription>{t('customers.debtLedgerDesc')}</CardDescription>
                         </div>
                         {totalDebt > 0 && <AlertTriangle className="h-5 w-5 text-destructive animate-pulse" />}
                     </CardHeader>
@@ -549,7 +751,7 @@ function CustomerDetailContent() {
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
                                                 <span className="font-bold text-destructive">{currencySymbol}{(receipt.total || 0).toLocaleString()}</span>
-                                                <div className="text-[10px] text-muted-foreground bg-destructive/5 px-1 rounded inline-block ml-1">UNPAID</div>
+                                                <div className="text-[10px] text-muted-foreground bg-destructive/5 px-1 rounded inline-block ml-1 uppercase">{t('invoices.statusUnpaid')}</div>
                                             </div>
                                             <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                                                 <Link href={`/receipts/details?id=${receipt.id}`}><ChevronRight className="h-4 w-4" /></Link>
@@ -558,14 +760,14 @@ function CustomerDetailContent() {
                                     </div>
                                 ))}
                                 <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
-                                    <Link href={`/receipts?customerId=${displayCustomer.id}`}>View Full Statement</Link>
+                                    <Link href={`/receipts?customerId=${displayCustomer.id}`}>{t('customers.viewFullStatement')}</Link>
                                 </Button>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center p-8 text-center bg-primary/5 rounded-lg">
                                 <CheckCircle2 className="h-8 w-8 text-primary mb-2" />
-                                <p className="text-sm font-medium">Clear Account</p>
-                                <p className="text-xs text-muted-foreground">This customer has no outstanding debts.</p>
+                                <p className="text-sm font-medium">{t('customers.clearAccount')}</p>
+                                <p className="text-xs text-muted-foreground">{t('customers.clearAccountDesc')}</p>
                             </div>
                         )}
                     </CardContent>
@@ -575,8 +777,8 @@ function CustomerDetailContent() {
                 <Card className="bg-card border-border/60 shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div>
-                            <CardTitle className="flex items-center gap-2"><Receipt className="text-primary h-5 w-5" /> Recent Receipts</CardTitle>
-                            <CardDescription>The last few transactions for this customer.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Receipt className="text-primary h-5 w-5" /> {t('customers.recentReceipts')}</CardTitle>
+                            <CardDescription>{t('customers.recentReceiptsDesc')}</CardDescription>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -585,7 +787,7 @@ function CustomerDetailContent() {
                                 {receipts.slice(0, 5).map(receipt => {
                                     const isUnpaid = receipt.paymentMethod === 'Invoice' && receipt.status === 'unpaid';
                                     const isPending = (receipt.paymentMethod === 'Invoice' || receipt.paymentMethod === 'Bank Transfer') && receipt.status === 'pending';
-                                    const badgeText = isUnpaid ? 'unpaid' : (isPending ? 'pending' : 'paid');
+                                    const badgeText = isUnpaid ? t('invoices.statusUnpaid') : (isPending ? t('invoices.statusPending') : t('invoices.statusPaid'));
                                     const badgeClass = isUnpaid 
                                         ? "bg-destructive/10 text-destructive" 
                                         : (isPending 
@@ -616,14 +818,14 @@ function CustomerDetailContent() {
                                     );
                                 })}
                                 <Button variant="outline" className="w-full text-xs h-8 border-dashed" asChild>
-                                    <Link href={`/receipts?customerId=${displayCustomer.id}`}>View All Transactions</Link>
+                                    <Link href={`/receipts?customerId=${displayCustomer.id}`}>{t('customers.viewAllTransactions')}</Link>
                                 </Button>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center p-8 text-center bg-muted/20 rounded-lg">
                                 <FileText className="h-8 w-8 text-muted-foreground mb-2 opacity-20" />
-                                <p className="text-sm font-medium">No Receipts</p>
-                                <p className="text-xs text-muted-foreground">No transaction history found for this customer.</p>
+                                <p className="text-sm font-medium">{t('customers.noReceipts')}</p>
+                                <p className="text-xs text-muted-foreground">{t('customers.noReceiptsDesc')}</p>
                             </div>
                         )}
                     </CardContent>
@@ -632,17 +834,17 @@ function CustomerDetailContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary" /> Customer Analytics & Performance</CardTitle>
-                    <CardDescription>Generate an intelligent summary and suggestions based on this customer's behavior.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary" /> {t('customers.analyticsTitle')}</CardTitle>
+                    <CardDescription>{t('customers.analyticsDesc')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {!insights && !isGeneratingInsights && (
                         <div className="text-center p-8 border-2 border-dashed rounded-lg">
-                            <p className="font-medium">Ready for Data Analysis?</p>
-                            <p className="text-sm text-muted-foreground mb-4">Analyze this customer's purchase history to get actionable business insights.</p>
+                            <p className="font-medium">{t('customers.analyticsReady')}</p>
+                            <p className="text-sm text-muted-foreground mb-4">{t('customers.analyticsReadyDesc')}</p>
                             <Button onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
                                 {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                Generate Analysis
+                                {t('customers.generateAnalysis')}
                             </Button>
                         </div>
                     )}
@@ -652,26 +854,27 @@ function CustomerDetailContent() {
                     {insights && (
                         <div className="space-y-6">
                             <div>
-                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> Business Summary</h3>
+                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Lightbulb /> {t('customers.businessSummary')}</h3>
                                 <div className="text-muted-foreground prose prose-sm" dangerouslySetInnerHTML={{ __html: renderBoldSafe(insights.summary) }}></div>
                             </div>
                             <Separator />
                             <div>
-                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Package /> Product Suggestions</h3>
+                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Package /> {t('customers.productSuggestions')}</h3>
                                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                                     {insights.productSuggestions.map((p, i) => <li key={i}>{p}</li>)}
                                 </ul>
                             </div>
                             <Separator />
                             <div>
-                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Bot /> Engagement Tactics</h3>
+                                <h3 className="font-semibold mb-2 flex items-center gap-2"><Bot /> {t('customers.engagementTactics')}</h3>
                                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                                    {insights.engagementTactics.map((t, i) => <li key={i}>{t}</li>)}
+                                    {/* Not `t` as the parameter name — it would shadow the translator. */}
+                                    {insights.engagementTactics.map((tactic, i) => <li key={i}>{tactic}</li>)}
                                 </ul>
                             </div>
                             <Button variant="outline" onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
                                 {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                Regenerate
+                                {t('customers.regenerate')}
                             </Button>
                         </div>
                     )}
@@ -681,20 +884,20 @@ function CustomerDetailContent() {
             <AlertDialog open={!!customerToDelete} onOpenChange={(open) => { if (!open) setCustomerToDelete(null); }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogTitle>{t('customers.deleteOneConfirmTitle')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete {customerToDelete?.name} from your customer records. This action cannot be undone.
+                            {t('customers.deleteOneConfirmBody', { name: customerToDelete?.name ?? '' })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting} onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeleting} onClick={() => setCustomerToDelete(null)}>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={async () => {
                                 if (!customerToDelete || !firestore || !currentUserProfile) {
                                     toast({
                                         variant: 'destructive',
-                                        title: 'Delete Failed',
-                                        description: 'Could not perform deletion. User or customer data is missing. Please try refreshing the page.',
+                                        title: t('customers.deleteFailedTitle'),
+                                        description: t('customers.deleteOneFailedSession'),
                                         duration: 5000,
                                     });
                                     setIsDeleting(false);
@@ -727,8 +930,8 @@ function CustomerDetailContent() {
 
                                     toast({
                                         variant: 'success',
-                                        title: 'Customer Deleted',
-                                        description: `${customerToDelete.name} has been removed.`
+                                        title: t('customers.deletedOneTitle'),
+                                        description: t('customers.deletedOneDescription', { name: customerToDelete.name })
                                     });
 
                                     setCustomerToDelete(null);
@@ -739,8 +942,8 @@ function CustomerDetailContent() {
                                     console.error("Failed to delete customer:", error);
                                     toast({
                                         variant: 'destructive',
-                                        title: 'Delete Failed',
-                                        description: error.message || 'Could not delete customer.'
+                                        title: t('customers.deleteFailedTitle'),
+                                        description: error.message || t('customers.deleteOneFailed')
                                     });
                                 } finally {
                                     setIsDeleting(false);
@@ -750,7 +953,7 @@ function CustomerDetailContent() {
                             disabled={isDeleting}
                         >
                             {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Delete
+                            {t('common.delete')}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

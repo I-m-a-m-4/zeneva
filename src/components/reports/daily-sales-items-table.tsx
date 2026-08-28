@@ -25,6 +25,7 @@ import autoTable from 'jspdf-autotable';
 import { Calendar } from '@/components/ui/calendar';
 import { Printer, Image as ImageIcon, FileSpreadsheet, Check, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import { useI18n } from '@/context/i18n-context';
 
 interface DailySalesItemsTableProps {
   receipts: Receipt[];
@@ -33,6 +34,7 @@ interface DailySalesItemsTableProps {
 }
 
 export default function DailySalesItemsTable({ receipts, products, currencySymbol }: DailySalesItemsTableProps) {
+  const { t } = useI18n();
   const { toast } = useToast();
   const tableRef = React.useRef<HTMLDivElement>(null);
 
@@ -142,9 +144,9 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
             quantity: item.quantity,
             price: item.price,
             total: item.price * item.quantity,
-            receiptNumber: r.receiptNumber || 'N/A',
+            receiptNumber: r.receiptNumber || t('inventory.notAvailable'),
             createdAt: date,
-            paymentMethod: r.paymentMethod || 'Walk-in',
+            paymentMethod: r.paymentMethod || t('receipts.walkIn'),
             imageUrl: product?.imageUrl || undefined,
             categoryType: product?.categoryType || 'product',
             category: product?.category || undefined
@@ -155,7 +157,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
 
     // Sort by date descending (newest sold items first)
     return list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [receipts, products, selectedDate]);
+  }, [receipts, products, selectedDate, t]);
 
   // Apply filters and search term
   const filteredItems = React.useMemo(() => {
@@ -193,13 +195,20 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   // CSV export handler
   const handleExportCSV = () => {
     if (filteredItems.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data', description: 'No items available to export.' });
+      toast({
+        variant: 'destructive',
+        title: t('reports.noDataTitle'),
+        description: t('reports.noDataToExport'),
+      });
       return;
     }
 
     // After the empty guard, so an export of nothing is not counted as one.
     trackFeature('reports_exported');
 
+    // Column headings and the Type values stay English, as in every other report export:
+    // a spreadsheet is read by other software as often as by a person, and a file whose
+    // headers shift with the till's language cannot be appended to last month's.
     const csvData = Papa.unparse(
       filteredItems.map(item => ({
         'Product/Service': item.name,
@@ -222,7 +231,11 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast({ variant: 'success', title: 'Export Successful', description: `${filteredItems.length} sales rows exported.` });
+      toast({
+        variant: 'success',
+        title: t('reports.exportSuccessful'),
+        description: t('reports.dsiExportedCsvBody', { count: filteredItems.length }),
+      });
     };
     reader.readAsDataURL(blob);
   };
@@ -230,7 +243,10 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   const handleExportImage = async () => {
     const element = tableRef.current;
     if (!element) return;
-    toast({ title: 'Generating Report...', description: 'Please wait while we capture the daily sales table.' });
+    toast({
+      title: t('reports.generatingTitle'),
+      description: t('reports.dsiGeneratingBody'),
+    });
     try {
         const canvas = await html2canvas(element, {
             scale: 4,
@@ -243,19 +259,34 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast({ variant: 'success', title: 'Export Successful', description: 'Table exported as High-Res Image.' });
+        toast({
+            variant: 'success',
+            title: t('reports.exportSuccessful'),
+            description: t('reports.dsiExportedImageBody'),
+        });
     } catch (err) {
-        toast({ variant: 'destructive', title: 'Export Failed', description: 'Could not capture the image.' });
+        toast({
+            variant: 'destructive',
+            title: t('reports.dsiExportFailed'),
+            description: t('reports.dsiExportFailedBody'),
+        });
     }
   };
 
   const handleExportPDF = async () => {
     if (filteredItems.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data', description: 'No items available to export.' });
+      toast({
+        variant: 'destructive',
+        title: t('reports.noDataTitle'),
+        description: t('reports.noDataToExport'),
+      });
       return;
     }
 
-    toast({ title: 'Generating PDF...', description: 'Please wait while we create your document.' });
+    toast({
+      title: t('reports.generatingPdf'),
+      description: t('reports.generatingPdfBody'),
+    });
 
     const doc = new jsPDF();
     
@@ -314,6 +345,12 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
     doc.text(`Expected Transfers: ${formatCurrencyForPDF(dailyTransferExpected)}`, 74, 40);
     doc.text(`Verified Transfers: ${formatCurrencyForPDF(dailyTransferReceived)}`, 144, 40);
 
+    /*
+     * The PDF stays English for the same reason as the Profit & Loss export: the embedded
+     * face is DM Sans `latin-400-normal.ttf` and the fallback is jsPDF's WinAnsi Helvetica,
+     * so neither can draw a Korean, Japanese, Chinese or Arabic glyph. A translated document
+     * would export as blank boxes.
+     */
     const tableColumn = ["Item", "Type", "Qty", "Price", "Total Revenue", "Receipt", "Time"];
     const tableRows: any[] = [];
 
@@ -369,7 +406,11 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
     });
 
     doc.save(`zeneva-daily-sales-${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
-    toast({ variant: 'success', title: 'Export Successful', description: 'Table exported as PDF.' });
+    toast({
+      variant: 'success',
+      title: t('reports.exportSuccessful'),
+      description: t('reports.dsiExportedPdfBody'),
+    });
   };
 
   return (
@@ -377,30 +418,31 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       <CardHeader className="pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-capture print:hidden">
           <div>
-            <CardTitle>Daily Sales Items Log</CardTitle>
+            <CardTitle>{t('reports.dsiTitle')}</CardTitle>
             <CardDescription>
-              Detailed logs of individual product and service items sold on the selected day.
+              {t('reports.dsiSubtitle')}
             </CardDescription>
           </div>
           
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 self-start sm:self-auto">
-                <Download className="mr-2 h-4 w-4" />Export Report
+                <Download className="mr-2 h-4 w-4" />
+                {t('reports.dsiExportReport')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleExportImage}>
                 <ImageIcon className="h-4 w-4 mr-2" />
-                Export as High-Res Image
+                {t('reports.dsiExportImage')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportPDF}>
                 <Printer className="h-4 w-4 mr-2" />
-                Export as PDF
+                {t('reports.dsiExportPdf')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportCSV}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Export as CSV
+                {t('reports.dsiExportCsv')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -412,45 +454,45 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-b border-border/50 bg-muted/5">
         <Card className="bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-slate-500 dark:text-slate-400">Day's Cash Sales</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-500 dark:text-slate-400">{t('reports.dsiCashSales')}</CardTitle>
             <Banknote className="h-4 w-4 text-slate-400 dark:text-slate-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{currencySymbol}{dailyCash.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Total physical cash expected in drawer</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('reports.dsiCashHint')}</p>
           </CardContent>
         </Card>
 
         <Card className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-400">Expected Bank Transfers</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-400">{t('reports.dsiTransfers')}</CardTitle>
             <ArrowRightLeft className="h-4 w-4 text-blue-400 dark:text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-900 dark:text-blue-200">{currencySymbol}{dailyTransferExpected.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">Total transfers processed via POS</p>
+            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">{t('reports.dsiTransfersHint')}</p>
           </CardContent>
         </Card>
 
         <Card className="bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-900/50 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-violet-600 dark:text-violet-400">Card Transactions</CardTitle>
+            <CardTitle className="text-sm font-medium text-violet-600 dark:text-violet-400">{t('reports.dsiCard')}</CardTitle>
             <CreditCard className="h-4 w-4 text-violet-400 dark:text-violet-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-violet-900 dark:text-violet-200">{currencySymbol}{dailyCard.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-violet-600/70 dark:text-violet-400/70 mt-1">Total POS card payments collected</p>
+            <p className="text-xs text-violet-600/70 dark:text-violet-400/70 mt-1">{t('reports.dsiCardHint')}</p>
           </CardContent>
         </Card>
 
         <Card className="bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/50 shadow-none">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Verified Transfers</CardTitle>
+            <CardTitle className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{t('reports.dsiVerified')}</CardTitle>
             <ShieldCheck className="h-4 w-4 text-emerald-400 dark:text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-200">{currencySymbol}{dailyTransferReceived.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">Confirmed landing in terminal</p>
+            <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">{t('reports.dsiVerifiedHint')}</p>
           </CardContent>
         </Card>
       </div>
@@ -473,14 +515,14 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                 <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-white transition-colors" />
                 {selectedDate ? (
                   isSameDay(selectedDate, new Date()) ? (
-                    `Today (${format(selectedDate, 'EEEE, PP')})`
+                    t('reports.dsiToday', { date: format(selectedDate, 'EEEE, PP') })
                   ) : isSameDay(selectedDate, subDays(new Date(), 1)) ? (
-                    `Yesterday (${format(selectedDate, 'EEEE, PP')})`
+                    t('reports.dsiYesterday', { date: format(selectedDate, 'EEEE, PP') })
                   ) : (
                     format(selectedDate, 'EEEE, PP')
                   )
                 ) : (
-                  <span>Pick a day</span>
+                  <span>{t('reports.dsiPickDay')}</span>
                 )}
               </Button>
             </PopoverTrigger>
@@ -503,7 +545,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         <div className="relative flex-1 min-w-[240px] group">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
-            placeholder="Search by item name or receipt..."
+            placeholder={t('reports.dsiSearchPlaceholder')}
             className="pl-9 h-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -513,22 +555,26 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="w-[180px] min-w-[180px] h-9 justify-between font-normal">
-              {typeFilter === 'all' ? 'All Types' : typeFilter === 'product' ? 'Products Only' : 'Services Only'}
+              {typeFilter === 'all'
+                ? t('reports.dsiAllTypes')
+                : typeFilter === 'product'
+                  ? t('reports.dsiProductsOnly')
+                  : t('reports.dsiServicesOnly')}
               <ChevronDown className="h-4 w-4 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-[180px]">
             <DropdownMenuItem onClick={() => setTypeFilter('all')}>
               {typeFilter === 'all' && <Check className="mr-2 h-4 w-4" />}
-              <span className={typeFilter === 'all' ? 'font-medium' : 'ml-6'}>All Types</span>
+              <span className={typeFilter === 'all' ? 'font-medium' : 'ml-6'}>{t('reports.dsiAllTypes')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTypeFilter('product')}>
               {typeFilter === 'product' && <Check className="mr-2 h-4 w-4" />}
-              <span className={typeFilter === 'product' ? 'font-medium' : 'ml-6'}>Products Only</span>
+              <span className={typeFilter === 'product' ? 'font-medium' : 'ml-6'}>{t('reports.dsiProductsOnly')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTypeFilter('service')}>
               {typeFilter === 'service' && <Check className="mr-2 h-4 w-4" />}
-              <span className={typeFilter === 'service' ? 'font-medium' : 'ml-6'}>Services Only</span>
+              <span className={typeFilter === 'service' ? 'font-medium' : 'ml-6'}>{t('reports.dsiServicesOnly')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -536,7 +582,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="w-[120px] min-w-[120px] h-9 justify-between font-normal">
-              {pageSize} rows
+              {t('reports.dsiRowsOption', { count: pageSize })}
               <ChevronDown className="h-4 w-4 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
@@ -544,14 +590,14 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
             {[15, 30, 50, 100].map(size => (
               <DropdownMenuItem key={size} onClick={() => { setPageSize(size); setCurrentPage(1); }}>
                 {pageSize === size && <Check className="mr-2 h-4 w-4" />}
-                <span className={pageSize === size ? 'font-medium' : 'ml-6'}>{size} rows</span>
+                <span className={pageSize === size ? 'font-medium' : 'ml-6'}>{t('reports.dsiRowsOption', { count: size })}</span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
         
         <div className="text-xs text-muted-foreground ml-auto font-medium">
-          Showing {filteredItems.length} item sales
+          {t('reports.dsiShowing', { count: filteredItems.length })}
         </div>
       </div>
 
@@ -559,13 +605,13 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-16"><span className="sr-only">Image</span></TableHead>
-              <TableHead className="font-semibold">Item</TableHead>
-              <TableHead className="font-semibold text-center w-24">Qty Sold</TableHead>
-              <TableHead className="font-semibold">Price</TableHead>
-              <TableHead className="font-semibold">Total Revenue</TableHead>
-              <TableHead className="font-semibold">Receipt</TableHead>
-              <TableHead className="font-semibold text-right pr-6 w-[180px] min-w-[180px]">Date & Time</TableHead>
+              <TableHead className="w-16"><span className="sr-only">{t('inventory.colImage')}</span></TableHead>
+              <TableHead className="font-semibold">{t('reports.colItem')}</TableHead>
+              <TableHead className="font-semibold text-center w-24">{t('reports.colQtySold')}</TableHead>
+              <TableHead className="font-semibold">{t('common.price')}</TableHead>
+              <TableHead className="font-semibold">{t('dashboard.totalRevenue')}</TableHead>
+              <TableHead className="font-semibold">{t('reports.colReceipt')}</TableHead>
+              <TableHead className="font-semibold text-right pr-6 w-[180px] min-w-[180px]">{t('reports.colDateTime')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -623,7 +669,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                             ? "text-[9px] h-3.5 bg-blue-500/10 text-blue-600 border-blue-500/20 px-1 font-semibold" 
                             : "text-[9px] h-3.5 bg-orange-500/10 text-orange-600 border-orange-500/20 px-1 font-semibold"}
                         >
-                          {item.categoryType === 'service' ? 'Service' : 'Product'}
+                          {item.categoryType === 'service' ? t('reports.colService') : t('reports.colProduct')}
                         </Badge>
                         {item.category && <span className="text-[10px] text-muted-foreground font-normal">• {item.category}</span>}
                       </div>
@@ -660,8 +706,8 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                 <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center p-8">
                     <Package className="h-10 w-10 text-muted-foreground/40 mb-3" />
-                    <p className="font-semibold text-sm">No sales items logged</p>
-                    <p className="text-xs text-muted-foreground mt-1">There are no records matching your active filters on this day.</p>
+                    <p className="font-semibold text-sm">{t('reports.dsiEmptyTitle')}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t('reports.dsiEmptyBody')}</p>
                   </div>
                 </TableCell>
               </TableRow>
@@ -673,8 +719,13 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
       {/* Pagination Footer */}
       {totalPages > 1 && (
         <CardFooter className="py-3.5 px-6 border-t flex items-center justify-between bg-muted/10">
+          {/* The two figures lose their `font-semibold text-foreground` spans. `translate`
+              returns a string, so keeping them would mean splitting this into "Page" and
+              "of" fragments and fixing the English order — which Arabic reverses and
+              Japanese leads with the number. Word order is worth more than the weight
+              contrast on a pagination footer. */}
           <div className="text-xs text-muted-foreground font-medium">
-            Page <span className="font-semibold text-foreground">{currentPage}</span> of <span className="font-semibold text-foreground">{totalPages}</span>
+            {t('reports.dsiPageOf', { page: currentPage, total: totalPages })}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -685,7 +736,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
-              <span className="sr-only">Previous Page</span>
+              <span className="sr-only">{t('reports.dsiPrevPage')}</span>
             </Button>
             <Button
               variant="outline"
@@ -695,7 +746,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
               disabled={currentPage === totalPages}
             >
               <ChevronRight className="h-4 w-4" />
-              <span className="sr-only">Next Page</span>
+              <span className="sr-only">{t('reports.dsiNextPage')}</span>
             </Button>
           </div>
         </CardFooter>

@@ -14,6 +14,7 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { usePOS } from '@/context/pos-context';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/context/i18n-context';
 
 interface ProfitLossStatementProps {
     receipts: Receipt[];
@@ -22,6 +23,7 @@ interface ProfitLossStatementProps {
 }
 
 export default function ProfitLossStatement({ receipts, products, currencySymbol }: ProfitLossStatementProps) {
+    const { t } = useI18n();
     const financialSummary = React.useMemo(() => {
         let grossRevenue = 0;
         let totalCogs = 0;
@@ -46,7 +48,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                 totalCogs += itemCogs;
 
                 // Category tracking
-                const category = product?.category || 'Uncategorized';
+                const category = product?.category || t('inventory.uncategorized');
                 if (!categoryFinancials[category]) {
                     categoryFinancials[category] = { revenue: 0, cogs: 0, qty: 0 };
                 }
@@ -85,13 +87,16 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             totalItemsSold,
             categoryList
         };
-    }, [receipts, products]);
+    }, [receipts, products, t]);
 
     const { business } = usePOS();
     const { toast } = useToast();
 
     const handleExportPDF = async () => {
-        toast({ title: 'Generating PDF...', description: 'Please wait while we create your document.' });
+        toast({
+            title: t('reports.generatingPdf'),
+            description: t('reports.generatingPdfBody'),
+        });
 
         const doc = new jsPDF();
         
@@ -137,6 +142,18 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
         doc.setTextColor(110, 110, 110);
         doc.text(`Generated: ${format(new Date(), 'EEEE, MMMM d, yyyy')}`, 14, 31);
 
+        /*
+         * The PDF body stays English, deliberately, and this is a font limitation rather
+         * than an oversight. The embedded face is DM Sans `latin-400-normal.ttf` — the Latin
+         * subset — and when that fetch fails jsPDF falls back to built-in Helvetica, which is
+         * WinAnsi-encoded. Neither carries a Korean, Japanese, Chinese or Arabic glyph, so a
+         * translated statement would export as blank boxes: worse than English, not better.
+         * Shipping this properly means bundling a CJK/Arabic face per locale (~5-15MB each),
+         * which is its own decision.
+         *
+         * `didParseCell` below also string-matches these labels to bold the section rows, so
+         * translating them in place would silently lose the styling as well.
+         */
         const tableColumn = ["Financial Line Item", "Amount", "% of Gross Revenue"];
         const netSales = financialSummary.grossRevenue - financialSummary.totalDiscounts;
         const tableRows = [
@@ -180,7 +197,11 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
         });
 
         doc.save(`zeneva-profit-loss-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-        toast({ variant: 'success', title: 'Export Successful', description: 'Advanced Profit & Loss statement exported as PDF.' });
+        toast({
+            variant: 'success',
+            title: t('reports.exportSuccessful'),
+            description: t('reports.plsExportedBody'),
+        });
     };
 
     return (
@@ -189,36 +210,38 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card className="border border-border/60 bg-gradient-to-br from-card to-muted/20">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground">Gross Revenue</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-muted-foreground">{t('reports.plsGrossRevenue')}</CardTitle>
                         <DollarSign className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-black">{currencySymbol}{financialSummary.grossRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Total sales before deductions</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t('reports.plsGrossRevenueHint')}</p>
                     </CardContent>
                 </Card>
 
                 <Card className="border border-border/60 bg-gradient-to-br from-card to-muted/20">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground">Cost of Goods Sold (COGS)</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-muted-foreground">{t('reports.plsCogs')}</CardTitle>
                         <FileText className="h-4 w-4 text-amber-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-black">{currencySymbol}{financialSummary.totalCogs.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Product acquisition costs</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t('reports.plsCogsHint')}</p>
                     </CardContent>
                 </Card>
 
                 <Card className="border border-border/60 bg-gradient-to-br from-card to-muted/20">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground">Gross Profit</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-muted-foreground">{t('reports.colGrossProfit')}</CardTitle>
                         <Coins className="h-4 w-4 text-indigo-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-black">{currencySymbol}{financialSummary.grossProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                         <div className="flex items-center gap-1.5 mt-1">
                             <Badge variant="secondary" className="text-[10px] font-bold px-1.5 py-0 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                                {financialSummary.grossMarginPct.toFixed(1)}% Margin
+                                {t('reports.plsMarginPct', {
+                                    pct: financialSummary.grossMarginPct.toFixed(1),
+                                })}
                             </Badge>
                         </div>
                     </CardContent>
@@ -226,7 +249,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
 
                 <Card className="border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-card to-card">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Net Operating Income</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{t('reports.plsNetOperatingIncome')}</CardTitle>
                         <TrendingUp className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
@@ -234,7 +257,9 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             {currencySymbol}{financialSummary.netProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </div>
                         <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">
-                            {financialSummary.netMarginPct.toFixed(1)}% Net Margin
+                            {t('reports.plsNetMarginPct', {
+                                pct: financialSummary.netMarginPct.toFixed(1),
+                            })}
                         </p>
                     </CardContent>
                 </Card>
@@ -266,44 +291,44 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                 <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/10 pb-4">
                     <div>
                         <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-primary" /> Advanced Income Statement
+                            <FileText className="h-5 w-5 text-primary" /> {t('reports.plsTitle')}
                         </CardTitle>
                         <CardDescription className="mt-1">
-                            Formal, accounting-standard breakdown of revenue, COGS, operating expenses, and net profit.
+                            {t('reports.plsSubtitle')}
                         </CardDescription>
                     </div>
                     <Button variant="outline" size="sm" onClick={handleExportPDF} className="hidden sm:flex">
-                        <Download className="mr-2 h-4 w-4" /> Export Statement
+                        <Download className="mr-2 h-4 w-4" /> {t('reports.plsExportStatement')}
                     </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/50 hover:bg-transparent">
-                                <TableHead className="font-semibold text-foreground">Financial Line Item</TableHead>
-                                <TableHead className="text-right font-semibold text-foreground">Amount ({currencySymbol})</TableHead>
-                                <TableHead className="text-right font-semibold text-foreground">% of Gross Revenue</TableHead>
+                                <TableHead className="font-semibold text-foreground">{t('reports.plsColLineItem')}</TableHead>
+                                <TableHead className="text-right font-semibold text-foreground">{t('reports.plsColAmount', { symbol: currencySymbol })}</TableHead>
+                                <TableHead className="text-right font-semibold text-foreground">{t('reports.plsColPctGross')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {/* Revenue Section */}
                             <TableRow className="bg-muted/20">
-                                <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">Revenue</TableCell>
+                                <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">{t('reports.colRevenue')}</TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
-                                <TableCell className="ps-8 font-medium">Gross Sales Revenue</TableCell>
+                                <TableCell className="ps-8 font-medium">{t('reports.plsGrossSalesRevenue')}</TableCell>
                                 <TableCell className="text-right font-medium">{financialSummary.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                                 <TableCell className="text-right font-mono text-muted-foreground">100.0%</TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
-                                <TableCell className="ps-8 text-muted-foreground">Less: Discounts & Price Markdowns</TableCell>
+                                <TableCell className="ps-8 text-muted-foreground">{t('reports.plsLessDiscounts')}</TableCell>
                                 <TableCell className="text-right font-medium text-destructive">({financialSummary.totalDiscounts.toLocaleString(undefined, { minimumFractionDigits: 2 })})</TableCell>
                                 <TableCell className="text-right font-mono text-muted-foreground">
                                     {financialSummary.grossRevenue > 0 ? ((financialSummary.totalDiscounts / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
                                 </TableCell>
                             </TableRow>
                             <TableRow className="font-semibold border-b border-muted">
-                                <TableCell className="ps-4">Net Sales Revenue</TableCell>
+                                <TableCell className="ps-4">{t('reports.plsNetSalesRevenue')}</TableCell>
                                 <TableCell className="text-right">{((financialSummary.grossRevenue) - (financialSummary.totalDiscounts)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                                 <TableCell className="text-right font-mono text-muted-foreground">
                                     {financialSummary.grossRevenue > 0 ? (((financialSummary.grossRevenue - financialSummary.totalDiscounts) / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
@@ -312,34 +337,34 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
 
                             {/* COGS Section */}
                             <TableRow className="bg-muted/20">
-                                <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">Cost of Goods Sold (COGS)</TableCell>
+                                <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">{t('reports.plsCogs')}</TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
-                                <TableCell className="ps-8 text-muted-foreground">Total Cost of Goods Sold</TableCell>
+                                <TableCell className="ps-8 text-muted-foreground">{t('reports.plsTotalCogs')}</TableCell>
                                 <TableCell className="text-right font-medium text-amber-600">({financialSummary.totalCogs.toLocaleString(undefined, { minimumFractionDigits: 2 })})</TableCell>
                                 <TableCell className="text-right font-mono text-muted-foreground">
                                     {financialSummary.grossRevenue > 0 ? ((financialSummary.totalCogs / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
                                 </TableCell>
                             </TableRow>
                             <TableRow className="font-bold border-y border-muted bg-indigo-50/30 dark:bg-indigo-950/10">
-                                <TableCell className="ps-4 text-indigo-700 dark:text-indigo-300">Gross Profit</TableCell>
+                                <TableCell className="ps-4 text-indigo-700 dark:text-indigo-300">{t('reports.colGrossProfit')}</TableCell>
                                 <TableCell className="text-right text-indigo-700 dark:text-indigo-300">{financialSummary.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                                 <TableCell className="text-right font-mono text-indigo-700 dark:text-indigo-300">{financialSummary.grossMarginPct.toFixed(1)}%</TableCell>
                             </TableRow>
 
                             {/* Expenses Section */}
                             <TableRow className="bg-muted/20">
-                                <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">Operating Expenses</TableCell>
+                                <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">{t('reports.plsOperatingExpenses')}</TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
-                                <TableCell className="ps-8 text-muted-foreground">Total Operating Expenses</TableCell>
+                                <TableCell className="ps-8 text-muted-foreground">{t('reports.plsTotalOperatingExpenses')}</TableCell>
                                 <TableCell className="text-right font-medium text-muted-foreground">(0.00)</TableCell>
                                 <TableCell className="text-right font-mono text-muted-foreground">0.0%</TableCell>
                             </TableRow>
                             
                             {/* Net Profit Section */}
                             <TableRow className="font-black text-base border-t-2 border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20">
-                                <TableCell className="font-black text-emerald-700 dark:text-emerald-400 py-4">Net Operating Profit</TableCell>
+                                <TableCell className="font-black text-emerald-700 dark:text-emerald-400 py-4">{t('reports.plsNetOperatingProfit')}</TableCell>
                                 <TableCell className="text-right font-black text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                                 <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
                             </TableRow>
@@ -352,22 +377,22 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             <Card className="border border-border/50">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Layers className="h-5 w-5 text-primary" /> Category Profitability & Margin Heatmap
+                        <Layers className="h-5 w-5 text-primary" /> {t('reports.plsHeatmapTitle')}
                     </CardTitle>
                     <CardDescription>
-                        Breakdown of net profit contributions and profit margins across product categories.
+                        {t('reports.plsHeatmapSubtitle')}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/50 hover:bg-transparent">
-                                <TableHead className="font-semibold">Category</TableHead>
-                                <TableHead className="text-center font-semibold">Units Sold</TableHead>
-                                <TableHead className="text-right font-semibold">Revenue</TableHead>
-                                <TableHead className="text-right font-semibold">COGS</TableHead>
-                                <TableHead className="text-right font-semibold">Gross Profit</TableHead>
-                                <TableHead className="text-center font-semibold">Profit Margin</TableHead>
+                                <TableHead className="font-semibold">{t('inventory.category')}</TableHead>
+                                <TableHead className="text-center font-semibold">{t('dashboard.unitsSold')}</TableHead>
+                                <TableHead className="text-right font-semibold">{t('reports.colRevenue')}</TableHead>
+                                <TableHead className="text-right font-semibold">{t('reports.colCogs')}</TableHead>
+                                <TableHead className="text-right font-semibold">{t('reports.colGrossProfit')}</TableHead>
+                                <TableHead className="text-center font-semibold">{t('reports.plsProfitMargin')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -392,7 +417,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                        No sales records available to generate category profitability data.
+                                        {t('reports.plsHeatmapEmpty')}
                                     </TableCell>
                                 </TableRow>
                             )}

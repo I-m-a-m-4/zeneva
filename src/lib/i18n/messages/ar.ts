@@ -862,6 +862,8 @@ const ar: Messages = {
     colStock: 'المخزون',
     notAvailable: 'غير متاح',
     bundleBadge: 'حزمة',
+    unknownProduct: 'منتج غير معروف',
+    uncategorized: 'غير مصنف',
     fullEdit: 'تعديل كامل',
     quickEdit: 'تعديل سريع',
     printBarcode: 'طباعة الباركود',
@@ -1318,6 +1320,482 @@ const ar: Messages = {
     downloadedDescription: 'تم حفظ صورة لوحة التحكم.',
     downloadFailed: 'فشل التنزيل',
     downloadFailedDescription: 'تعذّر التقاط صورة لوحة التحكم.',
+  },
+  reports: {
+    title: 'التقارير',
+    subtitle: 'تحليل معمَّق لأداء عملك.',
+
+    // المقارنة مع الفترة السابقة
+    deltaNewThisPeriod: 'جديد في هذه الفترة',
+    deltaFlat: 'بلا تغيير',
+    deltaVsPrevious: '{pct}% مقابل السابقة',
+
+    tabAnalytics: 'لوحة التحليلات',
+    tabProfitLoss: 'الأرباح والخسائر',
+    tabDailySales: 'الأصناف المُباعة يوميًا',
+    tabBusinessRating: 'تقييم العمل',
+
+    updatingMetrics: 'جارٍ تحديث المؤشرات...',
+    loadingDashboard: 'جارٍ تحميل لوحة التحليلات...',
+    exportReport: 'تصدير التقرير',
+    exportCsv: 'تصدير البيانات بصيغة CSV',
+    exportImage: 'تصدير كصورة بدقة عالية',
+    exportPdf: 'تصدير بصيغة PDF (طباعة)',
+
+    loadingDataTitle: 'جارٍ تحميل البيانات...',
+    loadingDataBody:
+      'الأمر يستغرق وقتًا أطول من المعتاد. إذا كنت غير متصل، فسنعرض لك بياناتك المُزامنة محليًا.',
+    generatingTitle: 'جارٍ إنشاء التقرير...',
+    generatingBody: 'يُرجى الانتظار ريثما نلتقط لوحتك.',
+    downloadedTitle: 'تم تنزيل التقرير',
+    exportedTitle: 'تم تصدير التحليل',
+    exportedBody: 'تم حفظ ملف CSV الخاص بك.',
+
+    kpiRevenue: 'الإيرادات',
+    kpiRevenueHint: 'إجمالي المتحصلات',
+    kpiNetCost: 'التكلفة الصافية',
+    kpiNetCostHint: 'إجمالي تكلفة المبيعات',
+    kpiNetProfit: 'الربح الصافي',
+    kpiNetProfitHint: 'المتحصلات ناقص التكاليف',
+    kpiProductRevenue: 'إيرادات المنتجات',
+    kpiProductRevenueHint: 'الإيرادات من السلع المادية',
+    kpiServiceRevenue: 'إيرادات الخدمات',
+    kpiServiceRevenueHint: 'الإيرادات من الخدمات المُقدَّمة',
+    kpiSales: 'المبيعات',
+    kpiSalesHint: 'إجمالي المعاملات',
+    kpiUniqueProducts: 'منتجات مختلفة',
+    kpiUniqueProductsHint: 'عدد المنتجات المختلفة المُباعة',
+    kpiUnitsSold: 'الوحدات المُباعة',
+    kpiUnitsSoldHint: 'إجمالي القطع المُصرَّفة',
+    kpiDailyVelocity: 'المعدل اليومي',
+    kpiDailyVelocityHint: 'المبيعات في اليوم',
+    kpiDailyRevenue: 'الإيراد اليومي',
+    kpiDailyRevenueHint: 'متوسط الإيراد في اليوم',
+    kpiCatalogSize: 'حجم الكتالوج',
+    kpiCatalogSizeHint: 'إجمالي المنتجات المختلفة في المخزون',
+    kpiAvgOrder: 'متوسط الفاتورة',
+    kpiAvgOrderHint: 'الإيراد لكل عملية بيع',
+    kpiCustomers: 'العملاء',
+    kpiCustomersBought_one: 'عميل واحد اشترى في هذه الفترة',
+    kpiCustomersBought_other: '{formatted} عميل اشتروا في هذه الفترة',
+    kpiCustomersHint: 'إجمالي العملاء المسجَّلين',
+
+    gateVisualName: 'التحليل المرئي المتقدم',
+    gateVisualBody:
+      'افتح الرسوم البيانية التفصيلية واتجاهات المبيعات وهوامش الربح لتفهم عملك على حقيقته.',
+    gateCustomerName: 'ذكاء العملاء وسرعة دوران المخزون',
+    gateCustomerBody:
+      'افتح تحليلات إدارة العملاء المتقدمة وقيمة العميل مدى الحياة، وحسِّن مستويات مخزونك بتحليل ABC القائم على البيانات.',
+    gateProfitLossName: 'قائمة الأرباح والخسائر',
+    gateProfitLossBody:
+      'افتح قوائم الأرباح والخسائر التفصيلية لتحليل هوامش متجرك.',
+    gateDailySalesBody:
+      'افتح التتبع اليومي للأصناف المُباعة وسجلات تدقيق المخزون.',
+
+    // مصطلحات مشتركة بين اللوحات
+    colItem: 'الصنف',
+    colProduct: 'المنتج',
+    colCustomer: 'العميل',
+    colService: 'الخدمة',
+    colClass: 'الفئة',
+    colUnits: 'الوحدات',
+    colQtySold: 'الكمية المُباعة',
+    colOrders: 'الطلبات',
+    colRevenue: 'الإيرادات',
+    colProfit: 'الربح',
+    colMargin: 'الهامش',
+    colShare: 'النسبة',
+    colSales: 'المبيعات',
+    colCost: 'التكلفة',
+    colGrossProfit: 'الربح الإجمالي',
+    colCogs: 'تكلفة المبيعات',
+    colTotalSpent: 'إجمالي المصروف',
+    colReceipt: 'الإيصال',
+    colDateTime: 'التاريخ والوقت',
+    colImage: 'الصورة',
+    colMember: 'العضو',
+    revenueColon: 'الإيرادات:',
+
+    exportSuccessful: 'تم التصدير بنجاح',
+    generatingPdf: 'جارٍ إنشاء ملف PDF...',
+    generatingPdfBody: 'يُرجى الانتظار ريثما نُنشئ مستندك.',
+    noDataTitle: 'لا توجد بيانات',
+    noDataToExport: 'لا توجد أصناف متاحة للتصدير.',
+
+    // تسوية طرق الدفع
+    pmTitle: 'تسوية طرق الدفع',
+    pmSubtitle: 'توزيع الإيرادات المُحصَّلة حسب قناة الدفع.',
+    pmTransactions: 'المعاملات',
+
+    // كبار العملاء
+    tcTitle: 'كبار العملاء',
+    tcSubtitle: 'العملاء الذين صرفوا أكثر من غيرهم في هذه الفترة.',
+    tcEmptyTitle: 'لا توجد بيانات عملاء',
+    tcEmptyBody: 'اربط المبيعات بالعملاء لعرض هذا التقرير.',
+
+    // المبيعات عبر الزمن
+    sotTitle: 'المبيعات عبر الزمن',
+    sotSubtitle: 'اتجاهات أداء الإيرادات.',
+    sotEmpty:
+      'لم تُسجَّل أي مبيعات في هذه الفترة. عند إتمام أول عملية بيع، سيُنشَّط هذا الرسم البياني تلقائيًا.',
+
+    // تحليل المخزون الراكد
+    dsTitle: 'تحليل المخزون الراكد',
+    dsSubtitle: 'أصناف لم تُبَع منذ 60 يومًا أو أكثر (رأس مال مُجمَّد).',
+    dsLockedCapital: 'رأس المال المُجمَّد المُقدَّر',
+    dsUnitsLeft: 'وحدة متبقية',
+    dsSku: 'رمز الصنف:',
+    dsValueLocked: 'القيمة المُجمَّدة',
+    dsViewInventory: 'عرض المخزون بالكامل',
+    dsEmpty: 'لم يُكتشف مخزون راكد يُذكر. مخزونك يدور جيدًا!',
+
+    // تحذير نضوب المخزون
+    depTitle: 'تحذير نضوب المخزون',
+    depSubtitle:
+      'تحذيرات تنبؤية للمنتجات المعرَّضة للنفاد قريبًا، بناءً على معدل بيعها خلال آخر 30 يومًا.',
+    depStock: 'المخزون:',
+    depSelling: 'يُبَع ~',
+    depPerDay: '/يوم',
+    depRunsOut_one: 'ينفد خلال يوم واحد',
+    depRunsOut_other: 'ينفد خلال {count} يوم',
+
+    // معلومة اليوم
+    iotdTitle: 'معلومة اليوم',
+    iotdVsMedian: 'مقابل الوسيط',
+    iotdYou: 'أنت',
+    iotdMedianShop: 'المتجر الوسيط',
+    iotdRotation: '1 من {total} · معلومة أخرى غدًا',
+    iotdAtStake: 'على المحك',
+
+    // فترات جاهزة
+    drToday: 'اليوم',
+    drYesterday: 'أمس',
+    drLast7: 'آخر 7 أيام',
+    drLast30: 'آخر 30 يومًا',
+    tfLast7d: 'آخر 7 أيام',
+    tfLast30d: 'آخر 30 يومًا',
+    tf90Days: '90 يومًا',
+    tfLifetime: 'من البداية',
+    drThisMonth: 'هذا الشهر',
+    drLastMonth: 'الشهر الماضي',
+    drAllTime: 'كل الفترات',
+
+    // رسم الأرباح والخسائر
+    plcSubtitle: 'نظرة عامة على الصحة المالية.',
+    plcTotalCost: 'التكلفة الإجمالية',
+    plcEmpty:
+      'لم تُسجَّل أي مبيعات في هذه الفترة. أضِف «أسعار التكلفة» إلى منتجاتك لتتبُّع الربحية الحقيقية.',
+
+    // موقعك بالمقارنة
+    pcTitle: 'موقعك بالمقارنة',
+    pcEmptyTitle: 'المقارنة غير متاحة بعد',
+    pcEmptyBody:
+      'لا تقارنك Zeneva بالمتجر الوسيط إلا عندما يبيع عدد كافٍ من المتاجر بما يجعل الرقم ذا معنى. لا شيء هنا مُقدَّر بالتخمين.',
+    pcVsMedianShop: 'مقابل المتجر الوسيط',
+    pcFootnote:
+      'وسيط {shops} متجر على Zeneva حقَّق {sales} عملية بيع أو أكثر خلال آخر {days} يومًا. لا يُعرَّف أي متجر أبدًا، ولا يمكن لأي متجر أن يرى متجرك.',
+    pcFootnoteAsOf:
+      'وسيط {shops} متجر على Zeneva حقَّق {sales} عملية بيع أو أكثر خلال آخر {days} يومًا، حتى {asOf}. لا يُعرَّف أي متجر أبدًا، ولا يمكن لأي متجر أن يرى متجرك.',
+
+    // توقُّع الإيرادات
+    rfTitle: 'توقُّع الإيرادات',
+    rfSubtitle: 'توقُّع لـ 30 يومًا بالذكاء الاصطناعي، بناءً على معدلك الحالي.',
+    rfNotEnough: 'البيانات غير كافية لإنشاء توقُّع.',
+    rfProjection: 'توقُّع 30 يومًا',
+    rfVsPrevious7: '{pct}% مقابل الأيام السبعة السابقة',
+    rfRunRate: 'المعدل اليومي الحالي',
+    rfPerDay: '/ يوم',
+    rfHistorical: 'التاريخي',
+    rfForecast: 'التوقُّع',
+
+    // تحليل سلة المشتريات
+    baTitle: 'تحليل سلة المشتريات',
+    baSubtitle: 'اكتشف المنتجات التي تُشترى معًا كثيرًا.',
+    baHint:
+      'استخدم هذه المعلومات لإنشاء **عروض مجمَّعة** أو لترتيب متجرك بما يشجع البيع المتقاطع.',
+    baJointSales: 'المبيعات المشتركة',
+    baFootnote: 'تُعرض فقط الأزواج التي تجاوزت عملية بيع مشتركة واحدة.',
+    baEmptySearch: 'لم يُعثر على أي تركيبات منتجات تطابق بحثك.',
+    baEmptyNoPairs:
+      'لا توجد بعد مبيعات كافية متعددة الأصناف لاكتشاف تركيبات منتجات ذات دلالة.',
+
+    // معلومات حركة العمل
+    hhTitle: 'معلومات حركة العمل',
+    hhSubtitle: 'أكثر الساعات والأيام حركة في عملك.',
+    hhPeakHours: 'ساعات الذروة',
+    hhPeakDays: 'أيام الذروة',
+    hhPeakWindow: 'أكثر فترة حركة',
+    hhBusiestDay: 'أكثر أيام الأسبوع حركة',
+    hhDaySunday: 'الأحد',
+    hhDayMonday: 'الاثنين',
+    hhDayTuesday: 'الثلاثاء',
+    hhDayWednesday: 'الأربعاء',
+    hhDayThursday: 'الخميس',
+    hhDayFriday: 'الجمعة',
+    hhDaySaturday: 'السبت',
+    hhDayShortSunday: 'أحد',
+    hhDayShortMonday: 'اثن',
+    hhDayShortTuesday: 'ثلا',
+    hhDayShortWednesday: 'أرب',
+    hhDayShortThursday: 'خمي',
+    hhDayShortFriday: 'جمع',
+    hhDayShortSaturday: 'سبت',
+    hhSalesCount: '{count} عملية بيع',
+    hhPeakLine: '{label} — {count} عملية بيع',
+
+    // ذكاء العملاء
+    caTitle: 'ذكاء العملاء',
+    caAnonymousBuyer: 'مشترٍ غير معروف',
+    caSubtitle: 'احصل على رؤية أعمق لنمو قاعدة عملائك والحفاظ عليهم.',
+    caTotalCustomers: 'إجمالي العملاء',
+    caNewLast30: 'عملاء جدد (آخر 30 يومًا)',
+    caReturning: 'العملاء العائدون',
+    caRetentionRate: 'معدل الاستبقاء {pct}%',
+    caAcquisition: 'استقطاب العملاء',
+    caNewCustomers: 'عملاء جدد',
+    caNoAcquisition: 'لا توجد بيانات استقطاب لهذه الفترة.',
+    caTop5: 'أكثر 5 عملاء صرفًا',
+
+    // أداء الفريق
+    spAvgBasket: 'متوسط الفاتورة',
+    spItemsPerSale: 'أصناف / عملية بيع',
+    spDiscounted: 'مخفَّض',
+    spPriceOverrides: 'أسعار كُتبت يدويًا',
+    spNoAuthor: 'سُجِّلت قبل أن يكون للمبيعات منفِّذ',
+    spTitleSolo: 'حركة الكاشير',
+    spTitleTeam: 'أداء الفريق',
+    spSubtitleSolo: 'ما مرَّ على الكاشير في هذه الفترة.',
+    spSubtitleTeam_one: 'مَن حصَّل ماذا في هذه الفترة — شخص واحد.',
+    spSubtitleTeam_other: 'مَن حصَّل ماذا في هذه الفترة — {count} أشخاص.',
+    spSubtitleTeamPlus_one:
+      'مَن حصَّل ماذا في هذه الفترة — شخص واحد، إضافةً إلى المبيعات التي لم يُسجَّل منفِّذها.',
+    spSubtitleTeamPlus_other:
+      'مَن حصَّل ماذا في هذه الفترة — {count} أشخاص، إضافةً إلى المبيعات التي لم يُسجَّل منفِّذها.',
+    spFootnote:
+      'هذه أرقام حركة، وليست حكمًا. الخصومات والأسعار المكتوبة يدويًا غالبًا ما تكون تحديدًا ما ينبغي لبائع جيد أن يفعله: الرقم المرتفع سبب للسؤال لا للاتهام. الإيراد هو إجمالي الإيصال، لذا فإن الصفوف أدناه تُجمِّع إيراد المتجر في الفترة.',
+    spRunScan: 'تشغيل فحص منع الخسائر في سجل التدقيق',
+
+    // أداء الفئات
+    cpTitle: 'أداء الفئات',
+    cpSubtitle: 'أي أجزاء الكتالوج تُحقِّق نتائج — بحسب الإيراد، والهامش بجانبه.',
+    cpOther: 'أخرى ({count})',
+    cpFoldedTail:
+      'بِيعت {total} فئة؛ ويجمع الرسم البياني أصغر {folded} فئة تحت «أخرى».',
+    cpMarginUnknownPartial:
+      'سعر التكلفة غائب في {pct}% من الوحدات المُباعة — الهامش غير معروف، وليس صفرًا',
+    cpMarginUnknownNone: 'لا توجد أسعار تكلفة مُسجَّلة — الهامش غير معروف، وليس صفرًا',
+    cpVsPrevious: 'مقابل السابقة',
+    cpNew: 'جديد',
+    cpFlat: 'بلا تغيير',
+    cpFootnote:
+      'الإيراد هنا هو مجموع السعر × الكمية لكل سطر، فهو لا يشمل الضرائب ويُحتسب قبل الخصومات المُطبَّقة على الإيصال: لذلك لن يطابق تمامًا بطاقة الإيرادات في الأعلى، وهي إجمالي الكاشير. تُجمَّع النسب إلى 100% داخل هذه اللوحة.',
+
+    // سرعة دوران المخزون وتحليل ABC
+    abcTitle: 'سرعة دوران المخزون وتحليل ABC',
+    abcSubtitle: 'صنِّف المنتجات بحسب مساهمتها في الإيراد.',
+    abcAllProducts: 'كل المنتجات ({count})',
+    abcClassA: 'الفئة A ({count})',
+    abcClassB: 'الفئة B ({count})',
+    abcClassC: 'الفئة C ({count})',
+    abcClassBadge: 'الفئة {letter}',
+    abcEmptyTitle: 'بيانات المبيعات غير كافية',
+    abcEmptyBody: 'سيُنشأ هذا التقرير عندما يتوفر لديك سجل مبيعات أكبر للتحليل.',
+    abcProductInsight: 'تحليل المنتج',
+    abcInsightSubtitle: 'مؤشرات أداء تفصيلية للفترة المُحدَّدة.',
+    abcRevShare: 'نسبة الإيراد',
+    abcCumulative: '(تراكمي)',
+    abcRecommendation: 'توصية استراتيجية',
+    abcRecA:
+      'صنف في أعلى درجات الأولوية. تأكَّد من ألا ينزل المخزون أبدًا عن حد الأمان. وفكِّر في عروض مجمَّعة لفترة محدودة مع أصناف الفئة C لتسريع دورانها.',
+    abcRecB:
+      'أداء ثابت. ركِّز على تحقيق أقصى استفادة من فرص البيع المتقاطع. قد تُحسِّن اختبارات سعرية صغيرة الهوامش دون الإضرار بالحجم.',
+    abcRecC:
+      'صنف بطيء الدوران. قد يكون هناك رأس مال مُجمَّد. يُنصح بدمجه مع الأصناف الأكثر بيعًا أو بالنظر في استراتيجية تصفية إذا كانت تكلفة الاحتفاظ به مرتفعة.',
+    abcClose: 'إغلاق التحليل',
+    abcNoProducts: 'لم يُعثر على منتجات.',
+
+    // تسرُّبات الهامش
+    mlTitle: 'تسرُّبات الهامش',
+    mlSubtitle: 'أموال خرجت دون قرار وراءها.',
+    mlCleanBody:
+      'لم يُبَع أي صنف بأقل من التكلفة، ولم تُكتب أي أسعار يدويًا، ولم تُمنح أي خصومات في هذه الفترة.',
+    mlCleanUncosted_one:
+      'صنف واحد ليس له سعر تكلفة، لذا لم يتيسَّر التحقق مما إذا كان قد بِيع بأقل من التكلفة.',
+    mlCleanUncosted_other:
+      '{count} صنف ليس لها سعر تكلفة، لذا لم يتيسَّر التحقق مما إذا كانت قد بِيعت بأقل من التكلفة.',
+    mlAcross: 'بين البيع بأقل من التكلفة والأسعار المكتوبة يدويًا في هذه الفترة.',
+    mlSoldBelowCost: 'بِيع بأقل من التكلفة',
+    mlColSoldFor: 'بِيع بـ',
+    mlColLost: 'الخسارة',
+    mlOverridesTitle: 'ما تُنازِل عنه في الأسعار المكتوبة يدويًا',
+    mlColUnitsTyped: 'وحدات بسعر مكتوب يدويًا',
+    mlColBelowShelf: 'أقل من سعر البيع بـ',
+    mlOverridesFootnote:
+      'يُقاس مقابل سعر البيع وقت البيع، لا سعر اليوم: بذلك لا تظهر هنا أبدًا زيادة سعر مشروعة. الأسعار المكتوبة يدويًا مشروعة في الغالب؛ وهذه فاتورتها، لا اتهام.',
+    mlDiscountsTitle: 'الخصومات الممنوحة',
+    mlDiscountsFootnote_one:
+      'على عملية بيع واحدة. تُسجَّل الخصومات على البيع كاملًا، لا على كل صنف، لذا لا يُوزَّع هذا المبلغ على المنتجات عن قصد: فتوزيعه تخمين. ومَن منحها موجود في لوحة أداء الفريق أدناه.',
+    mlDiscountsFootnote_other:
+      'على {formatted} عملية بيع. تُسجَّل الخصومات على البيع كاملًا، لا على كل صنف، لذا لا يُوزَّع هذا المبلغ على المنتجات عن قصد: فتوزيعه تخمين. ومَن منحها موجود في لوحة أداء الفريق أدناه.',
+    mlUncostedFootnote_one:
+      'صنف واحد بِيع في هذه الفترة ليس له سعر تكلفة، فاستُثنِي كليًا من فحص البيع بأقل من التكلفة بدلًا من افتراض ربحيته. وإضافة أسعار التكلفة في المخزون هي ما يُكمل هذا الفحص.',
+    mlUncostedFootnote_other:
+      '{count} صنف بِيعت في هذه الفترة ليس لها سعر تكلفة، فاستُثنِيت كليًا من فحص البيع بأقل من التكلفة بدلًا من افتراض ربحيتها. وإضافة أسعار التكلفة في المخزون هي ما يُكمل هذا الفحص.',
+
+    // تقييم العمل
+    brFirstReading: 'أول قراءة',
+    brPlusPts: '+{count} نقطة',
+    brOffTitle: 'تقييم العمل مُعطَّل',
+    brOffBody:
+      'لم يُحذف شيء. أعِد تشغيله وقت ما تشاء من الإعدادات ← عام، وستستأنف نقاطك وسلسلتك وسجلك من حيث توقفت.',
+    brOpenSettings: 'فتح الإعدادات',
+    brPitchTitle: 'أتريد أن ترى من أين تتسرَّب أموالك؟',
+    brPitchBody:
+      'يقرأ تقييم العمل مبيعاتك أنت، ويمنح نقاطًا للأمور الأربعة التي تُضاعِف الإيراد: هامشك، ومتوسط فاتورتك، ومدى تكرار عودة المشترين، وزخمك. ثم يُشير إلى أكبر فرصة تتركها تفوتك، بالمال.',
+    brTurnOn: 'تشغيل تقييم العمل',
+    brNoThanks: 'لا، شكرًا',
+    brLevelBadge: 'المستوى {index}',
+    brLevelUp: 'المستوى {index} — {name}',
+    brNotRated: 'غير مُقيَّم بعد',
+    brToNextTier: '{points} للوصول إلى {name}',
+    brTopTier: 'حافظتَ على أعلى مستوى',
+    brNothingYet: 'لا توجد بيانات كافية بعد.',
+    brNothingLeft: 'لم يبقَ شيء على الطاولة. واصِل البيع.',
+    brHintWithMedian: '{hint} · وسيط المنصة {median}',
+    brClaimPrivate:
+      'مبني على إيصالاتك. لا يُرسَل شيء إلى أي مكان ولا يُعرض على أي شخص آخر.',
+    brClaimPriced: 'تُقيَّم كل فرصة من مبيعاتك أنت، لا من توقُّع.',
+    brClaimReversible: 'يمكنك تعطيله من الإعدادات في أي وقت.',
+    brNewTier: 'مستوى لم تبلغه من قبل. أحسنتَ.',
+    brNewBest: 'رقم قياسي جديد',
+    brNeedFirstSale: 'سجِّل أول عملية بيع للحصول على تقييم.',
+    brOnTheTable: 'على الطاولة',
+    brYourBest: 'أفضل نتيجة لك',
+    brDaysRecorded_one: 'يوم واحد مُسجَّل',
+    brDaysRecorded_other: '{count} يوم مُسجَّل',
+    brScoredOnLast: 'مُقيَّم على مبيعات آخر {days} يومًا',
+    brCheckBack: 'عُد غدًا لترى الاتجاه.',
+    brBadges: 'الشارات',
+
+    // الأصناف الأكثر بيعًا
+    tiTitleProducts: 'المنتجات الأكثر بيعًا',
+    tiTitleServices: 'الخدمات الأكثر بيعًا',
+    tiValue: 'القيمة',
+    tiByUnits: 'بحسب الوحدات المُباعة',
+    tiByRevenue: 'بحسب الإيراد',
+    tiByProfit: 'بحسب الربح',
+    tiByUnitsLower: 'بحسب الوحدات المُباعة',
+    tiByRevenueLower: 'بحسب الإيراد',
+    tiByProfitLower: 'بحسب الربح',
+    tiEmptyProducts:
+      'سيُبرِز هذا الرسم البياني أفضل منتجاتك عندما تبدأ البيع من نقطة البيع.',
+    tiEmptyServices:
+      'سيُبرِز هذا الرسم البياني أفضل خدماتك عندما تبدأ البيع من نقطة البيع.',
+    tiNoCostProducts:
+      'لا يوجد منتج في هذه الفترة له سعر تكلفة مُسجَّل، لذا لا يمكن حساب الربح. أضِف أسعار التكلفة في المخزون، أو رتِّب بحسب الوحدات أو الإيراد.',
+    tiNoCostServices:
+      'لا توجد خدمة في هذه الفترة لها سعر تكلفة مُسجَّل، لذا لا يمكن حساب الربح. أضِف أسعار التكلفة في المخزون، أو رتِّب بحسب الوحدات أو الإيراد.',
+    tiSoldProducts_one: 'بِيع منتج واحد.',
+    tiSoldProducts_other: 'بِيع {formatted} منتج.',
+    tiSoldServices_one: 'بِيعت خدمة واحدة.',
+    tiSoldServices_other: 'بِيعت {formatted} خدمة.',
+    tiUncosted_one:
+      'واحد منها ليس له سعر تكلفة، لذا فربحه غير معروف وليس صفرًا، ولا يُرسم في الرسم البياني.',
+    tiUncosted_other:
+      '{count} منها ليس لها سعر تكلفة، لذا فربحها غير معروف وليس صفرًا، ولا تُرسم في الرسم البياني.',
+    tiAtALoss_one: 'واحد بِيع بخسارة — اطَّلِع على القائمة الكاملة.',
+    tiAtALoss_other: '{count} بِيعت بخسارة — اطَّلِع على القائمة الكاملة.',
+    tiNoDataProducts: 'ستظهر أفضل منتجاتك هنا.',
+    tiNoDataServices: 'ستظهر أفضل خدماتك هنا.',
+    tiSoldInPeriodProducts_one: 'بِيع منتج واحد في هذه الفترة.',
+    tiSoldInPeriodProducts_other: 'بِيع {formatted} منتج في هذه الفترة.',
+    tiSoldInPeriodServices_one: 'بِيعت خدمة واحدة في هذه الفترة.',
+    tiSoldInPeriodServices_other: 'بِيعت {formatted} خدمة في هذه الفترة.',
+    tiCaptionProducts_one: 'عرض {shown} من {total} منتج · {measure}',
+    tiCaptionProducts_other: 'عرض {shown} من {total} منتج · {measure}',
+    tiCaptionServices_one: 'عرض {shown} من {total} خدمة · {measure}',
+    tiCaptionServices_other: 'عرض {shown} من {total} خدمة · {measure}',
+    tiViewAllCount: 'عرض الـ {count} كلها',
+    tiDialogTitleProducts: 'كل المنتجات المُباعة ({count})',
+    tiDialogTitleServices: 'كل الخدمات المُباعة ({count})',
+    tiDialogBody:
+      'مُرتَّب {measure} للفترة المُحدَّدة في أعلى الصفحة. الإيراد هنا هو إيراد الأسطر — مجموع السعر × الكمية — فهو لا يشمل الضرائب ويُحتسب قبل أي خصم مُطبَّق على الإيصال، ولن يطابق تمامًا رقم الإيرادات في البطاقات أعلاه.',
+    tiShowingOf: '{shown} من {total}',
+    tiSearchProducts: 'ابحث في المنتجات أو رمز الصنف أو الفئة…',
+    tiSearchServices: 'ابحث في الخدمات أو رمز الصنف أو الفئة…',
+    tiExportCsv: 'تصدير CSV',
+    tiNothingMatches: 'لا شيء يطابق «{query}».',
+    tiNoCostAll: 'لا يوجد سعر تكلفة مُسجَّل، لذا فالربح غير معروف، وليس صفرًا.',
+    tiNoCostPartial:
+      'لا يوجد سعر تكلفة مُسجَّل في {pct}% من الوحدات المُباعة، لذا فالربح غير معروف، وليس صفرًا.',
+
+    // قائمة الأرباح والخسائر المتقدمة
+    plsTitle: 'قائمة الأرباح والخسائر المتقدمة',
+    plsSubtitle:
+      'تفصيل رسمي بالمعايير المحاسبية للإيرادات وتكلفة المبيعات والمصروفات التشغيلية والربح الصافي.',
+    plsExportStatement: 'تصدير القائمة',
+    plsExportedBody: 'تم تصدير قائمة الأرباح والخسائر المتقدمة بصيغة PDF.',
+    plsGrossRevenue: 'الإيراد الإجمالي',
+    plsGrossRevenueHint: 'إجمالي المبيعات قبل الخصومات',
+    plsCogs: 'تكلفة البضاعة المُباعة',
+    plsCogsHint: 'تكاليف شراء المنتجات',
+    plsMarginPct: 'هامش {pct}%',
+    plsNetOperatingIncome: 'الدخل التشغيلي الصافي',
+    plsNetMarginPct: 'هامش صافٍ {pct}%',
+    plsColLineItem: 'البند المالي',
+    plsColAmount: 'المبلغ ({symbol})',
+    plsColPctGross: '% من الإيراد الإجمالي',
+    plsGrossSalesRevenue: 'إيراد المبيعات الإجمالي',
+    plsLessDiscounts: '(–) الخصومات وتخفيضات الأسعار',
+    plsNetSalesRevenue: 'إيراد المبيعات الصافي',
+    plsTotalCogs: 'إجمالي تكلفة البضاعة المُباعة',
+    plsOperatingExpenses: 'المصروفات التشغيلية',
+    plsTotalOperatingExpenses: 'إجمالي المصروفات التشغيلية',
+    plsNetOperatingProfit: 'الربح التشغيلي الصافي',
+    plsHeatmapTitle: 'ربحية الفئات وخريطة حرارة الهوامش',
+    plsHeatmapSubtitle:
+      'تفصيل مساهمات الربح الصافي والهوامش بحسب فئة المنتج.',
+    plsProfitMargin: 'هامش الربح',
+    plsHeatmapEmpty:
+      'لا يتوفر سجل مبيعات لإنشاء بيانات ربحية الفئات.',
+
+    // سجل الأصناف المُباعة يوميًا
+    dsiTitle: 'سجل الأصناف المُباعة يوميًا',
+    dsiSubtitle: 'سجلات تفصيلية لكل منتج وخدمة بِيعت في اليوم المُحدَّد.',
+    dsiExportReport: 'تصدير التقرير',
+    dsiExportImage: 'تصدير كصورة بدقة عالية',
+    dsiExportPdf: 'تصدير بصيغة PDF',
+    dsiExportCsv: 'تصدير بصيغة CSV',
+    dsiGeneratingBody: 'يُرجى الانتظار ريثما نلتقط جدول مبيعات اليوم.',
+    dsiExportedCsvBody_one: 'تم تصدير سطر مبيعات واحد.',
+    dsiExportedCsvBody_other: 'تم تصدير {count} سطر مبيعات.',
+    dsiExportedImageBody: 'تم تصدير الجدول كصورة بدقة عالية.',
+    dsiExportedPdfBody: 'تم تصدير الجدول بصيغة PDF.',
+    dsiExportFailed: 'فشل التصدير',
+    dsiExportFailedBody: 'لم يتيسَّر التقاط الصورة.',
+    dsiCashSales: 'المبيعات النقدية لليوم',
+    dsiCashHint: 'إجمالي النقد المتوقَّع في الدرج',
+    dsiTransfers: 'التحويلات البنكية المتوقَّعة',
+    dsiTransfersHint: 'إجمالي التحويلات التي عالجتها نقطة البيع',
+    dsiCard: 'معاملات البطاقات',
+    dsiCardHint: 'إجمالي مدفوعات البطاقات المُحصَّلة في نقطة البيع',
+    dsiVerified: 'التحويلات المُتحقَّق منها',
+    dsiVerifiedHint: 'أُكِّدت عند وصولها إلى الجهاز',
+    dsiPickDay: 'اختر يومًا',
+    dsiToday: 'اليوم ({date})',
+    dsiYesterday: 'أمس ({date})',
+    dsiSearchPlaceholder: 'ابحث باسم الصنف أو رقم الإيصال...',
+    dsiAllTypes: 'كل الأنواع',
+    dsiProductsOnly: 'المنتجات فقط',
+    dsiServicesOnly: 'الخدمات فقط',
+    dsiRowsOption: '{count} صف',
+    dsiShowing_one: 'عرض صنف واحد مُباع',
+    dsiShowing_other: 'عرض {count} صنف مُباع',
+    dsiEmptyTitle: 'لا توجد أصناف مُباعة مُسجَّلة',
+    dsiEmptyBody: 'لا توجد سجلات تطابق عوامل التصفية النشطة في هذا اليوم.',
+    dsiPageOf: 'صفحة {page} من {total}',
+    dsiPrevPage: 'الصفحة السابقة',
+    dsiNextPage: 'الصفحة التالية',
   },
   support: {
     title: 'الدعم',

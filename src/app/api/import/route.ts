@@ -102,7 +102,7 @@ function fail(status: number, error: string, extra: Record<string, any> = {}) {
  * rate, and a weight derived from the wrong model reprices balances people paid
  * for.
  */
-const MODEL_ID = 'gemini-2.5-flash';
+const MODEL_ID = 'gemini-3.6-flash';
 
 /**
  * Rows of a file the model is shown when mapping columns.

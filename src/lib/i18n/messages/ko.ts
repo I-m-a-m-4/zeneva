@@ -843,6 +843,8 @@ const ko: Messages = {
     colStock: '재고',
     notAvailable: '해당 없음',
     bundleBadge: '세트',
+    unknownProduct: '알 수 없는 상품',
+    uncategorized: '분류 없음',
     fullEdit: '전체 수정',
     quickEdit: '빠른 수정',
     printBarcode: '바코드 인쇄',
@@ -1291,6 +1293,482 @@ const ko: Messages = {
     downloadedDescription: '대시보드 이미지를 저장했습니다.',
     downloadFailed: '다운로드에 실패했습니다',
     downloadFailedDescription: '대시보드 이미지를 만들지 못했습니다.',
+  },
+  reports: {
+    title: '리포트',
+    subtitle: '비즈니스 성과를 깊이 분석합니다.',
+
+    // 이전 기간과 비교
+    deltaNewThisPeriod: '이번 기간 신규',
+    deltaFlat: '변화 없음',
+    deltaVsPrevious: '이전 기간 대비 {pct}%',
+
+    tabAnalytics: '분석 대시보드',
+    tabProfitLoss: '손익',
+    tabDailySales: '일별 판매 내역',
+    tabBusinessRating: '비즈니스 평가',
+
+    updatingMetrics: '지표를 업데이트하고 있습니다…',
+    loadingDashboard: '분석 대시보드를 불러오고 있습니다…',
+    exportReport: '리포트 내보내기',
+    exportCsv: '데이터를 CSV로 내보내기',
+    exportImage: '고해상도 이미지로 내보내기',
+    exportPdf: 'PDF로 내보내기(인쇄)',
+
+    loadingDataTitle: '데이터를 불러오고 있습니다…',
+    loadingDataBody:
+      '평소보다 오래 걸리고 있습니다. 오프라인이라면 기기에 동기화된 데이터를 보여드립니다.',
+    generatingTitle: '리포트를 만들고 있습니다…',
+    generatingBody: '대시보드를 캡처하는 동안 잠시 기다려 주세요.',
+    downloadedTitle: '리포트를 다운로드했습니다',
+    exportedTitle: '분석을 내보냈습니다',
+    exportedBody: 'CSV 파일을 저장했습니다.',
+
+    kpiRevenue: '매출',
+    kpiRevenueHint: '총 수취 금액',
+    kpiNetCost: '순원가',
+    kpiNetCostHint: '판매에 들어간 총원가',
+    kpiNetProfit: '순이익',
+    kpiNetProfitHint: '수취 금액에서 원가를 뺀 금액',
+    kpiProductRevenue: '상품 매출',
+    kpiProductRevenueHint: '실물 상품에서 나온 매출',
+    kpiServiceRevenue: '서비스 매출',
+    kpiServiceRevenueHint: '제공한 서비스에서 나온 매출',
+    kpiSales: '판매',
+    kpiSalesHint: '총 거래 건수',
+    kpiUniqueProducts: '판매된 상품 종류',
+    kpiUniqueProductsHint: '판매된 서로 다른 상품의 수',
+    kpiUnitsSold: '판매 수량',
+    kpiUnitsSoldHint: '출고된 총 수량',
+    kpiDailyVelocity: '일 회전 속도',
+    kpiDailyVelocityHint: '하루 판매 건수',
+    kpiDailyRevenue: '일 매출',
+    kpiDailyRevenueHint: '하루 평균 매출',
+    kpiCatalogSize: '상품 목록 규모',
+    kpiCatalogSizeHint: '재고에 있는 총 상품 종류',
+    kpiAvgOrder: '평균 구매 금액',
+    kpiAvgOrderHint: '판매 1건당 매출',
+    kpiCustomers: '고객',
+    kpiCustomersBought_one: '이번 기간에 {formatted}명이 구매',
+    kpiCustomersBought_other: '이번 기간에 {formatted}명이 구매',
+    kpiCustomersHint: '등록된 총 고객 수',
+
+    gateVisualName: '고급 시각 분석',
+    gateVisualBody:
+      '상세 차트, 매출 추이, 이익률을 열어 비즈니스의 실제 모습을 확인하세요.',
+    gateCustomerName: '고객 인사이트와 재고 회전',
+    gateCustomerBody:
+      '고급 고객 분석과 고객 생애 가치를 열고, 데이터 기반 ABC 분석으로 재고 수준을 최적화하세요.',
+    gateProfitLossName: '손익계산서',
+    gateProfitLossBody:
+      '상세 손익계산서를 열어 매장의 이익률을 분석하세요.',
+    gateDailySalesBody:
+      '일별 판매 내역 추적과 재고 감사 로그를 엽니다.',
+
+    // 패널 공통 용어
+    colItem: '항목',
+    colProduct: '상품',
+    colCustomer: '고객',
+    colService: '서비스',
+    colClass: '등급',
+    colUnits: '수량',
+    colQtySold: '판매 수량',
+    colOrders: '주문',
+    colRevenue: '매출',
+    colProfit: '이익',
+    colMargin: '이익률',
+    colShare: '비중',
+    colSales: '판매',
+    colCost: '원가',
+    colGrossProfit: '매출총이익',
+    colCogs: '매출원가',
+    colTotalSpent: '누적 구매액',
+    colReceipt: '영수증',
+    colDateTime: '날짜 및 시간',
+    colImage: '이미지',
+    colMember: '구성원',
+    revenueColon: '매출:',
+
+    exportSuccessful: '내보내기 완료',
+    generatingPdf: 'PDF를 만들고 있습니다…',
+    generatingPdfBody: '문서를 만드는 동안 잠시 기다려 주세요.',
+    noDataTitle: '데이터 없음',
+    noDataToExport: '내보낼 항목이 없습니다.',
+
+    // 결제 수단 대조
+    pmTitle: '결제 수단 대조',
+    pmSubtitle: '결제 경로별로 나눈 수취 매출.',
+    pmTransactions: '거래',
+
+    // 주요 고객
+    tcTitle: '주요 고객',
+    tcSubtitle: '이번 기간에 가장 많이 구매한 고객.',
+    tcEmptyTitle: '고객 데이터 없음',
+    tcEmptyBody: '판매를 고객과 연결하면 이 리포트를 볼 수 있습니다.',
+
+    // 기간별 매출
+    sotTitle: '기간별 매출',
+    sotSubtitle: '매출 성과의 추이.',
+    sotEmpty:
+      '이번 기간에 기록된 판매가 없습니다. 첫 판매가 완료되면 이 차트는 자동으로 활성화됩니다.',
+
+    // 정체 재고 분석
+    dsTitle: '정체 재고 분석',
+    dsSubtitle: '60일 이상 팔리지 않은 항목(묶인 자금).',
+    dsLockedCapital: '묶인 자금 추정액',
+    dsUnitsLeft: '개 남음',
+    dsSku: 'SKU:',
+    dsValueLocked: '묶인 금액',
+    dsViewInventory: '전체 재고 보기',
+    dsEmpty: '눈에 띄는 정체 재고가 없습니다. 재고가 잘 돌고 있습니다!',
+
+    // 품절 경고
+    depTitle: '품절 경고',
+    depSubtitle:
+      '최근 30일 판매 속도를 바탕으로, 곧 품절될 상품을 미리 알려드립니다.',
+    depStock: '재고:',
+    depSelling: '약 ',
+    depPerDay: '/일',
+    depRunsOut_one: '{count}일 후 품절',
+    depRunsOut_other: '{count}일 후 품절',
+
+    // 오늘의 인사이트
+    iotdTitle: '오늘의 인사이트',
+    iotdVsMedian: '중간값 대비',
+    iotdYou: '내 매장',
+    iotdMedianShop: '중간값 매장',
+    iotdRotation: '{total}개 중 1개 · 내일 하나 더',
+    iotdAtStake: '걸린 금액',
+
+    // 기간 프리셋
+    drToday: '오늘',
+    drYesterday: '어제',
+    drLast7: '최근 7일',
+    drLast30: '최근 30일',
+    tfLast7d: '최근 7일',
+    tfLast30d: '최근 30일',
+    tf90Days: '90일',
+    tfLifetime: '전체 기간',
+    drThisMonth: '이번 달',
+    drLastMonth: '지난달',
+    drAllTime: '전체 기간',
+
+    // 손익 차트
+    plcSubtitle: '재무 건전성 개요.',
+    plcTotalCost: '총원가',
+    plcEmpty:
+      '이번 기간에 기록된 판매가 없습니다. 상품에 “원가”를 입력하면 실제 이익을 추적할 수 있습니다.',
+
+    // 내 매장의 위치
+    pcTitle: '내 매장의 위치',
+    pcEmptyTitle: '아직 비교할 수 없습니다',
+    pcEmptyBody:
+      'Zeneva는 숫자에 의미가 생길 만큼 충분한 매장이 판매하고 있을 때만 중간값 매장과 비교합니다. 여기에 추측으로 만든 숫자는 하나도 없습니다.',
+    pcVsMedianShop: '중간값 매장 대비',
+    pcFootnote:
+      '최근 {days}일 동안 {sales}건 이상 판매한 Zeneva 매장 {shops}곳의 중간값. 어떤 매장도 이름이 드러나지 않으며, 다른 매장이 내 매장을 볼 수도 없습니다.',
+    pcFootnoteAsOf:
+      '{asOf} 기준, 최근 {days}일 동안 {sales}건 이상 판매한 Zeneva 매장 {shops}곳의 중간값. 어떤 매장도 이름이 드러나지 않으며, 다른 매장이 내 매장을 볼 수도 없습니다.',
+
+    // 매출 예측
+    rfTitle: '매출 예측',
+    rfSubtitle: '현재 속도를 바탕으로 한 AI의 30일 예측.',
+    rfNotEnough: '예측을 만들기에 데이터가 부족합니다.',
+    rfProjection: '30일 예상',
+    rfVsPrevious7: '이전 7일 대비 {pct}%',
+    rfRunRate: '현재 일 판매 속도',
+    rfPerDay: '/ 일',
+    rfHistorical: '실적',
+    rfForecast: '예측',
+
+    // 장바구니 분석
+    baTitle: '장바구니 분석',
+    baSubtitle: '자주 함께 구매되는 상품을 찾아냅니다.',
+    baHint:
+      '이 인사이트로 **묶음 상품**을 만들거나, 교차 판매가 늘어나도록 매장 진열을 정하세요.',
+    baJointSales: '함께 판매된 건수',
+    baFootnote: '함께 판매가 1건을 넘은 조합만 표시합니다.',
+    baEmptySearch: '검색과 일치하는 상품 조합을 찾지 못했습니다.',
+    baEmptyNoPairs:
+      '의미 있는 상품 조합을 찾아내기에는 여러 항목이 담긴 판매가 아직 부족합니다.',
+
+    // 혼잡 시간 인사이트
+    hhTitle: '혼잡 시간 인사이트',
+    hhSubtitle: '가장 바쁜 시간과 요일.',
+    hhPeakHours: '피크 시간',
+    hhPeakDays: '피크 요일',
+    hhPeakWindow: '가장 바쁜 시간대',
+    hhBusiestDay: '한 주에서 가장 바쁜 요일',
+    hhDaySunday: '일요일',
+    hhDayMonday: '월요일',
+    hhDayTuesday: '화요일',
+    hhDayWednesday: '수요일',
+    hhDayThursday: '목요일',
+    hhDayFriday: '금요일',
+    hhDaySaturday: '토요일',
+    hhDayShortSunday: '일',
+    hhDayShortMonday: '월',
+    hhDayShortTuesday: '화',
+    hhDayShortWednesday: '수',
+    hhDayShortThursday: '목',
+    hhDayShortFriday: '금',
+    hhDayShortSaturday: '토',
+    hhSalesCount: '판매 {count}건',
+    hhPeakLine: '{label} — 판매 {count}건',
+
+    // 고객 인사이트
+    caTitle: '고객 인사이트',
+    caAnonymousBuyer: '익명 구매자',
+    caSubtitle: '고객 기반의 성장과 유지를 더 깊이 파악하세요.',
+    caTotalCustomers: '총 고객',
+    caNewLast30: '신규 고객(최근 30일)',
+    caReturning: '재방문 고객',
+    caRetentionRate: '유지율 {pct}%',
+    caAcquisition: '고객 유입',
+    caNewCustomers: '신규 고객',
+    caNoAcquisition: '이 기간의 고객 유입 데이터가 없습니다.',
+    caTop5: '가장 많이 구매한 고객 5명',
+
+    // 팀 성과
+    spAvgBasket: '평균 구매 금액',
+    spItemsPerSale: '항목 / 판매',
+    spDiscounted: '할인 적용',
+    spPriceOverrides: '직접 입력한 가격',
+    spNoAuthor: '판매에 담당자가 기록되기 전에 저장됨',
+    spTitleSolo: '카운터 활동',
+    spTitleTeam: '팀 성과',
+    spSubtitleSolo: '이번 기간에 카운터에서 일어난 일.',
+    spSubtitleTeam_one: '이번 기간에 누가 얼마를 올렸는지 — {count}명.',
+    spSubtitleTeam_other: '이번 기간에 누가 얼마를 올렸는지 — {count}명.',
+    spSubtitleTeamPlus_one:
+      '이번 기간에 누가 얼마를 올렸는지 — {count}명, 그리고 담당자가 기록되지 않은 판매.',
+    spSubtitleTeamPlus_other:
+      '이번 기간에 누가 얼마를 올렸는지 — {count}명, 그리고 담당자가 기록되지 않은 판매.',
+    spFootnote:
+      '이것은 활동 수치이며 평가가 아닙니다. 할인과 직접 입력한 가격은 좋은 판매원이 마땅히 해야 할 일인 경우가 많습니다. 숫자가 크다는 것은 물어볼 이유이지, 몰아붙일 이유가 아닙니다. 매출은 영수증 전체 금액이므로, 아래 행을 모두 더하면 이번 기간 매장 매출이 됩니다.',
+    spRunScan: '감사 로그에서 손실 방지 검사 실행',
+
+    // 카테고리 성과
+    cpTitle: '카테고리 성과',
+    cpSubtitle: '상품 목록의 어느 부분이 성과를 내는지 — 매출 순으로, 이익률을 함께 표시.',
+    cpOther: '기타({count})',
+    cpFoldedTail:
+      '{total}개 카테고리가 판매되었으며, 차트는 가장 작은 {folded}개를 “기타”로 묶습니다.',
+    cpMarginUnknownPartial:
+      '판매 수량의 {pct}%에 원가가 없습니다 — 이익률은 0이 아니라 알 수 없음입니다',
+    cpMarginUnknownNone: '기록된 원가가 없습니다 — 이익률은 0이 아니라 알 수 없음입니다',
+    cpVsPrevious: '이전 기간 대비',
+    cpNew: '신규',
+    cpFlat: '변화 없음',
+    cpFootnote:
+      '여기서 매출은 각 행의 가격 × 수량 합계이므로 세금이 포함되지 않고, 영수증 할인 이전 금액입니다. 그래서 위쪽 매출 카드와 정확히 일치하지 않습니다. 그쪽은 카운터 총액입니다. 비율은 이 패널 안에서 100%가 됩니다.',
+
+    // 재고 회전과 ABC 분석
+    abcTitle: '재고 회전과 ABC 분석',
+    abcSubtitle: '매출 기여도에 따라 상품을 등급으로 나눕니다.',
+    abcAllProducts: '전체 상품({count})',
+    abcClassA: 'A등급({count})',
+    abcClassB: 'B등급({count})',
+    abcClassC: 'C등급({count})',
+    abcClassBadge: '{letter}등급',
+    abcEmptyTitle: '판매 데이터가 부족합니다',
+    abcEmptyBody: '분석할 판매 기록이 더 쌓이면 이 리포트가 만들어집니다.',
+    abcProductInsight: '상품 인사이트',
+    abcInsightSubtitle: '선택한 기간의 상세 성과 지표.',
+    abcRevShare: '매출 비중',
+    abcCumulative: '(누적)',
+    abcRecommendation: '전략 제안',
+    abcRecA:
+      '최우선 순위 항목입니다. 재고가 안전 수준 아래로 내려가지 않게 하세요. 회전을 높이기 위해 C등급 항목과의 기간 한정 묶음 판매도 고려해 보세요.',
+    abcRecB:
+      '안정적인 성과입니다. 교차 판매 기회를 최대한 살리는 데 집중하세요. 작은 가격 실험으로 판매량을 해치지 않고 이익률을 개선할 수 있습니다.',
+    abcRecC:
+      '회전이 느린 항목입니다. 자금이 묶여 있을 수 있습니다. 잘 팔리는 항목과 묶어 판매하거나, 보관 비용이 크다면 재고 정리 전략을 검토하세요.',
+    abcClose: '인사이트 닫기',
+    abcNoProducts: '상품을 찾을 수 없습니다.',
+
+    // 이익 누수
+    mlTitle: '이익 누수',
+    mlSubtitle: '아무 결정도 없이 나간 돈.',
+    mlCleanBody:
+      '이번 기간에 원가보다 낮게 팔린 항목도, 직접 입력한 가격도, 지급한 할인도 없었습니다.',
+    mlCleanUncosted_one:
+      '{count}개 항목에 원가가 없어서 원가보다 낮게 팔렸는지 확인할 수 없었습니다.',
+    mlCleanUncosted_other:
+      '{count}개 항목에 원가가 없어서 원가보다 낮게 팔렸는지 확인할 수 없었습니다.',
+    mlAcross: '이번 기간의 원가 미달 판매와 직접 입력한 가격을 합한 금액.',
+    mlSoldBelowCost: '원가보다 낮게 판매',
+    mlColSoldFor: '판매가',
+    mlColLost: '손실',
+    mlOverridesTitle: '직접 입력한 가격으로 내준 금액',
+    mlColUnitsTyped: '직접 입력한 가격 수량',
+    mlColBelowShelf: '판매가보다 낮은 금액',
+    mlOverridesFootnote:
+      '오늘의 가격이 아니라 판매 시점의 판매가를 기준으로 측정합니다. 정당한 가격 인상은 여기에 절대 나타나지 않습니다. 직접 입력한 가격은 대부분 정당합니다. 이것은 그 청구서이며, 몰아붙이는 것이 아닙니다.',
+    mlDiscountsTitle: '지급한 할인',
+    mlDiscountsFootnote_one:
+      '판매 {formatted}건에 대해. 할인은 항목별이 아니라 판매 전체에 기록되므로 이 금액은 의도적으로 상품에 배분하지 않습니다. 배분은 추측이 됩니다. 누가 지급했는지는 아래 팀 성과 패널에 있습니다.',
+    mlDiscountsFootnote_other:
+      '판매 {formatted}건에 대해. 할인은 항목별이 아니라 판매 전체에 기록되므로 이 금액은 의도적으로 상품에 배분하지 않습니다. 배분은 추측이 됩니다. 누가 지급했는지는 아래 팀 성과 패널에 있습니다.',
+    mlUncostedFootnote_one:
+      '이번 기간에 판매된 {count}개 항목에 원가가 없어서, 이익이 났다고 가정하는 대신 원가 미달 검사에서 완전히 제외했습니다. 재고에 원가를 입력하면 이 검사가 완전해집니다.',
+    mlUncostedFootnote_other:
+      '이번 기간에 판매된 {count}개 항목에 원가가 없어서, 이익이 났다고 가정하는 대신 원가 미달 검사에서 완전히 제외했습니다. 재고에 원가를 입력하면 이 검사가 완전해집니다.',
+
+    // 비즈니스 평가
+    brFirstReading: '첫 측정',
+    brPlusPts: '+{count}점',
+    brOffTitle: '비즈니스 평가가 꺼져 있습니다',
+    brOffBody:
+      '아무것도 지워지지 않았습니다. 설정 → 일반에서 언제든 다시 켜면 점수와 연속 기록, 이력이 그대로 이어집니다.',
+    brOpenSettings: '설정 열기',
+    brPitchTitle: '돈이 어디서 새고 있는지 보고 싶으신가요?',
+    brPitchBody:
+      '비즈니스 평가는 사장님의 판매 데이터를 읽고, 매출을 키우는 네 가지에 점수를 매깁니다. 이익률, 평균 구매 금액, 구매자가 다시 오는 빈도, 그리고 성장 흐름입니다. 그리고 가장 큰 기회를 얼마만큼 놓치고 있는지 금액으로 보여줍니다.',
+    brTurnOn: '비즈니스 평가 켜기',
+    brNoThanks: '괜찮습니다',
+    brLevelBadge: '레벨 {index}',
+    brLevelUp: '레벨 {index} — {name}',
+    brNotRated: '아직 평가되지 않음',
+    brToNextTier: '{name}까지 {points}',
+    brTopTier: '최고 레벨을 지켰습니다',
+    brNothingYet: '아직 데이터가 부족합니다.',
+    brNothingLeft: '놓치고 있는 것이 없습니다. 계속 이대로 하세요.',
+    brHintWithMedian: '{hint} · 플랫폼 중간값 {median}',
+    brClaimPrivate:
+      '사장님의 영수증을 바탕으로 계산합니다. 어디로도 전송되지 않고, 다른 누구에게도 보이지 않습니다.',
+    brClaimPriced: '기회의 금액은 예측이 아니라 사장님의 판매에서 계산합니다.',
+    brClaimReversible: '설정에서 언제든 끌 수 있습니다.',
+    brNewTier: '이전에는 닿아본 적 없는 레벨입니다. 잘하셨습니다.',
+    brNewBest: '최고 기록',
+    brNeedFirstSale: '첫 판매를 기록하면 평가를 받을 수 있습니다.',
+    brOnTheTable: '놓치고 있는 금액',
+    brYourBest: '최고 성적',
+    brDaysRecorded_one: '{count}일 기록됨',
+    brDaysRecorded_other: '{count}일 기록됨',
+    brScoredOnLast: '최근 {days}일 판매로 채점',
+    brCheckBack: '흐름은 내일 다시 확인해 보세요.',
+    brBadges: '배지',
+
+    // 많이 팔린 항목
+    tiTitleProducts: '많이 팔린 상품',
+    tiTitleServices: '많이 팔린 서비스',
+    tiValue: '금액',
+    tiByUnits: '판매 수량 기준',
+    tiByRevenue: '매출 기준',
+    tiByProfit: '이익 기준',
+    tiByUnitsLower: '판매 수량 기준',
+    tiByRevenueLower: '매출 기준',
+    tiByProfitLower: '이익 기준',
+    tiEmptyProducts:
+      'POS에서 판매를 시작하면 이 차트가 잘 팔리는 상품을 보여줍니다.',
+    tiEmptyServices:
+      'POS에서 판매를 시작하면 이 차트가 잘 팔리는 서비스를 보여줍니다.',
+    tiNoCostProducts:
+      '이번 기간의 어떤 상품에도 원가가 기록되어 있지 않아 이익을 계산할 수 없습니다. 재고에 원가를 입력하거나, 수량 또는 매출 기준으로 정렬하세요.',
+    tiNoCostServices:
+      '이번 기간의 어떤 서비스에도 원가가 기록되어 있지 않아 이익을 계산할 수 없습니다. 재고에 원가를 입력하거나, 수량 또는 매출 기준으로 정렬하세요.',
+    tiSoldProducts_one: '상품 {formatted}개가 팔렸습니다.',
+    tiSoldProducts_other: '상품 {formatted}개가 팔렸습니다.',
+    tiSoldServices_one: '서비스 {formatted}건이 팔렸습니다.',
+    tiSoldServices_other: '서비스 {formatted}건이 팔렸습니다.',
+    tiUncosted_one:
+      '그중 {count}개에 원가가 없어서 이익은 0이 아니라 알 수 없음이며, 차트에 포함되지 않습니다.',
+    tiUncosted_other:
+      '그중 {count}개에 원가가 없어서 이익은 0이 아니라 알 수 없음이며, 차트에 포함되지 않습니다.',
+    tiAtALoss_one: '{count}개가 손실을 보며 팔렸습니다 — 전체 목록을 확인하세요.',
+    tiAtALoss_other: '{count}개가 손실을 보며 팔렸습니다 — 전체 목록을 확인하세요.',
+    tiNoDataProducts: '잘 팔리는 상품이 여기에 표시됩니다.',
+    tiNoDataServices: '잘 팔리는 서비스가 여기에 표시됩니다.',
+    tiSoldInPeriodProducts_one: '이번 기간에 상품 {formatted}개가 팔렸습니다.',
+    tiSoldInPeriodProducts_other: '이번 기간에 상품 {formatted}개가 팔렸습니다.',
+    tiSoldInPeriodServices_one: '이번 기간에 서비스 {formatted}건이 팔렸습니다.',
+    tiSoldInPeriodServices_other: '이번 기간에 서비스 {formatted}건이 팔렸습니다.',
+    tiCaptionProducts_one: '상품 {total}개 중 {shown}개 표시 · {measure}',
+    tiCaptionProducts_other: '상품 {total}개 중 {shown}개 표시 · {measure}',
+    tiCaptionServices_one: '서비스 {total}건 중 {shown}건 표시 · {measure}',
+    tiCaptionServices_other: '서비스 {total}건 중 {shown}건 표시 · {measure}',
+    tiViewAllCount: '{count}개 전체 보기',
+    tiDialogTitleProducts: '판매된 전체 상품({count})',
+    tiDialogTitleServices: '판매된 전체 서비스({count})',
+    tiDialogBody:
+      '페이지 위쪽에서 선택한 기간에 대해 {measure} 정렬했습니다. 여기서 매출은 행 매출 — 가격 × 수량의 합 — 이므로 세금이 포함되지 않고 영수증 할인 이전 금액이며, 위쪽 카드의 매출 숫자와 정확히 일치하지 않습니다.',
+    tiShowingOf: '{total}개 중 {shown}개',
+    tiSearchProducts: '상품, SKU 또는 카테고리 검색…',
+    tiSearchServices: '서비스, SKU 또는 카테고리 검색…',
+    tiExportCsv: 'CSV 내보내기',
+    tiNothingMatches: '“{query}”와 일치하는 항목이 없습니다.',
+    tiNoCostAll: '기록된 원가가 없어서 이익은 0이 아니라 알 수 없음입니다.',
+    tiNoCostPartial:
+      '판매 수량의 {pct}%에 원가가 기록되어 있지 않아 이익은 0이 아니라 알 수 없음입니다.',
+
+    // 상세 손익계산서
+    plsTitle: '상세 손익계산서',
+    plsSubtitle:
+      '회계 기준에 따른 매출, 매출원가, 영업비용, 순이익의 공식 내역.',
+    plsExportStatement: '계산서 내보내기',
+    plsExportedBody: '상세 손익계산서를 PDF로 내보냈습니다.',
+    plsGrossRevenue: '총매출',
+    plsGrossRevenueHint: '할인 전 판매 합계',
+    plsCogs: '매출원가',
+    plsCogsHint: '상품 매입 원가',
+    plsMarginPct: '이익률 {pct}%',
+    plsNetOperatingIncome: '순영업이익',
+    plsNetMarginPct: '순이익률 {pct}%',
+    plsColLineItem: '재무 항목',
+    plsColAmount: '금액({symbol})',
+    plsColPctGross: '총매출 대비 %',
+    plsGrossSalesRevenue: '총판매매출',
+    plsLessDiscounts: '(–) 할인 및 가격 인하',
+    plsNetSalesRevenue: '순판매매출',
+    plsTotalCogs: '매출원가 합계',
+    plsOperatingExpenses: '영업비용',
+    plsTotalOperatingExpenses: '영업비용 합계',
+    plsNetOperatingProfit: '순영업이익',
+    plsHeatmapTitle: '카테고리 수익성과 이익률 히트맵',
+    plsHeatmapSubtitle:
+      '상품 카테고리별 순이익 기여와 이익률 내역.',
+    plsProfitMargin: '이익률',
+    plsHeatmapEmpty:
+      '카테고리 수익성 데이터를 만들 판매 기록이 없습니다.',
+
+    // 일별 판매 내역 로그
+    dsiTitle: '일별 판매 내역 로그',
+    dsiSubtitle: '선택한 날에 판매된 모든 상품과 서비스의 상세 기록.',
+    dsiExportReport: '리포트 내보내기',
+    dsiExportImage: '고해상도 이미지로 내보내기',
+    dsiExportPdf: 'PDF로 내보내기',
+    dsiExportCsv: 'CSV로 내보내기',
+    dsiGeneratingBody: '그날의 판매 표를 캡처하는 동안 잠시 기다려 주세요.',
+    dsiExportedCsvBody_one: '판매 내역 {count}행을 내보냈습니다.',
+    dsiExportedCsvBody_other: '판매 내역 {count}행을 내보냈습니다.',
+    dsiExportedImageBody: '표를 고해상도 이미지로 내보냈습니다.',
+    dsiExportedPdfBody: '표를 PDF로 내보냈습니다.',
+    dsiExportFailed: '내보내기 실패',
+    dsiExportFailedBody: '이미지를 캡처할 수 없었습니다.',
+    dsiCashSales: '그날의 현금 판매',
+    dsiCashHint: '금전함에 있어야 할 현금 총액',
+    dsiTransfers: '입금 예정 계좌이체',
+    dsiTransfersHint: 'POS에서 처리한 계좌이체 합계',
+    dsiCard: '카드 거래',
+    dsiCardHint: 'POS에서 받은 카드 결제 합계',
+    dsiVerified: '확인된 계좌이체',
+    dsiVerifiedHint: '입금 시 기기에서 확인됨',
+    dsiPickDay: '날짜 선택',
+    dsiToday: '오늘({date})',
+    dsiYesterday: '어제({date})',
+    dsiSearchPlaceholder: '항목 이름 또는 영수증 번호로 검색…',
+    dsiAllTypes: '전체 유형',
+    dsiProductsOnly: '상품만',
+    dsiServicesOnly: '서비스만',
+    dsiRowsOption: '{count}행',
+    dsiShowing_one: '판매 내역 {count}건 표시',
+    dsiShowing_other: '판매 내역 {count}건 표시',
+    dsiEmptyTitle: '기록된 판매 내역이 없습니다',
+    dsiEmptyBody: '이 날짜에 현재 필터와 일치하는 기록이 없습니다.',
+    dsiPageOf: '{total}페이지 중 {page}페이지',
+    dsiPrevPage: '이전 페이지',
+    dsiNextPage: '다음 페이지',
   },
   support: {
     title: '지원',

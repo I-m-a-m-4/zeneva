@@ -847,6 +847,8 @@ const ja: Messages = {
     colStock: '在庫',
     notAvailable: '—',
     bundleBadge: 'セット',
+    unknownProduct: '不明な商品',
+    uncategorized: '未分類',
     fullEdit: '詳細編集',
     quickEdit: 'クイック編集',
     printBarcode: 'バーコードを印刷',
@@ -1295,6 +1297,482 @@ const ja: Messages = {
     downloadedDescription: 'ダッシュボードの画像を保存しました。',
     downloadFailed: 'ダウンロードに失敗しました',
     downloadFailedDescription: 'ダッシュボードの画像を取得できませんでした。',
+  },
+  reports: {
+    title: 'レポート',
+    subtitle: '事業のパフォーマンスを深く分析します。',
+
+    // 前期間との比較
+    deltaNewThisPeriod: '今期の新規',
+    deltaFlat: '変化なし',
+    deltaVsPrevious: '前期比 {pct}%',
+
+    tabAnalytics: '分析ダッシュボード',
+    tabProfitLoss: '損益',
+    tabDailySales: '日別販売明細',
+    tabBusinessRating: '事業スコア',
+
+    updatingMetrics: '指標を更新しています…',
+    loadingDashboard: '分析ダッシュボードを読み込んでいます…',
+    exportReport: 'レポートをエクスポート',
+    exportCsv: 'データを CSV でエクスポート',
+    exportImage: '高解像度の画像でエクスポート',
+    exportPdf: 'PDF でエクスポート（印刷）',
+
+    loadingDataTitle: 'データを読み込んでいます…',
+    loadingDataBody:
+      'いつもより時間がかかっています。オフラインの場合は、端末に同期済みのデータを表示します。',
+    generatingTitle: 'レポートを作成しています…',
+    generatingBody: 'ダッシュボードを取得しています。少しお待ちください。',
+    downloadedTitle: 'レポートをダウンロードしました',
+    exportedTitle: '分析をエクスポートしました',
+    exportedBody: 'CSV ファイルを保存しました。',
+
+    kpiRevenue: '売上',
+    kpiRevenueHint: '入金合計',
+    kpiNetCost: '純原価',
+    kpiNetCostHint: '販売に要した原価合計',
+    kpiNetProfit: '純利益',
+    kpiNetProfitHint: '入金から原価を差し引いた額',
+    kpiProductRevenue: '商品売上',
+    kpiProductRevenueHint: '物販による売上',
+    kpiServiceRevenue: 'サービス売上',
+    kpiServiceRevenueHint: '提供したサービスによる売上',
+    kpiSales: '販売',
+    kpiSalesHint: '取引総数',
+    kpiUniqueProducts: '商品種類数',
+    kpiUniqueProductsHint: '売れた商品の種類数',
+    kpiUnitsSold: '販売点数',
+    kpiUnitsSoldHint: '出庫した合計点数',
+    kpiDailyVelocity: '1日あたりの回転',
+    kpiDailyVelocityHint: '1日あたりの販売件数',
+    kpiDailyRevenue: '1日あたりの売上',
+    kpiDailyRevenueHint: '1日あたりの平均売上',
+    kpiCatalogSize: '商品カタログの規模',
+    kpiCatalogSizeHint: '在庫にある商品の総種類数',
+    kpiAvgOrder: '平均客単価',
+    kpiAvgOrderHint: '1件あたりの売上',
+    kpiCustomers: '顧客',
+    kpiCustomersBought_one: '今期は {formatted} 人が購入',
+    kpiCustomersBought_other: '今期は {formatted} 人が購入',
+    kpiCustomersHint: '登録済みの顧客総数',
+
+    gateVisualName: '高度なビジュアル分析',
+    gateVisualBody:
+      '詳細なグラフ、売上の推移、利益率を解放して、商売の実態をつかみましょう。',
+    gateCustomerName: '顧客インサイトと在庫回転',
+    gateCustomerBody:
+      '高度な顧客分析と顧客生涯価値を解放し、データにもとづく ABC 分析で在庫水準を最適化します。',
+    gateProfitLossName: '損益計算書',
+    gateProfitLossBody:
+      '詳細な損益計算書を解放して、店舗の利益率を分析しましょう。',
+    gateDailySalesBody:
+      '日別の販売明細の記録と在庫監査ログを解放します。',
+
+    // 各パネル共通の語彙
+    colItem: '項目',
+    colProduct: '商品',
+    colCustomer: '顧客',
+    colService: 'サービス',
+    colClass: 'ランク',
+    colUnits: '点数',
+    colQtySold: '販売数量',
+    colOrders: '注文',
+    colRevenue: '売上',
+    colProfit: '利益',
+    colMargin: '利益率',
+    colShare: '構成比',
+    colSales: '販売',
+    colCost: '原価',
+    colGrossProfit: '粗利',
+    colCogs: '売上原価',
+    colTotalSpent: '購入金額累計',
+    colReceipt: 'レシート',
+    colDateTime: '日時',
+    colImage: '画像',
+    colMember: 'メンバー',
+    revenueColon: '売上：',
+
+    exportSuccessful: 'エクスポートしました',
+    generatingPdf: 'PDF を作成しています…',
+    generatingPdfBody: '書類を作成しています。少しお待ちください。',
+    noDataTitle: 'データがありません',
+    noDataToExport: 'エクスポートできる項目がありません。',
+
+    // 支払い方法の照合
+    pmTitle: '支払い方法の照合',
+    pmSubtitle: '支払い手段ごとの入金内訳。',
+    pmTransactions: '取引',
+
+    // 上位顧客
+    tcTitle: '上位顧客',
+    tcSubtitle: '今期もっとも多く購入した顧客。',
+    tcEmptyTitle: '顧客データがありません',
+    tcEmptyBody: '販売を顧客に紐づけると、このレポートが表示されます。',
+
+    // 売上の推移
+    sotTitle: '売上の推移',
+    sotSubtitle: '売上パフォーマンスの傾向。',
+    sotEmpty:
+      '今期の販売記録がありません。最初の販売が完了すると、このグラフは自動的に有効になります。',
+
+    // 滞留在庫の分析
+    dsTitle: '滞留在庫の分析',
+    dsSubtitle: '60 日以上売れていない商品（寝ている資金）。',
+    dsLockedCapital: '寝ている資金の概算',
+    dsUnitsLeft: '点 残り',
+    dsSku: 'SKU：',
+    dsValueLocked: '寝ている金額',
+    dsViewInventory: '在庫をすべて表示',
+    dsEmpty: '目立った滞留在庫はありません。在庫はよく回っています。',
+
+    // 在庫切れ警告
+    depTitle: '在庫切れ警告',
+    depSubtitle:
+      '直近 30 日の販売ペースにもとづき、間もなく在庫切れになる商品を予測して知らせます。',
+    depStock: '在庫：',
+    depSelling: '約 ',
+    depPerDay: '/日',
+    depRunsOut_one: '{count} 日で在庫切れ',
+    depRunsOut_other: '{count} 日で在庫切れ',
+
+    // 今日のインサイト
+    iotdTitle: '今日のインサイト',
+    iotdVsMedian: '中位との比較',
+    iotdYou: 'あなた',
+    iotdMedianShop: '中位の店舗',
+    iotdRotation: '{total} 件中 1 件目 · 明日もう 1 件',
+    iotdAtStake: '対象金額',
+
+    // 期間プリセット
+    drToday: '今日',
+    drYesterday: '昨日',
+    drLast7: '直近 7 日',
+    drLast30: '直近 30 日',
+    tfLast7d: '直近 7 日',
+    tfLast30d: '直近 30 日',
+    tf90Days: '90 日',
+    tfLifetime: '全期間',
+    drThisMonth: '今月',
+    drLastMonth: '先月',
+    drAllTime: '全期間',
+
+    // 損益グラフ
+    plcSubtitle: '財務状況の概要。',
+    plcTotalCost: '原価合計',
+    plcEmpty:
+      '今期の販売記録がありません。商品に「原価」を入力すると、本当の利益を把握できます。',
+
+    // 他店との比較
+    pcTitle: '他店との比較',
+    pcEmptyTitle: '比較はまだできません',
+    pcEmptyBody:
+      'Zeneva が中位の店舗と比較するのは、その数字に意味が出るだけの店舗が販売しているときだけです。ここに推測の数字はひとつもありません。',
+    pcVsMedianShop: '中位の店舗との比較',
+    pcFootnote:
+      '直近 {days} 日に {sales} 件以上販売した Zeneva の {shops} 店舗の中位値。店舗名が明かされることはなく、他店があなたの店を見ることもできません。',
+    pcFootnoteAsOf:
+      '{asOf} 時点、直近 {days} 日に {sales} 件以上販売した Zeneva の {shops} 店舗の中位値。店舗名が明かされることはなく、他店があなたの店を見ることもできません。',
+
+    // 売上予測
+    rfTitle: '売上予測',
+    rfSubtitle: '現在のペースにもとづく AI の 30 日予測。',
+    rfNotEnough: '予測を作成するにはデータが足りません。',
+    rfProjection: '30 日予測',
+    rfVsPrevious7: '前の 7 日と比べて {pct}%',
+    rfRunRate: '現在の 1 日あたりのペース',
+    rfPerDay: '/ 日',
+    rfHistorical: '実績',
+    rfForecast: '予測',
+
+    // バスケット分析
+    baTitle: 'バスケット分析',
+    baSubtitle: 'よく一緒に買われている商品を見つけます。',
+    baHint:
+      'このインサイトを使って**セット販売**を作る、あるいは併売が伸びるように店内の並べ方を決めましょう。',
+    baJointSales: '同時販売',
+    baFootnote: '同時販売が 1 件を超える組み合わせのみ表示しています。',
+    baEmptySearch: '検索条件に合う商品の組み合わせは見つかりませんでした。',
+    baEmptyNoPairs:
+      '意味のある商品の組み合わせを見つけるには、複数点の販売がまだ足りません。',
+
+    // 混雑状況のインサイト
+    hhTitle: '混雑状況のインサイト',
+    hhSubtitle: '商売がもっとも忙しい時間帯と曜日。',
+    hhPeakHours: 'ピークの時間帯',
+    hhPeakDays: 'ピークの曜日',
+    hhPeakWindow: 'もっとも忙しい時間帯',
+    hhBusiestDay: '週でもっとも忙しい曜日',
+    hhDaySunday: '日曜日',
+    hhDayMonday: '月曜日',
+    hhDayTuesday: '火曜日',
+    hhDayWednesday: '水曜日',
+    hhDayThursday: '木曜日',
+    hhDayFriday: '金曜日',
+    hhDaySaturday: '土曜日',
+    hhDayShortSunday: '日',
+    hhDayShortMonday: '月',
+    hhDayShortTuesday: '火',
+    hhDayShortWednesday: '水',
+    hhDayShortThursday: '木',
+    hhDayShortFriday: '金',
+    hhDayShortSaturday: '土',
+    hhSalesCount: '{count} 件の販売',
+    hhPeakLine: '{label} — {count} 件の販売',
+
+    // 顧客インサイト
+    caTitle: '顧客インサイト',
+    caAnonymousBuyer: '匿名の購入者',
+    caSubtitle: '顧客基盤の成長と定着をより深く理解します。',
+    caTotalCustomers: '顧客総数',
+    caNewLast30: '新規顧客（直近 30 日）',
+    caReturning: '再来店の顧客',
+    caRetentionRate: '定着率 {pct}%',
+    caAcquisition: '新規顧客の獲得',
+    caNewCustomers: '新規顧客',
+    caNoAcquisition: 'この期間の顧客獲得データはありません。',
+    caTop5: 'もっとも多く購入した 5 人の顧客',
+
+    // チームの実績
+    spAvgBasket: '平均客単価',
+    spItemsPerSale: '点数 / 1 件',
+    spDiscounted: '値引きあり',
+    spPriceOverrides: '手入力した価格',
+    spNoAuthor: '販売に担当者が記録される前の記録',
+    spTitleSolo: 'レジの動き',
+    spTitleTeam: 'チームの実績',
+    spSubtitleSolo: '今期レジで何があったか。',
+    spSubtitleTeam_one: '今期、誰がいくら売り上げたか — {count} 名。',
+    spSubtitleTeam_other: '今期、誰がいくら売り上げたか — {count} 名。',
+    spSubtitleTeamPlus_one:
+      '今期、誰がいくら売り上げたか — {count} 名、加えて担当者が記録されていない販売。',
+    spSubtitleTeamPlus_other:
+      '今期、誰がいくら売り上げたか — {count} 名、加えて担当者が記録されていない販売。',
+    spFootnote:
+      'これは動きを示す数字で、評価ではありません。値引きや手入力の価格は、良い販売員がまさにすべきことである場合も多くあります。数字が大きいのは尋ねる理由であって、責める理由ではありません。売上はレシート全体の金額なので、下の各行を合計すると今期の店舗売上になります。',
+    spRunScan: '監査ログでロス防止スキャンを実行',
+
+    // カテゴリ別の実績
+    cpTitle: 'カテゴリ別の実績',
+    cpSubtitle: 'カタログのどこが成果を出しているか — 売上順に、利益率を並べて表示。',
+    cpOther: 'その他（{count}）',
+    cpFoldedTail:
+      '{total} カテゴリが売れました。グラフは小さい {folded} カテゴリを「その他」にまとめています。',
+    cpMarginUnknownPartial:
+      '販売点数の {pct}% に原価がありません — 利益率はゼロではなく不明です',
+    cpMarginUnknownNone: '原価の記録がありません — 利益率はゼロではなく不明です',
+    cpVsPrevious: '前期比',
+    cpNew: '新規',
+    cpFlat: '変化なし',
+    cpFootnote:
+      'ここでの売上は各行の価格 × 数量の合計なので、税を含まず、レシートの値引き前の金額です。したがって上の売上カードとは完全には一致しません。あちらはレジの合計です。構成比はこのパネル内で 100% になります。',
+
+    // 在庫回転と ABC 分析
+    abcTitle: '在庫回転と ABC 分析',
+    abcSubtitle: '売上への貢献度で商品を分類します。',
+    abcAllProducts: 'すべての商品（{count}）',
+    abcClassA: 'A ランク（{count}）',
+    abcClassB: 'B ランク（{count}）',
+    abcClassC: 'C ランク（{count}）',
+    abcClassBadge: '{letter} ランク',
+    abcEmptyTitle: '販売データが足りません',
+    abcEmptyBody: '分析できる販売履歴が増えると、このレポートが作成されます。',
+    abcProductInsight: '商品インサイト',
+    abcInsightSubtitle: '選択した期間の詳細な実績指標。',
+    abcRevShare: '売上構成比',
+    abcCumulative: '（累計）',
+    abcRecommendation: '戦略の提案',
+    abcRecA:
+      '最優先の商品です。在庫が安全水準を下回らないようにしてください。回転を上げるため、C ランクの商品との期間限定セット販売も検討できます。',
+    abcRecB:
+      '安定した実績です。併売の機会を取りきることに集中しましょう。小さな価格テストで、数量を落とさずに利益率を改善できることがあります。',
+    abcRecC:
+      '回転の遅い商品です。資金が寝ている可能性があります。売れ筋との抱き合わせ、または保管コストが高い場合は在庫処分の検討をおすすめします。',
+    abcClose: 'インサイトを閉じる',
+    abcNoProducts: '商品が見つかりません。',
+
+    // 利益の漏れ
+    mlTitle: '利益の漏れ',
+    mlSubtitle: '何の判断もなく出ていったお金。',
+    mlCleanBody:
+      '今期は原価割れで売れた商品も、手入力した価格も、値引きもありませんでした。',
+    mlCleanUncosted_one:
+      '{count} 点に原価がないため、原価割れで売れたかどうか確認できませんでした。',
+    mlCleanUncosted_other:
+      '{count} 点に原価がないため、原価割れで売れたかどうか確認できませんでした。',
+    mlAcross: '今期の原価割れ販売と手入力した価格の合計。',
+    mlSoldBelowCost: '原価割れで販売',
+    mlColSoldFor: '販売価格',
+    mlColLost: '損失',
+    mlOverridesTitle: '手入力した価格で譲っている分',
+    mlColUnitsTyped: '手入力した価格の点数',
+    mlColBelowShelf: '表示価格との差',
+    mlOverridesFootnote:
+      '今日の価格ではなく、販売時点の表示価格を基準に計測しています。正当な値上げがここに出ることはありません。手入力の価格はたいてい正当なものです。これはその請求書であって、告発ではありません。',
+    mlDiscountsTitle: '出した値引き',
+    mlDiscountsFootnote_one:
+      '{formatted} 件の販売に対して。値引きは商品ごとではなく販売全体に記録されるため、この金額は意図的に商品へ配分していません。配分は推測になります。誰が出したかは下のチーム実績パネルにあります。',
+    mlDiscountsFootnote_other:
+      '{formatted} 件の販売に対して。値引きは商品ごとではなく販売全体に記録されるため、この金額は意図的に商品へ配分していません。配分は推測になります。誰が出したかは下のチーム実績パネルにあります。',
+    mlUncostedFootnote_one:
+      '今期売れた {count} 点に原価がないため、利益が出ていると仮定するのではなく、原価割れの確認から完全に除外しました。在庫に原価を入力すると、この確認が完全になります。',
+    mlUncostedFootnote_other:
+      '今期売れた {count} 点に原価がないため、利益が出ていると仮定するのではなく、原価割れの確認から完全に除外しました。在庫に原価を入力すると、この確認が完全になります。',
+
+    // 事業スコア
+    brFirstReading: '最初の測定',
+    brPlusPts: '+{count} ポイント',
+    brOffTitle: '事業スコアはオフです',
+    brOffBody:
+      '何も削除されていません。設定 → 一般からいつでも再開できます。スコア、連続日数、履歴はそのまま続きます。',
+    brOpenSettings: '設定を開く',
+    brPitchTitle: 'お金がどこから漏れているか、見てみませんか？',
+    brPitchBody:
+      '事業スコアはあなたの販売データを読み、売上を伸ばす 4 つの要素に点をつけます。利益率、平均客単価、購入者が戻ってくる頻度、そして勢いです。そのうえで、いちばん大きな機会をいくら取りこぼしているかを金額で示します。',
+    brTurnOn: '事業スコアをオンにする',
+    brNoThanks: '今はしない',
+    brLevelBadge: 'レベル {index}',
+    brLevelUp: 'レベル {index} — {name}',
+    brNotRated: 'まだ評価されていません',
+    brToNextTier: '{name} まであと {points}',
+    brTopTier: '最高レベルを維持しました',
+    brNothingYet: 'まだデータが足りません。',
+    brNothingLeft: '取りこぼしはもうありません。このまま続けましょう。',
+    brHintWithMedian: '{hint} · プラットフォーム中位 {median}',
+    brClaimPrivate:
+      'あなたのレシートにもとづく計算です。どこにも送信されず、他の誰にも表示されません。',
+    brClaimPriced: '機会の金額は予測ではなく、あなた自身の販売から算出しています。',
+    brClaimReversible: '設定からいつでもオフにできます。',
+    brNewTier: 'これまで届いたことのないレベルです。よくやりました。',
+    brNewBest: '自己最高記録',
+    brNeedFirstSale: '最初の販売を記録すると、スコアが出ます。',
+    brOnTheTable: '取りこぼし',
+    brYourBest: '自己最高',
+    brDaysRecorded_one: '{count} 日分の記録',
+    brDaysRecorded_other: '{count} 日分の記録',
+    brScoredOnLast: '直近 {days} 日の販売でスコア化',
+    brCheckBack: '推移は明日また見てみましょう。',
+    brBadges: 'バッジ',
+
+    // 売れている項目
+    tiTitleProducts: 'よく売れている商品',
+    tiTitleServices: 'よく売れているサービス',
+    tiValue: '金額',
+    tiByUnits: '販売点数順',
+    tiByRevenue: '売上順',
+    tiByProfit: '利益順',
+    tiByUnitsLower: '販売点数順',
+    tiByRevenueLower: '売上順',
+    tiByProfitLower: '利益順',
+    tiEmptyProducts:
+      'レジで販売を始めると、このグラフに売れている商品が表示されます。',
+    tiEmptyServices:
+      'レジで販売を始めると、このグラフに売れているサービスが表示されます。',
+    tiNoCostProducts:
+      '今期の商品に原価の記録がないため、利益を計算できません。在庫に原価を入力するか、点数または売上で並べ替えてください。',
+    tiNoCostServices:
+      '今期のサービスに原価の記録がないため、利益を計算できません。在庫に原価を入力するか、点数または売上で並べ替えてください。',
+    tiSoldProducts_one: '{formatted} 点の商品が売れました。',
+    tiSoldProducts_other: '{formatted} 点の商品が売れました。',
+    tiSoldServices_one: '{formatted} 件のサービスが売れました。',
+    tiSoldServices_other: '{formatted} 件のサービスが売れました。',
+    tiUncosted_one:
+      'そのうち {count} 点に原価がないため、利益はゼロではなく不明で、グラフには含まれていません。',
+    tiUncosted_other:
+      'そのうち {count} 点に原価がないため、利益はゼロではなく不明で、グラフには含まれていません。',
+    tiAtALoss_one: '{count} 点が赤字で売れました — 一覧をご確認ください。',
+    tiAtALoss_other: '{count} 点が赤字で売れました — 一覧をご確認ください。',
+    tiNoDataProducts: '売れている商品がここに表示されます。',
+    tiNoDataServices: '売れているサービスがここに表示されます。',
+    tiSoldInPeriodProducts_one: '今期 {formatted} 点の商品が売れました。',
+    tiSoldInPeriodProducts_other: '今期 {formatted} 点の商品が売れました。',
+    tiSoldInPeriodServices_one: '今期 {formatted} 件のサービスが売れました。',
+    tiSoldInPeriodServices_other: '今期 {formatted} 件のサービスが売れました。',
+    tiCaptionProducts_one: '{total} 点の商品のうち {shown} 点を表示 · {measure}',
+    tiCaptionProducts_other: '{total} 点の商品のうち {shown} 点を表示 · {measure}',
+    tiCaptionServices_one: '{total} 件のサービスのうち {shown} 件を表示 · {measure}',
+    tiCaptionServices_other: '{total} 件のサービスのうち {shown} 件を表示 · {measure}',
+    tiViewAllCount: '{count} 件すべてを表示',
+    tiDialogTitleProducts: '売れたすべての商品（{count}）',
+    tiDialogTitleServices: '売れたすべてのサービス（{count}）',
+    tiDialogBody:
+      'ページ上部で選択した期間について{measure}に並べています。ここでの売上は明細の売上 — 価格 × 数量の合計 — なので税を含まず、レシートの値引き前の金額です。上のカードの売上とは完全には一致しません。',
+    tiShowingOf: '{total} 件中 {shown} 件',
+    tiSearchProducts: '商品、SKU、カテゴリを検索…',
+    tiSearchServices: 'サービス、SKU、カテゴリを検索…',
+    tiExportCsv: 'CSV をエクスポート',
+    tiNothingMatches: '「{query}」に一致するものはありません。',
+    tiNoCostAll: '原価の記録がないため、利益はゼロではなく不明です。',
+    tiNoCostPartial:
+      '販売点数の {pct}% に原価の記録がないため、利益はゼロではなく不明です。',
+
+    // 詳細な損益計算書
+    plsTitle: '詳細な損益計算書',
+    plsSubtitle:
+      '会計基準に沿った、売上・売上原価・営業費用・純利益の正式な内訳。',
+    plsExportStatement: '計算書をエクスポート',
+    plsExportedBody: '詳細な損益計算書を PDF でエクスポートしました。',
+    plsGrossRevenue: '総売上',
+    plsGrossRevenueHint: '値引き前の販売合計',
+    plsCogs: '売上原価',
+    plsCogsHint: '商品の仕入原価',
+    plsMarginPct: '利益率 {pct}%',
+    plsNetOperatingIncome: '営業利益（純額）',
+    plsNetMarginPct: '純利益率 {pct}%',
+    plsColLineItem: '財務項目',
+    plsColAmount: '金額（{symbol}）',
+    plsColPctGross: '総売上に対する %',
+    plsGrossSalesRevenue: '総売上高',
+    plsLessDiscounts: '（–）値引き・価格引き下げ',
+    plsNetSalesRevenue: '純売上高',
+    plsTotalCogs: '売上原価合計',
+    plsOperatingExpenses: '営業費用',
+    plsTotalOperatingExpenses: '営業費用合計',
+    plsNetOperatingProfit: '営業純利益',
+    plsHeatmapTitle: 'カテゴリ別の収益性と利益率ヒートマップ',
+    plsHeatmapSubtitle:
+      '商品カテゴリ別の純利益貢献と利益率の内訳。',
+    plsProfitMargin: '利益率',
+    plsHeatmapEmpty:
+      'カテゴリ別の収益性データを作成できる販売履歴がありません。',
+
+    // 日別販売明細ログ
+    dsiTitle: '日別販売明細ログ',
+    dsiSubtitle: '選択した日に売れたすべての商品とサービスの詳細な記録。',
+    dsiExportReport: 'レポートをエクスポート',
+    dsiExportImage: '高解像度の画像でエクスポート',
+    dsiExportPdf: 'PDF でエクスポート',
+    dsiExportCsv: 'CSV でエクスポート',
+    dsiGeneratingBody: 'その日の販売表を取得しています。少しお待ちください。',
+    dsiExportedCsvBody_one: '販売明細 {count} 行をエクスポートしました。',
+    dsiExportedCsvBody_other: '販売明細 {count} 行をエクスポートしました。',
+    dsiExportedImageBody: '表を高解像度の画像でエクスポートしました。',
+    dsiExportedPdfBody: '表を PDF でエクスポートしました。',
+    dsiExportFailed: 'エクスポートに失敗しました',
+    dsiExportFailedBody: '画像を取得できませんでした。',
+    dsiCashSales: 'その日の現金売上',
+    dsiCashHint: 'ドロワーにあるはずの現金合計',
+    dsiTransfers: '入金予定の振込',
+    dsiTransfersHint: 'レジで処理した振込の合計',
+    dsiCard: 'カード取引',
+    dsiCardHint: 'レジで受け取ったカード決済の合計',
+    dsiVerified: '確認済みの振込',
+    dsiVerifiedHint: '入金時に端末で確認済み',
+    dsiPickDay: '日付を選択',
+    dsiToday: '今日（{date}）',
+    dsiYesterday: '昨日（{date}）',
+    dsiSearchPlaceholder: '項目名またはレシート番号で検索…',
+    dsiAllTypes: 'すべての種類',
+    dsiProductsOnly: '商品のみ',
+    dsiServicesOnly: 'サービスのみ',
+    dsiRowsOption: '{count} 行',
+    dsiShowing_one: '販売明細 {count} 件を表示',
+    dsiShowing_other: '販売明細 {count} 件を表示',
+    dsiEmptyTitle: '販売明細の記録がありません',
+    dsiEmptyBody: 'この日に、現在の絞り込み条件に合う記録はありません。',
+    dsiPageOf: '{total} ページ中 {page} ページ',
+    dsiPrevPage: '前のページ',
+    dsiNextPage: '次のページ',
   },
   support: {
     title: 'サポート',

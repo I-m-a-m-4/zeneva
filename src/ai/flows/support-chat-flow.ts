@@ -95,7 +95,7 @@ const prompt = ai.definePrompt({
    * figures) or `visualCount` (counts stock off a photo, where vision precision is the
    * whole product).
    */
-  model: 'googleai/gemini-2.5-flash-lite',
+  model: 'googleai/gemini-3.6-flash',
   input: {schema: ZenevaSupportChatInputSchema},
   output: {schema: ZenevaSupportChatOutputSchema},
   system: `You are Zen AI, a highly advanced, extremely intelligent, and friendly AI strategist built specifically for the Zeneva high-performance business suite. Zeneva is an enterprise-ready, offline-first application that handles inventory, sales, and complex business analytics.

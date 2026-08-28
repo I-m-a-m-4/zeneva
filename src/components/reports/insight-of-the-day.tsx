@@ -101,10 +101,11 @@ function Compare({
   peer: NonNullable<RatingInsight['peer']>;
   animate: boolean;
 }) {
+  const { t } = useI18n();
   const diff = peer.mine - peer.median;
   const rows = [
-    { name: 'You', value: peer.mine, mine: true },
-    { name: 'Median shop', value: peer.median, mine: false },
+    { name: t('reports.iotdYou'), value: peer.mine, mine: true },
+    { name: t('reports.iotdMedianShop'), value: peer.median, mine: false },
   ];
 
   return (
@@ -125,7 +126,7 @@ function Compare({
         </span>
       </div>
       {rows.map((row, i) => (
-        <div key={row.name} className="flex items-center gap-2.5">
+        <div key={i} className="flex items-center gap-2.5">
           <span
             className={cn(
               'w-24 shrink-0 text-[11px] font-semibold',
@@ -166,6 +167,7 @@ export default function InsightOfTheDay({
   total: number;
   currencySymbol: string;
 }) {
+  const { t } = useI18n();
   const reduce = useReducedMotion();
   const animate = !reduce;
   const a = accent(insight.severity);

@@ -819,6 +819,8 @@ const zh: Messages = {
     colStock: '库存',
     notAvailable: '无',
     bundleBadge: '组合',
+    unknownProduct: '未知商品',
+    uncategorized: '未分类',
     fullEdit: '完整编辑',
     quickEdit: '快速编辑',
     printBarcode: '打印条码',
@@ -1265,6 +1267,482 @@ const zh: Messages = {
     downloadedDescription: '仪表板图片已保存。',
     downloadFailed: '下载失败',
     downloadFailedDescription: '无法生成仪表板图片。',
+  },
+  reports: {
+    title: '报表',
+    subtitle: '深入分析您的经营表现。',
+
+    // 与上一周期的对比
+    deltaNewThisPeriod: '本期新增',
+    deltaFlat: '无变化',
+    deltaVsPrevious: '较上期 {pct}%',
+
+    tabAnalytics: '分析看板',
+    tabProfitLoss: '损益',
+    tabDailySales: '每日销售明细',
+    tabBusinessRating: '经营评分',
+
+    updatingMetrics: '正在更新指标…',
+    loadingDashboard: '正在加载分析看板…',
+    exportReport: '导出报表',
+    exportCsv: '导出数据为 CSV',
+    exportImage: '导出为高清图片',
+    exportPdf: '导出为 PDF（打印）',
+
+    loadingDataTitle: '正在加载数据…',
+    loadingDataBody:
+      '耗时比平常长。如果您处于离线状态，我们会显示本地已同步的数据。',
+    generatingTitle: '正在生成报表…',
+    generatingBody: '请稍候，正在截取您的看板。',
+    downloadedTitle: '报表已下载',
+    exportedTitle: '分析已导出',
+    exportedBody: '您的 CSV 文件已保存。',
+
+    kpiRevenue: '营收',
+    kpiRevenueHint: '总收款',
+    kpiNetCost: '净成本',
+    kpiNetCostHint: '销售总成本',
+    kpiNetProfit: '净利润',
+    kpiNetProfitHint: '收款减去成本',
+    kpiProductRevenue: '商品营收',
+    kpiProductRevenueHint: '实物商品带来的营收',
+    kpiServiceRevenue: '服务营收',
+    kpiServiceRevenueHint: '已提供服务带来的营收',
+    kpiSales: '销售',
+    kpiSalesHint: '交易总数',
+    kpiUniqueProducts: '不同商品数',
+    kpiUniqueProductsHint: '已售出的不同商品数量',
+    kpiUnitsSold: '销售件数',
+    kpiUnitsSoldHint: '出库总件数',
+    kpiDailyVelocity: '日均速度',
+    kpiDailyVelocityHint: '每日销售笔数',
+    kpiDailyRevenue: '日均营收',
+    kpiDailyRevenueHint: '平均每日营收',
+    kpiCatalogSize: '商品库规模',
+    kpiCatalogSizeHint: '库存中不同商品总数',
+    kpiAvgOrder: '平均单笔金额',
+    kpiAvgOrderHint: '每笔销售的营收',
+    kpiCustomers: '客户',
+    kpiCustomersBought_one: '本期有 {formatted} 位客户下单',
+    kpiCustomersBought_other: '本期有 {formatted} 位客户下单',
+    kpiCustomersHint: '已登记客户总数',
+
+    gateVisualName: '高级可视化分析',
+    gateVisualBody:
+      '解锁详细图表、销售趋势与利润率，看清生意的真实面貌。',
+    gateCustomerName: '客户洞察与库存周转',
+    gateCustomerBody:
+      '解锁高级客户关系分析与客户终身价值，并用数据驱动的 ABC 分析优化库存水平。',
+    gateProfitLossName: '损益表',
+    gateProfitLossBody:
+      '解锁详细损益表，分析店铺的利润率。',
+    gateDailySalesBody:
+      '解锁每日销售明细追踪与库存审计日志。',
+
+    // 各面板通用词汇
+    colItem: '项目',
+    colProduct: '商品',
+    colCustomer: '客户',
+    colService: '服务',
+    colClass: '等级',
+    colUnits: '件数',
+    colQtySold: '销售数量',
+    colOrders: '订单',
+    colRevenue: '营收',
+    colProfit: '利润',
+    colMargin: '利润率',
+    colShare: '占比',
+    colSales: '销售',
+    colCost: '成本',
+    colGrossProfit: '毛利',
+    colCogs: '销售成本',
+    colTotalSpent: '累计消费',
+    colReceipt: '收据',
+    colDateTime: '日期与时间',
+    colImage: '图片',
+    colMember: '成员',
+    revenueColon: '营收：',
+
+    exportSuccessful: '导出成功',
+    generatingPdf: '正在生成 PDF…',
+    generatingPdfBody: '请稍候，正在生成您的文件。',
+    noDataTitle: '暂无数据',
+    noDataToExport: '没有可导出的项目。',
+
+    // 支付方式对账
+    pmTitle: '支付方式对账',
+    pmSubtitle: '按支付渠道划分的已收营收。',
+    pmTransactions: '交易',
+
+    // 主要客户
+    tcTitle: '主要客户',
+    tcSubtitle: '本期消费最多的客户。',
+    tcEmptyTitle: '暂无客户数据',
+    tcEmptyBody: '将销售与客户关联后即可查看此报表。',
+
+    // 销售趋势
+    sotTitle: '销售趋势',
+    sotSubtitle: '营收表现的走势。',
+    sotEmpty:
+      '本期没有销售记录。完成第一笔销售后，此图表会自动生效。',
+
+    // 滞销库存分析
+    dsTitle: '滞销库存分析',
+    dsSubtitle: '60 天及以上未售出的商品（占用资金）。',
+    dsLockedCapital: '估算占用资金',
+    dsUnitsLeft: '件剩余',
+    dsSku: 'SKU：',
+    dsValueLocked: '占用金额',
+    dsViewInventory: '查看完整库存',
+    dsEmpty: '未发现明显滞销库存。您的库存周转良好！',
+
+    // 缺货预警
+    depTitle: '缺货预警',
+    depSubtitle:
+      '根据过去 30 天的销售速度，对即将售完的商品做出预测性预警。',
+    depStock: '库存：',
+    depSelling: '约 ',
+    depPerDay: '/天',
+    depRunsOut_one: '{count} 天内售完',
+    depRunsOut_other: '{count} 天内售完',
+
+    // 今日洞察
+    iotdTitle: '今日洞察',
+    iotdVsMedian: '与中位数对比',
+    iotdYou: '您',
+    iotdMedianShop: '中位数店铺',
+    iotdRotation: '第 1 条，共 {total} 条 · 明天还有一条',
+    iotdAtStake: '涉及金额',
+
+    // 预设周期
+    drToday: '今天',
+    drYesterday: '昨天',
+    drLast7: '近 7 天',
+    drLast30: '近 30 天',
+    tfLast7d: '近 7 天',
+    tfLast30d: '近 30 天',
+    tf90Days: '90 天',
+    tfLifetime: '全部时间',
+    drThisMonth: '本月',
+    drLastMonth: '上月',
+    drAllTime: '全部时间',
+
+    // 损益图表
+    plcSubtitle: '财务健康状况概览。',
+    plcTotalCost: '总成本',
+    plcEmpty:
+      '本期没有销售记录。为商品填写“成本价”即可追踪真实利润。',
+
+    // 您的对比位置
+    pcTitle: '您的对比位置',
+    pcEmptyTitle: '暂无法对比',
+    pcEmptyBody:
+      '只有当足够多的店铺在销售、让数字有意义时，Zeneva 才会把您与中位数店铺对比。这里没有任何数字是猜出来的。',
+    pcVsMedianShop: '与中位数店铺对比',
+    pcFootnote:
+      '取过去 {days} 天内完成 {sales} 笔及以上销售的 {shops} 家 Zeneva 店铺的中位数。任何店铺都不会被指名，也没有店铺能看到您的店铺。',
+    pcFootnoteAsOf:
+      '截至 {asOf}，取过去 {days} 天内完成 {sales} 笔及以上销售的 {shops} 家 Zeneva 店铺的中位数。任何店铺都不会被指名，也没有店铺能看到您的店铺。',
+
+    // 营收预测
+    rfTitle: '营收预测',
+    rfSubtitle: '基于您当前销售速度的 AI 30 天预测。',
+    rfNotEnough: '数据不足，无法生成预测。',
+    rfProjection: '30 天预测',
+    rfVsPrevious7: '较前 7 天 {pct}%',
+    rfRunRate: '当前日均速度',
+    rfPerDay: '/ 天',
+    rfHistorical: '历史',
+    rfForecast: '预测',
+
+    // 购物篮分析
+    baTitle: '购物篮分析',
+    baSubtitle: '找出经常被一起购买的商品。',
+    baHint:
+      '用这些洞察来设计**组合优惠**，或调整店内陈列以提升交叉销售。',
+    baJointSales: '同单销售',
+    baFootnote: '仅显示同单销售超过 1 次的组合。',
+    baEmptySearch: '没有找到与搜索匹配的商品组合。',
+    baEmptyNoPairs:
+      '多品项销售还不足够，暂时无法识别有意义的商品组合。',
+
+    // 客流洞察
+    hhTitle: '客流洞察',
+    hhSubtitle: '您生意最忙的时段与日期。',
+    hhPeakHours: '高峰时段',
+    hhPeakDays: '高峰日期',
+    hhPeakWindow: '最忙时段',
+    hhBusiestDay: '一周中最忙的一天',
+    hhDaySunday: '星期日',
+    hhDayMonday: '星期一',
+    hhDayTuesday: '星期二',
+    hhDayWednesday: '星期三',
+    hhDayThursday: '星期四',
+    hhDayFriday: '星期五',
+    hhDaySaturday: '星期六',
+    hhDayShortSunday: '周日',
+    hhDayShortMonday: '周一',
+    hhDayShortTuesday: '周二',
+    hhDayShortWednesday: '周三',
+    hhDayShortThursday: '周四',
+    hhDayShortFriday: '周五',
+    hhDayShortSaturday: '周六',
+    hhSalesCount: '{count} 笔销售',
+    hhPeakLine: '{label} — {count} 笔销售',
+
+    // 客户洞察
+    caTitle: '客户洞察',
+    caAnonymousBuyer: '匿名买家',
+    caSubtitle: '更深入地了解客户群的增长与留存。',
+    caTotalCustomers: '客户总数',
+    caNewLast30: '新增客户（近 30 天）',
+    caReturning: '回头客',
+    caRetentionRate: '留存率 {pct}%',
+    caAcquisition: '客户获取',
+    caNewCustomers: '新增客户',
+    caNoAcquisition: '本期没有客户获取数据。',
+    caTop5: '消费最多的 5 位客户',
+
+    // 团队表现
+    spAvgBasket: '平均单笔金额',
+    spItemsPerSale: '项目 / 笔',
+    spDiscounted: '已打折',
+    spPriceOverrides: '手动改价',
+    spNoAuthor: '记录于销售还未记入经手人之前',
+    spTitleSolo: '收银台活动',
+    spTitleTeam: '团队表现',
+    spSubtitleSolo: '本期收银台经手了什么。',
+    spSubtitleTeam_one: '本期谁收了多少 —— {count} 人。',
+    spSubtitleTeam_other: '本期谁收了多少 —— {count} 人。',
+    spSubtitleTeamPlus_one:
+      '本期谁收了多少 —— {count} 人，另加未记录经手人的销售。',
+    spSubtitleTeamPlus_other:
+      '本期谁收了多少 —— {count} 人，另加未记录经手人的销售。',
+    spFootnote:
+      '这些是活动数字，不是评判。折扣和手动改价往往正是一位好销售该做的事：数字高是值得一问的理由，不是指责的理由。营收按整张收据计算，因此下面各行加总即为本期店铺营收。',
+    spRunScan: '在审计日志中运行防损扫描',
+
+    // 分类表现
+    cpTitle: '分类表现',
+    cpSubtitle: '商品库的哪些部分在出成绩 —— 按营收排序，利润率并列显示。',
+    cpOther: '其他（{count}）',
+    cpFoldedTail:
+      '共有 {total} 个分类售出；图表将最小的 {folded} 个归入“其他”。',
+    cpMarginUnknownPartial:
+      '销售件数中有 {pct}% 缺少成本价 —— 利润率未知，而非为零',
+    cpMarginUnknownNone: '没有记录成本价 —— 利润率未知，而非为零',
+    cpVsPrevious: '较上期',
+    cpNew: '新增',
+    cpFlat: '无变化',
+    cpFootnote:
+      '此处营收为各行价格 × 数量之和，因此不含税，也在收据折扣之前计算：所以它不会与上方的营收卡片完全一致，那张卡片是收银台总额。百分比在本面板内加总为 100%。',
+
+    // 库存周转与 ABC 分析
+    abcTitle: '库存周转与 ABC 分析',
+    abcSubtitle: '按对营收的贡献为商品分级。',
+    abcAllProducts: '全部商品（{count}）',
+    abcClassA: 'A 级（{count}）',
+    abcClassB: 'B 级（{count}）',
+    abcClassC: 'C 级（{count}）',
+    abcClassBadge: '{letter} 级',
+    abcEmptyTitle: '销售数据不足',
+    abcEmptyBody: '当您有更多销售记录可供分析时，此报表就会生成。',
+    abcProductInsight: '商品洞察',
+    abcInsightSubtitle: '所选周期的详细表现指标。',
+    abcRevShare: '营收占比',
+    abcCumulative: '（累计）',
+    abcRecommendation: '策略建议',
+    abcRecA:
+      '最高优先级商品。确保库存永不低于安全水位。可考虑与 C 级商品做限时组合，以加快其周转。',
+    abcRecB:
+      '表现稳定。重点放在把交叉销售的机会做足。小幅价格测试可能在不影响销量的前提下改善利润率。',
+    abcRecC:
+      '周转缓慢的商品，可能有资金被占用。建议与畅销品搭配销售，或在持有成本较高时考虑清货策略。',
+    abcClose: '关闭洞察',
+    abcNoProducts: '未找到商品。',
+
+    // 利润流失
+    mlTitle: '利润流失',
+    mlSubtitle: '没有经过任何决策就流出去的钱。',
+    mlCleanBody:
+      '本期没有商品以低于成本售出，没有手动改价，也没有给出折扣。',
+    mlCleanUncosted_one:
+      '有 {count} 件商品没有成本价，因此无法核查它是否以低于成本售出。',
+    mlCleanUncosted_other:
+      '有 {count} 件商品没有成本价，因此无法核查它们是否以低于成本售出。',
+    mlAcross: '本期低于成本售出与手动改价合计。',
+    mlSoldBelowCost: '低于成本售出',
+    mlColSoldFor: '售价',
+    mlColLost: '损失',
+    mlOverridesTitle: '手动改价让出去的部分',
+    mlColUnitsTyped: '手动改价件数',
+    mlColBelowShelf: '低于标价',
+    mlOverridesFootnote:
+      '以成交当时的标价为基准，而非今天的价格：因此正当的涨价永远不会出现在这里。手动改价大多是正当的；这只是它的账单，不是指责。',
+    mlDiscountsTitle: '已给出的折扣',
+    mlDiscountsFootnote_one:
+      '涉及 {formatted} 笔销售。折扣记录在整笔销售上，而不是逐项记录，因此这笔金额有意不分摊到各商品：分摊只是猜测。是谁给的折扣，见下方团队表现面板。',
+    mlDiscountsFootnote_other:
+      '涉及 {formatted} 笔销售。折扣记录在整笔销售上，而不是逐项记录，因此这笔金额有意不分摊到各商品：分摊只是猜测。是谁给的折扣，见下方团队表现面板。',
+    mlUncostedFootnote_one:
+      '本期售出的 {count} 件商品没有成本价，因此被完全排除在低于成本核查之外，而不是假定它有利润。在库存中补上成本价，这项核查才算完整。',
+    mlUncostedFootnote_other:
+      '本期售出的 {count} 件商品没有成本价，因此被完全排除在低于成本核查之外，而不是假定它们有利润。在库存中补上成本价，这项核查才算完整。',
+
+    // 经营评分
+    brFirstReading: '首次读数',
+    brPlusPts: '+{count} 分',
+    brOffTitle: '经营评分已关闭',
+    brOffBody:
+      '没有任何数据被删除。随时可在设置 → 通用中重新开启，您的分数、连续天数与历史都会从原处继续。',
+    brOpenSettings: '打开设置',
+    brPitchTitle: '想知道您的钱从哪里漏掉了吗？',
+    brPitchBody:
+      '经营评分读取您自己的销售数据，为决定营收的四件事打分：利润率、平均单笔金额、买家回头的频率，以及您的势头。然后用金额指出您正把最大的机会留在桌上。',
+    brTurnOn: '开启经营评分',
+    brNoThanks: '暂时不用',
+    brLevelBadge: '等级 {index}',
+    brLevelUp: '等级 {index} —— {name}',
+    brNotRated: '尚未评分',
+    brToNextTier: '距 {name} 还差 {points}',
+    brTopTier: '您守住了最高等级',
+    brNothingYet: '数据还不够。',
+    brNothingLeft: '桌上已经什么都没留下。继续卖。',
+    brHintWithMedian: '{hint} · 平台中位数 {median}',
+    brClaimPrivate:
+      '基于您的收据计算。不会发送到任何地方，也不会展示给其他任何人。',
+    brClaimPriced: '每个机会都按您自己的销售定价，而不是按预测。',
+    brClaimReversible: '随时可在设置中关闭。',
+    brNewTier: '您此前从未到过的等级。做得好。',
+    brNewBest: '新纪录',
+    brNeedFirstSale: '记录第一笔销售即可获得评分。',
+    brOnTheTable: '留在桌上',
+    brYourBest: '您的最佳成绩',
+    brDaysRecorded_one: '已记录 {count} 天',
+    brDaysRecorded_other: '已记录 {count} 天',
+    brScoredOnLast: '按近 {days} 天的销售评分',
+    brCheckBack: '明天再来看走势。',
+    brBadges: '徽章',
+
+    // 畅销项目
+    tiTitleProducts: '畅销商品',
+    tiTitleServices: '畅销服务',
+    tiValue: '金额',
+    tiByUnits: '按销售件数',
+    tiByRevenue: '按营收',
+    tiByProfit: '按利润',
+    tiByUnitsLower: '按销售件数',
+    tiByRevenueLower: '按营收',
+    tiByProfitLower: '按利润',
+    tiEmptyProducts:
+      '当您开始在收银台销售后，此图表会突出显示您最好的商品。',
+    tiEmptyServices:
+      '当您开始在收银台销售后，此图表会突出显示您最好的服务。',
+    tiNoCostProducts:
+      '本期没有任何商品记录了成本价，因此无法计算利润。请在库存中补上成本价，或按件数或营收排序。',
+    tiNoCostServices:
+      '本期没有任何服务记录了成本价，因此无法计算利润。请在库存中补上成本价，或按件数或营收排序。',
+    tiSoldProducts_one: '售出 {formatted} 件商品。',
+    tiSoldProducts_other: '售出 {formatted} 件商品。',
+    tiSoldServices_one: '售出 {formatted} 项服务。',
+    tiSoldServices_other: '售出 {formatted} 项服务。',
+    tiUncosted_one:
+      '其中 {count} 件没有成本价，因此利润未知而非为零，也未纳入图表。',
+    tiUncosted_other:
+      '其中 {count} 件没有成本价，因此利润未知而非为零，也未纳入图表。',
+    tiAtALoss_one: '{count} 件亏本售出 —— 请查看完整列表。',
+    tiAtALoss_other: '{count} 件亏本售出 —— 请查看完整列表。',
+    tiNoDataProducts: '您最好的商品会显示在这里。',
+    tiNoDataServices: '您最好的服务会显示在这里。',
+    tiSoldInPeriodProducts_one: '本期售出 {formatted} 件商品。',
+    tiSoldInPeriodProducts_other: '本期售出 {formatted} 件商品。',
+    tiSoldInPeriodServices_one: '本期售出 {formatted} 项服务。',
+    tiSoldInPeriodServices_other: '本期售出 {formatted} 项服务。',
+    tiCaptionProducts_one: '显示 {total} 件商品中的 {shown} 件 · {measure}',
+    tiCaptionProducts_other: '显示 {total} 件商品中的 {shown} 件 · {measure}',
+    tiCaptionServices_one: '显示 {total} 项服务中的 {shown} 项 · {measure}',
+    tiCaptionServices_other: '显示 {total} 项服务中的 {shown} 项 · {measure}',
+    tiViewAllCount: '查看全部 {count} 项',
+    tiDialogTitleProducts: '已售出的全部商品（{count}）',
+    tiDialogTitleServices: '已售出的全部服务（{count}）',
+    tiDialogBody:
+      '按页面顶部所选周期{measure}排序。此处营收为行营收 —— 价格 × 数量之和 —— 因此不含税，也在收据折扣之前计算，不会与上方卡片的营收数字完全一致。',
+    tiShowingOf: '{total} 中的 {shown}',
+    tiSearchProducts: '搜索商品、SKU 或分类…',
+    tiSearchServices: '搜索服务、SKU 或分类…',
+    tiExportCsv: '导出 CSV',
+    tiNothingMatches: '没有与“{query}”匹配的内容。',
+    tiNoCostAll: '没有记录成本价，因此利润未知，而非为零。',
+    tiNoCostPartial:
+      '销售件数中有 {pct}% 没有记录成本价，因此利润未知，而非为零。',
+
+    // 高级损益表
+    plsTitle: '高级损益表',
+    plsSubtitle:
+      '按会计准则编制的营收、销售成本、经营费用与净利润的正式明细。',
+    plsExportStatement: '导出报表',
+    plsExportedBody: '高级损益表已导出为 PDF。',
+    plsGrossRevenue: '营收总额',
+    plsGrossRevenueHint: '折扣前的销售总额',
+    plsCogs: '销货成本',
+    plsCogsHint: '商品采购成本',
+    plsMarginPct: '利润率 {pct}%',
+    plsNetOperatingIncome: '净营业收入',
+    plsNetMarginPct: '净利润率 {pct}%',
+    plsColLineItem: '财务项目',
+    plsColAmount: '金额（{symbol}）',
+    plsColPctGross: '占营收总额 %',
+    plsGrossSalesRevenue: '销售营收总额',
+    plsLessDiscounts: '（–）折扣与减价',
+    plsNetSalesRevenue: '销售营收净额',
+    plsTotalCogs: '销货成本合计',
+    plsOperatingExpenses: '经营费用',
+    plsTotalOperatingExpenses: '经营费用合计',
+    plsNetOperatingProfit: '净营业利润',
+    plsHeatmapTitle: '分类盈利能力与利润率热力图',
+    plsHeatmapSubtitle:
+      '按商品分类划分的净利润贡献与利润率明细。',
+    plsProfitMargin: '利润率',
+    plsHeatmapEmpty:
+      '没有可用的销售记录来生成分类盈利数据。',
+
+    // 每日销售明细日志
+    dsiTitle: '每日销售明细日志',
+    dsiSubtitle: '所选日期售出的每件商品与每项服务的详细记录。',
+    dsiExportReport: '导出报表',
+    dsiExportImage: '导出为高清图片',
+    dsiExportPdf: '导出为 PDF',
+    dsiExportCsv: '导出为 CSV',
+    dsiGeneratingBody: '请稍候，正在截取当日销售表格。',
+    dsiExportedCsvBody_one: '已导出 {count} 行销售记录。',
+    dsiExportedCsvBody_other: '已导出 {count} 行销售记录。',
+    dsiExportedImageBody: '表格已导出为高清图片。',
+    dsiExportedPdfBody: '表格已导出为 PDF。',
+    dsiExportFailed: '导出失败',
+    dsiExportFailedBody: '无法截取图片。',
+    dsiCashSales: '当日现金销售',
+    dsiCashHint: '钱箱中应有的现金总额',
+    dsiTransfers: '应到账的银行转账',
+    dsiTransfersHint: '收银台处理的转账总额',
+    dsiCard: '刷卡交易',
+    dsiCardHint: '收银台收取的刷卡总额',
+    dsiVerified: '已核实的转账',
+    dsiVerifiedHint: '到账时已在本机确认',
+    dsiPickDay: '选择日期',
+    dsiToday: '今天（{date}）',
+    dsiYesterday: '昨天（{date}）',
+    dsiSearchPlaceholder: '按项目名称或收据编号搜索…',
+    dsiAllTypes: '全部类型',
+    dsiProductsOnly: '仅商品',
+    dsiServicesOnly: '仅服务',
+    dsiRowsOption: '{count} 行',
+    dsiShowing_one: '显示 {count} 条销售明细',
+    dsiShowing_other: '显示 {count} 条销售明细',
+    dsiEmptyTitle: '没有销售明细记录',
+    dsiEmptyBody: '这一天没有符合当前筛选条件的记录。',
+    dsiPageOf: '第 {page} 页，共 {total} 页',
+    dsiPrevPage: '上一页',
+    dsiNextPage: '下一页',
   },
   support: {
     title: '客服支持',

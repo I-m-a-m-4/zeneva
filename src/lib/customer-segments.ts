@@ -70,6 +70,31 @@ export const SEGMENT_LABELS: Record<SegmentKey, string> = {
   'never-seen': 'No purchases on record',
 };
 
+/**
+ * The i18n key for a segment's badge label, so a translated surface does not
+ * need its own copy of the mapping.
+ *
+ * `SEGMENT_LABELS` stays because this module is pure — it must not reach for
+ * `useI18n` — and because it is still the fallback anywhere that has no `t`.
+ * A per-page copy of this map is the drift trap: two surfaces render the same
+ * badge, and the second one to be translated silently keeps the first one's
+ * stale key names. Note the hyphenated keys cannot be derived by casing alone
+ * (`at-risk` → `segmentAtRisk`), which is why this is a table and not a regex.
+ */
+const SEGMENT_LABEL_KEYS: Record<SegmentKey, string> = {
+  vip: 'customers.segmentVip',
+  loyal: 'customers.segmentLoyal',
+  new: 'customers.segmentNew',
+  'at-risk': 'customers.segmentAtRisk',
+  lapsed: 'customers.segmentLapsed',
+  owing: 'customers.segmentOwing',
+  'never-seen': 'customers.segmentNeverSeen',
+};
+
+export function segmentLabelKey(key: SegmentKey): string {
+  return SEGMENT_LABEL_KEYS[key];
+}
+
 export const SEGMENT_HINTS: Record<SegmentKey, string> = {
   vip: `${VIP_MIN_ORDERS}+ purchases and in your top spenders — the people worth keeping happy.`,
   loyal: `${LOYAL_MIN_ORDERS}+ purchases and still active.`,

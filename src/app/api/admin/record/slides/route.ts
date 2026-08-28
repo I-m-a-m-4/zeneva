@@ -53,7 +53,7 @@ const API_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
  * Text model, not the TTS one `narrate.mjs` uses — same key, different endpoint.
  * Flash because this is four short strings and an operator is watching a spinner.
  */
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-3.6-flash';
 
 /** A slide pair is a few hundred bytes. Anything slower is the API being down. */
 const TIMEOUT_MS = 45_000;

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from '@/components/ui/button';
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, ShoppingBag, Calendar, Activity, Info, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
+import { useI18n } from '@/context/i18n-context';
 
 interface AbcAnalysisProps {
     receipts: Receipt[];
@@ -32,6 +33,7 @@ type ProductAnalysis = {
 }
 
 export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcAnalysisProps) {
+    const { t } = useI18n();
     const [searchQuery, setSearchQuery] = React.useState('');
     const [selectedProduct, setSelectedProduct] = React.useState<ProductAnalysis | null>(null);
 
@@ -45,7 +47,7 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
                     const item = receipt.items.find(i => i.productId === pid);
                     const prod = products?.find(p => p.id === pid || p.name === item?.name);
                     const parentProd = prod?.parentId ? products?.find(p => p.id === prod.parentId) : null;
-                    const displayName = parentProd ? `${parentProd.name} (${prod?.variantValue || item?.name})` : (item?.name || 'Unknown Product');
+                    const displayName = parentProd ? `${parentProd.name} (${prod?.variantValue || item?.name})` : (item?.name || t('inventory.unknownProduct'));
 
                     productDataMap[pid] = { revenue: 0, quantity: 0, orderCount: 0, name: displayName };
                 }
@@ -99,7 +101,7 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
             classC: classifiedProducts.filter(p => p.class === 'C' && p.name.toLowerCase().includes(searchQuery.toLowerCase())),
         };
 
-    }, [receipts, products, searchQuery]);
+    }, [receipts, products, searchQuery, t]);
 
     const { all, classA, classB, classC } = analysisData;
     const hasData = classA.length > 0 || classB.length > 0 || classC.length > 0;
@@ -109,15 +111,15 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
             <CardHeader>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <CardTitle className='flex items-center gap-2'><BarChart className="h-5 w-5 text-primary" /> Inventory Velocity & ABC Analysis</CardTitle>
+                        <CardTitle className='flex items-center gap-2'><BarChart className="h-5 w-5 text-primary" /> {t('reports.abcTitle')}</CardTitle>
                         <CardDescription>
-                            Categorizes products based on their revenue contribution.
+                            {t('reports.abcSubtitle')}
                         </CardDescription>
                     </div>
                     <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 text-muted-foreground -translate-y-1/2" />
                         <Input
-                            placeholder="Search products..."
+                            placeholder={t('inventory.searchProducts')}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-9 h-9"
@@ -130,10 +132,10 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
                     <Tabs defaultValue="all">
                         <div className="overflow-x-auto pb-2">
                             <TabsList className="flex w-max md:w-full md:grid md:grid-cols-4 mb-2">
-                                <TabsTrigger value="all" className="px-4">All Products ({all.length})</TabsTrigger>
-                                <TabsTrigger value="classA" className="px-4">Class A ({classA.length})</TabsTrigger>
-                                <TabsTrigger value="classB" className="px-4">Class B ({classB.length})</TabsTrigger>
-                                <TabsTrigger value="classC" className="px-4">Class C ({classC.length})</TabsTrigger>
+                                <TabsTrigger value="all" className="px-4">{t('reports.abcAllProducts', { count: all.length })}</TabsTrigger>
+                                <TabsTrigger value="classA" className="px-4">{t('reports.abcClassA', { count: classA.length })}</TabsTrigger>
+                                <TabsTrigger value="classB" className="px-4">{t('reports.abcClassB', { count: classB.length })}</TabsTrigger>
+                                <TabsTrigger value="classC" className="px-4">{t('reports.abcClassC', { count: classC.length })}</TabsTrigger>
                             </TabsList>
                         </div>
                         <TabsContent value="all">
@@ -152,8 +154,8 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
                 ) : (
                     <div className="text-center py-12 text-muted-foreground">
                         <Package className="mx-auto h-12 w-12 opacity-50" />
-                        <h3 className="mt-4 text-lg font-medium">Not Enough Sales Data</h3>
-                        <p className="mt-2 max-w-md mx-auto">This report will be generated once you have more sales records to analyze.</p>
+                        <h3 className="mt-4 text-lg font-medium">{t('reports.abcEmptyTitle')}</h3>
+                        <p className="mt-2 max-w-md mx-auto">{t('reports.abcEmptyBody')}</p>
                     </div>
                 )}
             </CardContent>
@@ -162,48 +164,48 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <div className="flex items-center gap-2 mb-2">
-                            <Badge variant={selectedProduct?.class === 'A' ? 'default' : selectedProduct?.class === 'B' ? 'secondary' : 'outline'} className={selectedProduct?.class === 'A' ? 'bg-primary' : ''}>Class {selectedProduct?.class}</Badge>
-                            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Product Insight</span>
+                            <Badge variant={selectedProduct?.class === 'A' ? 'default' : selectedProduct?.class === 'B' ? 'secondary' : 'outline'} className={selectedProduct?.class === 'A' ? 'bg-primary' : ''}>{t('reports.abcClassBadge', { letter: selectedProduct?.class ?? '' })}</Badge>
+                            <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">{t('reports.abcProductInsight')}</span>
                         </div>
                         <DialogTitle className="text-xl font-bold">{selectedProduct?.name}</DialogTitle>
-                        <DialogDescription> Detailed performance metrics for the selected period.</DialogDescription>
+                        <DialogDescription>{t('reports.abcInsightSubtitle')}</DialogDescription>
                     </DialogHeader>
 
                     {selectedProduct && (
                         <div className="grid gap-6 py-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-muted/40 p-4 rounded-xl border border-primary/5">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><DollarSign className="h-3 w-3" /> Total Revenue</div>
+                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><DollarSign className="h-3 w-3" /> {t('dashboard.totalRevenue')}</div>
                                     <div className="text-lg font-bold">{currencySymbol}{selectedProduct.revenue.toLocaleString()}</div>
                                 </div>
                                 <div className="bg-muted/40 p-4 rounded-xl border border-primary/5">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><ShoppingCart className="h-3 w-3" /> Orders</div>
+                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><ShoppingCart className="h-3 w-3" /> {t('reports.colOrders')}</div>
                                     <div className="text-lg font-bold">{selectedProduct.orderCount}</div>
                                 </div>
                                 <div className="bg-muted/40 p-4 rounded-xl border border-primary/5">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><ShoppingBag className="h-3 w-3" /> Units Sold</div>
+                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><ShoppingBag className="h-3 w-3" /> {t('dashboard.unitsSold')}</div>
                                     <div className="text-lg font-bold">{selectedProduct.quantity}</div>
                                 </div>
                                 <div className="bg-muted/40 p-4 rounded-xl border border-primary/5">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Activity className="h-3 w-3" /> Rev Share</div>
-                                    <div className="text-lg font-bold">{selectedProduct.cumulativePercent.toFixed(1)}% <span className="text-[10px] font-normal text-muted-foreground">(cum.)</span></div>
+                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Activity className="h-3 w-3" /> {t('reports.abcRevShare')}</div>
+                                    <div className="text-lg font-bold">{selectedProduct.cumulativePercent.toFixed(1)}% <span className="text-[10px] font-normal text-muted-foreground">{t('reports.abcCumulative')}</span></div>
                                 </div>
                             </div>
 
                             <div className="p-4 rounded-xl border border-primary/10 bg-primary/5">
-                                <h4 className="flex items-center gap-2 text-sm font-semibold mb-2 text-primary"><Sparkles className="h-4 w-4" /> Strategic Recommendation</h4>
+                                <h4 className="flex items-center gap-2 text-sm font-semibold mb-2 text-primary"><Sparkles className="h-4 w-4" /> {t('reports.abcRecommendation')}</h4>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
                                     {selectedProduct.class === 'A'
-                                        ? "Highest priority item. Ensure stock never drops below safety levels. Consider limited-time bundles with Class C items to improve their velocity."
+                                        ? t('reports.abcRecA')
                                         : selectedProduct.class === 'B'
-                                            ? "Steady performer. Focus on maximizing cross-sell opportunities. Slight price trials might optimize margins without hurting volume."
-                                            : "Low velocity item. Capital may be trapped. Recommend bundling with top sellers or applying a clearance strategy if holding costs are high."}
+                                            ? t('reports.abcRecB')
+                                            : t('reports.abcRecC')}
                                 </p>
                             </div>
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setSelectedProduct(null)} className="w-full">Close Analysis</Button>
+                        <Button variant="outline" onClick={() => setSelectedProduct(null)} className="w-full">{t('reports.abcClose')}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -212,8 +214,9 @@ export default function AbcAnalysis({ receipts, products, currencySymbol }: AbcA
 }
 
 function CategoryTable({ products, currencySymbol, onRowClick }: { products: ProductAnalysis[], currencySymbol: string, onRowClick: (p: ProductAnalysis) => void }) {
+    const { t } = useI18n();
     if (products.length === 0) {
-        return <div className="text-center text-muted-foreground py-10">No products found.</div>
+        return <div className="text-center text-muted-foreground py-10">{t('reports.abcNoProducts')}</div>
     }
     return (
         <div className="h-[400px] overflow-auto border rounded-md">
@@ -221,11 +224,11 @@ function CategoryTable({ products, currencySymbol, onRowClick }: { products: Pro
                 <Table>
                 <TableHeader className="bg-muted/50">
                     <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-center">Orders</TableHead>
-                        <TableHead className="text-right">Qty Sold</TableHead>
-                        <TableHead className="text-right">Revenue</TableHead>
-                        <TableHead className="text-center">Class</TableHead>
+                        <TableHead>{t('reports.colProduct')}</TableHead>
+                        <TableHead className="text-center">{t('reports.colOrders')}</TableHead>
+                        <TableHead className="text-right">{t('reports.colQtySold')}</TableHead>
+                        <TableHead className="text-right">{t('reports.colRevenue')}</TableHead>
+                        <TableHead className="text-center">{t('reports.colClass')}</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                 </TableHeader>

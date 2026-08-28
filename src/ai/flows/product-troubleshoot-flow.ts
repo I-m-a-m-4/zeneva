@@ -66,7 +66,7 @@ const prompt = ai.definePrompt({
    * neighbours. There is no arithmetic and no money figure in the output, so the
    * failure mode of a weaker model is a duller suggestion, not a wrong number.
    */
-  model: 'googleai/gemini-2.5-flash-lite',
+  model: 'googleai/gemini-3.6-flash',
   input: {schema: ProductTroubleshootInputSchema},
   output: {schema: ProductTroubleshootOutputSchema},
   // NEW: Updated prompt for more concise, structured, and budget-friendly output

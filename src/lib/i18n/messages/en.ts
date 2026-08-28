@@ -19,6 +19,7 @@ const en = {
     noResults: 'No results found.',
     tryAgain: 'Try Again',
     retry: 'Retry',
+    refresh: 'Refresh',
     back: 'Back',
     next: 'Next',
     previous: 'Previous',
@@ -860,6 +861,8 @@ const en = {
     colStock: 'Stock',
     notAvailable: 'N/A',
     bundleBadge: 'Bundle',
+    unknownProduct: 'Unknown Product',
+    uncategorized: 'Uncategorized',
     fullEdit: 'Full Edit',
     quickEdit: 'Quick Edit',
     printBarcode: 'Print Barcode',
@@ -1179,6 +1182,51 @@ const en = {
     matchSimilarName: 'similar name',
     matchSimilarNameSameSize: 'similar name, same size',
     matchSimilarNameDifferentSize: 'similar name but a different size',
+    // Debt & backorder page. A "debt" here is stock sold while the shelf was
+    // already empty, so every figure is what the shop owes a buyer, not money
+    // owed to the shop — `customers.outstandingDebt` is the other direction.
+    debtTitle: 'Debt & Backorder Management',
+    debtSubtitle: 'Monitor products sold while out of stock and manage customer commitments.',
+    debtViewAllInventory: 'View All Inventory',
+    debtTotalItemsOwed: 'Total Items Owed',
+    debtUnitsToFulfil: 'Units to be fulfilled',
+    debtValue: 'Debt Value',
+    debtValueDesc: 'Value of backordered sales',
+    debtPotentialProfit: 'Potential Profit',
+    debtPotentialProfitDesc: 'Est. profit once restocked',
+    debtDemandIndex: 'Demand Index',
+    debtDemandHigh: 'High',
+    debtDemandBasis_one: 'Based on {count} item',
+    debtDemandBasis_other: 'Based on {count} items',
+    debtBackorderedProducts: 'Backordered Products',
+    debtBackorderedProductsDesc: 'Products with negative stock balances',
+    debtSearchPlaceholder: 'Search debts...',
+    debtColUnitsOwed: 'Units Owed',
+    debtColSeverity: 'Severity',
+    debtUnitsParen_one: '({count} unit)',
+    debtUnitsParen_other: '({count} units)',
+    // Four rungs, one key each rather than one key with the word substituted in:
+    // these are adjectives and several of the eleven languages inflect them.
+    debtSeverityLow: 'Low',
+    debtSeverityMedium: 'Medium',
+    debtSeverityHigh: 'High',
+    debtSeverityCritical: 'Critical',
+    debtDetails: 'Details',
+    debtNoneFound: 'No recorded debts or backorders found.',
+    debtNoneFoundHint:
+      'When you sell products while they are out of stock, they will appear here as debts to be fulfilled.',
+    debtFooterNote:
+      'These products show higher-than-normal demand despite being out of stock. Prioritize restocking.',
+    debtHistoryTitle: 'Backorder History: {product}',
+    debtHistoryDesc:
+      'Specific transactions that occurred after stock reached zero and require fulfillment.',
+    debtNoEmail: 'No email provided',
+    debtUnits_one: '{count} unit',
+    debtUnits_other: '{count} units',
+    // `orderType` stays English in the data — it is compared against, not just
+    // shown — so the badge translates at render. 'Online' reuses `common.online`.
+    debtOrderTypeInStore: 'In-store',
+    debtNoRecentOrders: 'No recent orders found for this product.',
   },
   customers: {
     title: 'Customers',
@@ -1217,6 +1265,70 @@ const en = {
     deletedDescription_one: '{count} customer has been removed.',
     deletedDescription_other: '{count} customers have been removed.',
     deleteFailed: 'Could not delete customers.',
+    // Segment badges. Keyed by `SegmentKey` through `segmentLabelKey()` in
+    // `src/lib/customer-segments.ts` so the page and the filters cannot drift.
+    segmentVip: 'VIP',
+    segmentLoyal: 'Loyal',
+    segmentNew: 'New',
+    segmentAtRisk: 'At risk',
+    segmentLapsed: 'Lapsed',
+    segmentOwing: 'Owing',
+    segmentNeverSeen: 'No purchases on record',
+    segmentRegular: 'Regular',
+    // Customer detail page.
+    detailNotFound: 'Customer not found.',
+    backToCustomers: 'Back to Customers',
+    totalOrders: 'Total Orders',
+    outstandingDebt: 'Outstanding Debt',
+    // One key, not "Member since" beside a date: several of the eleven
+    // languages put the date first. Costs the date its bold styling.
+    memberSince: 'Member since {date}',
+    editProfile: 'Edit Profile',
+    deleteCustomer: 'Delete Customer',
+    purchaseHistoryDesc: 'Products this customer has purchased, sorted by most recent.',
+    colTotalQuantity: 'Total Quantity',
+    colLastPurchased: 'Last Purchased',
+    noPurchases: 'No purchases yet.',
+    debtLedger: 'Debt Ledger',
+    debtLedgerDesc: 'Unpaid invoices and credit history.',
+    viewFullStatement: 'View Full Statement',
+    clearAccount: 'Clear Account',
+    clearAccountDesc: 'This customer has no outstanding debts.',
+    recentReceipts: 'Recent Receipts',
+    recentReceiptsDesc: 'The last few transactions for this customer.',
+    viewAllTransactions: 'View All Transactions',
+    noReceipts: 'No Receipts',
+    noReceiptsDesc: 'No transaction history found for this customer.',
+    analyticsTitle: 'Customer Analytics & Performance',
+    analyticsDesc:
+      "Generate an intelligent summary and suggestions based on this customer's behavior.",
+    analyticsReady: 'Ready for Data Analysis?',
+    analyticsReadyDesc:
+      "Analyze this customer's purchase history to get actionable business insights.",
+    generateAnalysis: 'Generate Analysis',
+    businessSummary: 'Business Summary',
+    productSuggestions: 'Product Suggestions',
+    engagementTactics: 'Engagement Tactics',
+    regenerate: 'Regenerate',
+    insightsUnavailableTitle: 'Unable to Generate Insights',
+    insightsUnavailableBody:
+      'Required customer or business data is missing. Please try refreshing the page.',
+    insightsDoneTitle: 'Insights Generated!',
+    insightsDoneBody: 'Intelligent customer analysis completed.',
+    insightsFailed: 'Could not generate insights.',
+    // Deleting one named customer. Separate from the bulk `delete*` keys above,
+    // which are counted; this one carries the name and cannot borrow `{count}`.
+    // `deleteFailedTitle` is shared by both — the title is the same either way,
+    // only the body differs, so the bulk page reuses it in Batch 7.
+    deleteFailedTitle: 'Delete Failed',
+    deleteOneConfirmTitle: 'Are you absolutely sure?',
+    deleteOneConfirmBody:
+      'This will permanently delete {name} from your customer records. This action cannot be undone.',
+    deleteOneFailedSession:
+      'Could not perform deletion. User or customer data is missing. Please try refreshing the page.',
+    deletedOneTitle: 'Customer Deleted',
+    deletedOneDescription: '{name} has been removed.',
+    deleteOneFailed: 'Could not delete customer.',
   },
   receipts: {
     title: 'Receipts',
@@ -1431,6 +1543,7 @@ const en = {
     colItem: 'Item',
     colProduct: 'Product',
     colCustomer: 'Customer',
+    colService: 'Service',
     colClass: 'Class',
     colUnits: 'Units',
     colQtySold: 'Qty Sold',
@@ -1497,6 +1610,8 @@ const en = {
     // Insight of the day
     iotdTitle: 'Insight of the day',
     iotdVsMedian: 'vs median',
+    iotdYou: 'You',
+    iotdMedianShop: 'Median shop',
     iotdRotation: '1 of {total} · new one tomorrow',
     iotdAtStake: 'At stake',
 
@@ -1508,6 +1623,10 @@ const en = {
     drYesterday: 'Yesterday',
     drLast7: 'Last 7 Days',
     drLast30: 'Last 30 Days',
+    tfLast7d: 'Last 7d',
+    tfLast30d: 'Last 30d',
+    tf90Days: '90 Days',
+    tfLifetime: 'Lifetime',
     drThisMonth: 'This Month',
     drLastMonth: 'Last Month',
     drAllTime: 'All Time',
@@ -1640,6 +1759,7 @@ const en = {
     abcClassA: 'Class A ({count})',
     abcClassB: 'Class B ({count})',
     abcClassC: 'Class C ({count})',
+    abcClassBadge: 'Class {letter}',
     abcEmptyTitle: 'Not Enough Sales Data',
     abcEmptyBody: 'This report will be generated once you have more sales records to analyze.',
     abcProductInsight: 'Product Insight',
@@ -1647,6 +1767,12 @@ const en = {
     abcRevShare: 'Rev Share',
     abcCumulative: '(cum.)',
     abcRecommendation: 'Strategic Recommendation',
+    abcRecA:
+      'Highest priority item. Ensure stock never drops below safety levels. Consider limited-time bundles with Class C items to improve their velocity.',
+    abcRecB:
+      'Steady performer. Focus on maximizing cross-sell opportunities. Slight price trials might optimize margins without hurting volume.',
+    abcRecC:
+      'Low velocity item. Capital may be trapped. Recommend bundling with top sellers or applying a clearance strategy if holding costs are high.',
     abcClose: 'Close Analysis',
     abcNoProducts: 'No products found.',
 
@@ -1727,10 +1853,21 @@ const en = {
      * `This chart will highlight your best {noun}` cannot be one key, because the article and
      * the adjective agreement both move with the noun in half of the eleven.
      */
+    tiTitleProducts: 'Top Selling Products',
+    tiTitleServices: 'Top Services',
     tiValue: 'Value',
     tiByUnits: 'By units sold',
     tiByRevenue: 'By revenue',
     tiByProfit: 'By profit',
+    /*
+     * Lowercase forms, spelled out rather than `.toLowerCase()`d at the call site:
+     * German capitalises every noun, and Turkish's dotless ı means `toLowerCase()`
+     * changes the letter. Read by the panel caption and the dialog body, which is why
+     * the caption reads “· by units sold” rather than the measure noun alone.
+     */
+    tiByUnitsLower: 'by units sold',
+    tiByRevenueLower: 'by revenue',
+    tiByProfitLower: 'by profit',
     tiEmptyProducts:
       'This chart will highlight your best products once you start making sales through the POS.',
     tiEmptyServices:
@@ -1747,19 +1884,29 @@ const en = {
     tiUncosted_other: '{count} have no cost price, so their profit is unknown rather than zero and they are not charted.',
     tiAtALoss_one: '{count} sold at a loss — see the full list.',
     tiAtALoss_other: '{count} sold at a loss — see the full list.',
-    tiNoneProducts: 'No products sold in this period.',
-    tiNoneServices: 'No services sold in this period.',
-    tiViewAllProducts: 'View all products',
-    tiViewAllServices: 'View all services',
+    tiNoDataProducts: 'Your best products will appear here.',
+    tiNoDataServices: 'Your best services will appear here.',
+    tiSoldInPeriodProducts_one: '{formatted} product sold in this period.',
+    tiSoldInPeriodProducts_other: '{formatted} products sold in this period.',
+    tiSoldInPeriodServices_one: '{formatted} service sold in this period.',
+    tiSoldInPeriodServices_other: '{formatted} services sold in this period.',
+    tiCaptionProducts_one: 'Showing {shown} of {total} product · {measure}',
+    tiCaptionProducts_other: 'Showing {shown} of {total} products · {measure}',
+    tiCaptionServices_one: 'Showing {shown} of {total} service · {measure}',
+    tiCaptionServices_other: 'Showing {shown} of {total} services · {measure}',
+    tiViewAllCount: 'View all {count}',
     tiDialogTitleProducts: 'All products sold ({count})',
     tiDialogTitleServices: 'All services sold ({count})',
     tiDialogBody:
       'Ranked {measure} for the period selected at the top of the page. Revenue here is line revenue — the sum of price × quantity — so it excludes tax and is gross of any receipt-level discount, and will not exactly match the Revenue figure in the cards above.',
     tiShowingOf: '{shown} of {total}',
+    tiSearchProducts: 'Search products, SKU or category…',
+    tiSearchServices: 'Search services, SKU or category…',
     tiExportCsv: 'Export CSV',
     tiNothingMatches: 'Nothing matches “{query}”.',
-    tiNoCostRecorded: 'No cost price recorded',
-    tiNoCostRecordedFor: '{name}, so profit is unknown — not zero.',
+    tiNoCostAll: 'No cost price recorded, so profit is unknown — not zero.',
+    tiNoCostPartial:
+      'No cost price recorded on {pct}% of the units sold, so profit is unknown — not zero.',
 
     // Advanced Income Statement
     plsTitle: 'Advanced Income Statement',
@@ -1771,9 +1918,9 @@ const en = {
     plsGrossRevenueHint: 'Total sales before deductions',
     plsCogs: 'Cost of Goods Sold (COGS)',
     plsCogsHint: 'Product acquisition costs',
-    plsMarginPct: '% Margin',
+    plsMarginPct: '{pct}% Margin',
     plsNetOperatingIncome: 'Net Operating Income',
-    plsNetMarginPct: '% Net Margin',
+    plsNetMarginPct: '{pct}% Net Margin',
     plsColLineItem: 'Financial Line Item',
     plsColAmount: 'Amount ({symbol})',
     plsColPctGross: '% of Gross Revenue',
@@ -1794,10 +1941,13 @@ const en = {
     dsiTitle: 'Daily Sales Items Log',
     dsiSubtitle:
       'Detailed logs of individual product and service items sold on the selected day.',
+    dsiExportReport: 'Export Report',
+    dsiExportImage: 'Export as High-Res Image',
     dsiExportPdf: 'Export as PDF',
     dsiExportCsv: 'Export as CSV',
     dsiGeneratingBody: 'Please wait while we capture the daily sales table.',
-    dsiExportedCsvBody: 'Daily sales items exported as CSV.',
+    dsiExportedCsvBody_one: '{count} sales row exported.',
+    dsiExportedCsvBody_other: '{count} sales rows exported.',
     dsiExportedImageBody: 'Table exported as High-Res Image.',
     dsiExportedPdfBody: 'Table exported as PDF.',
     dsiExportFailed: 'Export Failed',
@@ -1811,17 +1961,58 @@ const en = {
     dsiVerified: 'Verified Transfers',
     dsiVerifiedHint: 'Confirmed landing in terminal',
     dsiPickDay: 'Pick a day',
+    dsiToday: 'Today ({date})',
+    dsiYesterday: 'Yesterday ({date})',
     dsiSearchPlaceholder: 'Search by item name or receipt...',
     dsiAllTypes: 'All Types',
     dsiProductsOnly: 'Products Only',
     dsiServicesOnly: 'Services Only',
     dsiRowsOption: '{count} rows',
-    dsiShowing: 'Showing {from}-{to} of {total} item sales',
+    dsiShowing_one: 'Showing {count} item sale',
+    dsiShowing_other: 'Showing {count} item sales',
     dsiEmptyTitle: 'No sales items logged',
     dsiEmptyBody: 'There are no records matching your active filters on this day.',
     dsiPageOf: 'Page {page} of {total}',
     dsiPrevPage: 'Previous Page',
     dsiNextPage: 'Next Page',
+  },
+  invoices: {
+    title: 'Invoice Tracking',
+    subtitle: 'Manage and track all customer invoices and payments.',
+    allInvoices: 'All Invoices',
+    allInvoicesDesc: 'A complete list of formal invoices generated by your business.',
+    searchPlaceholder: 'Search invoices...',
+    colInvoiceNumber: 'Invoice #',
+    // The three payment states. Also used by the receipt badges on the customer
+    // detail page, where CSS renders them uppercase — same words, same keys.
+    statusPending: 'Pending',
+    statusUnpaid: 'Unpaid',
+    statusPaid: 'Paid',
+    markPaid: 'Mark Paid',
+    noneFound: 'No Invoices Found',
+    noneFoundHint: 'Complete a sale in the POS to generate your first invoice.',
+    goToPos: 'Go to POS',
+    paidTitle: 'Payment Recorded',
+    paidDescription: 'Invoice marked as paid successfully.',
+    paidFailed: 'Failed to update invoice status.',
+  },
+  billing: {
+    title: 'Billing & Subscriptions',
+    subtitle: 'Manage your plan, view payment history, and upgrade your account.',
+    lifetimeAccess: 'Lifetime Access',
+    lifetimeAccessDesc: 'You have permanent access to all features.',
+    profileNotFound: 'Business profile not found. Please refresh or contact support.',
+    impersonationTitle: 'You are viewing this page as an impersonated user.',
+    impersonationBody: 'Billing button clicks are blocked. Stop impersonating to make real changes.',
+    sectionTitle: 'Subscription & Billing',
+    sectionDesc: 'Manage your subscription plan and view billing history.',
+    currentStatus: 'Current Status',
+    historyTitle: 'Subscription History',
+    historyDesc: 'A log of your recent subscription payments.',
+    colAmount: 'Amount',
+    // The `action` and `currency` on a `subscription_history` row are stored
+    // values written by the webhooks, so they stay as they were recorded.
+    noHistory: 'No subscription history found.',
   },
   support: {
     title: 'Support',

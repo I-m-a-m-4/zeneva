@@ -20,6 +20,7 @@ interface DeadStockAnalysisProps {
 }
 
 export default function DeadStockAnalysis({ products, receipts, currencySymbol }: DeadStockAnalysisProps) {
+    const { t } = useI18n();
     const deadStock = React.useMemo(() => {
         const sixtyDaysAgo = subDays(new Date(), 60);
         

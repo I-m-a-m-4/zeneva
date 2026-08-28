@@ -32,6 +32,7 @@ import MobileBottomNav from '@/components/layout/mobile-bottom-nav';
 import type { UserNotification, BusinessInstance, AdminNotification, UserProfile } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
+import ZenAIWidget from '@/components/shared/zen-ai-widget';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate, getCountryFromIP } from '@/lib/utils';
@@ -372,7 +373,22 @@ export default function AuthenticatedLayout({
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
+  const [isZenAIOpen, setIsZenAIOpen] = React.useState(false);
+  const [dictationTrigger, setDictationTrigger] = React.useState(0);
   const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Trigger Zen AI with dictation when Control key is pressed
+      if (e.key === 'Control') {
+        // Prevent default browser hotkey triggers if any
+        setIsZenAIOpen(true);
+        setDictationTrigger(prev => prev + 1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -1495,7 +1511,7 @@ export default function AuthenticatedLayout({
                 </DropdownMenu>
               </SidebarFooter>
             </Sidebar>
-            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+            <div className="flex-1 flex flex-col overflow-hidden bg-background relative">
               <header className="no-print flex h-16 shrink-0 items-center gap-2 sm:gap-4 border-b bg-background px-2 sm:px-6 z-10">
                 <SidebarTrigger className="hidden md:flex" />
                 <BusinessHealthIndicator />
@@ -1511,6 +1527,16 @@ export default function AuthenticatedLayout({
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Parked Sales</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label="Zen AI" onClick={() => setIsZenAIOpen(true)}>
+                        <Bot className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Zen AI</p>
                     </TooltipContent>
                   </Tooltip>
                   <Tooltip>
@@ -1793,7 +1819,8 @@ export default function AuthenticatedLayout({
                   </div>
                 )}
               </main>
-            </div>
+               <ZenAIWidget isOpen={isZenAIOpen} onClose={() => setIsZenAIOpen(false)} dictationTrigger={dictationTrigger} />
+             </div>
           </div>
           <MobileBottomNav 
             navItems={isUserLoading ? [] : mainMobileNavItems} 

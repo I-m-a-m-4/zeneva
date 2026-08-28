@@ -362,6 +362,54 @@ function scanFile(abs: string): Finding[] {
 }
 
 // ---------------------------------------------------------------------------
+// Survey mode — `test:i18n -- --survey <path>…`, printing findings and exiting
+// before any assertion runs.
+//
+// Each batch starts by asking "what is actually on this screen", and the files it
+// is about to translate do not import `useI18n` yet — so neither assertion below
+// can see them and the advisory scan skips them by construction. That question was
+// answered for batches 1–3 by a throwaway `scripts/tmp-detector.ts` holding a
+// second copy of the detector, which is the worst possible arrangement: a survey
+// that disagrees with the guard sends you to translate strings the guard will not
+// check, or misses ones it will. The copy did drift, and its `VISIBLE_ATTRS` was
+// missing `subtitle`, so the reports page surveyed clean at 49 literals when it
+// held 58 — half of every PageTitle in the app.
+//
+// Reusing `scanFile` makes that class of disagreement impossible. Accepts files or
+// directories; a directory is walked with the same SKIP rules as the guard, so
+// `loading.tsx`/`skeleton.tsx` and `components/ui` stay out of a survey too.
+const surveyIdx = process.argv.indexOf('--survey');
+if (surveyIdx !== -1) {
+  const targets = process.argv.slice(surveyIdx + 1);
+  if (!targets.length) {
+    console.error('--survey needs at least one file or directory');
+    process.exit(2);
+  }
+
+  let total = 0;
+  for (const target of targets) {
+    const abs = path.isAbsolute(target) ? target : path.join(ROOT, target);
+    if (!fs.existsSync(abs)) {
+      console.error(`  ! not found: ${target}`);
+      continue;
+    }
+    const files = fs.statSync(abs).isDirectory() ? walkDir(abs) : [abs];
+    for (const file of files) {
+      const rel = path.relative(ROOT, file);
+      if (skipped(rel)) continue;
+      const findings = scanFile(file);
+      total += findings.length;
+      console.log(`\n${rel}  —  ${findings.length} literal(s)`);
+      for (const f of findings) {
+        console.log(`  ${String(f.line).padStart(5)}  ${f.kind.padEnd(16)} ${f.text}`);
+      }
+    }
+  }
+  console.log(`\nSurvey total: ${total} literal(s)`);
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
 // Assertion 0 — the detectors themselves still work.
 //
 // A guard whose detectors have silently stopped matching reports "0 failed" and
@@ -435,9 +483,45 @@ const E = () => <p>Save Product</p>;`).join(',') === 'jsx-text',
 // Assertion 1 — a translated file must not gain a fresh English literal.
 
 const ALL_FILES = walkDir(SRC);
-const I18N_AWARE = ALL_FILES.filter(f => /\buseI18n\b/.test(fs.readFileSync(f, 'utf8')));
+
+/**
+ * "Imports `useI18n`", matched as an actual import statement rather than as any
+ * mention of the word. A bare `/\buseI18n\b/` also matches prose: `page-skeletons.tsx`
+ * carries a comment explaining that a skeleton is a server component and *cannot*
+ * reach `useI18n`, and that sentence alone was enough to enrol it in both assertions
+ * below — where it then failed the "calls it, not just imports it" check for a hook
+ * it never imported. `[^;]` spans newlines, so a multi-line import clause matches too.
+ */
+const I18N_AWARE = ALL_FILES.filter(f => /^\s*import\s[^;]*\buseI18n\b/m.test(fs.readFileSync(f, 'utf8')));
 
 check('the scan found the i18n-aware files at all', I18N_AWARE.length > 10, I18N_AWARE.length);
+
+// ---------------------------------------------------------------------------
+// Assertion 1a — importing `useI18n` is not the same as calling it.
+//
+// This one is here because it actually happened, three files at once. A batch
+// script inserted the import automatically and left the `const { t } = useI18n();`
+// binding to a hand-written edit list, so three panels ended up with every English
+// string replaced by `t('…')`, the import present, and `t` never bound. The file
+// does not compile — but the *text* detector above reports 0 findings for it,
+// because the English really is gone. It reads as a finished file.
+//
+// So the detector cannot see this class at all, and neither can a reviewer skimming
+// a diff full of correct-looking `t()` calls. Only the compiler catches it, and
+// `npm run typecheck` here runs against a ~133-error baseline where three more are
+// easy to miss. Hence a direct assertion.
+//
+// Import lines are stripped first, or `import { useI18n } from …` would satisfy the
+// call test on its own.
+for (const abs of I18N_AWARE) {
+  const rel = path.relative(ROOT, abs);
+  const body = fs
+    .readFileSync(abs, 'utf8')
+    .split(/\r\n|\r|\n/)
+    .filter(l => !/^\s*import\b/.test(l))
+    .join('\n');
+  check(`${rel} calls useI18n(), not just imports it`, /\buseI18n\s*\(/.test(body));
+}
 
 /**
  * Enforcement is scoped to the batches that have actually landed. The marketing
@@ -461,7 +545,46 @@ const ENFORCED = [
   path.join('src', 'app', '(auth)', 'login', 'page.tsx'),
   path.join('src', 'app', '(auth)', 'signup', 'page.tsx'),
   path.join('src', 'app', '(auth)', 'forgot-password', 'page.tsx'),
+  // Batch 3 — the reports cluster. Every live panel; the six files left out are in
+  // UNREFERENCED below, and `streak-flame.tsx` is in COPY_FREE.
+  path.join('src', 'app', '(app)', 'reports', 'page.tsx'),
+  ...[
+    'abc-analysis',
+    'basket-analysis',
+    'business-rating-panel',
+    'category-performance',
+    'customer-analytics',
+    'daily-sales-items-table',
+    'date-range-picker',
+    'dead-stock-analysis',
+    'hourly-sales-heatmap',
+    'insight-of-the-day',
+    'inventory-depletion-card',
+    'margin-leaks',
+    'payment-method-analysis',
+    'peer-compare',
+    'profit-loss-chart',
+    'profit-loss-statement',
+    'revenue-forecast-card',
+    'sales-over-time-chart',
+    'staff-performance',
+    'timeframe-picker',
+    'top-customers-list',
+    'top-items-panel',
+  ].map(f => path.join('src', 'components', 'reports', `${f}.tsx`)),
 ];
+
+/**
+ * Files with no user-visible copy at all. They must stay that way: adding a string
+ * to one is exactly the regression this guard exists to catch, and because they do
+ * not import `useI18n` they would otherwise fall outside both assertions — invisible
+ * to ENFORCED (which requires the import) and invisible to the advisory scan (which
+ * only looks at i18n-aware files).
+ *
+ * `streak-flame.tsx` is an animated SVG flame and a number. There is nothing in it
+ * to translate, so demanding a `useI18n` import would be noise.
+ */
+const COPY_FREE = [path.join('src', 'components', 'reports', 'streak-flame.tsx')];
 
 /**
  * The same list doubles as assertion 2: these files must import `useI18n`. A
@@ -483,6 +606,100 @@ for (const rel of ENFORCED) {
   const findings = scanFile(abs);
   if (findings.length) enforcedFindings.push({ rel, findings });
   check(`${rel} has no hardcoded user-visible strings`, findings.length === 0, findings.slice(0, 6));
+}
+
+for (const rel of COPY_FREE) {
+  const abs = path.join(ROOT, rel);
+  check(`${rel} exists`, fs.existsSync(abs));
+  if (!fs.existsSync(abs)) continue;
+  const findings = scanFile(abs);
+  check(`${rel} is still copy-free`, findings.length === 0, findings.slice(0, 6));
+}
+
+// ---------------------------------------------------------------------------
+// Assertion 3 — a file skipped as dead must still be dead.
+//
+// Batch 3 left six files in `components/reports` untranslated, holding 58 English
+// literals between them. That is only defensible for as long as nothing renders
+// them, and "nothing imports this" is not a property anybody re-checks before
+// wiring a component back into a page. Somebody reviving `reports-dashboard.tsx`
+// gets a screen that is English in eleven languages and no signal at all.
+//
+// So the exemption is pinned to the reason for it: import one of these from a
+// surface that is in scope and the guard goes red, naming the file and the literal
+// count it is carrying. `allowedImporters` records who may legitimately reference
+// it today — an empty list means nothing at all may.
+const UNREFERENCED: Array<{ rel: string; reason: string; allowedImporters: string[] }> = [
+  {
+    rel: path.join('src', 'components', 'reports', 'reports-dashboard.tsx'),
+    reason: 'no importers; the reports page composes the panels itself',
+    allowedImporters: [],
+  },
+  {
+    rel: path.join('src', 'components', 'reports', 'reports-teaser.tsx'),
+    reason: 'no importers; the upgrade pitch is FeatureGate now',
+    allowedImporters: [],
+  },
+  {
+    rel: path.join('src', 'components', 'reports', 'recent-sales-table.tsx'),
+    reason: 'no importers',
+    allowedImporters: [],
+  },
+  {
+    rel: path.join('src', 'components', 'reports', 'top-services-chart.tsx'),
+    reason: 'superseded by top-items-panel.tsx (see its header comment)',
+    allowedImporters: [],
+  },
+  {
+    // Reached only from `src/reports/page.tsx`, which sits outside `src/app` and so
+    // is not a route — and which nothing imports either. Dead by transitivity.
+    rel: path.join('src', 'components', 'reports', 'top-products-chart.tsx'),
+    reason: 'superseded by top-items-panel.tsx; only importer is the stray src/reports/page.tsx',
+    allowedImporters: [path.join('src', 'reports')],
+  },
+];
+
+/** Every source file, admin and all — the point is to see out-of-scope importers. */
+function walkAll(dir: string, out: string[] = []): string[] {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkAll(abs, out);
+    else if (/\.tsx?$/.test(entry.name)) out.push(abs);
+  }
+  return out;
+}
+
+const EVERY_FILE = walkAll(SRC);
+
+/**
+ * A dead file may be imported by another dead file — `reports-dashboard.tsx` renders
+ * `recent-sales-table.tsx` and `top-products-chart.tsx`, and all three are unreachable
+ * together. What matters is whether anything *live* pulls the set in, so the whole
+ * UNREFERENCED set counts as an allowed importer of every member. Delete an entry and
+ * the ones it imported are re-examined on their own, which is the right consequence.
+ */
+const DEAD_SET = new Set(UNREFERENCED.map(u => u.rel));
+
+for (const { rel, reason, allowedImporters } of UNREFERENCED) {
+  const abs = path.join(ROOT, rel);
+  check(`${rel} exists`, fs.existsSync(abs));
+  if (!fs.existsSync(abs)) continue;
+
+  const base = path.basename(rel, '.tsx');
+  const importers = EVERY_FILE.filter(f => {
+    if (f === abs) return false;
+    const src = fs.readFileSync(f, 'utf8');
+    return new RegExp(`/${base}['"]`).test(src);
+  }).map(f => path.relative(ROOT, f));
+
+  const unexpected = importers.filter(
+    i => !DEAD_SET.has(i) && !allowedImporters.some(a => i.startsWith(a + path.sep)),
+  );
+  check(
+    `${rel} is still untranslated-but-unrendered (${reason})`,
+    unexpected.length === 0,
+    unexpected.length ? { importedBy: unexpected, literals: scanFile(abs).length } : undefined,
+  );
 }
 
 // ---------------------------------------------------------------------------

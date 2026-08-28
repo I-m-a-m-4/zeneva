@@ -70,20 +70,11 @@ import { downloadCsv } from '@/lib/csv';
 import { aggregateItems, rankItems, type ItemStat, type RankBy } from '@/lib/reports-aggregates';
 import { trackFeature } from '@/lib/product-telemetry';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/context/i18n-context';
 import type { Product, Receipt } from '@/types';
 
 /** How many bars the chart shows. The rest are one click away. */
 const CHART_ROWS = 8;
-
-const chartConfig = {
-  value: { label: 'Value', color: 'hsl(var(--primary))' },
-} satisfies ChartConfig;
-
-const MEASURES: { value: RankBy; label: string; axis: string }[] = [
-  { value: 'units', label: 'By units sold', axis: 'Units' },
-  { value: 'revenue', label: 'By revenue', axis: 'Revenue' },
-  { value: 'profit', label: 'By profit', axis: 'Profit' },
-];
 
 type SortKey = 'rank' | 'name' | 'units' | 'revenue' | 'profit' | 'margin' | 'share';
 
@@ -100,6 +91,33 @@ export default function TopItemsPanel({
   kind,
   currencySymbol = '',
 }: TopItemsPanelProps) {
+  const { t } = useI18n();
+  // Inside the component: every label below is translated, and there is no `t` at
+  // module scope. `labelLower` is a key of its own rather than `.toLowerCase()` on
+  // `label` — see the note on `tiByUnitsLower` in en.ts.
+  const chartConfig = {
+    value: { label: t('reports.tiValue'), color: 'hsl(var(--primary))' },
+  } satisfies ChartConfig;
+  const MEASURES: { value: RankBy; label: string; labelLower: string; axis: string }[] = [
+    {
+      value: 'units',
+      label: t('reports.tiByUnits'),
+      labelLower: t('reports.tiByUnitsLower'),
+      axis: t('reports.colUnits'),
+    },
+    {
+      value: 'revenue',
+      label: t('reports.tiByRevenue'),
+      labelLower: t('reports.tiByRevenueLower'),
+      axis: t('reports.colRevenue'),
+    },
+    {
+      value: 'profit',
+      label: t('reports.tiByProfit'),
+      labelLower: t('reports.tiByProfitLower'),
+      axis: t('reports.colProfit'),
+    },
+  ];
   const [measure, setMeasure] = React.useState<RankBy>('units');
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -107,7 +125,8 @@ export default function TopItemsPanel({
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
 
   const isService = kind === 'service';
-  const noun = isService ? 'service' : 'product';
+  // English on purpose, and the only use left is the CSV filename slug: an export keeps
+  // an ASCII, stable name so a shop's files still sort together whatever the app language.
   const nounPlural = isService ? 'services' : 'products';
 
   const money = React.useCallback(
@@ -273,11 +292,18 @@ export default function TopItemsPanel({
     <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="min-w-0">
-          <CardTitle>{isService ? 'Top Services' : 'Top Selling Products'}</CardTitle>
+          <CardTitle>
+            {t(isService ? 'reports.tiTitleServices' : 'reports.tiTitleProducts')}
+          </CardTitle>
           <CardDescription>
             {noData
-              ? `Your best ${nounPlural} will appear here.`
-              : `Showing ${chartData.length} of ${ranked.length} ${ranked.length === 1 ? noun : nounPlural} · ${activeMeasure.axis.toLowerCase()}`}
+              ? t(isService ? 'reports.tiNoDataServices' : 'reports.tiNoDataProducts')
+              : t(isService ? 'reports.tiCaptionServices' : 'reports.tiCaptionProducts', {
+                  count: ranked.length,
+                  shown: chartData.length,
+                  total: ranked.length,
+                  measure: activeMeasure.labelLower,
+                })}
           </CardDescription>
         </div>
         <Select value={measure} onValueChange={v => setMeasure(v as RankBy)}>
@@ -302,10 +328,7 @@ export default function TopItemsPanel({
               <p className="flex items-center justify-center gap-2 font-semibold">
                 <Bot className="h-4 w-4 text-primary" /> Zen AI
               </p>
-              <p>
-                This chart will highlight your best {nounPlural} once you start making sales
-                through the POS.
-              </p>
+              <p>{t(isService ? 'reports.tiEmptyServices' : 'reports.tiEmptyProducts')}</p>
             </div>
           </div>
         ) : chartData.length === 0 ? (
@@ -313,8 +336,7 @@ export default function TopItemsPanel({
           <div className="flex h-[300px] flex-col items-center justify-center p-4 text-center text-muted-foreground">
             <Sparkles className="mb-4 h-12 w-12 opacity-50" />
             <p className="max-w-sm text-sm">
-              No {noun} in this period has a cost price recorded, so profit cannot be
-              worked out. Add cost prices in Inventory, or rank by units or revenue.
+              {t(isService ? 'reports.tiNoCostServices' : 'reports.tiNoCostProducts')}
             </p>
           </div>
         ) : (
@@ -364,57 +386,62 @@ export default function TopItemsPanel({
             <p className="text-[11px] leading-snug text-muted-foreground">
               {measure === 'profit' ? (
                 <>
-                  {soldCount} {soldCount === 1 ? noun : nounPlural} sold.
-                  {costGaps > 0 && (
-                    <>
-                      {' '}
-                      {costGaps} {costGaps === 1 ? 'has' : 'have'} no cost price, so{' '}
-                      {costGaps === 1 ? 'its' : 'their'} profit is unknown rather than
-                      zero and {costGaps === 1 ? 'it is' : 'they are'} not charted.
-                    </>
-                  )}
-                  {lossMaking > 0 && (
-                    <>
-                      {' '}
-                      {lossMaking} sold at a loss — see the full list.
-                    </>
-                  )}
+                  {t(isService ? 'reports.tiSoldServices' : 'reports.tiSoldProducts', {
+                    count: soldCount,
+                    formatted: soldCount.toLocaleString(),
+                  })}
+                  {costGaps > 0 && ` ${t('reports.tiUncosted', { count: costGaps })}`}
+                  {lossMaking > 0 && ` ${t('reports.tiAtALoss', { count: lossMaking })}`}
                 </>
               ) : (
-                <>
-                  {soldCount} {soldCount === 1 ? noun : nounPlural} sold in this period.
-                </>
+                t(
+                  isService
+                    ? 'reports.tiSoldInPeriodServices'
+                    : 'reports.tiSoldInPeriodProducts',
+                  { count: soldCount, formatted: soldCount.toLocaleString() },
+                )
               )}
             </p>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs">
-                  View all {ranked.length}
+                  {t('reports.tiViewAllCount', { count: ranked.length })}
                 </Button>
               </DialogTrigger>
               <DialogContent className="flex max-h-[85vh] max-w-5xl flex-col">
                 <DialogHeader>
                   <DialogTitle>
-                    All {isService ? 'services' : 'products'} sold ({ranked.length})
+                    {t(
+                      isService
+                        ? 'reports.tiDialogTitleServices'
+                        : 'reports.tiDialogTitleProducts',
+                      { count: ranked.length },
+                    )}
                   </DialogTitle>
+                  {/* The inline <strong>line revenue</strong> is lost here: `translate`
+                      returns a string, so one key cannot carry a React node. The whole
+                      sentence is one key rather than three, so the emphasis is the only
+                      casualty — splitting it would put the clause order under the caller's
+                      control instead of the translator's. */}
                   <DialogDescription className="text-xs">
-                    Ranked {activeMeasure.label.toLowerCase()} for the period selected at the
-                    top of the page. Revenue here is <strong>line revenue</strong> — the sum
-                    of price × quantity — so it excludes tax and is gross of any
-                    receipt-level discount, and will not exactly match the Revenue figure in
-                    the cards above.
+                    {t('reports.tiDialogBody', { measure: activeMeasure.labelLower })}
                   </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <Input
-                    placeholder={`Search ${nounPlural}, SKU or category…`}
+                    placeholder={t(
+                      isService ? 'reports.tiSearchServices' : 'reports.tiSearchProducts',
+                    )}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     className="h-8 max-w-xs text-xs"
                   />
                   <span className="text-xs text-muted-foreground">
-                    {filtered.length} of {ranked.length}
+                    {t('reports.tiShowingOf', {
+                      shown: filtered.length,
+                      total: ranked.length,
+                    })}
                   </span>
                   <Button
                     variant="outline"
@@ -423,7 +450,7 @@ export default function TopItemsPanel({
                     className="ms-auto h-8 shrink-0 text-xs"
                   >
                     <Download className="me-1.5 h-3.5 w-3.5" />
-                    Export CSV
+                    {t('reports.tiExportCsv')}
                   </Button>
                 </div>
 
@@ -435,20 +462,20 @@ export default function TopItemsPanel({
                           #
                         </SortHead>
                         <SortHead k="name" numeric={false}>
-                          {isService ? 'Service' : 'Product'}
+                          {t(isService ? 'reports.colService' : 'reports.colProduct')}
                         </SortHead>
-                        <SortHead k="units">Units</SortHead>
-                        <SortHead k="revenue">Revenue</SortHead>
-                        <SortHead k="profit">Profit</SortHead>
-                        <SortHead k="margin">Margin</SortHead>
-                        <SortHead k="share">Share</SortHead>
+                        <SortHead k="units">{t('reports.colUnits')}</SortHead>
+                        <SortHead k="revenue">{t('reports.colRevenue')}</SortHead>
+                        <SortHead k="profit">{t('reports.colProfit')}</SortHead>
+                        <SortHead k="margin">{t('reports.colMargin')}</SortHead>
+                        <SortHead k="share">{t('reports.colShare')}</SortHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {sorted.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                            Nothing matches &ldquo;{search}&rdquo;.
+                            {t('reports.tiNothingMatches', { query: search })}
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -478,11 +505,11 @@ export default function TopItemsPanel({
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p className="max-w-[220px] text-xs">
-                                      No cost price recorded
                                       {s.costCoverage > 0
-                                        ? ` on ${Math.round((1 - s.costCoverage) * 100)}% of the units sold`
-                                        : ''}
-                                      , so profit is unknown — not zero.
+                                        ? t('reports.tiNoCostPartial', {
+                                            pct: Math.round((1 - s.costCoverage) * 100),
+                                          })
+                                        : t('reports.tiNoCostAll')}
                                     </p>
                                   </TooltipContent>
                                 </Tooltip>

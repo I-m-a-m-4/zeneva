@@ -860,6 +860,8 @@ const hi: Messages = {
     colStock: 'स्टॉक',
     notAvailable: 'लागू नहीं',
     bundleBadge: 'बंडल',
+    unknownProduct: 'अज्ञात उत्पाद',
+    uncategorized: 'अवर्गीकृत',
     fullEdit: 'पूरा संपादन',
     quickEdit: 'त्वरित संपादन',
     printBarcode: 'बारकोड प्रिंट करें',
@@ -1319,6 +1321,482 @@ const hi: Messages = {
     downloadedDescription: 'आपके डैशबोर्ड की इमेज सहेज ली गई है।',
     downloadFailed: 'डाउनलोड विफल',
     downloadFailedDescription: 'डैशबोर्ड की इमेज नहीं बन सकी।',
+  },
+  reports: {
+    title: 'रिपोर्ट',
+    subtitle: 'आपके कारोबार के प्रदर्शन का गहरा विश्लेषण।',
+
+    // पिछली अवधि से तुलना
+    deltaNewThisPeriod: 'इस अवधि में नया',
+    deltaFlat: 'कोई बदलाव नहीं',
+    deltaVsPrevious: 'पिछली अवधि से {pct}%',
+
+    tabAnalytics: 'विश्लेषण डैशबोर्ड',
+    tabProfitLoss: 'लाभ-हानि',
+    tabDailySales: 'रोज़ बिके आइटम',
+    tabBusinessRating: 'कारोबार रेटिंग',
+
+    updatingMetrics: 'आँकड़े अपडेट हो रहे हैं…',
+    loadingDashboard: 'विश्लेषण डैशबोर्ड लोड हो रहा है…',
+    exportReport: 'रिपोर्ट निर्यात करें',
+    exportCsv: 'डेटा CSV में निर्यात करें',
+    exportImage: 'उच्च गुणवत्ता वाली इमेज में निर्यात करें',
+    exportPdf: 'PDF में निर्यात करें (प्रिंट)',
+
+    loadingDataTitle: 'डेटा लोड हो रहा है…',
+    loadingDataBody:
+      'इसमें आम तौर पर ज़्यादा समय लग रहा है। अगर आप ऑफ़लाइन हैं, तो हम आपका स्थानीय रूप से सिंक किया गया डेटा दिखाएँगे।',
+    generatingTitle: 'रिपोर्ट बन रही है…',
+    generatingBody: 'आपका डैशबोर्ड कैप्चर होने तक प्रतीक्षा करें।',
+    downloadedTitle: 'रिपोर्ट डाउनलोड हो गई',
+    exportedTitle: 'विश्लेषण निर्यात हो गया',
+    exportedBody: 'आपकी CSV फ़ाइल सेव कर दी गई है।',
+
+    kpiRevenue: 'आय',
+    kpiRevenueHint: 'कुल प्राप्तियाँ',
+    kpiNetCost: 'शुद्ध लागत',
+    kpiNetCostHint: 'बिक्री की कुल लागत',
+    kpiNetProfit: 'शुद्ध मुनाफ़ा',
+    kpiNetProfitHint: 'प्राप्तियाँ घटा लागत',
+    kpiProductRevenue: 'उत्पादों से आय',
+    kpiProductRevenueHint: 'भौतिक सामान से आय',
+    kpiServiceRevenue: 'सेवाओं से आय',
+    kpiServiceRevenueHint: 'दी गई सेवाओं से आय',
+    kpiSales: 'बिक्री',
+    kpiSalesHint: 'कुल लेन-देन',
+    kpiUniqueProducts: 'अलग-अलग उत्पाद',
+    kpiUniqueProductsHint: 'बिके अलग-अलग उत्पादों की संख्या',
+    kpiUnitsSold: 'बिकी इकाइयाँ',
+    kpiUnitsSoldHint: 'कुल निकाली गई इकाइयाँ',
+    kpiDailyVelocity: 'रोज़ की रफ़्तार',
+    kpiDailyVelocityHint: 'प्रति दिन बिक्री',
+    kpiDailyRevenue: 'रोज़ की आय',
+    kpiDailyRevenueHint: 'प्रति दिन औसत आय',
+    kpiCatalogSize: 'कैटलॉग का आकार',
+    kpiCatalogSizeHint: 'स्टॉक में कुल अलग-अलग उत्पाद',
+    kpiAvgOrder: 'औसत बिल',
+    kpiAvgOrderHint: 'प्रति बिक्री आय',
+    kpiCustomers: 'ग्राहक',
+    kpiCustomersBought_one: 'इस अवधि में एक ग्राहक ने खरीदा',
+    kpiCustomersBought_other: 'इस अवधि में {formatted} ग्राहकों ने खरीदा',
+    kpiCustomersHint: 'कुल दर्ज ग्राहक',
+
+    gateVisualName: 'उन्नत दृश्य विश्लेषण',
+    gateVisualBody:
+      'अपने कारोबार की असली तस्वीर देखने के लिए विस्तृत चार्ट, बिक्री के रुझान और मुनाफ़े के मार्जिन खोलें।',
+    gateCustomerName: 'ग्राहक जानकारी और स्टॉक की रफ़्तार',
+    gateCustomerBody:
+      'उन्नत CRM विश्लेषण और ग्राहक की जीवनकाल कीमत खोलें, और डेटा-आधारित ABC विश्लेषण से अपने स्टॉक स्तर बेहतर करें।',
+    gateProfitLossName: 'लाभ-हानि विवरण',
+    gateProfitLossBody:
+      'अपनी दुकान के मार्जिन का विश्लेषण करने के लिए विस्तृत लाभ-हानि विवरण खोलें।',
+    gateDailySalesBody:
+      'रोज़ बिके आइटम की ट्रैकिंग और स्टॉक ऑडिट लॉग खोलें।',
+
+    // पैनलों में साझा शब्दावली
+    colItem: 'आइटम',
+    colProduct: 'उत्पाद',
+    colCustomer: 'ग्राहक',
+    colService: 'सेवा',
+    colClass: 'श्रेणी',
+    colUnits: 'इकाइयाँ',
+    colQtySold: 'बिकी मात्रा',
+    colOrders: 'ऑर्डर',
+    colRevenue: 'आय',
+    colProfit: 'मुनाफ़ा',
+    colMargin: 'मार्जिन',
+    colShare: 'हिस्सा',
+    colSales: 'बिक्री',
+    colCost: 'लागत',
+    colGrossProfit: 'सकल मुनाफ़ा',
+    colCogs: 'बिक्री की लागत',
+    colTotalSpent: 'कुल खर्च',
+    colReceipt: 'रसीद',
+    colDateTime: 'दिनांक और समय',
+    colImage: 'इमेज',
+    colMember: 'सदस्य',
+    revenueColon: 'आय:',
+
+    exportSuccessful: 'निर्यात सफल',
+    generatingPdf: 'PDF बन रही है…',
+    generatingPdfBody: 'आपका दस्तावेज़ बनने तक प्रतीक्षा करें।',
+    noDataTitle: 'कोई डेटा नहीं',
+    noDataToExport: 'निर्यात के लिए कोई आइटम उपलब्ध नहीं है।',
+
+    // भुगतान तरीकों का मिलान
+    pmTitle: 'भुगतान तरीकों का मिलान',
+    pmSubtitle: 'भुगतान माध्यम के हिसाब से वसूल हुई आय का बँटवारा।',
+    pmTransactions: 'लेन-देन',
+
+    // शीर्ष ग्राहक
+    tcTitle: 'शीर्ष ग्राहक',
+    tcSubtitle: 'इस अवधि में सबसे ज़्यादा खर्च करने वाले ग्राहक।',
+    tcEmptyTitle: 'ग्राहक डेटा नहीं है',
+    tcEmptyBody: 'यह रिपोर्ट देखने के लिए बिक्री को ग्राहकों से जोड़ें।',
+
+    // समय के साथ बिक्री
+    sotTitle: 'समय के साथ बिक्री',
+    sotSubtitle: 'आय के प्रदर्शन के रुझान।',
+    sotEmpty:
+      'इस अवधि में कोई बिक्री दर्ज नहीं हुई। पहली बिक्री पूरी होते ही यह चार्ट अपने आप सक्रिय हो जाएगा।',
+
+    // रुका हुआ स्टॉक विश्लेषण
+    dsTitle: 'रुका हुआ स्टॉक विश्लेषण',
+    dsSubtitle: '60 या ज़्यादा दिनों से न बिके आइटम (फँसी पूँजी)।',
+    dsLockedCapital: 'अनुमानित फँसी पूँजी',
+    dsUnitsLeft: 'इकाइयाँ बची',
+    dsSku: 'SKU:',
+    dsValueLocked: 'फँसी कीमत',
+    dsViewInventory: 'पूरी इन्वेंटरी देखें',
+    dsEmpty: 'कोई ख़ास रुका हुआ स्टॉक नहीं मिला। आपका स्टॉक अच्छी तरह घूम रहा है!',
+
+    // स्टॉक ख़त्म होने की चेतावनी
+    depTitle: 'स्टॉक ख़त्म होने की चेतावनी',
+    depSubtitle:
+      'पिछले 30 दिनों की बिक्री की रफ़्तार के आधार पर, जल्द ख़त्म होने वाले उत्पादों की पूर्वानुमानित चेतावनियाँ।',
+    depStock: 'स्टॉक:',
+    depSelling: '~',
+    depPerDay: '/दिन बिक रहा है',
+    depRunsOut_one: 'एक दिन में ख़त्म',
+    depRunsOut_other: '{count} दिनों में ख़त्म',
+
+    // आज की जानकारी
+    iotdTitle: 'आज की जानकारी',
+    iotdVsMedian: 'माध्यिका से तुलना',
+    iotdYou: 'आप',
+    iotdMedianShop: 'माध्यिका दुकान',
+    iotdRotation: '{total} में से 1 · कल एक और जानकारी',
+    iotdAtStake: 'दाँव पर',
+
+    // तैयार अवधियाँ
+    drToday: 'आज',
+    drYesterday: 'कल',
+    drLast7: 'पिछले 7 दिन',
+    drLast30: 'पिछले 30 दिन',
+    tfLast7d: 'पिछले 7 दिन',
+    tfLast30d: 'पिछले 30 दिन',
+    tf90Days: '90 दिन',
+    tfLifetime: 'शुरू से अब तक',
+    drThisMonth: 'इस महीने',
+    drLastMonth: 'पिछले महीने',
+    drAllTime: 'सभी समय',
+
+    // लाभ-हानि चार्ट
+    plcSubtitle: 'वित्तीय स्थिति का सार।',
+    plcTotalCost: 'कुल लागत',
+    plcEmpty:
+      'इस अवधि में कोई बिक्री दर्ज नहीं हुई। असली मुनाफ़ा ट्रैक करने के लिए अपने उत्पादों में “लागत मूल्य” जोड़ें।',
+
+    // आपकी तुलनात्मक स्थिति
+    pcTitle: 'आपकी तुलनात्मक स्थिति',
+    pcEmptyTitle: 'तुलना अभी उपलब्ध नहीं',
+    pcEmptyBody:
+      'Zeneva आपकी तुलना माध्यिका दुकान से तभी करता है जब इतनी दुकानें बेच रही हों कि आँकड़े का कोई मतलब बने। यहाँ कुछ भी अनुमान से नहीं है।',
+    pcVsMedianShop: 'माध्यिका दुकान से तुलना',
+    pcFootnote:
+      'पिछले {days} दिनों में {sales} या ज़्यादा बिक्री करने वाली Zeneva की {shops} दुकानों की माध्यिका। किसी दुकान की पहचान कभी नहीं बताई जाती, और कोई दुकान आपकी दुकान नहीं देख सकती।',
+    pcFootnoteAsOf:
+      '{asOf} तक, पिछले {days} दिनों में {sales} या ज़्यादा बिक्री करने वाली Zeneva की {shops} दुकानों की माध्यिका। किसी दुकान की पहचान कभी नहीं बताई जाती, और कोई दुकान आपकी दुकान नहीं देख सकती।',
+
+    // आय का पूर्वानुमान
+    rfTitle: 'आय का पूर्वानुमान',
+    rfSubtitle: 'आपकी मौजूदा रफ़्तार पर आधारित, AI से बना 30 दिन का पूर्वानुमान।',
+    rfNotEnough: 'पूर्वानुमान बनाने के लिए पर्याप्त डेटा नहीं है।',
+    rfProjection: '30 दिन का अनुमान',
+    rfVsPrevious7: 'पिछले 7 दिनों से {pct}%',
+    rfRunRate: 'मौजूदा रोज़ की रफ़्तार',
+    rfPerDay: '/ दिन',
+    rfHistorical: 'पिछला रिकॉर्ड',
+    rfForecast: 'पूर्वानुमान',
+
+    // साथ बिकने वाले सामान का विश्लेषण
+    baTitle: 'साथ बिकने वाले सामान का विश्लेषण',
+    baSubtitle: 'पता लगाएँ कि कौन-से उत्पाद अक्सर साथ में खरीदे जाते हैं।',
+    baHint:
+      'इस जानकारी से **बंडल ऑफ़र** बनाएँ या क्रॉस-सेलिंग बढ़ाने के लिए अपनी दुकान की सजावट तय करें।',
+    baJointSales: 'साथ हुई बिक्री',
+    baFootnote: 'सिर्फ़ वे जोड़े दिखाए गए हैं जो एक से ज़्यादा बार साथ बिके।',
+    baEmptySearch: 'आपकी खोज से मेल खाता कोई उत्पाद संयोजन नहीं मिला।',
+    baEmptyNoPairs:
+      'सार्थक उत्पाद संयोजन पहचानने के लिए अभी कई आइटम वाली पर्याप्त बिक्री नहीं है।',
+
+    // व्यस्त समय की जानकारी
+    hhTitle: 'व्यस्त समय की जानकारी',
+    hhSubtitle: 'आपके कारोबार के सबसे व्यस्त घंटे और दिन।',
+    hhPeakHours: 'व्यस्त घंटे',
+    hhPeakDays: 'व्यस्त दिन',
+    hhPeakWindow: 'सबसे व्यस्त समय',
+    hhBusiestDay: 'हफ़्ते का सबसे व्यस्त दिन',
+    hhDaySunday: 'रविवार',
+    hhDayMonday: 'सोमवार',
+    hhDayTuesday: 'मंगलवार',
+    hhDayWednesday: 'बुधवार',
+    hhDayThursday: 'गुरुवार',
+    hhDayFriday: 'शुक्रवार',
+    hhDaySaturday: 'शनिवार',
+    hhDayShortSunday: 'रवि',
+    hhDayShortMonday: 'सोम',
+    hhDayShortTuesday: 'मंगल',
+    hhDayShortWednesday: 'बुध',
+    hhDayShortThursday: 'गुरु',
+    hhDayShortFriday: 'शुक्र',
+    hhDayShortSaturday: 'शनि',
+    hhSalesCount: '{count} बिक्री',
+    hhPeakLine: '{label} — {count} बिक्री',
+
+    // ग्राहक जानकारी
+    caTitle: 'ग्राहक जानकारी',
+    caAnonymousBuyer: 'अनाम खरीदार',
+    caSubtitle: 'अपने ग्राहक आधार की बढ़त और उन्हें बनाए रखने की गहरी समझ पाएँ।',
+    caTotalCustomers: 'कुल ग्राहक',
+    caNewLast30: 'नए ग्राहक (पिछले 30 दिन)',
+    caReturning: 'लौटने वाले ग्राहक',
+    caRetentionRate: '{pct}% ग्राहक बने रहे',
+    caAcquisition: 'ग्राहक जुड़ना',
+    caNewCustomers: 'नए ग्राहक',
+    caNoAcquisition: 'इस अवधि के लिए ग्राहक जुड़ने का डेटा नहीं है।',
+    caTop5: 'सबसे ज़्यादा खर्च करने वाले 5 ग्राहक',
+
+    // टीम का प्रदर्शन
+    spAvgBasket: 'औसत बिल',
+    spItemsPerSale: 'आइटम / बिक्री',
+    spDiscounted: 'छूट दी गई',
+    spPriceOverrides: 'हाथ से लिखे मूल्य',
+    spNoAuthor: 'बिक्री में विक्रेता दर्ज होने से पहले रिकॉर्ड हुई',
+    spTitleSolo: 'काउंटर की गतिविधि',
+    spTitleTeam: 'टीम का प्रदर्शन',
+    spSubtitleSolo: 'इस अवधि में काउंटर पर क्या-क्या हुआ।',
+    spSubtitleTeam_one: 'इस अवधि में किसने कितना कमाया — एक व्यक्ति।',
+    spSubtitleTeam_other: 'इस अवधि में किसने कितना कमाया — {count} लोग।',
+    spSubtitleTeamPlus_one:
+      'इस अवधि में किसने कितना कमाया — एक व्यक्ति, साथ में वह बिक्री जिसमें विक्रेता दर्ज नहीं है।',
+    spSubtitleTeamPlus_other:
+      'इस अवधि में किसने कितना कमाया — {count} लोग, साथ में वह बिक्री जिसमें विक्रेता दर्ज नहीं है।',
+    spFootnote:
+      'ये गतिविधि के आँकड़े हैं, कोई फ़ैसला नहीं। छूट और हाथ से लिखे मूल्य अक्सर ठीक वही होते हैं जो एक अच्छे विक्रेता को करने चाहिए: बड़ा आँकड़ा पूछने की वजह है, आरोप की नहीं। आय पूरी रसीद की है, इसलिए नीचे की पंक्तियाँ मिलकर अवधि की दुकान की आय बनाती हैं।',
+    spRunScan: 'ऑडिट लॉग में नुकसान रोकने वाला स्कैन चलाएँ',
+
+    // श्रेणियों का प्रदर्शन
+    cpTitle: 'श्रेणियों का प्रदर्शन',
+    cpSubtitle: 'कैटलॉग का कौन-सा हिस्सा काम कर रहा है — आय के हिसाब से, साथ में मार्जिन।',
+    cpOther: 'अन्य ({count})',
+    cpFoldedTail:
+      '{total} श्रेणियाँ बिकीं; चार्ट सबसे छोटी {folded} को “अन्य” में जोड़ता है।',
+    cpMarginUnknownPartial:
+      'बिकी इकाइयों में {pct}% पर लागत मूल्य नहीं है — मार्जिन अज्ञात है, शून्य नहीं',
+    cpMarginUnknownNone: 'कोई लागत मूल्य दर्ज नहीं — मार्जिन अज्ञात है, शून्य नहीं',
+    cpVsPrevious: 'पिछली अवधि से',
+    cpNew: 'नया',
+    cpFlat: 'कोई बदलाव नहीं',
+    cpFootnote:
+      'यहाँ आय हर पंक्ति के मूल्य × मात्रा का जोड़ है, इसलिए इसमें कर शामिल नहीं है और यह रसीद पर लगी छूट से पहले की है: इसीलिए यह ऊपर के आय कार्ड से पूरी तरह मेल नहीं खाएगा, जो काउंटर का कुल है। प्रतिशत इस पैनल के भीतर 100% बनते हैं।',
+
+    // स्टॉक की रफ़्तार और ABC विश्लेषण
+    abcTitle: 'स्टॉक की रफ़्तार और ABC विश्लेषण',
+    abcSubtitle: 'उत्पादों को आय में उनके योगदान के हिसाब से वर्गीकृत करें।',
+    abcAllProducts: 'सभी उत्पाद ({count})',
+    abcClassA: 'श्रेणी A ({count})',
+    abcClassB: 'श्रेणी B ({count})',
+    abcClassC: 'श्रेणी C ({count})',
+    abcClassBadge: 'श्रेणी {letter}',
+    abcEmptyTitle: 'बिक्री का पर्याप्त डेटा नहीं',
+    abcEmptyBody: 'विश्लेषण के लिए ज़्यादा बिक्री इतिहास होने पर यह रिपोर्ट बन जाएगी।',
+    abcProductInsight: 'उत्पाद की जानकारी',
+    abcInsightSubtitle: 'चुनी गई अवधि के विस्तृत प्रदर्शन आँकड़े।',
+    abcRevShare: 'आय में हिस्सा',
+    abcCumulative: '(संचयी)',
+    abcRecommendation: 'रणनीतिक सुझाव',
+    abcRecA:
+      'सबसे ऊँची प्राथमिकता वाला आइटम। ध्यान रखें कि स्टॉक कभी सुरक्षित स्तर से नीचे न जाए। रफ़्तार बढ़ाने के लिए इसे श्रेणी C के आइटम के साथ सीमित समय के बंडल में देने पर विचार करें।',
+    abcRecB:
+      'स्थिर प्रदर्शन। क्रॉस-सेलिंग के मौकों का पूरा फ़ायदा उठाने पर ध्यान दें। छोटे मूल्य परीक्षण मात्रा घटाए बिना मार्जिन बेहतर कर सकते हैं।',
+    abcRecC:
+      'धीमी रफ़्तार वाला आइटम। पूँजी फँसी हो सकती है। इसे सबसे ज़्यादा बिकने वाले आइटम के साथ जोड़ें, या रखने की लागत ज़्यादा हो तो सफ़ाई की रणनीति सोचें।',
+    abcClose: 'विश्लेषण बंद करें',
+    abcNoProducts: 'कोई उत्पाद नहीं मिला।',
+
+    // मार्जिन में रिसाव
+    mlTitle: 'मार्जिन में रिसाव',
+    mlSubtitle: 'वह पैसा जो बिना किसी फ़ैसले के निकल गया।',
+    mlCleanBody:
+      'इस अवधि में कोई आइटम लागत से कम पर नहीं बिका, कोई मूल्य हाथ से नहीं लिखा गया, और कोई छूट नहीं दी गई।',
+    mlCleanUncosted_one:
+      'एक आइटम का लागत मूल्य नहीं है, इसलिए यह जाँचा नहीं जा सका कि वह लागत से कम पर बिका या नहीं।',
+    mlCleanUncosted_other:
+      '{count} आइटम का लागत मूल्य नहीं है, इसलिए यह जाँचा नहीं जा सका कि वे लागत से कम पर बिके या नहीं।',
+    mlAcross: 'इस अवधि में लागत से कम पर बिक्री और हाथ से लिखे मूल्यों को मिलाकर।',
+    mlSoldBelowCost: 'लागत से कम पर बिका',
+    mlColSoldFor: 'जिस पर बिका',
+    mlColLost: 'नुकसान',
+    mlOverridesTitle: 'हाथ से लिखे मूल्यों में आप जो छोड़ रहे हैं',
+    mlColUnitsTyped: 'हाथ से लिखे मूल्य वाली इकाइयाँ',
+    mlColBelowShelf: 'बिक्री मूल्य से कम',
+    mlOverridesFootnote:
+      'बिक्री के समय के बिक्री मूल्य से मापा गया, आज के मूल्य से नहीं: इसलिए एक जायज़ मूल्य बढ़ोतरी यहाँ कभी नहीं दिखेगी। हाथ से लिखे मूल्य आम तौर पर जायज़ होते हैं; यह उनका बिल है, आरोप नहीं।',
+    mlDiscountsTitle: 'दी गई छूट',
+    mlDiscountsFootnote_one:
+      'एक बिक्री पर। छूट पूरी बिक्री पर दर्ज होती है, हर आइटम पर नहीं, इसलिए यह रकम जान-बूझकर उत्पादों में नहीं बाँटी जाती: बाँटना अनुमान होगा। किसने छूट दी, यह नीचे टीम प्रदर्शन पैनल में है।',
+    mlDiscountsFootnote_other:
+      '{formatted} बिक्री पर। छूट पूरी बिक्री पर दर्ज होती है, हर आइटम पर नहीं, इसलिए यह रकम जान-बूझकर उत्पादों में नहीं बाँटी जाती: बाँटना अनुमान होगा। किसने छूट दी, यह नीचे टीम प्रदर्शन पैनल में है।',
+    mlUncostedFootnote_one:
+      'इस अवधि में बिके एक आइटम का लागत मूल्य नहीं है, इसलिए उसे मुनाफ़े वाला मान लेने के बजाय लागत से कम की जाँच से पूरी तरह बाहर रखा गया। इन्वेंटरी में लागत मूल्य जोड़ने से यह जाँच पूरी होती है।',
+    mlUncostedFootnote_other:
+      'इस अवधि में बिके {count} आइटम का लागत मूल्य नहीं है, इसलिए उन्हें मुनाफ़े वाला मान लेने के बजाय लागत से कम की जाँच से पूरी तरह बाहर रखा गया। इन्वेंटरी में लागत मूल्य जोड़ने से यह जाँच पूरी होती है।',
+
+    // कारोबार रेटिंग
+    brFirstReading: 'पहली रीडिंग',
+    brPlusPts: '+{count} अंक',
+    brOffTitle: 'कारोबार रेटिंग बंद है',
+    brOffBody:
+      'कुछ भी मिटाया नहीं गया। सेटिंग → सामान्य से जब चाहें इसे फिर चालू करें, और आपके अंक, सिलसिला और इतिहास वहीं से आगे बढ़ेंगे।',
+    brOpenSettings: 'सेटिंग खोलें',
+    brPitchTitle: 'देखना चाहेंगे कि आपका पैसा कहाँ रिस रहा है?',
+    brPitchBody:
+      'कारोबार रेटिंग आपकी ही बिक्री पढ़ती है और उन चार बातों पर अंक देती है जो आय को गुणा करती हैं: आपका मार्जिन, आपका औसत बिल, खरीदार कितनी बार लौटते हैं, और आपकी रफ़्तार। फिर यह पैसे में बताती है कि आप सबसे बड़ा मौका कहाँ छोड़ रहे हैं।',
+    brTurnOn: 'कारोबार रेटिंग चालू करें',
+    brNoThanks: 'नहीं, धन्यवाद',
+    brLevelBadge: 'स्तर {index}',
+    brLevelUp: 'स्तर {index} — {name}',
+    brNotRated: 'अभी रेटिंग नहीं हुई',
+    brToNextTier: '{name} तक {points}',
+    brTopTier: 'आपने सबसे ऊँचा स्तर बनाए रखा',
+    brNothingYet: 'अभी पर्याप्त डेटा नहीं है।',
+    brNothingLeft: 'मेज़ पर कुछ नहीं बचा। बेचते रहें।',
+    brHintWithMedian: '{hint} · प्लेटफ़ॉर्म माध्यिका {median}',
+    brClaimPrivate:
+      'आपकी रसीदों पर आधारित। कुछ भी कहीं नहीं भेजा जाता और किसी और को नहीं दिखाया जाता।',
+    brClaimPriced: 'हर मौके की कीमत आपकी ही बिक्री से लगती है, किसी अनुमान से नहीं।',
+    brClaimReversible: 'सेटिंग से इसे कभी भी बंद कर सकते हैं।',
+    brNewTier: 'ऐसा स्तर जो आपने पहले नहीं छुआ। बहुत बढ़िया।',
+    brNewBest: 'नया रिकॉर्ड',
+    brNeedFirstSale: 'रेटिंग पाने के लिए अपनी पहली बिक्री दर्ज करें।',
+    brOnTheTable: 'मेज़ पर',
+    brYourBest: 'आपका सर्वश्रेष्ठ',
+    brDaysRecorded_one: 'एक दिन दर्ज',
+    brDaysRecorded_other: '{count} दिन दर्ज',
+    brScoredOnLast: 'पिछले {days} दिनों की बिक्री पर अंकित',
+    brCheckBack: 'रुझान देखने के लिए कल फिर आएँ।',
+    brBadges: 'बैज',
+
+    // सबसे ज़्यादा बिकने वाले आइटम
+    tiTitleProducts: 'सबसे ज़्यादा बिकने वाले उत्पाद',
+    tiTitleServices: 'सबसे ज़्यादा बिकने वाली सेवाएँ',
+    tiValue: 'कीमत',
+    tiByUnits: 'बिकी इकाइयों के हिसाब से',
+    tiByRevenue: 'आय के हिसाब से',
+    tiByProfit: 'मुनाफ़े के हिसाब से',
+    tiByUnitsLower: 'बिकी इकाइयों के हिसाब से',
+    tiByRevenueLower: 'आय के हिसाब से',
+    tiByProfitLower: 'मुनाफ़े के हिसाब से',
+    tiEmptyProducts:
+      'जब आप POS से बेचना शुरू करेंगे, यह चार्ट आपके सबसे अच्छे उत्पाद दिखाएगा।',
+    tiEmptyServices:
+      'जब आप POS से बेचना शुरू करेंगे, यह चार्ट आपकी सबसे अच्छी सेवाएँ दिखाएगा।',
+    tiNoCostProducts:
+      'इस अवधि के किसी उत्पाद का लागत मूल्य दर्ज नहीं है, इसलिए मुनाफ़ा नहीं निकाला जा सकता। इन्वेंटरी में लागत मूल्य जोड़ें, या इकाइयों या आय के हिसाब से क्रम लगाएँ।',
+    tiNoCostServices:
+      'इस अवधि की किसी सेवा का लागत मूल्य दर्ज नहीं है, इसलिए मुनाफ़ा नहीं निकाला जा सकता। इन्वेंटरी में लागत मूल्य जोड़ें, या इकाइयों या आय के हिसाब से क्रम लगाएँ।',
+    tiSoldProducts_one: 'एक उत्पाद बिका।',
+    tiSoldProducts_other: '{formatted} उत्पाद बिके।',
+    tiSoldServices_one: 'एक सेवा बिकी।',
+    tiSoldServices_other: '{formatted} सेवाएँ बिकीं।',
+    tiUncosted_one:
+      'उनमें से एक का लागत मूल्य नहीं है, इसलिए उसका मुनाफ़ा अज्ञात है, शून्य नहीं, और वह चार्ट में नहीं है।',
+    tiUncosted_other:
+      'उनमें से {count} का लागत मूल्य नहीं है, इसलिए उनका मुनाफ़ा अज्ञात है, शून्य नहीं, और वे चार्ट में नहीं हैं।',
+    tiAtALoss_one: 'एक नुकसान पर बिका — पूरी सूची देखें।',
+    tiAtALoss_other: '{count} नुकसान पर बिके — पूरी सूची देखें।',
+    tiNoDataProducts: 'आपके सबसे अच्छे उत्पाद यहाँ दिखेंगे।',
+    tiNoDataServices: 'आपकी सबसे अच्छी सेवाएँ यहाँ दिखेंगी।',
+    tiSoldInPeriodProducts_one: 'इस अवधि में एक उत्पाद बिका।',
+    tiSoldInPeriodProducts_other: 'इस अवधि में {formatted} उत्पाद बिके।',
+    tiSoldInPeriodServices_one: 'इस अवधि में एक सेवा बिकी।',
+    tiSoldInPeriodServices_other: 'इस अवधि में {formatted} सेवाएँ बिकीं।',
+    tiCaptionProducts_one: '{total} में से {shown} उत्पाद · {measure}',
+    tiCaptionProducts_other: '{total} में से {shown} उत्पाद · {measure}',
+    tiCaptionServices_one: '{total} में से {shown} सेवा · {measure}',
+    tiCaptionServices_other: '{total} में से {shown} सेवाएँ · {measure}',
+    tiViewAllCount: 'सभी {count} देखें',
+    tiDialogTitleProducts: 'बिके सभी उत्पाद ({count})',
+    tiDialogTitleServices: 'बिकी सभी सेवाएँ ({count})',
+    tiDialogBody:
+      'पेज के ऊपर चुनी गई अवधि के लिए {measure} क्रम में। यहाँ आय पंक्ति की आय है — मूल्य × मात्रा का जोड़ — इसलिए इसमें कर शामिल नहीं है और यह रसीद पर लगी किसी छूट से पहले की है, और यह ऊपर के कार्ड के आय आँकड़े से पूरी तरह मेल नहीं खाएगी।',
+    tiShowingOf: '{total} में से {shown}',
+    tiSearchProducts: 'उत्पाद, SKU या श्रेणी खोजें…',
+    tiSearchServices: 'सेवा, SKU या श्रेणी खोजें…',
+    tiExportCsv: 'CSV निर्यात करें',
+    tiNothingMatches: '“{query}” से कुछ मेल नहीं खाता।',
+    tiNoCostAll: 'कोई लागत मूल्य दर्ज नहीं, इसलिए मुनाफ़ा अज्ञात है, शून्य नहीं।',
+    tiNoCostPartial:
+      'बिकी इकाइयों में {pct}% पर लागत मूल्य दर्ज नहीं, इसलिए मुनाफ़ा अज्ञात है, शून्य नहीं।',
+
+    // उन्नत लाभ-हानि विवरण
+    plsTitle: 'उन्नत लाभ-हानि विवरण',
+    plsSubtitle:
+      'आय, बिक्री की लागत, परिचालन खर्च और शुद्ध मुनाफ़े का लेखा-मानकों के अनुसार औपचारिक विवरण।',
+    plsExportStatement: 'विवरण निर्यात करें',
+    plsExportedBody: 'उन्नत लाभ-हानि विवरण PDF में निर्यात हो गया।',
+    plsGrossRevenue: 'सकल आय',
+    plsGrossRevenueHint: 'छूट से पहले कुल बिक्री',
+    plsCogs: 'बिके माल की लागत',
+    plsCogsHint: 'उत्पाद खरीद की लागत',
+    plsMarginPct: '{pct}% मार्जिन',
+    plsNetOperatingIncome: 'शुद्ध परिचालन आय',
+    plsNetMarginPct: '{pct}% शुद्ध मार्जिन',
+    plsColLineItem: 'वित्तीय मद',
+    plsColAmount: 'रकम ({symbol})',
+    plsColPctGross: 'सकल आय का %',
+    plsGrossSalesRevenue: 'सकल बिक्री आय',
+    plsLessDiscounts: '(–) छूट और मूल्य कटौती',
+    plsNetSalesRevenue: 'शुद्ध बिक्री आय',
+    plsTotalCogs: 'बिके माल की कुल लागत',
+    plsOperatingExpenses: 'परिचालन खर्च',
+    plsTotalOperatingExpenses: 'कुल परिचालन खर्च',
+    plsNetOperatingProfit: 'शुद्ध परिचालन मुनाफ़ा',
+    plsHeatmapTitle: 'श्रेणी की मुनाफ़ाख़ोरी और मार्जिन हीटमैप',
+    plsHeatmapSubtitle:
+      'उत्पाद श्रेणी के हिसाब से शुद्ध मुनाफ़े के योगदान और मार्जिन का विवरण।',
+    plsProfitMargin: 'मुनाफ़े का मार्जिन',
+    plsHeatmapEmpty:
+      'श्रेणी की मुनाफ़ाख़ोरी का डेटा बनाने के लिए बिक्री इतिहास उपलब्ध नहीं है।',
+
+    // रोज़ बिके आइटम का लॉग
+    dsiTitle: 'रोज़ बिके आइटम का लॉग',
+    dsiSubtitle: 'चुने गए दिन बिके हर उत्पाद और सेवा का विस्तृत रिकॉर्ड।',
+    dsiExportReport: 'रिपोर्ट निर्यात करें',
+    dsiExportImage: 'उच्च गुणवत्ता वाली इमेज में निर्यात करें',
+    dsiExportPdf: 'PDF में निर्यात करें',
+    dsiExportCsv: 'CSV में निर्यात करें',
+    dsiGeneratingBody: 'दिन की बिक्री की तालिका कैप्चर होने तक प्रतीक्षा करें।',
+    dsiExportedCsvBody_one: 'बिक्री की एक पंक्ति निर्यात हुई।',
+    dsiExportedCsvBody_other: 'बिक्री की {count} पंक्तियाँ निर्यात हुईं।',
+    dsiExportedImageBody: 'तालिका उच्च गुणवत्ता वाली इमेज में निर्यात हो गई।',
+    dsiExportedPdfBody: 'तालिका PDF में निर्यात हो गई।',
+    dsiExportFailed: 'निर्यात विफल',
+    dsiExportFailedBody: 'इमेज कैप्चर नहीं हो सकी।',
+    dsiCashSales: 'दिन की नकद बिक्री',
+    dsiCashHint: 'दराज़ में अपेक्षित कुल नकद',
+    dsiTransfers: 'अपेक्षित बैंक ट्रांसफ़र',
+    dsiTransfersHint: 'POS से हुए कुल ट्रांसफ़र',
+    dsiCard: 'कार्ड लेन-देन',
+    dsiCardHint: 'POS पर लिए गए कुल कार्ड भुगतान',
+    dsiVerified: 'सत्यापित ट्रांसफ़र',
+    dsiVerifiedHint: 'डिवाइस पर पहुँचने पर पुष्ट',
+    dsiPickDay: 'दिन चुनें',
+    dsiToday: 'आज ({date})',
+    dsiYesterday: 'कल ({date})',
+    dsiSearchPlaceholder: 'आइटम के नाम या रसीद संख्या से खोजें…',
+    dsiAllTypes: 'सभी प्रकार',
+    dsiProductsOnly: 'सिर्फ़ उत्पाद',
+    dsiServicesOnly: 'सिर्फ़ सेवाएँ',
+    dsiRowsOption: '{count} पंक्तियाँ',
+    dsiShowing_one: 'एक बिका आइटम दिख रहा है',
+    dsiShowing_other: '{count} बिके आइटम दिख रहे हैं',
+    dsiEmptyTitle: 'बिके आइटम दर्ज नहीं हैं',
+    dsiEmptyBody: 'इस दिन के लिए चालू फ़िल्टरों से मेल खाता कोई रिकॉर्ड नहीं है।',
+    dsiPageOf: '{total} में से पेज {page}',
+    dsiPrevPage: 'पिछला पेज',
+    dsiNextPage: 'अगला पेज',
   },
   support: {
     title: 'सहायता',

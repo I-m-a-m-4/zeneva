@@ -612,7 +612,7 @@ export async function POST(req: Request) {
   const startedAt = Date.now();
 
   const result = streamText({
-    model: google('gemini-2.5-flash'),
+    model: google('gemini-3.6-flash'),
     system: `${SYSTEM_PROMPT.replace(
       RATING_SECTION_TOKEN,
       ratingEnabled ? RATING_SECTION_ON : RATING_SECTION_OFF,

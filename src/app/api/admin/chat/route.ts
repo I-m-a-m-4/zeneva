@@ -152,7 +152,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: google('gemini-2.5-flash'),
+    model: google('gemini-3.6-flash'),
     system: SYSTEM_PROMPT,
     messages: modelMessages,
     // Lower than the merchant route's 24. These tools are few and cheap, and a

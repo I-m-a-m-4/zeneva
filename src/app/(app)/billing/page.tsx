@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate } from '@/lib/utils';
 import RefreshButton from '@/components/shared/refresh-button';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 import { BillingBodySkeleton } from './skeleton';
 
 const SubscriptionSection = dynamic(
@@ -53,15 +54,18 @@ function BillingPageSkeleton() {
     return <BillingBodySkeleton />;
 }
 
-const LifetimeAccessStatus = () => (
-    <div className="flex items-center gap-3">
-        <ShieldCheck className="h-8 w-8 text-green-600" />
-        <div>
-            <p className="text-lg font-semibold text-green-600">Lifetime Access</p>
-            <p className="text-xs text-muted-foreground">You have permanent access to all features.</p>
+const LifetimeAccessStatus = () => {
+    const { t } = useI18n();
+    return (
+        <div className="flex items-center gap-3">
+            <ShieldCheck className="h-8 w-8 text-green-600" />
+            <div>
+                <p className="text-lg font-semibold text-green-600">{t('billing.lifetimeAccess')}</p>
+                <p className="text-xs text-muted-foreground">{t('billing.lifetimeAccessDesc')}</p>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 
 
@@ -70,6 +74,7 @@ function BillingPage() {
   const { user, isUserLoading } = useUser();
   const { business: currentBusiness, currentUserProfile: userProfile, isLoading: isPosLoading, isImpersonating } = usePOS();
   const firestore = useFirestore();
+  const { t } = useI18n();
 
   const subscriptionHistoryQuery = useMemoFirebase(() => {
     if (!currentBusiness?.id || !firestore) return null;
@@ -87,13 +92,13 @@ function BillingPage() {
   }
   
   if (!currentBusiness || !userProfile) {
-    return <div className="p-8 text-center text-muted-foreground">Business profile not found. Please refresh or contact support.</div>;
+    return <div className="p-8 text-center text-muted-foreground">{t('billing.profileNotFound')}</div>;
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <PageTitle title="Billing & Subscriptions" subtitle="Manage your plan, view payment history, and upgrade your account." />
+        <PageTitle title={t('billing.title')} subtitle={t('billing.subtitle')} />
         <RefreshButton />
       </div>
 
@@ -101,20 +106,20 @@ function BillingPage() {
         <div className="flex items-center gap-3 rounded-lg border border-orange-500/40 bg-orange-500/10 px-4 py-3 text-sm text-orange-700 dark:text-orange-400">
           <span className="text-lg">⚠️</span>
           <div>
-            <p className="font-semibold">You are viewing this page as an impersonated user.</p>
-            <p className="text-xs opacity-80">Billing button clicks are blocked. Stop impersonating to make real changes.</p>
+            <p className="font-semibold">{t('billing.impersonationTitle')}</p>
+            <p className="text-xs opacity-80">{t('billing.impersonationBody')}</p>
           </div>
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />Subscription & Billing</CardTitle>
-          <CardDescription>Manage your subscription plan and view billing history.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />{t('billing.sectionTitle')}</CardTitle>
+          <CardDescription>{t('billing.sectionDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
             <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
-                <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Current Status</p>
+                <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">{t('billing.currentStatus')}</p>
                 {currentBusiness.accessLevel === 'lifetime' ? (
                     <LifetimeAccessStatus />
                 ) : (
@@ -128,17 +133,17 @@ function BillingPage() {
 
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" />Subscription History</CardTitle>
-            <CardDescription>A log of your recent subscription payments.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" />{t('billing.historyTitle')}</CardTitle>
+            <CardDescription>{t('billing.historyDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
             <ScrollArea className="h-60">
                  <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Action</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead className="text-right">Date</TableHead>
+                            <TableHead>{t('inventory.colAction')}</TableHead>
+                            <TableHead>{t('billing.colAmount')}</TableHead>
+                            <TableHead className="text-right">{t('common.date')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -157,13 +162,13 @@ function BillingPage() {
                                       * rail are USD too, and are still listed here.
                                       */}
                                     <TableCell>{item.currency === 'USD' ? '$' : '₦'}{item.amount.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(safeToDate(item.timestamp), 'PPp') : 'N/A'}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(safeToDate(item.timestamp), 'PPp') : t('inventory.notAvailable')}</TableCell>
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                                    No subscription history found.
+                                    {t('billing.noHistory')}
                                 </TableCell>
                             </TableRow>
                         )}

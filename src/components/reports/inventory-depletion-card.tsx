@@ -22,6 +22,8 @@ export default function InventoryDepletionCard({ receipts, products }: Inventory
     // call removed below. The Tauri permission is requested once at sign-in by
     // NativeNotificationListener, so there was nothing for anyone to enable here.
 
+    const { t } = useI18n();
+
     const depletionAlerts = React.useMemo(() => {
         if (!receipts || !products) return [];
 

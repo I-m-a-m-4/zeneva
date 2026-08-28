@@ -867,6 +867,8 @@ const it: Messages = {
     colStock: 'Scorte',
     notAvailable: 'N/D',
     bundleBadge: 'Kit',
+    unknownProduct: 'Prodotto sconosciuto',
+    uncategorized: 'Senza categoria',
     fullEdit: 'Modifica completa',
     quickEdit: 'Modifica rapida',
     printBarcode: 'Stampa codice a barre',
@@ -1334,6 +1336,494 @@ const it: Messages = {
     downloadedDescription: 'L’immagine della dashboard è stata salvata.',
     downloadFailed: 'Download non riuscito',
     downloadFailedDescription: 'Impossibile generare l’immagine della dashboard.',
+  },
+  reports: {
+    title: 'Report',
+    subtitle: 'Analizza in profondità le prestazioni della tua attività.',
+
+    // Confronto con il periodo precedente
+    deltaNewThisPeriod: 'nuovo in questo periodo',
+    deltaFlat: 'stabile',
+    deltaVsPrevious: '{pct}% vs precedente',
+
+    tabAnalytics: 'Dashboard analitica',
+    tabProfitLoss: 'Conto economico',
+    tabDailySales: 'Articoli venduti al giorno',
+    tabBusinessRating: 'Valutazione dell’attività',
+
+    updatingMetrics: 'Aggiornamento delle metriche...',
+    loadingDashboard: 'Caricamento della dashboard analitica...',
+    exportReport: 'Esporta report',
+    exportCsv: 'Esporta i dati in CSV',
+    exportImage: 'Esporta come immagine ad alta risoluzione',
+    exportPdf: 'Esporta in PDF (Stampa)',
+
+    loadingDataTitle: 'Caricamento dei dati...',
+    loadingDataBody:
+      'Sta impiegando più tempo del previsto. Se sei offline, ti mostriamo i dati sincronizzati in locale.',
+    generatingTitle: 'Generazione del report...',
+    generatingBody: 'Attendi mentre acquisiamo la tua dashboard.',
+    downloadedTitle: 'Report scaricato',
+    exportedTitle: 'Analisi esportata',
+    exportedBody: 'Il tuo file CSV è stato salvato.',
+
+    kpiRevenue: 'Ricavi',
+    kpiRevenueHint: 'Incassi totali',
+    kpiNetCost: 'Costo netto',
+    kpiNetCostHint: 'Costo totale del venduto',
+    kpiNetProfit: 'Utile netto',
+    kpiNetProfitHint: 'Incassi meno i costi',
+    kpiProductRevenue: 'Ricavi da prodotti',
+    kpiProductRevenueHint: 'Ricavi da beni fisici',
+    kpiServiceRevenue: 'Ricavi da servizi',
+    kpiServiceRevenueHint: 'Ricavi dai servizi erogati',
+    kpiSales: 'Vendite',
+    kpiSalesHint: 'Transazioni totali',
+    kpiUniqueProducts: 'Prodotti distinti',
+    kpiUniqueProductsHint: 'Numero di prodotti diversi venduti',
+    kpiUnitsSold: 'Unità vendute',
+    kpiUnitsSoldHint: 'Totale pezzi movimentati',
+    kpiDailyVelocity: 'Ritmo giornaliero',
+    kpiDailyVelocityHint: 'Vendite al giorno',
+    kpiDailyRevenue: 'Ricavi giornalieri',
+    kpiDailyRevenueHint: 'Ricavi medi al giorno',
+    kpiCatalogSize: 'Dimensione del catalogo',
+    kpiCatalogSizeHint: 'Totale prodotti distinti in giacenza',
+    kpiAvgOrder: 'Scontrino medio',
+    kpiAvgOrderHint: 'Ricavi per vendita',
+    kpiCustomers: 'Clienti',
+    kpiCustomersBought_one: '{formatted} ha acquistato in questo periodo',
+    kpiCustomersBought_other: '{formatted} hanno acquistato in questo periodo',
+    kpiCustomersHint: 'Totale clienti registrati',
+
+    gateVisualName: 'Analisi visiva avanzata',
+    gateVisualBody:
+      'Sblocca grafici dettagliati, andamento delle vendite e margini di utile per capire davvero la tua attività.',
+    gateCustomerName: 'Intelligence clienti e rotazione delle giacenze',
+    gateCustomerBody:
+      'Sblocca analisi CRM avanzate, il valore del cliente nel tempo e ottimizza le giacenze con l’analisi ABC basata sui dati.',
+    gateProfitLossName: 'Conto economico',
+    gateProfitLossBody:
+      'Sblocca conti economici dettagliati per analizzare i margini del tuo negozio.',
+    gateDailySalesBody:
+      'Sblocca il monitoraggio giornaliero degli articoli venduti e i registri di controllo delle giacenze.',
+
+    // Vocabolario condiviso dai pannelli
+    colItem: 'Articolo',
+    colProduct: 'Prodotto',
+    colCustomer: 'Cliente',
+    colService: 'Servizio',
+    colClass: 'Classe',
+    colUnits: 'Unità',
+    colQtySold: 'Q.tà venduta',
+    colOrders: 'Ordini',
+    colRevenue: 'Ricavi',
+    colProfit: 'Utile',
+    colMargin: 'Margine',
+    colShare: 'Quota',
+    colSales: 'Vendite',
+    colCost: 'Costo',
+    colGrossProfit: 'Utile lordo',
+    colCogs: 'Costo del venduto',
+    colTotalSpent: 'Totale speso',
+    colReceipt: 'Ricevuta',
+    colDateTime: 'Data e ora',
+    colImage: 'Immagine',
+    colMember: 'Membro',
+    revenueColon: 'Ricavi:',
+
+    exportSuccessful: 'Esportazione riuscita',
+    generatingPdf: 'Generazione del PDF...',
+    generatingPdfBody: 'Attendi mentre creiamo il tuo documento.',
+    noDataTitle: 'Nessun dato',
+    noDataToExport: 'Nessun articolo disponibile da esportare.',
+
+    // Riconciliazione per metodo di pagamento
+    pmTitle: 'Riconciliazione per metodo di pagamento',
+    pmSubtitle: 'Ripartizione dei ricavi incassati per canale di pagamento.',
+    pmTransactions: 'Transazioni',
+
+    // Clienti principali
+    tcTitle: 'Clienti principali',
+    tcSubtitle: 'I clienti che hanno speso di più in questo periodo.',
+    tcEmptyTitle: 'Nessun dato sui clienti',
+    tcEmptyBody: 'Collega le vendite ai clienti per vedere questo report.',
+
+    // Vendite nel tempo
+    sotTitle: 'Vendite nel tempo',
+    sotSubtitle: 'Andamento delle prestazioni dei ricavi.',
+    sotEmpty:
+      'Nessuna vendita registrata in questo periodo. Alla tua prima vendita questo grafico si attiverà automaticamente.',
+
+    // Analisi delle giacenze immobilizzate
+    dsTitle: 'Analisi delle giacenze immobilizzate',
+    dsSubtitle: 'Articoli senza vendite da 60 giorni o più (capitale immobilizzato).',
+    dsLockedCapital: 'Capitale immobilizzato stimato',
+    dsUnitsLeft: 'unità rimaste',
+    dsSku: 'SKU:',
+    dsValueLocked: 'Valore immobilizzato',
+    dsViewInventory: 'Vedi tutte le giacenze',
+    dsEmpty:
+      'Nessuna giacenza immobilizzata significativa rilevata. Il tuo magazzino ruota bene!',
+
+    // Avviso di esaurimento delle giacenze
+    depTitle: 'Avviso di esaurimento delle giacenze',
+    depSubtitle:
+      'Avvisi predittivi per i prodotti a rischio di esaurirsi presto, in base al ritmo di vendita degli ultimi 30 giorni.',
+    depStock: 'Giacenza:',
+    depSelling: 'Vende ~',
+    depPerDay: '/giorno',
+    depRunsOut_one: 'Si esaurisce in {count} giorno',
+    depRunsOut_other: 'Si esaurisce in {count} giorni',
+
+    // Dato del giorno
+    iotdTitle: 'Dato del giorno',
+    iotdVsMedian: 'vs mediana',
+    iotdYou: 'Tu',
+    iotdMedianShop: 'Negozio mediano',
+    iotdRotation: '1 di {total} · un altro domani',
+    iotdAtStake: 'In gioco',
+
+    // Periodi predefiniti
+    drToday: 'Oggi',
+    drYesterday: 'Ieri',
+    drLast7: 'Ultimi 7 giorni',
+    drLast30: 'Ultimi 30 giorni',
+    tfLast7d: 'Ultimi 7 g',
+    tfLast30d: 'Ultimi 30 g',
+    tf90Days: '90 giorni',
+    tfLifetime: 'Dall’inizio',
+    drThisMonth: 'Questo mese',
+    drLastMonth: 'Mese scorso',
+    drAllTime: 'Tutto il periodo',
+
+    // Grafico del conto economico
+    plcSubtitle: 'Panoramica della salute finanziaria.',
+    plcTotalCost: 'Costo totale',
+    plcEmpty:
+      'Nessuna vendita registrata in questo periodo. Inserisci i «prezzi di costo» dei tuoi prodotti per monitorare la redditività reale.',
+
+    // Come ti collochi
+    pcTitle: 'Come ti collochi',
+    pcEmptyTitle: 'Confronto non ancora disponibile',
+    pcEmptyBody:
+      'Zeneva ti confronta con il negozio mediano solo quando hanno venduto abbastanza negozi perché il dato abbia senso. Nulla qui è stimato.',
+    pcVsMedianShop: 'vs negozio mediano',
+    pcFootnote:
+      'Mediana di {shops} negozi Zeneva con almeno {sales} vendite negli ultimi {days} giorni. I negozi non vengono mai identificati e nessun negozio può vedere il tuo.',
+    pcFootnoteAsOf:
+      'Mediana di {shops} negozi Zeneva con almeno {sales} vendite negli ultimi {days} giorni, al {asOf}. I negozi non vengono mai identificati e nessun negozio può vedere il tuo.',
+
+    // Previsione dei ricavi
+    rfTitle: 'Previsione dei ricavi',
+    rfSubtitle: 'Proiezione a 30 giorni con IA, basata sul tuo ritmo attuale.',
+    rfNotEnough: 'Dati insufficienti per generare una previsione.',
+    rfProjection: 'Proiezione a 30 giorni',
+    rfVsPrevious7: '{pct}% vs i 7 giorni precedenti',
+    rfRunRate: 'Ritmo giornaliero attuale',
+    rfPerDay: '/ giorno',
+    rfHistorical: 'Storico',
+    rfForecast: 'Previsione',
+
+    // Analisi del carrello
+    baTitle: 'Analisi del carrello',
+    baSubtitle: 'Scopri quali prodotti vengono acquistati spesso insieme.',
+    baHint:
+      'Usa queste informazioni per creare **pacchetti promozionali** o disporre il negozio in modo da favorire la vendita incrociata.',
+    baJointSales: 'Vendite congiunte',
+    baFootnote: 'Vengono mostrate solo le coppie con più di 1 vendita congiunta.',
+    baEmptySearch: 'Nessuna combinazione di prodotti trovata per la tua ricerca.',
+    baEmptyNoPairs:
+      'Non ci sono ancora abbastanza vendite con più articoli per rilevare combinazioni di prodotti significative.',
+
+    // Informazioni sul traffico
+    hhTitle: 'Informazioni sul traffico dell’attività',
+    hhSubtitle: 'Le ore e i giorni di maggiore attività della tua impresa.',
+    hhPeakHours: 'Ore di punta',
+    hhPeakDays: 'Giorni di punta',
+    hhPeakWindow: 'Fascia con più traffico',
+    hhBusiestDay: 'Giorno più intenso della settimana',
+    hhDaySunday: 'Domenica',
+    hhDayMonday: 'Lunedì',
+    hhDayTuesday: 'Martedì',
+    hhDayWednesday: 'Mercoledì',
+    hhDayThursday: 'Giovedì',
+    hhDayFriday: 'Venerdì',
+    hhDaySaturday: 'Sabato',
+    hhDayShortSunday: 'Dom',
+    hhDayShortMonday: 'Lun',
+    hhDayShortTuesday: 'Mar',
+    hhDayShortWednesday: 'Mer',
+    hhDayShortThursday: 'Gio',
+    hhDayShortFriday: 'Ven',
+    hhDayShortSaturday: 'Sab',
+    hhSalesCount: '{count} vendite',
+    hhPeakLine: '{label} — {count} vendite',
+
+    // Intelligence clienti
+    caTitle: 'Intelligence clienti',
+    caAnonymousBuyer: 'Acquirente anonimo',
+    caSubtitle:
+      'Ottieni una visione più profonda della crescita e della fidelizzazione della tua clientela.',
+    caTotalCustomers: 'Totale clienti',
+    caNewLast30: 'Nuovi clienti (ultimi 30 g)',
+    caReturning: 'Clienti abituali',
+    caRetentionRate: '{pct}% di tasso di fidelizzazione',
+    caAcquisition: 'Acquisizione clienti',
+    caNewCustomers: 'Nuovi clienti',
+    caNoAcquisition: 'Nessun dato di acquisizione per questo periodo.',
+    caTop5: 'I 5 clienti che spendono di più',
+
+    // Prestazioni del team
+    spAvgBasket: 'Scontrino medio',
+    spItemsPerSale: 'Articoli / vendita',
+    spDiscounted: 'Scontato',
+    spPriceOverrides: 'Prezzi digitati a mano',
+    spNoAuthor: 'Registrato prima che le vendite avessero un autore',
+    spTitleSolo: 'Attività di cassa',
+    spTitleTeam: 'Prestazioni del team',
+    spSubtitleSolo: 'Cosa è passato in cassa in questo periodo.',
+    spSubtitleTeam_one: 'Chi ha incassato cosa in questo periodo — {count} persona.',
+    spSubtitleTeam_other: 'Chi ha incassato cosa in questo periodo — {count} persone.',
+    spSubtitleTeamPlus_one:
+      'Chi ha incassato cosa in questo periodo — {count} persona, più le vendite senza autore registrato.',
+    spSubtitleTeamPlus_other:
+      'Chi ha incassato cosa in questo periodo — {count} persone, più le vendite senza autore registrato.',
+    spFootnote:
+      'Questi sono numeri di attività, non un verdetto. Gli sconti e i prezzi digitati a mano sono spesso esattamente ciò che un buon venditore deve fare: un numero alto è un motivo per chiedere, non per sospettare. I ricavi sono il totale della ricevuta, quindi le righe qui sotto sommano i ricavi del negozio nel periodo.',
+    spRunScan: 'Esegui la scansione antifrode nel registro di controllo',
+
+    // Prestazioni per categoria
+    cpTitle: 'Prestazioni per categoria',
+    cpSubtitle:
+      'Quali parti del catalogo rendono — per ricavi, con il margine accanto.',
+    cpOther: 'Altre ({count})',
+    cpFoldedTail:
+      '{total} categorie vendute; il grafico raggruppa le {folded} più piccole sotto «Altre».',
+    cpMarginUnknownPartial:
+      'Prezzo di costo mancante sul {pct}% delle unità vendute — margine sconosciuto, non zero',
+    cpMarginUnknownNone:
+      'Nessun prezzo di costo registrato — margine sconosciuto, non zero',
+    cpVsPrevious: 'vs precedente',
+    cpNew: 'nuovo',
+    cpFlat: 'stabile',
+    cpFootnote:
+      'I ricavi qui sono la somma di prezzo × quantità di ogni riga, quindi escludono le imposte e sono al lordo degli sconti applicati alla ricevuta: non corrisponderanno esattamente alla scheda Ricavi in alto, che è il totale di cassa. Le quote sommano al 100% all’interno di questo pannello.',
+
+    // Rotazione delle giacenze e analisi ABC
+    abcTitle: 'Rotazione delle giacenze e analisi ABC',
+    abcSubtitle: 'Classifica i prodotti in base al loro contributo ai ricavi.',
+    abcAllProducts: 'Tutti i prodotti ({count})',
+    abcClassA: 'Classe A ({count})',
+    abcClassB: 'Classe B ({count})',
+    abcClassC: 'Classe C ({count})',
+    abcClassBadge: 'Classe {letter}',
+    abcEmptyTitle: 'Dati di vendita insufficienti',
+    abcEmptyBody:
+      'Questo report verrà generato quando avrai più storico di vendite da analizzare.',
+    abcProductInsight: 'Analisi del prodotto',
+    abcInsightSubtitle:
+      'Metriche di prestazione dettagliate per il periodo selezionato.',
+    abcRevShare: 'Quota ricavi',
+    abcCumulative: '(cumulata)',
+    abcRecommendation: 'Raccomandazione strategica',
+    abcRecA:
+      'Articolo di massima priorità. Assicurati che la giacenza non scenda mai sotto il livello di sicurezza. Considera pacchetti a tempo limitato con articoli di Classe C per accelerarne la rotazione.',
+    abcRecB:
+      'Prestazioni costanti. Concentrati sullo sfruttare al massimo le occasioni di vendita incrociata. Piccoli test di prezzo potrebbero migliorare i margini senza penalizzare i volumi.',
+    abcRecC:
+      'Articolo a bassa rotazione. Potrebbe immobilizzare capitale. Si consiglia di abbinarlo ai più venduti o di valutare una strategia di svendita se il costo di mantenimento è alto.',
+    abcClose: 'Chiudi analisi',
+    abcNoProducts: 'Nessun prodotto trovato.',
+
+    // Perdite di margine
+    mlTitle: 'Perdite di margine',
+    mlSubtitle: 'Denaro uscito senza una decisione dietro.',
+    mlCleanBody:
+      'Nessun articolo venduto sotto costo, nessun prezzo digitato a mano e nessuno sconto in questo periodo.',
+    mlCleanUncosted_one:
+      '{count} articolo non ha un prezzo di costo, quindi non è stato possibile verificare se è stato venduto sotto costo.',
+    mlCleanUncosted_other:
+      '{count} articoli non hanno un prezzo di costo, quindi non è stato possibile verificare se sono stati venduti sotto costo.',
+    mlAcross:
+      'tra vendite sotto costo e prezzi digitati a mano in questo periodo.',
+    mlSoldBelowCost: 'Venduto sotto costo',
+    mlColSoldFor: 'Venduto a',
+    mlColLost: 'Perso',
+    mlOverridesTitle: 'Concesso sui prezzi digitati a mano',
+    mlColUnitsTyped: 'Unità con prezzo digitato a mano',
+    mlColBelowShelf: 'Sotto il prezzo di vendita di',
+    mlOverridesFootnote:
+      'Misurato rispetto al prezzo di vendita al momento della vendita, non a quello di oggi: così un legittimo aumento di prezzo non compare mai qui. I prezzi digitati a mano sono di norma legittimi; questo ne è il conto, non un’accusa.',
+    mlDiscountsTitle: 'Sconti concessi',
+    mlDiscountsFootnote_one:
+      'Su {formatted} vendita. Gli sconti sono registrati sull’intera vendita, non per articolo, quindi questa cifra deliberatamente non viene ripartita tra i prodotti: farlo sarebbe tirare a indovinare. Chi li ha concessi è nel pannello Prestazioni del team, più sotto.',
+    mlDiscountsFootnote_other:
+      'Su {formatted} vendite. Gli sconti sono registrati sull’intera vendita, non per articolo, quindi questa cifra deliberatamente non viene ripartita tra i prodotti: farlo sarebbe tirare a indovinare. Chi li ha concessi è nel pannello Prestazioni del team, più sotto.',
+    mlUncostedFootnote_one:
+      '{count} articolo venduto in questo periodo non ha un prezzo di costo, quindi è stato escluso del tutto dal controllo sulla vendita sotto costo invece di essere dato per redditizio. Inserire i prezzi di costo in Giacenze è ciò che completa quel controllo.',
+    mlUncostedFootnote_other:
+      '{count} articoli venduti in questo periodo non hanno un prezzo di costo, quindi sono stati esclusi del tutto dal controllo sulla vendita sotto costo invece di essere dati per redditizi. Inserire i prezzi di costo in Giacenze è ciò che completa quel controllo.',
+
+    // Valutazione dell’attività
+    brFirstReading: 'Prima lettura',
+    brPlusPts: '+{count} pt',
+    brOffTitle: 'La valutazione dell’attività è disattivata',
+    brOffBody:
+      'Nulla è stato cancellato. Riattivala quando vuoi in Impostazioni → Generali e il tuo punteggio, la tua serie e il tuo storico riprendono da dove si erano fermati.',
+    brOpenSettings: 'Apri le impostazioni',
+    brPitchTitle: 'Vuoi vedere dove va a finire il tuo denaro?',
+    brPitchBody:
+      'La valutazione dell’attività legge le tue vendite e assegna un punteggio alle quattro cose che moltiplicano i ricavi: il tuo margine, il tuo scontrino medio, la frequenza con cui gli acquirenti tornano e il tuo slancio. Poi indica la più grande occasione che stai lasciando sul tavolo, in denaro.',
+    brTurnOn: 'Attiva la valutazione dell’attività',
+    brNoThanks: 'No, grazie',
+    brLevelBadge: 'Livello {index}',
+    brLevelUp: 'Livello {index} — {name}',
+    brNotRated: 'Non ancora valutata',
+    brToNextTier: '{points} per {name}',
+    brTopTier: 'Livello massimo mantenuto',
+    brNothingYet: 'Non ci sono ancora dati sufficienti.',
+    brNothingLeft: 'Non resta nulla sul tavolo. Continua a vendere.',
+    brHintWithMedian: '{hint} · mediana della piattaforma {median}',
+    brClaimPrivate:
+      'Costruita dalle tue ricevute. Nulla viene inviato da nessuna parte né mostrato a nessun altro.',
+    brClaimPriced:
+      'Ogni occasione è valorizzata sulle tue vendite, mai su una proiezione.',
+    brClaimReversible:
+      'Puoi disattivarla di nuovo dalle Impostazioni in qualsiasi momento.',
+    brNewTier: 'Un livello che non avevi mai raggiunto. Ottimo lavoro.',
+    brNewBest: 'Nuovo record',
+    brNeedFirstSale: 'Registra la tua prima vendita per ottenere una valutazione.',
+    brOnTheTable: 'Sul tavolo',
+    brYourBest: 'Il tuo record',
+    brDaysRecorded_one: '{count} giorno registrato',
+    brDaysRecorded_other: '{count} giorni registrati',
+    brScoredOnLast: 'valutata sugli ultimi {days} giorni di vendite',
+    brCheckBack: 'Torna domani per vedere l’andamento.',
+    brBadges: 'Distintivi',
+
+    // Articoli più venduti
+    tiTitleProducts: 'Prodotti più venduti',
+    tiTitleServices: 'Servizi più venduti',
+    tiValue: 'Valore',
+    tiByUnits: 'Per unità vendute',
+    tiByRevenue: 'Per ricavi',
+    tiByProfit: 'Per utile',
+    tiByUnitsLower: 'per unità vendute',
+    tiByRevenueLower: 'per ricavi',
+    tiByProfitLower: 'per utile',
+    tiEmptyProducts:
+      'Questo grafico metterà in evidenza i tuoi prodotti migliori quando inizierai a vendere dalla cassa.',
+    tiEmptyServices:
+      'Questo grafico metterà in evidenza i tuoi servizi migliori quando inizierai a vendere dalla cassa.',
+    tiNoCostProducts:
+      'Nessun prodotto di questo periodo ha un prezzo di costo registrato, quindi l’utile non può essere calcolato. Inserisci i prezzi di costo in Giacenze oppure ordina per unità o ricavi.',
+    tiNoCostServices:
+      'Nessun servizio di questo periodo ha un prezzo di costo registrato, quindi l’utile non può essere calcolato. Inserisci i prezzi di costo in Giacenze oppure ordina per unità o ricavi.',
+    tiSoldProducts_one: '{formatted} prodotto venduto.',
+    tiSoldProducts_other: '{formatted} prodotti venduti.',
+    tiSoldServices_one: '{formatted} servizio venduto.',
+    tiSoldServices_other: '{formatted} servizi venduti.',
+    tiUncosted_one:
+      '{count} non ha un prezzo di costo, quindi il suo utile è sconosciuto invece di zero e non è rappresentato nel grafico.',
+    tiUncosted_other:
+      '{count} non hanno un prezzo di costo, quindi il loro utile è sconosciuto invece di zero e non sono rappresentati nel grafico.',
+    tiAtALoss_one: '{count} venduto in perdita — vedi l’elenco completo.',
+    tiAtALoss_other: '{count} venduti in perdita — vedi l’elenco completo.',
+    tiNoDataProducts: 'I tuoi prodotti migliori appariranno qui.',
+    tiNoDataServices: 'I tuoi servizi migliori appariranno qui.',
+    tiSoldInPeriodProducts_one: '{formatted} prodotto venduto in questo periodo.',
+    tiSoldInPeriodProducts_other: '{formatted} prodotti venduti in questo periodo.',
+    tiSoldInPeriodServices_one: '{formatted} servizio venduto in questo periodo.',
+    tiSoldInPeriodServices_other: '{formatted} servizi venduti in questo periodo.',
+    tiCaptionProducts_one: 'Mostrando {shown} di {total} prodotto · {measure}',
+    tiCaptionProducts_other: 'Mostrando {shown} di {total} prodotti · {measure}',
+    tiCaptionServices_one: 'Mostrando {shown} di {total} servizio · {measure}',
+    tiCaptionServices_other: 'Mostrando {shown} di {total} servizi · {measure}',
+    tiViewAllCount: 'Vedi tutti i {count}',
+    tiDialogTitleProducts: 'Tutti i prodotti venduti ({count})',
+    tiDialogTitleServices: 'Tutti i servizi venduti ({count})',
+    tiDialogBody:
+      'Ordinato {measure} per il periodo selezionato in cima alla pagina. I ricavi qui sono ricavi di riga — la somma di prezzo × quantità — quindi escludono le imposte e sono al lordo di qualsiasi sconto applicato alla ricevuta, e non corrisponderanno esattamente al dato Ricavi delle schede in alto.',
+    tiShowingOf: '{shown} di {total}',
+    tiSearchProducts: 'Cerca prodotti, SKU o categoria…',
+    tiSearchServices: 'Cerca servizi, SKU o categoria…',
+    tiExportCsv: 'Esporta CSV',
+    tiNothingMatches: 'Nulla corrisponde a «{query}».',
+    tiNoCostAll:
+      'Nessun prezzo di costo registrato, quindi l’utile è sconosciuto, non zero.',
+    tiNoCostPartial:
+      'Nessun prezzo di costo registrato sul {pct}% delle unità vendute, quindi l’utile è sconosciuto, non zero.',
+
+    // Conto economico avanzato
+    plsTitle: 'Conto economico avanzato',
+    plsSubtitle:
+      'Ripartizione formale, secondo gli standard contabili, di ricavi, costo del venduto, spese operative e utile netto.',
+    plsExportStatement: 'Esporta il conto',
+    plsExportedBody: 'Conto economico avanzato esportato in PDF.',
+    plsGrossRevenue: 'Ricavi lordi',
+    plsGrossRevenueHint: 'Vendite totali prima delle deduzioni',
+    plsCogs: 'Costo della merce venduta',
+    plsCogsHint: 'Costi di acquisto dei prodotti',
+    plsMarginPct: '{pct}% di margine',
+    plsNetOperatingIncome: 'Risultato operativo netto',
+    plsNetMarginPct: '{pct}% di margine netto',
+    plsColLineItem: 'Voce finanziaria',
+    plsColAmount: 'Importo ({symbol})',
+    plsColPctGross: '% dei ricavi lordi',
+    plsGrossSalesRevenue: 'Ricavi lordi delle vendite',
+    plsLessDiscounts: '(–) Sconti e riduzioni di prezzo',
+    plsNetSalesRevenue: 'Ricavi netti delle vendite',
+    plsTotalCogs: 'Costo totale della merce venduta',
+    plsOperatingExpenses: 'Spese operative',
+    plsTotalOperatingExpenses: 'Totale spese operative',
+    plsNetOperatingProfit: 'Utile operativo netto',
+    plsHeatmapTitle: 'Redditività per categoria e mappa di calore dei margini',
+    plsHeatmapSubtitle:
+      'Ripartizione dei contributi all’utile netto e dei margini per categoria di prodotto.',
+    plsProfitMargin: 'Margine di utile',
+    plsHeatmapEmpty:
+      'Nessuno storico di vendite disponibile per generare i dati di redditività per categoria.',
+
+    // Registro giornaliero degli articoli venduti
+    dsiTitle: 'Registro giornaliero degli articoli venduti',
+    dsiSubtitle:
+      'Registrazioni dettagliate di ogni prodotto e servizio venduto nel giorno selezionato.',
+    dsiExportReport: 'Esporta report',
+    dsiExportImage: 'Esporta come immagine ad alta risoluzione',
+    dsiExportPdf: 'Esporta in PDF',
+    dsiExportCsv: 'Esporta in CSV',
+    dsiGeneratingBody:
+      'Attendi mentre acquisiamo la tabella delle vendite del giorno.',
+    dsiExportedCsvBody_one: '{count} riga di vendita esportata.',
+    dsiExportedCsvBody_other: '{count} righe di vendita esportate.',
+    dsiExportedImageBody: 'Tabella esportata come immagine ad alta risoluzione.',
+    dsiExportedPdfBody: 'Tabella esportata in PDF.',
+    dsiExportFailed: 'Esportazione non riuscita',
+    dsiExportFailedBody: 'Non è stato possibile acquisire l’immagine.',
+    dsiCashSales: 'Vendite in contanti del giorno',
+    dsiCashHint: 'Totale contanti attesi in cassa',
+    dsiTransfers: 'Bonifici bancari attesi',
+    dsiTransfersHint: 'Totale bonifici gestiti dalla cassa',
+    dsiCard: 'Transazioni con carta',
+    dsiCardHint: 'Totale pagamenti con carta incassati alla cassa',
+    dsiVerified: 'Bonifici verificati',
+    dsiVerifiedHint: 'Confermati all’arrivo sul terminale',
+    dsiPickDay: 'Scegli un giorno',
+    dsiToday: 'Oggi ({date})',
+    dsiYesterday: 'Ieri ({date})',
+    dsiSearchPlaceholder: 'Cerca per nome articolo o ricevuta...',
+    dsiAllTypes: 'Tutti i tipi',
+    dsiProductsOnly: 'Solo prodotti',
+    dsiServicesOnly: 'Solo servizi',
+    dsiRowsOption: '{count} righe',
+    dsiShowing_one: 'Mostrando {count} articolo venduto',
+    dsiShowing_other: 'Mostrando {count} articoli venduti',
+    dsiEmptyTitle: 'Nessun articolo venduto registrato',
+    dsiEmptyBody: 'Nessuna registrazione corrisponde ai filtri attivi in questo giorno.',
+    dsiPageOf: 'Pagina {page} di {total}',
+    dsiPrevPage: 'Pagina precedente',
+    dsiNextPage: 'Pagina successiva',
   },
   support: {
     title: 'Assistenza',

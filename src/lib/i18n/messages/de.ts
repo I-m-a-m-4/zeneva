@@ -870,6 +870,8 @@ const de: Messages = {
     colStock: 'Bestand',
     notAvailable: 'k. A.',
     bundleBadge: 'Bundle',
+    unknownProduct: 'Unbekanntes Produkt',
+    uncategorized: 'Nicht kategorisiert',
     fullEdit: 'Vollständig bearbeiten',
     quickEdit: 'Schnell bearbeiten',
     printBarcode: 'Barcode drucken',
@@ -1338,6 +1340,497 @@ const de: Messages = {
     downloadedDescription: 'Ihr Dashboard-Bild wurde gespeichert.',
     downloadFailed: 'Download fehlgeschlagen',
     downloadFailedDescription: 'Das Dashboard-Bild konnte nicht erstellt werden.',
+  },
+  reports: {
+    title: 'Berichte',
+    subtitle: 'Analysieren Sie die Leistung Ihres Unternehmens im Detail.',
+
+    // Vergleich mit dem vorherigen Zeitraum
+    deltaNewThisPeriod: 'neu in diesem Zeitraum',
+    deltaFlat: 'unverändert',
+    deltaVsPrevious: '{pct} % vs. vorher',
+
+    tabAnalytics: 'Analyse-Dashboard',
+    tabProfitLoss: 'Gewinn und Verlust',
+    tabDailySales: 'Täglich verkaufte Artikel',
+    tabBusinessRating: 'Unternehmensbewertung',
+
+    updatingMetrics: 'Kennzahlen werden aktualisiert...',
+    loadingDashboard: 'Analyse-Dashboard wird geladen...',
+    exportReport: 'Bericht exportieren',
+    exportCsv: 'Daten als CSV exportieren',
+    exportImage: 'Als hochauflösendes Bild exportieren',
+    exportPdf: 'Als PDF exportieren (Drucken)',
+
+    loadingDataTitle: 'Daten werden geladen...',
+    loadingDataBody:
+      'Das dauert etwas länger als gewöhnlich. Falls Sie offline sind, zeigen wir Ihre lokal synchronisierten Daten.',
+    generatingTitle: 'Bericht wird erstellt...',
+    generatingBody: 'Bitte warten, Ihr Dashboard wird erfasst.',
+    downloadedTitle: 'Bericht heruntergeladen',
+    exportedTitle: 'Analyse exportiert',
+    exportedBody: 'Ihre CSV-Datei wurde gespeichert.',
+
+    kpiRevenue: 'Umsatz',
+    kpiRevenueHint: 'Gesamteinnahmen',
+    kpiNetCost: 'Nettokosten',
+    kpiNetCostHint: 'Gesamtkosten der Verkäufe',
+    kpiNetProfit: 'Nettogewinn',
+    kpiNetProfitHint: 'Einnahmen minus Kosten',
+    kpiProductRevenue: 'Produktumsatz',
+    kpiProductRevenueHint: 'Umsatz aus physischen Waren',
+    kpiServiceRevenue: 'Dienstleistungsumsatz',
+    kpiServiceRevenueHint: 'Umsatz aus erbrachten Dienstleistungen',
+    kpiSales: 'Verkäufe',
+    kpiSalesHint: 'Transaktionen insgesamt',
+    kpiUniqueProducts: 'Verschiedene Produkte',
+    kpiUniqueProductsHint: 'Anzahl unterschiedlicher verkaufter Produkte',
+    kpiUnitsSold: 'Verkaufte Einheiten',
+    kpiUnitsSoldHint: 'Insgesamt bewegte Stückzahl',
+    kpiDailyVelocity: 'Tagesumschlag',
+    kpiDailyVelocityHint: 'Verkäufe pro Tag',
+    kpiDailyRevenue: 'Tagesumsatz',
+    kpiDailyRevenueHint: 'Durchschnittlicher Umsatz pro Tag',
+    kpiCatalogSize: 'Katalogumfang',
+    kpiCatalogSizeHint: 'Verschiedene Produkte im Bestand insgesamt',
+    kpiAvgOrder: 'Durchschnittsbon',
+    kpiAvgOrderHint: 'Umsatz pro Verkauf',
+    kpiCustomers: 'Kunden',
+    kpiCustomersBought_one: '{formatted} hat in diesem Zeitraum gekauft',
+    kpiCustomersBought_other: '{formatted} haben in diesem Zeitraum gekauft',
+    kpiCustomersHint: 'Registrierte Kunden insgesamt',
+
+    gateVisualName: 'Erweiterte visuelle Analyse',
+    gateVisualBody:
+      'Schalten Sie detaillierte Diagramme, Verkaufstrends und Gewinnmargen frei, um Ihr Geschäft wirklich zu verstehen.',
+    gateCustomerName: 'Kundenanalyse und Bestandsumschlag',
+    gateCustomerBody:
+      'Schalten Sie erweiterte CRM-Analysen und den Kundenlebenswert frei und optimieren Sie Ihre Bestände mit datenbasierter ABC-Analyse.',
+    gateProfitLossName: 'Gewinn- und Verlustrechnung',
+    gateProfitLossBody:
+      'Schalten Sie detaillierte Gewinn- und Verlustrechnungen frei, um die Margen Ihres Geschäfts zu analysieren.',
+    gateDailySalesBody:
+      'Schalten Sie die tägliche Verfolgung verkaufter Artikel und die Bestands-Prüfprotokolle frei.',
+
+    // Von den Panels gemeinsam genutzte Begriffe
+    colItem: 'Artikel',
+    colProduct: 'Produkt',
+    colCustomer: 'Kunde',
+    colService: 'Dienstleistung',
+    colClass: 'Klasse',
+    colUnits: 'Einheiten',
+    colQtySold: 'Verk. Menge',
+    colOrders: 'Bestellungen',
+    colRevenue: 'Umsatz',
+    colProfit: 'Gewinn',
+    colMargin: 'Marge',
+    colShare: 'Anteil',
+    colSales: 'Verkäufe',
+    colCost: 'Kosten',
+    colGrossProfit: 'Rohgewinn',
+    colCogs: 'Wareneinsatz',
+    colTotalSpent: 'Gesamtausgaben',
+    colReceipt: 'Belegnr.',
+    colDateTime: 'Datum und Uhrzeit',
+    colImage: 'Bild',
+    colMember: 'Mitarbeiter',
+    revenueColon: 'Umsatz:',
+
+    exportSuccessful: 'Export erfolgreich',
+    generatingPdf: 'PDF wird erstellt...',
+    generatingPdfBody: 'Bitte warten, Ihr Dokument wird erstellt.',
+    noDataTitle: 'Keine Daten',
+    noDataToExport: 'Keine Artikel zum Exportieren verfügbar.',
+
+    // Abstimmung nach Zahlungsart
+    pmTitle: 'Abstimmung nach Zahlungsart',
+    pmSubtitle: 'Aufschlüsselung des vereinnahmten Umsatzes nach Zahlungskanal.',
+    pmTransactions: 'Transaktionen',
+
+    // Top-Kunden
+    tcTitle: 'Top-Kunden',
+    tcSubtitle: 'Kunden mit den höchsten Ausgaben in diesem Zeitraum.',
+    tcEmptyTitle: 'Keine Kundendaten',
+    tcEmptyBody: 'Verknüpfen Sie Verkäufe mit Kunden, um diesen Bericht zu sehen.',
+
+    // Umsatzentwicklung
+    sotTitle: 'Umsatzentwicklung',
+    sotSubtitle: 'Trends der Umsatzentwicklung.',
+    sotEmpty:
+      'In diesem Zeitraum wurden keine Verkäufe erfasst. Sobald Sie Ihren ersten Verkauf tätigen, wird dieses Diagramm automatisch aktiv.',
+
+    // Analyse toter Bestände
+    dsTitle: 'Analyse toter Bestände',
+    dsSubtitle: 'Artikel ohne Verkauf seit 60 Tagen oder länger (gebundenes Kapital).',
+    dsLockedCapital: 'Geschätztes gebundenes Kapital',
+    dsUnitsLeft: 'Einheiten übrig',
+    dsSku: 'SKU:',
+    dsValueLocked: 'Gebundener Wert',
+    dsViewInventory: 'Gesamten Bestand ansehen',
+    dsEmpty:
+      'Keine bedeutenden toten Bestände erkannt. Ihr Bestand dreht sich gut!',
+
+    // Warnung vor Bestandserschöpfung
+    depTitle: 'Warnung vor Bestandserschöpfung',
+    depSubtitle:
+      'Vorhersagende Warnungen für Produkte, die bald ausgehen könnten, basierend auf ihrem Verkaufstempo der letzten 30 Tage.',
+    depStock: 'Bestand:',
+    depSelling: 'Verkauft ~',
+    depPerDay: '/Tag',
+    depRunsOut_one: 'Reicht noch {count} Tag',
+    depRunsOut_other: 'Reicht noch {count} Tage',
+
+    // Erkenntnis des Tages
+    iotdTitle: 'Erkenntnis des Tages',
+    iotdVsMedian: 'vs. Median',
+    iotdYou: 'Sie',
+    iotdMedianShop: 'Median-Geschäft',
+    iotdRotation: '1 von {total} · morgen eine weitere',
+    iotdAtStake: 'Auf dem Spiel',
+
+    // Vordefinierte Zeiträume
+    drToday: 'Heute',
+    drYesterday: 'Gestern',
+    drLast7: 'Letzte 7 Tage',
+    drLast30: 'Letzte 30 Tage',
+    tfLast7d: 'Letzte 7 T',
+    tfLast30d: 'Letzte 30 T',
+    tf90Days: '90 Tage',
+    tfLifetime: 'Seit Beginn',
+    drThisMonth: 'Dieser Monat',
+    drLastMonth: 'Letzter Monat',
+    drAllTime: 'Gesamter Zeitraum',
+
+    // Gewinn-und-Verlust-Diagramm
+    plcSubtitle: 'Überblick über die finanzielle Gesundheit.',
+    plcTotalCost: 'Gesamtkosten',
+    plcEmpty:
+      'In diesem Zeitraum wurden keine Verkäufe erfasst. Hinterlegen Sie „Einkaufspreise“ für Ihre Produkte, um die echte Rentabilität zu verfolgen.',
+
+    // Wie Sie im Vergleich stehen
+    pcTitle: 'Wie Sie im Vergleich stehen',
+    pcEmptyTitle: 'Noch kein Vergleich verfügbar',
+    pcEmptyBody:
+      'Zeneva vergleicht Sie erst dann mit dem Median-Geschäft, wenn genügend Geschäfte verkauft haben, damit die Zahl aussagekräftig ist. Nichts hier ist geschätzt.',
+    pcVsMedianShop: 'vs. Median-Geschäft',
+    pcFootnote:
+      'Median aus {shops} Zeneva-Geschäften mit mindestens {sales} Verkäufen in den letzten {days} Tagen. Geschäfte werden nie identifiziert, und kein Geschäft kann Ihre Zahlen sehen.',
+    pcFootnoteAsOf:
+      'Median aus {shops} Zeneva-Geschäften mit mindestens {sales} Verkäufen in den letzten {days} Tagen, Stand {asOf}. Geschäfte werden nie identifiziert, und kein Geschäft kann Ihre Zahlen sehen.',
+
+    // Umsatzprognose
+    rfTitle: 'Umsatzprognose',
+    rfSubtitle: 'KI-Prognose für 30 Tage, basierend auf Ihrem aktuellen Tempo.',
+    rfNotEnough: 'Nicht genügend Daten für eine Prognose.',
+    rfProjection: '30-Tage-Prognose',
+    rfVsPrevious7: '{pct} % vs. die 7 Tage davor',
+    rfRunRate: 'Aktuelles Tagestempo',
+    rfPerDay: '/ Tag',
+    rfHistorical: 'Historisch',
+    rfForecast: 'Prognose',
+
+    // Warenkorbanalyse
+    baTitle: 'Warenkorbanalyse',
+    baSubtitle: 'Erfahren Sie, welche Produkte häufig zusammen gekauft werden.',
+    baHint:
+      'Nutzen Sie diese Erkenntnisse, um **Aktionspakete** zu schnüren oder Ihr Geschäft so einzurichten, dass Cross-Selling gefördert wird.',
+    baJointSales: 'Gemeinsame Verkäufe',
+    baFootnote: 'Es werden nur Paare mit mehr als 1 gemeinsamen Verkauf angezeigt.',
+    baEmptySearch: 'Keine Produktkombinationen für Ihre Suche gefunden.',
+    baEmptyNoPairs:
+      'Noch nicht genügend Verkäufe mit mehreren Artikeln, um aussagekräftige Produktkombinationen zu erkennen.',
+
+    // Erkenntnisse zum Kundenverkehr
+    hhTitle: 'Erkenntnisse zum Kundenverkehr',
+    hhSubtitle: 'Die geschäftigsten Stunden und Tage Ihres Betriebs.',
+    hhPeakHours: 'Spitzenstunden',
+    hhPeakDays: 'Spitzentage',
+    hhPeakWindow: 'Zeitfenster mit dem meisten Verkehr',
+    hhBusiestDay: 'Geschäftigster Wochentag',
+    hhDaySunday: 'Sonntag',
+    hhDayMonday: 'Montag',
+    hhDayTuesday: 'Dienstag',
+    hhDayWednesday: 'Mittwoch',
+    hhDayThursday: 'Donnerstag',
+    hhDayFriday: 'Freitag',
+    hhDaySaturday: 'Samstag',
+    hhDayShortSunday: 'So',
+    hhDayShortMonday: 'Mo',
+    hhDayShortTuesday: 'Di',
+    hhDayShortWednesday: 'Mi',
+    hhDayShortThursday: 'Do',
+    hhDayShortFriday: 'Fr',
+    hhDayShortSaturday: 'Sa',
+    hhSalesCount: '{count} Verkäufe',
+    hhPeakLine: '{label} — {count} Verkäufe',
+
+    // Kundenanalyse
+    caTitle: 'Kundenanalyse',
+    caAnonymousBuyer: 'Anonymer Käufer',
+    caSubtitle:
+      'Gewinnen Sie tiefere Einblicke in Wachstum und Bindung Ihres Kundenstamms.',
+    caTotalCustomers: 'Kunden insgesamt',
+    caNewLast30: 'Neue Kunden (letzte 30 T)',
+    caReturning: 'Wiederkehrende Kunden',
+    caRetentionRate: '{pct} % Bindungsrate',
+    caAcquisition: 'Kundengewinnung',
+    caNewCustomers: 'Neue Kunden',
+    caNoAcquisition: 'Keine Daten zur Kundengewinnung für diesen Zeitraum.',
+    caTop5: 'Die 5 Kunden mit den höchsten Ausgaben',
+
+    // Teamleistung
+    spAvgBasket: 'Durchschnittsbon',
+    spItemsPerSale: 'Artikel / Verkauf',
+    spDiscounted: 'Rabattiert',
+    spPriceOverrides: 'Von Hand eingegebene Preise',
+    spNoAuthor: 'Erfasst, bevor Verkäufe einen Urheber hatten',
+    spTitleSolo: 'Kassenaktivität',
+    spTitleTeam: 'Teamleistung',
+    spSubtitleSolo: 'Was in diesem Zeitraum über die Kasse ging.',
+    spSubtitleTeam_one:
+      'Wer in diesem Zeitraum was abgerechnet hat — {count} Person.',
+    spSubtitleTeam_other:
+      'Wer in diesem Zeitraum was abgerechnet hat — {count} Personen.',
+    spSubtitleTeamPlus_one:
+      'Wer in diesem Zeitraum was abgerechnet hat — {count} Person, zuzüglich der Verkäufe ohne erfassten Urheber.',
+    spSubtitleTeamPlus_other:
+      'Wer in diesem Zeitraum was abgerechnet hat — {count} Personen, zuzüglich der Verkäufe ohne erfassten Urheber.',
+    spFootnote:
+      'Dies sind Aktivitätszahlen, kein Urteil. Rabatte und von Hand eingegebene Preise sind oft genau das, was ein guter Verkäufer tun muss: Eine hohe Zahl ist ein Grund zu fragen, nicht zu verdächtigen. Der Umsatz ist der Belegbetrag, daher summieren sich die Zeilen unten zum Umsatz des Geschäfts im Zeitraum.',
+    spRunScan: 'Verlustprävention im Prüfprotokoll ausführen',
+
+    // Kategorieleistung
+    cpTitle: 'Kategorieleistung',
+    cpSubtitle:
+      'Welche Teile des Katalogs sich rechnen — nach Umsatz, mit der Marge daneben.',
+    cpOther: 'Andere ({count})',
+    cpFoldedTail:
+      '{total} Kategorien verkauft; das Diagramm fasst die {folded} kleinsten unter „Andere“ zusammen.',
+    cpMarginUnknownPartial:
+      'Einkaufspreis fehlt bei {pct} % der verkauften Einheiten — Marge unbekannt, nicht null',
+    cpMarginUnknownNone:
+      'Keine Einkaufspreise erfasst — Marge unbekannt, nicht null',
+    cpVsPrevious: 'vs. vorher',
+    cpNew: 'neu',
+    cpFlat: 'unverändert',
+    cpFootnote:
+      'Der Umsatz hier ist die Summe aus Preis × Menge je Position, also ohne Steuern und vor den auf den Beleg gewährten Rabatten: Er stimmt nicht genau mit der Umsatzkarte oben überein, die den Kassenbetrag zeigt. Die Anteile summieren sich innerhalb dieses Panels auf 100 %.',
+
+    // Bestandsumschlag und ABC-Analyse
+    abcTitle: 'Bestandsumschlag und ABC-Analyse',
+    abcSubtitle: 'Ordnen Sie Produkte nach ihrem Beitrag zum Umsatz ein.',
+    abcAllProducts: 'Alle Produkte ({count})',
+    abcClassA: 'Klasse A ({count})',
+    abcClassB: 'Klasse B ({count})',
+    abcClassC: 'Klasse C ({count})',
+    abcClassBadge: 'Klasse {letter}',
+    abcEmptyTitle: 'Nicht genügend Verkaufsdaten',
+    abcEmptyBody:
+      'Dieser Bericht wird erstellt, sobald Sie mehr Verkaufshistorie zur Auswertung haben.',
+    abcProductInsight: 'Produktanalyse',
+    abcInsightSubtitle: 'Detaillierte Leistungskennzahlen für den gewählten Zeitraum.',
+    abcRevShare: 'Umsatzanteil',
+    abcCumulative: '(kumuliert)',
+    abcRecommendation: 'Strategische Empfehlung',
+    abcRecA:
+      'Artikel mit höchster Priorität. Achten Sie darauf, dass der Bestand nie unter den Sicherheitsbestand fällt. Erwägen Sie zeitlich begrenzte Pakete mit Klasse-C-Artikeln, um deren Umschlag zu beschleunigen.',
+    abcRecB:
+      'Beständige Leistung. Konzentrieren Sie sich darauf, Cross-Selling-Gelegenheiten auszuschöpfen. Kleine Preistests könnten die Margen verbessern, ohne das Volumen zu beeinträchtigen.',
+    abcRecC:
+      'Artikel mit geringem Umschlag. Möglicherweise ist Kapital gebunden. Es empfiehlt sich, ihn mit Verkaufsschlagern zu bündeln oder bei hohen Lagerkosten eine Abverkaufsstrategie zu prüfen.',
+    abcClose: 'Analyse schließen',
+    abcNoProducts: 'Keine Produkte gefunden.',
+
+    // Margenverluste
+    mlTitle: 'Margenverluste',
+    mlSubtitle: 'Geld, das ohne Entscheidung dahinter abgeflossen ist.',
+    mlCleanBody:
+      'Keine Artikel unter Einkaufspreis verkauft, keine von Hand eingegebenen Preise und keine Rabatte in diesem Zeitraum.',
+    mlCleanUncosted_one:
+      'Bei {count} Artikel fehlt der Einkaufspreis, daher konnte nicht geprüft werden, ob er unter Einkaufspreis verkauft wurde.',
+    mlCleanUncosted_other:
+      'Bei {count} Artikeln fehlt der Einkaufspreis, daher konnte nicht geprüft werden, ob sie unter Einkaufspreis verkauft wurden.',
+    mlAcross:
+      'aus Verkäufen unter Einkaufspreis und von Hand eingegebenen Preisen in diesem Zeitraum.',
+    mlSoldBelowCost: 'Unter Einkaufspreis verkauft',
+    mlColSoldFor: 'Verkauft für',
+    mlColLost: 'Verloren',
+    mlOverridesTitle: 'Bei von Hand eingegebenen Preisen nachgegeben',
+    mlColUnitsTyped: 'Einheiten mit von Hand eingegebenem Preis',
+    mlColBelowShelf: 'Unter Verkaufspreis um',
+    mlOverridesFootnote:
+      'Gemessen am Verkaufspreis zum Zeitpunkt des Verkaufs, nicht am heutigen: So erscheint eine legitime Preiserhöhung hier nie. Von Hand eingegebene Preise sind meist berechtigt; dies ist die Rechnung dafür, kein Vorwurf.',
+    mlDiscountsTitle: 'Gewährte Rabatte',
+    mlDiscountsFootnote_one:
+      'Bei {formatted} Verkauf. Rabatte werden auf den gesamten Verkauf erfasst, nicht je Artikel, daher wird dieser Betrag bewusst nicht auf die Produkte verteilt — das wäre geraten. Wer sie gewährt hat, steht unten im Panel Teamleistung.',
+    mlDiscountsFootnote_other:
+      'Bei {formatted} Verkäufen. Rabatte werden auf den gesamten Verkauf erfasst, nicht je Artikel, daher wird dieser Betrag bewusst nicht auf die Produkte verteilt — das wäre geraten. Wer sie gewährt hat, steht unten im Panel Teamleistung.',
+    mlUncostedFootnote_one:
+      'Bei {count} in diesem Zeitraum verkauften Artikel fehlt der Einkaufspreis, daher wurde er von der Prüfung auf Verkauf unter Einkaufspreis ganz ausgenommen, statt als rentabel angenommen zu werden. Einkaufspreise im Bestand zu hinterlegen vervollständigt diese Prüfung.',
+    mlUncostedFootnote_other:
+      'Bei {count} in diesem Zeitraum verkauften Artikeln fehlt der Einkaufspreis, daher wurden sie von der Prüfung auf Verkauf unter Einkaufspreis ganz ausgenommen, statt als rentabel angenommen zu werden. Einkaufspreise im Bestand zu hinterlegen vervollständigt diese Prüfung.',
+
+    // Unternehmensbewertung
+    brFirstReading: 'Erste Messung',
+    brPlusPts: '+{count} Pkt.',
+    brOffTitle: 'Die Unternehmensbewertung ist ausgeschaltet',
+    brOffBody:
+      'Nichts wurde gelöscht. Schalten Sie sie jederzeit unter Einstellungen → Allgemein wieder ein, und Ihre Punktzahl, Ihre Serie und Ihr Verlauf machen dort weiter, wo sie aufgehört haben.',
+    brOpenSettings: 'Einstellungen öffnen',
+    brPitchTitle: 'Möchten Sie sehen, wo Ihr Geld verloren geht?',
+    brPitchBody:
+      'Die Unternehmensbewertung liest Ihre eigenen Verkäufe und bewertet die vier Dinge, die den Umsatz vervielfachen: Ihre Marge, Ihren Durchschnittsbon, wie oft Käufer zurückkommen und Ihre Dynamik. Danach nennt sie die größte Gelegenheit, die Sie liegen lassen — in Geld.',
+    brTurnOn: 'Unternehmensbewertung einschalten',
+    brNoThanks: 'Nein, danke',
+    brLevelBadge: 'Stufe {index}',
+    brLevelUp: 'Stufe {index} — {name}',
+    brNotRated: 'Noch nicht bewertet',
+    brToNextTier: '{points} bis {name}',
+    brTopTier: 'Höchste Stufe gehalten',
+    brNothingYet: 'Noch nicht genügend Daten.',
+    brNothingLeft: 'Es liegt nichts mehr auf dem Tisch. Verkaufen Sie weiter.',
+    brHintWithMedian: '{hint} · Plattform-Median {median}',
+    brClaimPrivate:
+      'Aus Ihren Belegen erstellt. Nichts wird irgendwohin gesendet oder jemand anderem gezeigt.',
+    brClaimPriced:
+      'Jede Gelegenheit wird aus Ihren eigenen Verkäufen bewertet, nie aus einer Prognose.',
+    brClaimReversible:
+      'Sie können sie jederzeit in den Einstellungen wieder ausschalten.',
+    brNewTier: 'Eine Stufe, die Sie noch nie erreicht hatten. Gut gemacht.',
+    brNewBest: 'Neuer Bestwert',
+    brNeedFirstSale: 'Erfassen Sie Ihren ersten Verkauf, um eine Bewertung zu erhalten.',
+    brOnTheTable: 'Liegt auf dem Tisch',
+    brYourBest: 'Ihr Bestwert',
+    brDaysRecorded_one: '{count} Tag erfasst',
+    brDaysRecorded_other: '{count} Tage erfasst',
+    brScoredOnLast: 'bewertet auf Basis der Verkäufe der letzten {days} Tage',
+    brCheckBack: 'Schauen Sie morgen wieder vorbei, um den Trend zu sehen.',
+    brBadges: 'Abzeichen',
+
+    // Meistverkaufte Artikel
+    tiTitleProducts: 'Meistverkaufte Produkte',
+    tiTitleServices: 'Meistverkaufte Dienstleistungen',
+    tiValue: 'Wert',
+    tiByUnits: 'Nach verkauften Einheiten',
+    tiByRevenue: 'Nach Umsatz',
+    tiByProfit: 'Nach Gewinn',
+    tiByUnitsLower: 'nach verkauften Einheiten',
+    tiByRevenueLower: 'nach Umsatz',
+    tiByProfitLower: 'nach Gewinn',
+    tiEmptyProducts:
+      'Dieses Diagramm hebt Ihre besten Produkte hervor, sobald Sie über die Kasse verkaufen.',
+    tiEmptyServices:
+      'Dieses Diagramm hebt Ihre besten Dienstleistungen hervor, sobald Sie über die Kasse verkaufen.',
+    tiNoCostProducts:
+      'Für kein Produkt in diesem Zeitraum ist ein Einkaufspreis erfasst, daher lässt sich der Gewinn nicht berechnen. Hinterlegen Sie Einkaufspreise im Bestand oder sortieren Sie nach Einheiten oder Umsatz.',
+    tiNoCostServices:
+      'Für keine Dienstleistung in diesem Zeitraum ist ein Einkaufspreis erfasst, daher lässt sich der Gewinn nicht berechnen. Hinterlegen Sie Einkaufspreise im Bestand oder sortieren Sie nach Einheiten oder Umsatz.',
+    tiSoldProducts_one: '{formatted} Produkt verkauft.',
+    tiSoldProducts_other: '{formatted} Produkte verkauft.',
+    tiSoldServices_one: '{formatted} Dienstleistung verkauft.',
+    tiSoldServices_other: '{formatted} Dienstleistungen verkauft.',
+    tiUncosted_one:
+      'Bei {count} fehlt der Einkaufspreis, daher ist der Gewinn unbekannt statt null und er wird nicht im Diagramm dargestellt.',
+    tiUncosted_other:
+      'Bei {count} fehlt der Einkaufspreis, daher ist der Gewinn unbekannt statt null und sie werden nicht im Diagramm dargestellt.',
+    tiAtALoss_one: '{count} mit Verlust verkauft — sehen Sie die vollständige Liste.',
+    tiAtALoss_other: '{count} mit Verlust verkauft — sehen Sie die vollständige Liste.',
+    tiNoDataProducts: 'Ihre besten Produkte erscheinen hier.',
+    tiNoDataServices: 'Ihre besten Dienstleistungen erscheinen hier.',
+    tiSoldInPeriodProducts_one: '{formatted} Produkt in diesem Zeitraum verkauft.',
+    tiSoldInPeriodProducts_other: '{formatted} Produkte in diesem Zeitraum verkauft.',
+    tiSoldInPeriodServices_one: '{formatted} Dienstleistung in diesem Zeitraum verkauft.',
+    tiSoldInPeriodServices_other:
+      '{formatted} Dienstleistungen in diesem Zeitraum verkauft.',
+    tiCaptionProducts_one: '{shown} von {total} Produkt angezeigt · {measure}',
+    tiCaptionProducts_other: '{shown} von {total} Produkten angezeigt · {measure}',
+    tiCaptionServices_one: '{shown} von {total} Dienstleistung angezeigt · {measure}',
+    tiCaptionServices_other:
+      '{shown} von {total} Dienstleistungen angezeigt · {measure}',
+    tiViewAllCount: 'Alle {count} ansehen',
+    tiDialogTitleProducts: 'Alle verkauften Produkte ({count})',
+    tiDialogTitleServices: 'Alle verkauften Dienstleistungen ({count})',
+    tiDialogBody:
+      'Sortiert {measure} für den oben auf der Seite gewählten Zeitraum. Der Umsatz hier ist Positionsumsatz — die Summe aus Preis × Menge — also ohne Steuern und vor allen auf den Beleg gewährten Rabatten, und er stimmt nicht genau mit der Umsatzzahl in den Karten oben überein.',
+    tiShowingOf: '{shown} von {total}',
+    tiSearchProducts: 'Produkte, SKU oder Kategorie suchen…',
+    tiSearchServices: 'Dienstleistungen, SKU oder Kategorie suchen…',
+    tiExportCsv: 'CSV exportieren',
+    tiNothingMatches: 'Nichts passt zu „{query}“.',
+    tiNoCostAll:
+      'Kein Einkaufspreis erfasst, daher ist der Gewinn unbekannt, nicht null.',
+    tiNoCostPartial:
+      'Bei {pct} % der verkauften Einheiten ist kein Einkaufspreis erfasst, daher ist der Gewinn unbekannt, nicht null.',
+
+    // Erweiterte Gewinn- und Verlustrechnung
+    plsTitle: 'Erweiterte Gewinn- und Verlustrechnung',
+    plsSubtitle:
+      'Formale, buchhalterisch übliche Aufschlüsselung von Umsatz, Wareneinsatz, Betriebsaufwand und Nettogewinn.',
+    plsExportStatement: 'Rechnung exportieren',
+    plsExportedBody: 'Erweiterte Gewinn- und Verlustrechnung als PDF exportiert.',
+    plsGrossRevenue: 'Bruttoumsatz',
+    plsGrossRevenueHint: 'Gesamtverkäufe vor Abzügen',
+    plsCogs: 'Wareneinsatz',
+    plsCogsHint: 'Beschaffungskosten der Produkte',
+    plsMarginPct: '{pct} % Marge',
+    plsNetOperatingIncome: 'Nettobetriebsergebnis',
+    plsNetMarginPct: '{pct} % Nettomarge',
+    plsColLineItem: 'Finanzposition',
+    plsColAmount: 'Betrag ({symbol})',
+    plsColPctGross: '% des Bruttoumsatzes',
+    plsGrossSalesRevenue: 'Bruttoumsatz aus Verkäufen',
+    plsLessDiscounts: '(–) Rabatte und Preisnachlässe',
+    plsNetSalesRevenue: 'Nettoumsatz aus Verkäufen',
+    plsTotalCogs: 'Wareneinsatz insgesamt',
+    plsOperatingExpenses: 'Betriebsaufwand',
+    plsTotalOperatingExpenses: 'Betriebsaufwand insgesamt',
+    plsNetOperatingProfit: 'Nettobetriebsgewinn',
+    plsHeatmapTitle: 'Rentabilität nach Kategorie und Margen-Heatmap',
+    plsHeatmapSubtitle:
+      'Aufschlüsselung der Beiträge zum Nettogewinn und der Margen je Produktkategorie.',
+    plsProfitMargin: 'Gewinnmarge',
+    plsHeatmapEmpty:
+      'Keine Verkaufshistorie verfügbar, um Rentabilitätsdaten je Kategorie zu erstellen.',
+
+    // Tagesprotokoll verkaufter Artikel
+    dsiTitle: 'Tagesprotokoll verkaufter Artikel',
+    dsiSubtitle:
+      'Detaillierte Aufzeichnungen jedes am gewählten Tag verkauften Produkts und jeder Dienstleistung.',
+    dsiExportReport: 'Bericht exportieren',
+    dsiExportImage: 'Als hochauflösendes Bild exportieren',
+    dsiExportPdf: 'Als PDF exportieren',
+    dsiExportCsv: 'Als CSV exportieren',
+    dsiGeneratingBody: 'Bitte warten, die Verkaufstabelle des Tages wird erfasst.',
+    dsiExportedCsvBody_one: '{count} Verkaufszeile exportiert.',
+    dsiExportedCsvBody_other: '{count} Verkaufszeilen exportiert.',
+    dsiExportedImageBody: 'Tabelle als hochauflösendes Bild exportiert.',
+    dsiExportedPdfBody: 'Tabelle als PDF exportiert.',
+    dsiExportFailed: 'Export fehlgeschlagen',
+    dsiExportFailedBody: 'Bild konnte nicht erfasst werden.',
+    dsiCashSales: 'Barverkäufe des Tages',
+    dsiCashHint: 'Erwartetes Bargeld in der Kassenschublade insgesamt',
+    dsiTransfers: 'Erwartete Banküberweisungen',
+    dsiTransfersHint: 'Über die Kasse abgewickelte Überweisungen insgesamt',
+    dsiCard: 'Kartentransaktionen',
+    dsiCardHint: 'An der Kasse vereinnahmte Kartenzahlungen insgesamt',
+    dsiVerified: 'Bestätigte Überweisungen',
+    dsiVerifiedHint: 'Bei Eingang am Terminal bestätigt',
+    dsiPickDay: 'Tag auswählen',
+    dsiToday: 'Heute ({date})',
+    dsiYesterday: 'Gestern ({date})',
+    dsiSearchPlaceholder: 'Nach Artikelname oder Beleg suchen...',
+    dsiAllTypes: 'Alle Typen',
+    dsiProductsOnly: 'Nur Produkte',
+    dsiServicesOnly: 'Nur Dienstleistungen',
+    dsiRowsOption: '{count} Zeilen',
+    dsiShowing_one: '{count} verkaufter Artikel angezeigt',
+    dsiShowing_other: '{count} verkaufte Artikel angezeigt',
+    dsiEmptyTitle: 'Keine verkauften Artikel erfasst',
+    dsiEmptyBody:
+      'Keine Aufzeichnungen entsprechen an diesem Tag Ihren aktiven Filtern.',
+    dsiPageOf: 'Seite {page} von {total}',
+    dsiPrevPage: 'Vorherige Seite',
+    dsiNextPage: 'Nächste Seite',
   },
   support: {
     title: 'Support',
