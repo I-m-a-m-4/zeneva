@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
-import { Bot, X, Sparkles, Loader2, User, Mic, ArrowUp, Maximize2, Minimize2, Trash2, Square, ExternalLink, Zap } from 'lucide-react';
+import { X, Sparkles, Loader2, User, Mic, ArrowUp, Maximize2, Minimize2, Trash2, Square, ExternalLink, Zap } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useUser, useFirestore } from '@/firebase';
@@ -412,41 +412,7 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
               {/* Chat Message Scroll Area */}
               <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 sm:p-5 overflow-y-auto">
                 <div className="space-y-4 max-w-3xl mx-auto">
-                  {messages.length === 0 && !creditsExhausted && (
-                    <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
-                      <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-3.5 border border-primary/20 shadow-xs">
-                        <Bot className="h-6 w-6" />
-                      </div>
-                      <h3 className="text-base font-bold text-foreground">How can I help you today?</h3>
-                      <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-6">
-                        Ask about stock levels, analyze revenue, or propose sales and inventory adjustments.
-                      </p>
 
-                      {/* Quick Chips in Widget */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
-                        {[
-                          { title: 'Check low stock alerts', text: 'Which products are low on stock?' },
-                          { title: 'Today\'s sales summary', text: 'How did we do today in sales and profit?' },
-                          { title: 'Record a quick sale', text: 'Record a sale: 2 units of Zeneva, paid cash' },
-                          { title: 'Audit dead inventory', text: 'Which products have zero sales this month?' },
-                        ].map((suggestion, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => handlePick(suggestion.text)}
-                            className="text-left text-xs p-2.5 rounded-xl border border-border/80 bg-card hover:bg-muted hover:border-primary/40 transition-all group"
-                          >
-                            <span className="font-medium text-foreground block group-hover:text-primary transition-colors">
-                              {suggestion.title}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground truncate block mt-0.5">
-                              {suggestion.text}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Render Messages */}
                   {messages.map((m) => {
