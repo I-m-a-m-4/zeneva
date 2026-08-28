@@ -398,7 +398,7 @@ export function buildSaleFromProposal(
 
   const receiptId = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`);
   const receiptNumber = `rec-${receiptId.split('-')[0]}`;
-  const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
+  const status = paymentMethod === 'Invoice' ? 'unpaid' : 'paid';
 
   // Operating hours are enforced here for the same reason the POS review page
   // enforces them: a sale rung up at 3am is either a mistake or worth knowing

@@ -786,7 +786,7 @@ function CustomerDetailContent() {
                             <div className="space-y-4">
                                 {receipts.slice(0, 5).map(receipt => {
                                     const isUnpaid = receipt.paymentMethod === 'Invoice' && receipt.status === 'unpaid';
-                                    const isPending = (receipt.paymentMethod === 'Invoice' || receipt.paymentMethod === 'Bank Transfer') && receipt.status === 'pending';
+                                    const isPending = receipt.paymentMethod === 'Invoice' && receipt.status === 'pending';
                                     const badgeText = isUnpaid ? t('invoices.statusUnpaid') : (isPending ? t('invoices.statusPending') : t('invoices.statusPaid'));
                                     const badgeClass = isUnpaid 
                                         ? "bg-destructive/10 text-destructive" 

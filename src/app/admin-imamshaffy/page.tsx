@@ -88,6 +88,7 @@ import {
     Mail,
     Zap,
     Laptop,
+    Sparkles,
     Smartphone,
     Timer,
     RefreshCw,
@@ -2551,6 +2552,15 @@ function AdminDashboardContent({
     const [broadcastLink, setBroadcastLink] = useState('');
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
 
+    // Feature Release Announcement State
+    const [featureTitle, setFeatureTitle] = useState('Introducing Quick Zen AI Assistant');
+    const [featureBadge, setFeatureBadge] = useState('v3.2.8 Update');
+    const [featureDescription, setFeatureDescription] = useState('Press the Ctrl key anywhere to summon Zen AI instantly. Dictate sales, ask for stock audits, or manage inventory in seconds without leaving your current screen.');
+    const [featureVideoUrl, setFeatureVideoUrl] = useState('');
+    const [featureActionText, setFeatureActionText] = useState('Try Zen AI (Ctrl)');
+    const [featureActionHref, setFeatureActionHref] = useState('/ai-insights');
+    const [isSavingFeatureUpdate, setIsSavingFeatureUpdate] = useState(false);
+
     // User Management State
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<'active' | 'joined' | 'name'>('active');
@@ -3537,6 +3547,34 @@ function AdminDashboardContent({
             toast({ variant: 'success', title: 'Broadcast Deleted', description: 'The announcement has been deleted successfully.' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Failed to Delete Broadcast', description: error.message || 'An unexpected error occurred.' });
+        }
+    };
+
+    const handlePublishFeatureUpdate = async () => {
+        if (!featureTitle || !featureDescription) {
+            toast({ variant: 'destructive', title: 'Missing Information', description: 'Please provide a title and description for the feature update.' });
+            return;
+        }
+        setIsSavingFeatureUpdate(true);
+        try {
+            const updatesRef = collection(firestore, 'feature_updates');
+            await addDoc(updatesRef, {
+                title: featureTitle,
+                badge: featureBadge,
+                description: featureDescription,
+                videoUrl: featureVideoUrl,
+                actionText: featureActionText,
+                actionHref: featureActionHref,
+                releaseVersion: '3.2.8',
+                isActive: true,
+                createdAt: serverTimestamp(),
+            });
+            toast({ variant: 'success', title: 'Feature Release Published!', description: 'The announcement modal is now active for users.' });
+        } catch (err: any) {
+            console.error('Error publishing feature release:', err);
+            toast({ variant: 'destructive', title: 'Publish Failed', description: err?.message || 'Could not publish update.' });
+        } finally {
+            setIsSavingFeatureUpdate(false);
         }
     };
 
@@ -4666,6 +4704,88 @@ function AdminDashboardContent({
                                 </Table>
                             </ScrollArea>
                         </CardContent>
+                    </Card>
+
+                    <Card className="mt-6 border-orange-500/30 shadow-md">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-foreground">
+                                <Sparkles className="h-5 w-5 text-orange-500" /> "What's New" Feature Release Video Modal
+                            </CardTitle>
+                            <CardDescription>
+                                Broadcast a major release modal with an embedded YouTube video or MP4 demo, displayed once to all users.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 max-w-2xl">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Release Title</Label>
+                                    <Input
+                                        placeholder="e.g. Introducing Quick Zen AI Assistant"
+                                        value={featureTitle}
+                                        onChange={(e) => setFeatureTitle(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Badge / Version Tag</Label>
+                                    <Input
+                                        placeholder="e.g. v3.2.8 Update"
+                                        value={featureBadge}
+                                        onChange={(e) => setFeatureBadge(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>YouTube or Video URL (Optional)</Label>
+                                <Input
+                                    placeholder="e.g. https://www.youtube.com/watch?v=... or https://.../demo.mp4"
+                                    value={featureVideoUrl}
+                                    onChange={(e) => setFeatureVideoUrl(e.target.value)}
+                                />
+                                <p className="text-[10px] text-muted-foreground">
+                                    Paste a YouTube link or direct video file. If left blank, a sleek dark animated showcase canvas will be shown.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Description</Label>
+                                <Textarea
+                                    rows={3}
+                                    placeholder="Explain the new feature, shortcuts (e.g. Ctrl key), and value to the merchant..."
+                                    value={featureDescription}
+                                    onChange={(e) => setFeatureDescription(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Action Button Text</Label>
+                                    <Input
+                                        placeholder="e.g. Try Zen AI (Ctrl)"
+                                        value={featureActionText}
+                                        onChange={(e) => setFeatureActionText(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Action Href / Link</Label>
+                                    <Input
+                                        placeholder="e.g. /ai-insights or /terminal"
+                                        value={featureActionHref}
+                                        onChange={(e) => setFeatureActionHref(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <Button
+                                onClick={handlePublishFeatureUpdate}
+                                disabled={isSavingFeatureUpdate}
+                                className="bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs h-9 px-5 rounded-xl shadow-sm"
+                            >
+                                {isSavingFeatureUpdate && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                                Publish "What's New" Video Update
+                            </Button>
+                        </CardFooter>
                     </Card>
                 </TabsContent>
 

@@ -215,7 +215,7 @@ export function computeCustomerSegments(input: {
     }
     const status = r.status ?? 'paid';
     const isUnpaid = r.paymentMethod === 'Invoice' && status === 'unpaid';
-    const isPending = (r.paymentMethod === 'Invoice' || r.paymentMethod === 'Bank Transfer') && status === 'pending';
+    const isPending = r.paymentMethod === 'Invoice' && status === 'pending';
     if (isUnpaid || isPending) {
       entry.outstanding += Number(r.total) || 0;
     }

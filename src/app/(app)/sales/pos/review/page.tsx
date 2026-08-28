@@ -78,7 +78,7 @@ function ReviewPageContent() {
         discount,
         total,
         paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice',
-        status: (paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid')) as 'pending' | 'unpaid' | 'paid',
+        status: (paymentMethod === 'Invoice' ? 'unpaid' : 'paid') as 'pending' | 'unpaid' | 'paid',
         createdAt: backdatedAt || new Date(), // Use a real date for optimistic display
     }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdatedAt]);
 
@@ -192,7 +192,7 @@ function ReviewPageContent() {
         const secureTax = secureSubtotal * (business.settings?.defaultTaxRate || 0) / 100;
         const secureTotal = secureSubtotal + secureTax - discount;
         const profit = secureTotal - secureTotalCost;
-        const status = paymentMethod === 'Bank Transfer' ? 'pending' : (paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
+        const status = paymentMethod === 'Invoice' ? 'unpaid' : 'paid';
 
         const wasScanned = cart.some(c => c.addedViaBarcode);
         const receiptMethod = autoPrint ? 'printed' : (shouldSendEmail ? 'digital' : 'none');

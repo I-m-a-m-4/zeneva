@@ -1,184 +1,192 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useToast } from './use-toast';
+import { useToast } from '@/hooks/use-toast';
 
-// Define the shape of the config object Paystack's `setup` method expects
+// Extend the Window interface to include PaystackPop
+declare global {
+  interface Window {
+    PaystackPop?: {
+      setup: (options: PaystackSetupConfig) => {
+        openIframe: () => void;
+      };
+    };
+  }
+}
+
+interface PaystackCustomField {
+  display_name: string;
+  variable_name: string;
+  value: string;
+}
+
+interface PaystackMetadata {
+  custom_fields?: PaystackCustomField[];
+  [key: string]: any;
+}
+
 interface PaystackSetupConfig {
   key: string;
   email: string;
-  amount: number;
+  amount: number; // in kobo
   currency?: string;
   ref?: string;
-  reference?: string;
+  callback?: (response: { reference: string }) => void;
+  onClose?: () => void;
+  plan?: string;
+  metadata?: PaystackMetadata;
   subaccount?: string;
-  callback: (transaction: any) => void;
-  onClose: () => void;
-  [key: string]: any; // Allow other properties
 }
 
-// Define the shape of the config object our hook's `initializePayment` function accepts
-interface PaystackHookConfig {
+export interface PaystackHookConfig {
   key: string;
   email: string;
   amount: number;
   currency?: string;
-  ref?: string;
   reference?: string;
+  onSuccess?: (reference: string) => void;
+  onClose?: () => void;
+  plan?: string;
+  metadata?: PaystackMetadata;
   subaccount?: string;
-  onSuccess: (transaction: any) => void;
-  onClose: () => void;
-  [key: string]: any; // Allow other properties
-}
-
-// Define the shape of the PaystackPop object on the window
-interface PaystackPop {
-  setup(config: PaystackSetupConfig): {
-    openIframe(): void;
-  };
-}
-
-// Add the PaystackPop object to the window interface
-declare global {
-  interface Window {
-    PaystackPop?: PaystackPop;
-  }
 }
 
 const SCRIPT_URL = 'https://js.paystack.co/v1/inline.js';
 const SCRIPT_ID = 'paystack-sdk';
-
-// Use a module-level promise to ensure the script is only loaded once.
 let scriptPromise: Promise<void> | null = null;
 
-const usePaystack = () => {
-  const { toast } = useToast();
+const loadScript = (): Promise<void> => {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (window.PaystackPop) return Promise.resolve();
+  if (scriptPromise) return scriptPromise;
+
+  scriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById(SCRIPT_ID);
+    if (existing) {
+      if (window.PaystackPop) {
+        resolve();
+        return;
+      }
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => {
+        scriptPromise = null;
+        existing.remove();
+        reject(new Error('Paystack SDK failed to load.'));
+      }, { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = SCRIPT_ID;
+    script.src = SCRIPT_URL;
+    script.async = true;
+
+    // 15s timeout
+    const timeout = setTimeout(() => {
+      scriptPromise = null;
+      script.remove();
+      reject(new Error('Paystack SDK load timed out'));
+    }, 15000);
+
+    script.onload = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+
+    script.onerror = (e) => {
+      clearTimeout(timeout);
+      console.warn('Paystack SDK network timeout or blocked:', e);
+      scriptPromise = null;
+      script.remove();
+      reject(new Error('Paystack SDK failed to load.'));
+    };
+
+    document.body.appendChild(script);
+  });
+
+  return scriptPromise;
+};
+
+export const usePaystack = () => {
   const [isSdkReady, setIsSdkReady] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Check if the script is already loaded by checking the window object.
-    if (window.PaystackPop) {
-      setIsSdkReady(true);
-      return;
-    }
-    
-    // If the script is not loaded, but the promise exists, it means it's currently loading.
-    if (scriptPromise) {
-      scriptPromise.then(() => {
+    let mounted = true;
+    loadScript()
+      .then(() => {
+        if (mounted) setIsSdkReady(true);
+      })
+      .catch((err) => {
+        // Silently capture prefetch error without spamming toasts during page load
+        if (mounted) setIsSdkReady(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const initializePayment = useCallback(async (config: PaystackHookConfig) => {
+    if (!window.PaystackPop) {
+      try {
+        await loadScript();
         setIsSdkReady(true);
-      }).catch(() => {
-        setIsSdkReady(false);
-      });
-      return;
-    }
-
-    // If there's no script and no promise, this is the first time we're loading it.
-    scriptPromise = new Promise((resolve, reject) => {
-        const existingScript = document.getElementById(SCRIPT_ID);
-        if (existingScript) {
-             // If another instance of this hook added the script but it hasn't loaded yet,
-            // we can just listen to its load/error events.
-            existingScript.addEventListener('load', () => {
-                setIsSdkReady(true);
-                resolve();
-            });
-            existingScript.addEventListener('error', (e) => {
-                console.error('Paystack SDK failed to load.', e);
-                toast({
-                    variant: 'destructive',
-                    title: 'Payment Gateway Error',
-                    description: 'Could not load the payment script. Please check your internet connection and disable any ad-blockers, then try again.',
-                    duration: 10000
-                });
-                scriptPromise = null;
-                document.getElementById(SCRIPT_ID)?.remove();
-                reject(new Error('Paystack SDK failed to load.'));
-            });
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.id = SCRIPT_ID;
-        script.src = SCRIPT_URL;
-        script.async = true;
-
-        script.onload = () => {
-            setIsSdkReady(true);
-            resolve();
-        };
-
-        script.onerror = (e) => {
-            console.error('Paystack SDK failed to load.', e);
-            toast({
-                variant: 'destructive',
-                title: 'Payment Gateway Error',
-                description: 'Could not load the payment script. Please check your internet connection and disable any ad-blockers, then try again.',
-                duration: 10000
-            });
-            scriptPromise = null;
-            document.getElementById(SCRIPT_ID)?.remove();
-            reject(new Error('Paystack SDK failed to load.'));
-        };
-
-        document.body.appendChild(script);
-    });
-
-  }, [toast]);
-
-  const initializePayment = useCallback((config: PaystackHookConfig) => {
-    if (!isSdkReady || !window.PaystackPop) {
-      console.error('Paystack SDK is not ready yet.');
-      toast({
+      } catch (err) {
+        console.error('Paystack load error:', err);
+        toast({
           variant: 'destructive',
-          title: 'Payment Gateway Not Ready',
-          description: 'The payment gateway is still loading. Please wait a moment and try again.'
+          title: 'Payment Gateway Error',
+          description: 'Could not connect to payment gateway. Please check your internet connection and try again.',
+        });
+        return;
+      }
+    }
+
+    if (!window.PaystackPop) {
+      toast({
+        variant: 'destructive',
+        title: 'Payment Gateway Error',
+        description: 'Payment system is temporarily unavailable. Please try again.',
       });
       return;
     }
-    
-    // Build the config object for Paystack, including the subaccount
+
     const paystackConfig: PaystackSetupConfig = {
       key: config.key,
       email: config.email,
       amount: config.amount,
       currency: config.currency || 'NGN',
-      ref: config.reference || config.ref,
+      ref: config.reference,
+      plan: config.plan,
+      metadata: config.metadata,
       subaccount: config.subaccount,
-      metadata: config.metadata || {},
-      callback: (transaction: any) => {
-        if (config.onSuccess && typeof config.onSuccess === 'function') {
-          config.onSuccess(transaction);
+      callback: (response) => {
+        if (config.onSuccess) {
+          config.onSuccess(response.reference);
         }
       },
       onClose: () => {
-        if (config.onClose && typeof config.onClose === 'function') {
+        if (config.onClose) {
           config.onClose();
         }
       },
     };
 
     try {
-        console.log('Initializing Paystack payment...', { 
-            key: config.key?.substring(0, 8) + '...', 
-            email: config.email, 
-            amount: config.amount,
-            currency: paystackConfig.currency
-        });
-        const handler = window.PaystackPop.setup(paystackConfig);
-        handler.openIframe();
-    } catch (error) {
-        console.error('Error in Paystack setup:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Payment Error',
-            description: 'Failed to initialize payment window. Please check your internet connection and try again.'
-        });
+      const handler = window.PaystackPop.setup(paystackConfig);
+      handler.openIframe();
+    } catch (e: any) {
+      console.error('Error opening Paystack iframe:', e);
+      toast({
+        variant: 'destructive',
+        title: 'Payment Error',
+        description: 'Could not open the payment gateway. Please try again.',
+      });
     }
+  }, [toast]);
 
-  }, [isSdkReady, toast]);
-
-  return { initializePayment, isScriptLoaded: isSdkReady };
+  return { isSdkReady, initializePayment };
 };
 
 export default usePaystack;

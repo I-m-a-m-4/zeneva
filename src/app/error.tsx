@@ -40,7 +40,7 @@ export default function GlobalError({
           <Button
             onClick={() => window.location.reload()}
             size="lg"
-            className="w-full gap-2"
+            className="w-full gap-2 bg-[#ea580c] hover:bg-[#ea580c]/90 text-white shadow-md rounded-xl font-semibold"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh Page

@@ -94,7 +94,7 @@ export default function InvoicesPage() {
     }, [receipts, searchTerm]);
 
     const getStatusBadge = (receipt: Receipt) => {
-        const status = receipt.status || (receipt.paymentMethod === 'Bank Transfer' ? 'pending' : 'paid');
+        const status = receipt.status || (receipt.paymentMethod === 'Invoice' ? 'unpaid' : 'paid');
 
         if (status === 'pending') {
             return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">{t('invoices.statusPending')}</Badge>;

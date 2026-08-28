@@ -33,6 +33,7 @@ import type { UserNotification, BusinessInstance, AdminNotification, UserProfile
 import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
 import ZenAIWidget from '@/components/shared/zen-ai-widget';
+import { FeatureUpdateModal } from '@/components/shared/feature-update-modal';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate, getCountryFromIP } from '@/lib/utils';
@@ -437,7 +438,30 @@ export default function AuthenticatedLayout({
     }
     return "";
   };
-  const fallbackInitials = getInitials(currentUserProfile?.name) || (currentUserProfile?.email || 'U').charAt(0).toUpperCase();
+  const resolvedUserName = React.useMemo(() => {
+    const rawName = 
+      (currentUserProfile as any)?.name?.trim() ||
+      (currentUserProfile as any)?.displayName?.trim() ||
+      (currentUserProfile as any)?.fullName?.trim() ||
+      user?.displayName?.trim() ||
+      (businessInstance as any)?.ownerName?.trim();
+    
+    if (rawName) return rawName;
+
+    const email = currentUserProfile?.email || user?.email || '';
+    if (!email) return 'User';
+    
+    const username = email.split('@')[0] || '';
+    return username
+      .replace(/[\._\-]/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .split(' ')
+      .filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ') || 'User';
+  }, [currentUserProfile, user, businessInstance]);
+
+  const fallbackInitials = getInitials(resolvedUserName) || (currentUserProfile?.email || user?.email || 'U').charAt(0).toUpperCase();
 
   // Helper: resolve a navigation link for each notification.
   //
@@ -1474,7 +1498,7 @@ export default function AuthenticatedLayout({
                             </>
                           ) : (
                             <>
-                              <span className="truncate text-sm font-medium" title={currentUserProfile?.name || currentUserProfile?.email || ''}>{currentUserProfile?.name || currentUserProfile?.email}</span>
+                              <span className="truncate text-sm font-medium" title={resolvedUserName}>{resolvedUserName}</span>
                               {hasLifetimeAccess && <Badge className="bg-gradient-to-r from-amber-500 to-orange-600 text-white border-0 shadow-sm animate-pulse-slow">Lifetime</Badge>}
                               {!hasLifetimeAccess && plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs px-1.5 py-0.5 mt-1', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                             </>
@@ -1652,7 +1676,7 @@ export default function AuthenticatedLayout({
                       <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-2">
                           <div className="flex justify-between items-center">
-                            <p className="text-sm font-medium leading-none truncate">{currentUserProfile?.name || "Zeneva User"}</p>
+                            <p className="text-sm font-medium leading-none truncate">{resolvedUserName}</p>
                             {plan && <Badge variant={plan === 'pro' ? 'secondary' : 'default'} className={cn('capitalize text-xs', (plan === 'starter' || plan === 'business') && 'bg-orange-500 hover:bg-orange-300 border-orange-600 text-white')}>{plan}</Badge>}
                           </div>
                           <p className="text-xs leading-none text-muted-foreground">
@@ -1820,6 +1844,7 @@ export default function AuthenticatedLayout({
                 )}
               </main>
                <ZenAIWidget isOpen={isZenAIOpen} onClose={() => setIsZenAIOpen(false)} dictationTrigger={dictationTrigger} />
+               <FeatureUpdateModal />
              </div>
           </div>
           <MobileBottomNav 

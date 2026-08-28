@@ -55,7 +55,7 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                             </div>
                             <div className="text-right">
                                 <h3 className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Payment Status:</h3>
-                                <p className="font-semibold capitalize text-sm">{receipt.status || (receipt.paymentMethod === 'Bank Transfer' ? 'pending' : 'paid')}</p>
+                                <p className="font-semibold capitalize text-sm">{receipt.status || (receipt.paymentMethod === 'Invoice' ? 'unpaid' : 'paid')}</p>
                                 <p className="text-[11px] text-muted-foreground">Via {receipt.paymentMethod}</p>
                             </div>
                         </div>
