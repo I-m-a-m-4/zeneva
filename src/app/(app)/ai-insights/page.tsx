@@ -273,7 +273,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
   // Plan & Credits info
   const currentMonth = new Date().toISOString().slice(0, 7);
   const plan = effectivePlan(businessData);
-  const monthlyLimit = aiMonthlyLimit(plan);
+  const monthlyLimit = aiMonthlyLimit(businessData);
   const allowanceUsed = businessData?.aiUsageCurrentDate === currentMonth ? (Number(businessData?.aiUsageCount) || 0) : 0;
   const bonusCredits = Number(businessData?.aiBonusCredits) || 0;
   const allowanceLeft = Math.max(0, monthlyLimit - allowanceUsed);
