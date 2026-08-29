@@ -584,7 +584,7 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
                       type="submit"
                       disabled={!input.trim()}
                       size="icon"
-                      className="h-10 w-10 rounded-full bg-foreground text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground shrink-0 shadow-xs"
+                      className="h-10 w-10 rounded-full bg-primary text-white hover:opacity-90 disabled:bg-primary/20 disabled:text-primary/60 shrink-0 shadow-xs"
                       title="Send prompt"
                     >
                       <ArrowUp className="h-5.5 w-5.5 stroke-[2.75]" />
