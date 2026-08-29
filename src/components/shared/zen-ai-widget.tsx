@@ -331,204 +331,223 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
             {/* Ambient Behind-Modal Glow */}
             <div className="absolute w-[500px] h-[350px] bg-gradient-to-r from-orange-500/25 via-amber-500/15 to-orange-600/25 blur-3xl pointer-events-none rounded-full" />
 
-            {/* Center Floating Dialog Modal */}
+            {/* Center Floating Dialog Modal Container */}
             <motion.div
               initial={{ opacity: 0, scale: 0.93, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.93, y: 16 }}
               transition={{ type: "spring", damping: 28, stiffness: 360 }}
               className={cn(
-                "relative z-10 w-full transition-all duration-300 flex flex-col",
-                "bg-background/95 backdrop-blur-md rounded-3xl border border-primary/40",
-                "shadow-2xl flex flex-col overflow-hidden",
-                isListening ? "orange-glow-listening" : isLoading ? "orange-glow-box" : "shadow-[0_10px_40px_rgba(0,0,0,0.35)]",
-                isExpanded ? "max-w-5xl h-[78vh]" : "max-w-[700px] h-[520px]"
+                "relative z-10 w-full flex flex-col gap-3 items-center transition-all duration-300",
+                isExpanded ? "max-w-5xl" : "max-w-[700px]"
               )}
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* Header Bar */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40 bg-muted/20 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-xs">
-                    <Sparkles className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold leading-none flex items-center gap-1.5 text-foreground">
-                      Zen AI
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                        Copilot
-                      </span>
-                    </h2>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {totalCreditsLeft > 0 ? `${totalCreditsLeft.toLocaleString()} credits remaining` : '0 credits left'}
-                    </p>
-                  </div>
-                </div>
+              {/* Ambient Behind-Modal Glow */}
+              <div className="absolute w-[500px] h-[350px] bg-gradient-to-r from-orange-500/25 via-amber-500/15 to-orange-600/25 blur-3xl pointer-events-none rounded-full z-[-1]" />
 
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      router.push('/ai-insights');
-                    }}
-                    className="h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 flex items-center gap-1.5 transition-colors"
-                    title="Open full page"
+              {/* Chat History Panel (Shown when messages exist or credits exhausted) */}
+              <AnimatePresence>
+                {(messages.length > 0 || creditsExhausted !== null) && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className={cn(
+                      "w-full bg-background/95 backdrop-blur-md border border-primary/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300",
+                      isExpanded ? "h-[68vh]" : "h-[450px]"
+                    )}
                   >
-                    <ExternalLink className="h-3.5 w-3.5 text-primary" />
-                    <span className="hidden sm:inline">Open in Zen AI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 flex items-center justify-center transition-colors"
-                    title={isExpanded ? "Standard view" : "Expand view"}
-                  >
-                    {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                  </button>
-
-                  {messages.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClear}
-                      className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-muted/80 flex items-center justify-center transition-colors"
-                      title="Clear chat"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 flex items-center justify-center transition-colors ml-1"
-                    title="Close"
-                  >
-                    <X className="h-4.5 w-4.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Chat Message Scroll Area */}
-              <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 sm:p-5 overflow-y-auto">
-                <div className="space-y-4 max-w-3xl mx-auto">
-
-
-                  {/* Render Messages */}
-                  {messages.map((m) => {
-                    const isUser = m.role === 'user';
-                    const text = textOf(m);
-                    const toolParts = (m.parts ?? []).filter(isToolUIPart);
-                    const hasToolUI = toolParts.length > 0;
-
-                    return (
-                      <div key={m.id} className={cn("flex gap-2.5 items-start", isUser ? "justify-end" : "justify-start")}>
-                        {!isUser && (
-                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0 mt-0.5">
-                            <Bot className="h-4 w-4" />
-                          </div>
-                        )}
-
-                        <div className={cn("flex flex-col gap-1 max-w-[85%]", isUser && "items-end")}>
-                          {text.trim() && (
-                            <div className={cn(
-                              "rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed",
-                              isUser
-                                ? "bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100 border border-stone-200 dark:border-stone-700 rounded-tr-none"
-                                : "bg-card text-foreground border border-border/80 rounded-tl-none shadow-xs"
-                            )}>
-                              {isUser ? text : <Markdown>{text}</Markdown>}
-                            </div>
-                          )}
-
-                          {hasToolUI && (
-                            <div className="flex flex-col gap-2 w-full mt-1">
-                              {toolParts.map((part: any) => {
-                                const output = part.output;
-                                const isProposal = output?.type === 'PROPOSAL';
-                                const enriched = isProposal
-                                  ? { ...output, status: proposalStatuses[output.proposalId] || output.status }
-                                  : output;
-
-                                return (
-                                  <div key={part.toolCallId} className="flex flex-col gap-1 w-full">
-                                    {output && (
-                                      <ToolResult
-                                        output={enriched}
-                                        onApprove={handleApprove}
-                                        onReject={handleReject}
-                                        onPick={handlePick}
-                                      />
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                    {/* Panel Header */}
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40 bg-muted/20 shrink-0">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-xs">
+                          <Sparkles className="h-4.5 w-4.5" />
                         </div>
-
-                        {isUser && (
-                          <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground border shrink-0 mt-0.5">
-                            <User className="h-4 w-4" />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Contextual Progressive Thinking Indicator */}
-                  {isLoading && (
-                    <div className="flex items-start gap-2.5 w-full">
-                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0 orange-glow-processing">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                      <div className="rounded-2xl px-4 py-2.5 bg-muted/40 border border-border/40 rounded-tl-none shadow-xs">
-                        <ZenStatus
-                          activeTool={runningTool(messages[messages.length - 1])}
-                          lastUserPrompt={lastUserPrompt}
-                          showMark={false}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Credit Exhaustion Instant Upgrade Banner */}
-                  {creditsExhausted && (
-                    <div className="w-full rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 shadow-sm my-2">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                            <Zap className="h-3.5 w-3.5 text-orange-600 fill-current" />
-                            Out of AI Credits
-                          </p>
-                          <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-                            {creditsExhausted.errorText || `Your ${creditsExhausted.plan} plan includes ${creditsExhausted.monthlyLimit.toLocaleString()} monthly AI credits, which are spent. Upgrade for higher limits.`}
+                        <div>
+                          <h2 className="text-sm font-bold leading-none flex items-center gap-1.5 text-foreground">
+                            Zen AI
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                              Copilot
+                            </span>
+                          </h2>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {totalCreditsLeft > 0 ? `${totalCreditsLeft.toLocaleString()} credits remaining` : '0 credits left'}
                           </p>
                         </div>
-                        <Button
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
                           type="button"
                           onClick={() => {
                             onClose();
-                            router.push('/billing');
+                            router.push('/ai-insights');
                           }}
-                          className="shrink-0 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs h-8 px-3 rounded-xl shadow-xs"
+                          className="h-8 px-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 flex items-center gap-1.5 transition-colors"
+                          title="Open full page"
                         >
-                          Upgrade Plan
-                        </Button>
+                          <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                          <span className="hidden sm:inline">Open in Zen AI</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsExpanded(!isExpanded)}
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 flex items-center justify-center transition-colors"
+                          title={isExpanded ? "Standard view" : "Expand view"}
+                        >
+                          {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                        </button>
+
+                        {messages.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleClear}
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-muted/80 flex items-center justify-center transition-colors"
+                            title="Clear chat"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 flex items-center justify-center transition-colors ml-1"
+                          title="Close"
+                        >
+                          <X className="h-4.5 w-4.5" />
+                        </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              </ScrollArea>
 
-              {/* Bottom Input Composer */}
-              <div className="p-3 sm:p-4 bg-muted/20 border-t border-border/40 shrink-0">
-                <form onSubmit={handleSubmit} className="flex items-center gap-2">
+                    {/* Chat Message Scroll Area */}
+                    <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 sm:p-5 overflow-y-auto">
+                      <div className="space-y-4 max-w-3xl mx-auto">
+                        {/* Render Messages */}
+                        {messages.map((m) => {
+                          const isUser = m.role === 'user';
+                          const text = textOf(m);
+                          const toolParts = (m.parts ?? []).filter(isToolUIPart);
+                          const hasToolUI = toolParts.length > 0;
+
+                          return (
+                            <div key={m.id} className={cn("flex gap-2.5 items-start", isUser ? "justify-end" : "justify-start")}>
+                              {!isUser && (
+                                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0 mt-0.5">
+                                  <Sparkles className="h-4 w-4" />
+                                </div>
+                              )}
+
+                              <div className={cn("flex flex-col gap-1 max-w-[85%]", isUser && "items-end")}>
+                                {text.trim() && (
+                                  <div className={cn(
+                                    "rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed",
+                                    isUser
+                                      ? "bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100 border border-stone-200 dark:border-stone-700 rounded-tr-none"
+                                      : "bg-card text-foreground border border-border/80 rounded-tl-none shadow-xs"
+                                  )}>
+                                    {isUser ? text : <Markdown>{text}</Markdown>}
+                                  </div>
+                                )}
+
+                                {hasToolUI && (
+                                  <div className="flex flex-col gap-2 w-full mt-1">
+                                    {toolParts.map((part: any) => {
+                                      const output = part.output;
+                                      const isProposal = output?.type === 'PROPOSAL';
+                                      const enriched = isProposal
+                                        ? { ...output, status: proposalStatuses[output.proposalId] || output.status }
+                                        : output;
+
+                                      return (
+                                        <div key={part.toolCallId} className="flex flex-col gap-1 w-full">
+                                          {output && (
+                                            <ToolResult
+                                              output={enriched}
+                                              onApprove={handleApprove}
+                                              onReject={handleReject}
+                                              onPick={handlePick}
+                                            />
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
+                              {isUser && (
+                                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground border shrink-0 mt-0.5">
+                                  <User className="h-4 w-4" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {/* Contextual Progressive Thinking Indicator */}
+                        {isLoading && (
+                          <div className="flex items-start gap-2.5 w-full">
+                            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0 orange-glow-processing">
+                              <Sparkles className="h-4 w-4" />
+                            </div>
+                            <div className="rounded-2xl px-4 py-2.5 bg-muted/40 border border-border/40 rounded-tl-none shadow-xs">
+                              <ZenStatus
+                                activeTool={runningTool(messages[messages.length - 1])}
+                                lastUserPrompt={lastUserPrompt}
+                                showMark={false}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Credit Exhaustion Instant Upgrade Banner */}
+                        {creditsExhausted && (
+                          <div className="w-full rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 shadow-sm my-2">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                  <Zap className="h-3.5 w-3.5 text-orange-600 fill-current" />
+                                  Out of AI Credits
+                                </p>
+                                <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                                  {creditsExhausted.errorText || `Your ${creditsExhausted.plan} plan includes ${creditsExhausted.monthlyLimit.toLocaleString()} monthly AI credits, which are spent. Upgrade for higher limits.`}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                onClick={() => {
+                                  onClose();
+                                  router.push('/billing');
+                                }}
+                                className="shrink-0 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs h-8 px-3 rounded-xl shadow-xs"
+                              >
+                                Upgrade Plan
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Pill Input Container */}
+              <div
+                className={cn(
+                  "w-full flex items-center bg-background border rounded-full pl-3 pr-2 py-2 border-border/80 shadow-2xl transition-all duration-300",
+                  isListening ? "orange-glow-listening scale-[1.01]" : "orange-glow-input"
+                )}
+              >
+                <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={toggleListening}
                     className={cn(
-                      "h-10 w-10 rounded-xl flex items-center justify-center transition-all shrink-0",
+                      "h-10 w-10 rounded-full flex items-center justify-center transition-all shrink-0",
                       isListening
                         ? "bg-primary text-white shadow-md animate-pulse"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -546,7 +565,7 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
                       onChange={(e) => setInput(e.target.value)}
                       placeholder={isListening ? "Listening to your voice..." : "Ask Zen AI anything..."}
                       disabled={isLoading}
-                      className="w-full bg-background border border-border/80 rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      className="w-full bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground/75 focus:ring-0 focus:outline-none py-1 pl-1"
                     />
                   </div>
 
@@ -555,7 +574,7 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
                       type="button"
                       onClick={handleStop}
                       size="icon"
-                      className="h-10 w-10 rounded-xl bg-orange-600 hover:bg-orange-700 text-white shrink-0 shadow-xs"
+                      className="h-10 w-10 rounded-full bg-orange-600 hover:bg-orange-700 text-white shrink-0 shadow-xs"
                       title="Stop generation"
                     >
                       <Square className="h-4.5 w-4.5 fill-current" />
@@ -565,12 +584,23 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
                       type="submit"
                       disabled={!input.trim()}
                       size="icon"
-                      className="h-10 w-10 rounded-xl bg-foreground text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground shrink-0 shadow-xs"
+                      className="h-10 w-10 rounded-full bg-foreground text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground shrink-0 shadow-xs"
                       title="Send prompt"
                     >
                       <ArrowUp className="h-5.5 w-5.5 stroke-[2.75]" />
                     </Button>
                   )}
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={onClose}
+                    className="h-10 w-10 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center shrink-0"
+                    title="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
                 </form>
               </div>
             </motion.div>
