@@ -500,11 +500,13 @@ export async function POST(req: Request) {
   // Ahead of the credit reservation on purpose: a turn rejected for an unreadable
   // history never reaches the model, so it must not reserve anything, and it does
   // not need the business document either.
-  const normalised = messages.map((m: any) =>
-    Array.isArray(m?.parts)
-      ? m
-      : { ...m, parts: [{ type: 'text', text: typeof m?.content === 'string' ? m.content : '' }] },
-  );
+  const normalised = messages
+    .filter((m: any) => m?.role !== 'tool')
+    .map((m: any) =>
+      Array.isArray(m?.parts)
+        ? m
+        : { ...m, parts: [{ type: 'text', text: typeof m?.content === 'string' ? m.content : '' }] },
+    );
 
   let modelMessages;
   try {

@@ -375,7 +375,13 @@ function ProductPicker({ result, onPick }: { result: any; onPick?: (p: any) => v
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         {candidates.map((c: any) => (
-          <ProductCard key={c.id} product={c} currency={result.currency} onPick={onPick} confidence={c.confidence} />
+          <ProductCard
+            key={c.id}
+            product={c}
+            currency={result.currency}
+            onPick={onPick ? (p) => onPick({ ...p, isPicker: true }) : undefined}
+            confidence={c.confidence}
+          />
         ))}
       </div>
       <p className="text-[11px] text-muted-foreground mt-2.5">Tap a product to continue.</p>

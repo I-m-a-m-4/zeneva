@@ -12,8 +12,8 @@ export function ProductTour() {
   const { t } = useI18n();
 
   useEffect(() => {
-    // Only show tour on the dashboard
-    if (pathname !== "/dashboard") return;
+    // Only show tour on the inventory page after onboarding
+    if (pathname !== "/inventory") return;
 
     /* ── Zeneva brand palette ─────────────────────────────────────── */
     const style = document.createElement("style");
@@ -147,44 +147,35 @@ export function ProductTour() {
         showProgress: true,
         animate: true,
         allowClose: true,
-        closeBtnText: t('tour.skip'),
-        doneBtnText: t('tour.done'),
-        nextBtnText: t('tour.next'),
-        prevBtnText: t('tour.back'),
+        closeBtnText: t('tour.skip') || "Skip",
+        doneBtnText: t('tour.done') || "Done",
+        nextBtnText: t('tour.next') || "Next",
+        prevBtnText: t('tour.back') || "Back",
         steps: [
           {
             popover: {
-              title: t('tour.welcomeTitle'),
-              description: t('tour.welcomeDesc'),
-              side: "left",
-              align: "start"
+              title: "Welcome to Zeneva!",
+              description: "Let's get your store set up. The first step is adding your products so you can start selling.",
+              side: "top",
+              align: "center"
             }
           },
           {
-            element: isMobile ? "#tour-nav-mobile-inventory" : "#tour-nav-inventory",
+            element: "#tour-import-products",
             popover: {
-              title: t('tour.inventoryTitle'),
-              description: t('tour.inventoryDesc'),
-              side: isMobile ? "top" : "right",
-              align: "start"
+              title: "Import Products",
+              description: "Already have a list of products? You can bulk import them using a file (Excel, CSV, Images, etc.) to save time.",
+              side: "bottom",
+              align: "end"
             }
           },
           {
-            element: isMobile ? "#tour-nav-mobile-pos" : "#tour-nav-pos",
+            element: "#tour-add-product",
             popover: {
-              title: t('tour.posTitle'),
-              description: t('tour.posDesc'),
-              side: isMobile ? "top" : "right",
-              align: "start"
-            }
-          },
-          {
-            element: isMobile ? "#tour-nav-mobile-dashboard" : "#tour-nav-dashboard",
-            popover: {
-              title: t('tour.dashboardTitle'),
-              description: t('tour.dashboardDesc'),
-              side: isMobile ? "top" : "right",
-              align: "start"
+              title: "Add New Product",
+              description: "Or, you can add products manually one by one. Click here when you're ready to add your first product!",
+              side: "bottom",
+              align: "end"
             }
           }
         ],

@@ -55,7 +55,7 @@ const onboardingSchemaBase = z.object({
 type OnboardingFormValues = z.infer<typeof onboardingSchemaBase>;
 
 const industries = [
-  'Retail & E-commerce', 'Fashion & Apparel', 'Electronics', 'Food & Beverage', 'Health & Beauty', 'Home & Furniture', 'Other'
+  'Retail & E-commerce', 'Supermarket & Groceries (Multiple Categories)', 'Pharmacy & Health', 'Fashion & Boutique', 'Restaurant & Cafe', 'Electronics & Gadgets', 'Home & Furniture', 'Other'
 ];
 const months = [
   'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
@@ -809,7 +809,7 @@ export default function OnboardingPage() {
 
       toast({ variant: 'success', title: 'Setup Complete!', description: 'Welcome to your Zeneva dashboard.' });
       void trackLaunchStage('onboarding_completed');
-      router.push('/dashboard');
+      router.push('/inventory');
     } catch (error) {
       console.error('Onboarding submission error:', error);
       void trackLaunchStage('signup_failed', 'onboarding-submit');
@@ -850,8 +850,8 @@ export default function OnboardingPage() {
   return (
     <div className="fixed inset-0 z-50 w-full flex flex-col items-center justify-center min-h-screen py-8 px-4 lg:px-8 bg-background/40 overflow-y-auto backdrop-blur-sm">
       
-      <div className="w-full max-w-2xl space-y-5 sm:space-y-6 bg-card/95 dark:bg-card/80 backdrop-blur-xl border border-border/60 p-6 sm:p-8 rounded-xl my-auto shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none">
-        <div className="text-center mb-6">
+      <div className="w-full max-w-4xl space-y-5 sm:space-y-6 bg-gradient-to-b from-orange-500/10 via-card/95 to-card/95 dark:via-card/80 dark:to-card/80 backdrop-blur-xl border border-dashed border-orange-500/40 p-6 sm:p-8 rounded-xl my-auto shadow-none">
+        <div className="text-center mb-6 relative z-10">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
             {t.title.replace('{name}', currentUserProfile?.name ? currentUserProfile.name.split(' ')[0] : 'Merchant')}
           </h1>

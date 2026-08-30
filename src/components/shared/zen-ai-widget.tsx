@@ -6,7 +6,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import { X, Sparkles, Loader2, User, Mic, ArrowUp, Maximize2, Minimize2, Trash2, Square, ExternalLink, Zap } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useUser, useFirestore } from '@/firebase';
 import { apiBase } from '@/lib/platform';
 import { Markdown } from '@/components/ai-insights/markdown';
@@ -127,6 +127,27 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
   }, [status]);
 
   const isLoading = status === 'submitted' || status === 'streaming';
+
+  // Sync widget messages to Firestore so they appear in the main page's Recent Chats
+  React.useEffect(() => {
+    if (!firestore || !businessId || !user || messages.length === 0) return;
+    if (isLoading) return;
+    try {
+      const cleanMessages = JSON.parse(JSON.stringify(messages));
+      const firstUser = cleanMessages.find((m: any) => m.role === 'user');
+      const title = (textOf(firstUser).slice(0, 40) || 'New Chat').trim();
+      setDoc(doc(firestore, 'ai_sessions', sessionId), {
+        businessId,
+        userId: user.uid,
+        title,
+        messages: cleanMessages,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.error('Widget: error syncing messages', e);
+    }
+  }, [messages, isLoading, sessionId, firestore, businessId, user]);
+
   const [input, setInput] = React.useState('');
   const [lastUserPrompt, setLastUserPrompt] = React.useState('');
 
@@ -164,6 +185,42 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
           return;
         }
         addToQueue({ type: 'complete-sale', payload: built.payload }, `Zen AI: recording sale ${built.receiptNumber}`);
+      } else if (action.action === 'COST_PRICES' || action.action === 'COST_ESTIMATE') {
+        const writes = check.writes ?? [];
+        if (writes.length === 0) {
+          toast({ title: 'Not applied', description: 'Nothing was left to change.', variant: 'destructive' });
+          return;
+        }
+        let queued = 0;
+        for (const write of writes) {
+          const id = write.productIds
+            ? addToQueue(
+                { type: 'bulk-update-products', payload: { productIds: write.productIds, values: write.values } },
+                `Zen AI: ${write.label}`,
+              )
+            : addToQueue(
+                { type: 'update-product', payload: { productId: write.productId, values: write.values } },
+                `Zen AI: ${write.label}`,
+              );
+          if (id) queued++;
+        }
+        if (queued === 0) {
+          toast({
+            title: 'Not applied',
+            description: 'Those changes could not be queued — you may not have permission to change inventory.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const affected = check.count ?? writes.length;
+        toast({
+          variant: 'success',
+          title: action.action === 'COST_ESTIMATE' ? 'Cost prices estimated' : 'Cost prices set',
+          description:
+            action.action === 'COST_ESTIMATE'
+              ? `${affected.toLocaleString()} products estimated.`
+              : `${affected.toLocaleString()} cost price${affected === 1 ? '' : 's'} updated.`,
+        });
       }
       setProposalStatuses(prev => ({ ...prev, [proposalId]: 'APPROVED' }));
       toast({ title: 'Proposal applied', variant: 'success' });
@@ -177,7 +234,7 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
     trackFeature('ai_proposal_rejected');
   }, []);
 
-  const handlePick = React.useCallback((text: string) => {
+  const handlePick = React.useCallback((val: any) => {
     if (isCreditsExhausted) {
       setCreditsExhausted({
         plan,
@@ -186,8 +243,19 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
       });
       return;
     }
-    setLastUserPrompt(text);
-    sendMessage({ text });
+    if (typeof val === 'string') {
+      setLastUserPrompt(val);
+      sendMessage({ text: val });
+    } else {
+      if (val.isPicker) {
+        const text = `I mean "${val.name}" (product id: ${val.id})`;
+        setLastUserPrompt(text);
+        sendMessage({ text });
+      } else {
+        setInput(`Show stock level and cost price for ${val.name}`);
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+    }
   }, [sendMessage, isCreditsExhausted, plan, monthlyLimit]);
 
   // Speech Recognition Setup
@@ -505,8 +573,14 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
 
                         {/* Credit Exhaustion Instant Upgrade Banner */}
                         {creditsExhausted && (
-                          <div className="w-full rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 shadow-sm my-2">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="w-full rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 shadow-sm my-2 relative">
+                            <button
+                              onClick={() => setCreditsExhausted(null)}
+                              className="absolute top-2 right-2 p-0.5 rounded-full text-orange-600/60 hover:text-orange-600 hover:bg-orange-500/10 transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mr-5">
                               <div className="min-w-0">
                                 <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
                                   <Zap className="h-3.5 w-3.5 text-orange-600 fill-current" />

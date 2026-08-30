@@ -6,19 +6,27 @@ const SECRET_KEY = process.env.NEXT_PUBLIC_STORAGE_ENCRYPTION_KEY || 'zeneva-pos
 
 export const secureStorage = {
   /**
-   * Encrypts and saves data to localStorage
+   * Encrypts and saves data to localStorage.
+   *
+   * Returns whether the value actually reached the store. Most callers can ignore
+   * that — a lost cache blob is re-fetched — but one cannot: the pending write
+   * queue has no other copy on web, and a swallowed `QuotaExceededError` there is
+   * a delete or a customer that silently never happened. See the
+   * `pos_queued_actions` effect in `pos-context.tsx`.
    */
-  setItem: (key: string, value: any): void => {
+  setItem: (key: string, value: any): boolean => {
     try {
       const stringValue = JSON.stringify(value);
       const encrypted = CryptoJS.AES.encrypt(stringValue, SECRET_KEY).toString();
       localStorage.setItem(key, encrypted);
+      return true;
     } catch (error: any) {
       if (error?.name === 'QuotaExceededError' || error?.code === 22 || error?.number === 0x8007000E) {
-        console.warn(`SecureStorage: Quota exceeded for key "${key}". Data is safely stored in IndexedDB instead.`);
+        console.warn(`SecureStorage: Quota exceeded for key "${key}". The caller must provide its own fallback store.`);
       } else {
         console.error('Encryption failed:', error);
       }
+      return false;
     }
   },
 

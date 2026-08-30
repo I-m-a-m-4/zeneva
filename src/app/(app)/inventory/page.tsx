@@ -85,7 +85,7 @@ import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { useBranch } from '@/context/branch-context';
-import { cn } from '@/lib/utils';
+import { cn, safeToDate } from '@/lib/utils';
 import { trackFeature } from '@/lib/product-telemetry';
 import Papa from 'papaparse';
 import { logAuditEvent } from '@/lib/audit';
@@ -369,8 +369,12 @@ function InventoryPageContent() {
         if (stockDiff !== 0) return stockDiff;
         return a.name.localeCompare(b.name);
       } else if (sortBy === 'newest') {
-        const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds || 0;
-        const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds || 0;
+        // Via `safeToDate`, not `toMillis?.() || seconds || 0`. A product this
+        // device just created carries `createdAt: Date.now()` — a plain number,
+        // which has neither of those properties, so it scored 0 and this default
+        // sort put brand-new products at the very bottom of the table.
+        const dateA = safeToDate(a.createdAt).getTime();
+        const dateB = safeToDate(b.createdAt).getTime();
         if (dateB !== dateA) return dateB - dateA;
         return a.name.localeCompare(b.name);
       }
@@ -683,7 +687,7 @@ function InventoryPageContent() {
               <span className="sm:whitespace-nowrap">{t('common.export')}</span>
             </Button>
             {canManageStock && (
-              <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setIsImportOpen(true)}>
+              <Button size="sm" variant="outline" className="h-9 gap-1" id="tour-import-products" onClick={() => setIsImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" />
                 <span className="sm:whitespace-nowrap">{t('common.import')}</span>
               </Button>
@@ -697,7 +701,7 @@ function InventoryPageContent() {
               </Button>
             )}
             {canManageStock && (
-              <Button size="sm" asChild className="h-9 gap-1">
+              <Button size="sm" asChild className="h-9 gap-1" id="tour-add-product">
                 <Link href="/inventory/add">
                   <PlusCircle className="h-3.5 w-3.5" />
                   <span className="sm:whitespace-nowrap">{t('inventory.addProduct')}</span>
@@ -1321,7 +1325,7 @@ function InventoryPageContent() {
                       </Link>
                     </Button>
                     <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-                      <Upload className="me-2 h-4 w-4" /> {t('inventory.importCsv')}
+                      <Upload className="me-2 h-4 w-4" /> {t('inventory.importProducts')}
                     </Button>
                   </div>
                 )}

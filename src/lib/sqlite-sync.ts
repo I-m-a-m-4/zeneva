@@ -241,16 +241,32 @@ export async function deleteProductFromOffline(productId: string) {
   }
 }
 
-export async function deleteMultipleProductsFromOffline(productIds: string[]) {
+/**
+ * Removes products from the local mirror, and says whether it actually happened.
+ *
+ * Returns `boolean` for the same reason `syncProductsToOffline` above does, and
+ * it is the same class of bug: on desktop this table is the *only* durable
+ * product store, so a swallowed `DELETE` leaves a product the server no longer
+ * has sitting in the mirror, ready to be hydrated back onto the shelf at the
+ * next launch. That is the "I deleted it and it came back" report. The caller
+ * checks the result and reports an anomaly, rather than assuming disk agreed.
+ *
+ * As there, `!db` off Tauri is normal and counts as success; a failed
+ * `Database.load` on Tauri does not.
+ */
+export async function deleteMultipleProductsFromOffline(productIds: string[]): Promise<boolean> {
   const db = await getOfflineDb();
-  if (!db) return;
-  
+  if (!db) return typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__;
+  if (productIds.length === 0) return true;
+
   try {
     for (const id of productIds) {
       await db.execute('DELETE FROM products WHERE id = $1', [id]);
     }
+    return true;
   } catch (err) {
     console.error('SQLite Delete Error (Multiple Products):', err);
+    return false;
   }
 }
 

@@ -245,6 +245,19 @@ function ReviewPageContent() {
             const baseQuantitySold = cartItem.quantity * multiplier;
             return {
                 id: cartItem.product.id,
+                /*
+                 * `quantitySold` is what the queue actually writes with, as
+                 * `increment(-quantitySold)`. `newStock` is an absolute figure
+                 * computed from *this* device's cached stock, so two tills selling
+                 * the same item both wrote a number derived from a stale read and
+                 * the second one silently erased the first — which is the "stock
+                 * doesn't update across users" report. The absolute value is kept
+                 * because the optimistic local update and the audit log's
+                 * before/after pair still want it, and because a sale queued by an
+                 * older build carries only this field: the queue falls back to
+                 * writing it absolutely when `quantitySold` is missing.
+                 */
+                quantitySold: baseQuantitySold,
                 newStock: (product?.stock || 0) - baseQuantitySold,
                 type: product?.type,
                 components: product?.components

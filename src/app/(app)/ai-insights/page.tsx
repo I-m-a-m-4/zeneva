@@ -178,6 +178,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
   const recognitionRef = useRef<any>(null);
 
   const [proposalStatuses, setProposalStatuses] = useState<Record<string, 'APPROVED' | 'REJECTED'>>({});
+  const skipNextSyncRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto rotate carousel every 6s
@@ -316,6 +317,30 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
   }, [status]);
 
   const isLoading = status === 'submitted' || status === 'streaming';
+
+  // Sync messages to Firestore
+  useEffect(() => {
+    if (!firestore || !businessId || !user || messages.length === 0) return;
+    if (isLoading) return;
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
+    }
+    try {
+      const cleanMessages = JSON.parse(JSON.stringify(messages));
+      const firstUser = cleanMessages.find((m: any) => m.role === 'user');
+      const title = (textOf(firstUser).slice(0, 40) || 'New Chat').trim();
+      setDoc(doc(firestore, 'ai_sessions', sessionId), {
+        businessId,
+        userId: user.uid,
+        title,
+        messages: cleanMessages,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.error('Error syncing messages', e);
+    }
+  }, [messages, isLoading, sessionId, firestore, businessId, user]);
   const [localInput, setLocalInput] = useState('');
   const [durations, setDurations] = useState<Record<string, number>>({});
   const turnStartRef = useRef<number | null>(null);
@@ -380,6 +405,45 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
           return;
         }
         addToQueue({ type: 'complete-sale', payload: built.payload }, `Zen AI: recording sale ${built.receiptNumber}`);
+      } else if (action.action === 'COST_PRICES' || action.action === 'COST_ESTIMATE') {
+        const writes = check.writes ?? [];
+        if (writes.length === 0) {
+          toast({ title: 'Not applied', description: 'Nothing was left to change.', variant: 'destructive' });
+          return;
+        }
+
+        let queued = 0;
+        for (const write of writes) {
+          const id = write.productIds
+            ? addToQueue(
+                { type: 'bulk-update-products', payload: { productIds: write.productIds, values: write.values } },
+                `Zen AI: ${write.label}`,
+              )
+            : addToQueue(
+                { type: 'update-product', payload: { productId: write.productId, values: write.values } },
+                `Zen AI: ${write.label}`,
+              );
+          if (id) queued++;
+        }
+
+        if (queued === 0) {
+          toast({
+            title: 'Not applied',
+            description: 'Those changes could not be queued — you may not have permission to change inventory.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const affected = check.count ?? writes.length;
+        toast({
+          variant: 'success',
+          title: action.action === 'COST_ESTIMATE' ? 'Cost prices estimated' : 'Cost prices set',
+          description:
+            action.action === 'COST_ESTIMATE'
+              ? `${affected.toLocaleString()} products estimated. They stay marked as estimates until a waybill replaces them.`
+              : `${affected.toLocaleString()} cost price${affected === 1 ? '' : 's'} updated.`,
+        });
       }
       setProposalStatuses(prev => ({ ...prev, [proposalId]: 'APPROVED' }));
       toast({ variant: 'success', title: 'Proposal applied' });
@@ -393,8 +457,19 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
     trackFeature('ai_proposal_rejected');
   }, []);
 
-  const handlePick = useCallback((text: string) => {
-    submitPrompt(text);
+  const handlePick = useCallback((val: any) => {
+    if (typeof val === 'string') {
+      submitPrompt(val);
+    } else {
+      if (val.isPicker) {
+        submitPrompt(`I mean "${val.name}" (product id: ${val.id})`);
+      } else {
+        setLocalInput(`Show stock level and cost price for ${val.name}`);
+        setTimeout(() => {
+          document.getElementById('zen-ai-input')?.focus();
+        }, 50);
+      }
+    }
   }, [submitPrompt]);
 
   const handleNewChat = () => {
@@ -431,8 +506,14 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
   const isInitialState = messages.length === 0;
 
   const creditWall = creditsExhausted && (
-    <div className="w-full rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 shadow-sm mb-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="w-full rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4 shadow-sm mb-4 relative">
+      <button 
+        onClick={() => setCreditsExhausted(null)} 
+        className="absolute top-2 right-2 p-1 rounded-full text-orange-600/60 hover:text-orange-600 hover:bg-orange-500/10 transition-colors"
+      >
+        <X className="w-4 h-4" />
+      </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mr-6">
         <div className="min-w-0">
           <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
             <Zap className="h-4 w-4 text-orange-600 fill-current" />
@@ -537,7 +618,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
         )}
 
         {/* ── Main Scrollable Area ── */}
-        <div className={`flex-1 min-h-0 flex flex-col ${isInitialState ? 'justify-center items-center' : ''} overflow-y-auto z-10`}>
+        <div className={`flex-1 min-h-0 flex flex-col ${isInitialState ? 'items-center' : ''} overflow-y-auto z-10`}>
 
           {/* ── Initial Empty State (Manus AI Redesign) ── */}
           <AnimatePresence>
@@ -547,18 +628,22 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.3 }}
-                className="w-full max-w-3xl px-4 flex flex-col items-center"
+                className="w-full max-w-3xl px-4 flex flex-col items-center min-h-full py-8"
               >
-                {/* ── MOBILE: just the headline, input is in the floating bar below ── */}
-                {/* Headline — always visible */}
-                <h1 className="text-[32px] sm:text-4xl lg:text-[44px] font-serif text-foreground font-normal tracking-tight text-center mb-8 sm:mb-10">
-                  What can I do for you?
-                </h1>
+                {/* Spacer to push content down so it centers perfectly */}
+                <div className="flex-1 w-full" />
+                
+                <div className="w-full flex flex-col items-center">
+                  {/* ── MOBILE: just the headline, input is in the floating bar below ── */}
+                  {/* Headline — always visible */}
+                  <h1 className="text-[32px] sm:text-4xl lg:text-[44px] font-serif text-foreground font-normal tracking-tight text-center mb-8 sm:mb-10">
+                    What can I do for you?
+                  </h1>
 
-                {/* Credit wall — always visible */}
-                {creditWall && <div className="w-full mb-3">{creditWall}</div>}
+                  {/* Credit wall — always visible */}
+                  {creditWall && <div className="w-full mb-3">{creditWall}</div>}
 
-                {/* ── DESKTOP ONLY: unified input box ── */}
+                  {/* ── DESKTOP ONLY: unified input box ── */}
                 <div className="hidden sm:flex w-full bg-card border border-border/90 rounded-3xl shadow-sm hover:shadow-md transition-all overflow-hidden flex-col">
                   {/* Prompt Text Input */}
                   <form onSubmit={handleSend} className="p-4 sm:p-5 flex flex-col gap-4">
@@ -664,9 +749,13 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                     );
                   })}
                 </div>
+                </div>
+
+                {/* Spacer to push carousel to the bottom */}
+                <div className="flex-1 w-full" />
 
                 {/* ── DESKTOP ONLY: feature carousel ── */}
-                <div className="hidden sm:flex w-full max-w-xl mt-10 sm:mt-12 flex-col items-center gap-3">
+                <div className="hidden sm:flex w-full max-w-xl mt-8 flex-col items-center gap-3">
                   <div className="w-full p-4 rounded-2xl bg-muted/40 border border-border/60 flex items-center justify-between gap-4 shadow-2xs">
                     <div className="flex items-center gap-3.5 min-w-0">
                       {React.createElement(CAROUSEL_SLIDES[carouselIndex].icon, { className: "h-6 w-6 text-orange-500 shrink-0" })}
@@ -826,6 +915,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                     <Mic className="w-4 h-4" />
                   </button>
                   <input
+                    id="zen-ai-input"
                     className="flex-1 bg-transparent py-2.5 px-2 outline-none text-foreground placeholder:text-muted-foreground text-sm sm:text-base"
                     value={localInput}
                     onChange={(e) => setLocalInput(e.target.value)}

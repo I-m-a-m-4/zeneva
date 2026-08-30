@@ -324,6 +324,17 @@ export function buildSaleFromProposal(
   let totalCost = 0;
   const items: any[] = [];
   const stockByProduct = new Map<string, number>();
+  /*
+   * Units sold per product, carried alongside the absolute figure above.
+   *
+   * The queue writes stock as `increment(-quantitySold)` so a concurrent till's
+   * sale is added to rather than overwritten. Without this the sale falls back to
+   * the legacy absolute write and takes the lost-update bug with it — the POS
+   * review page carries the same field for the same reason. `stockByProduct` is
+   * still needed: it is what the running availability check above reads, and what
+   * the optimistic local update uses.
+   */
+  const soldByProduct = new Map<string, number>();
 
   for (const line of action.items) {
     const product = products?.find(p => p.id === line.productId);
@@ -352,6 +363,7 @@ export function buildSaleFromProposal(
         );
       }
       stockByProduct.set(product.id, already - qty);
+      soldByProduct.set(product.id, (soldByProduct.get(product.id) ?? 0) + qty);
     }
 
     subtotal += price * qty;
@@ -441,7 +453,7 @@ export function buildSaleFromProposal(
 
   const productUpdates = Array.from(stockByProduct.entries()).map(([id, newStock]) => {
     const product = products?.find(p => p.id === id);
-    return { id, newStock, type: product?.type, components: product?.components };
+    return { id, newStock, quantitySold: soldByProduct.get(id) ?? 0, type: product?.type, components: product?.components };
   });
 
   const customerUpdate = customer

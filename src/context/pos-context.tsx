@@ -378,6 +378,47 @@ const DELTA_MIN_GAP_MS = 20_000;
  */
 const DELTA_OVERLAP_MS = 120_000;
 
+/*
+ * ── What to say when the server refuses a queued write ─────────────────────
+ *
+ * The old copy printed the raw Firestore message — "Server rejected: ... Reason:
+ * Missing or insufficient permissions." — which tells a shopkeeper nothing about
+ * what state their shop is now in. That matters most for a delete: the product is
+ * still there, and the previous behaviour had already removed it from the screen,
+ * so the toast was the only clue and it did not say so.
+ *
+ * These say what did *not* happen, in the shop's terms. English to match the
+ * other hardcoded toasts in this file; the error code is appended by the caller
+ * so a support conversation has something to grep for.
+ */
+function rejectionTitle(actionType: string): string {
+  switch (actionType) {
+    case 'delete-product': return 'Product not deleted';
+    case 'add-product': return 'Product not saved';
+    case 'update-product':
+    case 'bulk-update-products': return 'Changes not saved';
+    case 'add-customer': return 'Customer not saved';
+    case 'update-customer': return 'Customer not updated';
+    case 'delete-customer': return 'Customer not deleted';
+    case 'delete-receipt': return 'Sale not voided';
+    default: return 'Action not completed';
+  }
+}
+
+function rejectionBody(actionType: string): string {
+  switch (actionType) {
+    case 'delete-product': return 'The server would not accept this deletion, so the product is still in your inventory.';
+    case 'add-product': return 'The server would not accept this product, so it has not been added.';
+    case 'update-product':
+    case 'bulk-update-products': return 'The server would not accept these changes, so the product is unchanged.';
+    case 'add-customer': return 'The server would not accept this customer, so they have not been added.';
+    case 'update-customer': return 'The server would not accept these changes, so the customer is unchanged.';
+    case 'delete-customer': return 'The server would not accept this deletion, so the customer is still on file.';
+    case 'delete-receipt': return 'The server would not accept this void, so the sale still stands.';
+    default: return 'The server would not accept this action, so nothing was changed.';
+  }
+}
+
 export function POSProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
@@ -454,6 +495,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
   /** Set once per session when a forced re-sync has already been spent on a stamp/store disagreement. */
   const forcedProductResyncRef = useRef(false);
   /**
+   * The synced catalogue as of the last render, for code that must read it
+   * synchronously rather than through a state updater.
+   *
+   * `fetchFullProducts`'s deletion reconciliation needs the local id set at the
+   * moment it computes the purge, and it cannot get that from inside a
+   * `setSyncedProducts` updater: an updater runs during the render phase, not at
+   * call time, so anything it collects is still empty on the next line. It also
+   * cannot close over `syncedProducts` directly — that callback deliberately does
+   * not list it as a dependency, so the value would be from whenever the callback
+   * was last built.
+   */
+  const syncedProductsRef = useRef<Product[]>([]);
+  /**
    * One server-side profile read per session is enough to diagnose a refusal, and
    * the retry ladder would otherwise pay for it on every attempt.
    */
@@ -462,6 +516,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>(() => secureStorage.getItem<QueuedAction[]>('pos_queued_actions') || []);
   const queuedActionsRef = useRef<QueuedAction[]>(queuedActions);
+  /**
+   * Queue-durability bookkeeping. See the two `pos_queued_actions` effects below.
+   *
+   * `queueMirrorReadRef` latches the one-shot fallback read; `queueMirrorChecked`
+   * is what gates the persistence effect from touching the fallback key before
+   * that read has happened; `queueFallbackActiveRef` remembers that a fallback
+   * copy is currently on disk, so it is removed exactly once — when localStorage
+   * starts accepting the queue again — rather than on every queue change.
+   */
+  const queueMirrorReadRef = useRef(false);
+  const queueFallbackActiveRef = useRef(false);
+  const [queueMirrorChecked, setQueueMirrorChecked] = useState(false);
   const [isQueueProcessing, setIsQueueProcessing] = useState(false);
   const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => bootCache<Product[]>('pos_synced_products') || []);
   const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => bootCache<Customer[]>('pos_synced_customers') || []);
@@ -825,9 +891,102 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, offlineProfile?.id]);
 
   useEffect(() => {
-    secureStorage.setItem('pos_queued_actions', queuedActions);
+    const stored = secureStorage.setItem('pos_queued_actions', queuedActions);
     queuedActionsRef.current = queuedActions;
-  }, [queuedActions]);
+
+    /*
+     * A fallback copy of the queue, kept only while localStorage is refusing it.
+     *
+     * `secureStorage.setItem` swallowed `QuotaExceededError` until it was made to
+     * report, and on web the multi-megabyte `pos_synced_*` blobs share the same
+     * ~5MB budget. The five bulk collections all have an `idb` sibling and survive
+     * that; the queue had none, so a shop over quota queued a delete, reloaded, and
+     * the delete was simply gone — the product back on the shelf, nothing to show
+     * why. Desktop has its own SQLite copy via `saveActionToOfflineQueue`; this is
+     * what covers web and the PWA.
+     *
+     * Written *only* on a failed localStorage write, and removed as soon as one
+     * succeeds. That is what makes recovery unambiguous: if the key exists at all,
+     * it is a queue localStorage could not hold, so it is the authoritative copy
+     * and can be adopted outright. A mirror maintained unconditionally would be
+     * indistinguishable from a stale one, and adopting that replays committed work
+     * — a double-counted sale.
+     *
+     * Both branches wait for `queueMirrorChecked`. This effect runs on mount, long
+     * before the recovery read below resolves, so an ungated `remove` would delete
+     * the very copy it is there to recover. `queueMirrorChecked` is a *dependency*
+     * rather than a ref for exactly that reason: when the read finishes, this
+     * effect re-runs against the same queue and retries the write, so a failure
+     * that happened during the mount window still gets a fallback copy. Dropping
+     * it from the deps reopens that hole silently.
+     */
+    if (!queueMirrorChecked) return;
+    if (!stored) {
+      queueFallbackActiveRef.current = true;
+      idb.set('pos_queued_actions', queuedActions).catch(() => {});
+    } else if (queueFallbackActiveRef.current) {
+      queueFallbackActiveRef.current = false;
+      idb.remove('pos_queued_actions').catch(() => {});
+    }
+  }, [queuedActions, queueMirrorChecked]);
+
+  /**
+   * Adopts pending writes that only ever reached the IndexedDB fallback.
+   *
+   * Runs once, as early as possible, and deliberately does not wait for
+   * `businessId` — the effect above must not touch the fallback key until this has
+   * read it. The key's mere existence means a localStorage write failed while
+   * holding these actions, so everything in it is work that was never persisted
+   * anywhere else; union by id and let the queue commit it.
+   */
+  useEffect(() => {
+    if (queueMirrorReadRef.current) return;
+    queueMirrorReadRef.current = true;
+
+    let cancelled = false;
+    idb.get<QueuedAction[]>('pos_queued_actions')
+      .then(mirrored => {
+        if (cancelled || !mirrored || mirrored.length === 0) return;
+
+        /*
+         * Set whether or not anything is adopted, so the stale key is cleaned up
+         * the moment localStorage accepts the queue again. Without this, a
+         * fallback whose contents are already in state would sit on disk
+         * indefinitely.
+         */
+        queueFallbackActiveRef.current = true;
+
+        const have = new Set(queuedActionsRef.current.map(a => a.id));
+        const recovered = mirrored.filter(a => !have.has(a.id));
+        if (recovered.length === 0) return;
+
+        setQueuedActions(prev => {
+          const seen = new Set(prev.map(a => a.id));
+          return [...prev, ...recovered.filter(a => !seen.has(a.id))];
+        });
+
+        /*
+         * No `userId`/`businessId` in the context: this runs before auth has
+         * resolved, by design. The actions carry their own tenant, which is the
+         * more accurate answer anyway.
+         */
+        reportAnomaly(
+          'queue_recovered_from_fallback',
+          `${recovered.length} pending write(s) were missing from the localStorage queue and recovered from the IndexedDB fallback — the localStorage write had failed, most likely on quota. Without the fallback these writes would have been lost silently.`,
+          {
+            details: {
+              recovered: recovered.length,
+              types: recovered.map(a => a.type),
+              businessIds: Array.from(new Set(recovered.map(a => a.payload?.businessId).filter(Boolean))),
+            },
+          }
+        );
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setQueueMirrorChecked(true); });
+
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!isDesktopApp) secureStorage.setItem('pos_synced_products', syncedProducts);
@@ -1017,26 +1176,41 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const allProducts = useMemo(() => {
     if (initialProducts === null && syncedProducts.length === 0 && isProductCatalogPending) return null;
-    let merged = [...(initialProducts || [])];
-    const existingIds = new Set(merged.map(p => p.id));
-    syncedProducts.forEach(p => { if (!existingIds.has(p.id)) merged.push(p); else { const idx = merged.findIndex(m => m.id === p.id); if (idx !== -1) merged[idx] = p; } });
+    /*
+     * Merged through a Map keyed by id, because the previous version snapshotted
+     * `existingIds` from `initialProducts` *before* the loop and never updated it
+     * inside. `initialProducts` is always empty — that listener is disabled — so
+     * the set was empty, every `syncedProducts` row took the "not seen yet"
+     * branch, and a cache holding the same id twice rendered two table rows.
+     */
+    const byId = new Map<string, Product>();
+    (initialProducts || []).forEach(p => byId.set(p.id, p));
+    syncedProducts.forEach(p => byId.set(p.id, { ...(byId.get(p.id) || {}), ...p }));
+    let merged = Array.from(byId.values());
     const deletedIds = new Set(queuedActions.filter(a => a.type === 'delete-product').flatMap(a => a.payload.productIds));
     if (deletedIds.size > 0) merged = merged.filter(p => !deletedIds.has(p.id));
     queuedActions.forEach(action => {
       if (action.type === 'update-product') { const idx = merged.findIndex(p => p.id === action.payload.productId); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }
       else if (action.type === 'bulk-update-products') { action.payload.productIds.forEach((id: string) => { const idx = merged.findIndex(p => p.id === id); if (idx !== -1) merged[idx] = { ...merged[idx], ...action.payload.values }; }); }
       else if (action.type === 'add-product') { if (!merged.find(p => p.id === action.payload.id)) merged.push({ ...action.payload, isOptimistic: true }); }
-      else if (action.type === 'complete-sale') { 
+      else if (action.type === 'complete-sale') {
         const items = action.payload.receiptData?.items || action.payload.items;
         if (Array.isArray(items)) items.forEach((item: any) => { const idx = merged.findIndex(p => p.id === item.productId); if (idx !== -1) merged[idx] = { ...merged[idx], stock: (merged[idx].stock || 0) - item.quantity }; });
       }
     });
-    // Client-side sort by createdAt desc
-    return merged.sort((a, b) => {
-      const dateA = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-      const dateB = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
-      return dateB - dateA;
-    });
+    /*
+     * Newest first — through `safeToDate`, which is the only thing here that
+     * reads all four shapes `createdAt` arrives in.
+     *
+     * The old expression was `createdAt?.toMillis?.() || createdAt?.seconds || 0`.
+     * A product this device just created carries `createdAt: Date.now()` — a plain
+     * number, since the `serverTimestamp()` only exists on the server copy — and a
+     * number has neither `toMillis` nor `seconds`, so it scored 0 and sorted as the
+     * oldest thing in the shop. Adding a product sent it to the bottom of a
+     * "newest first" list, which is what "I added it and can't see it" looks like
+     * on a shop with a few hundred products.
+     */
+    return merged.sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
   }, [initialProducts, syncedProducts, queuedActions, isRealOnline, businessId, isProductCatalogPending]);
 
   const products = useMemo(() => {
@@ -1272,11 +1446,39 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const cQuery = query(collection(firestore, "customers"), where("businessId", "==", businessId), where("updatedAt", ">", lastCheck), limit(500));
       const rQuery = query(collection(firestore, "receipts"), where("businessId", "==", businessId), where("createdAt", ">", lastCheck), limit(100));
       
-      const [pSnap, cSnap, rSnap] = await Promise.all([getDocs(pQuery), getDocs(cQuery), getDocs(rQuery)]);
-      
-      const newProducts = pSnap.docs.map(d => ({ ...d.data(), id: d.id } as Product));
-      const newCustomers = cSnap.docs.map(d => ({ ...d.data(), id: d.id } as Customer));
-      const newReceipts = rSnap.docs.map(d => ({ ...d.data(), id: d.id } as Receipt));
+      /*
+       * `allSettled`, not `all`.
+       *
+       * These three are independent questions, and under `Promise.all` one
+       * rejection threw away the two answers that had come back fine. A cashier
+       * without `view_customers` is refused on the customer query as a matter of
+       * design — so on that device the products and receipts deltas never applied
+       * either, and nothing another till did ever arrived. Each collection now
+       * stands or falls alone.
+       */
+      const [pRes, cRes, rRes] = await Promise.allSettled([getDocs(pQuery), getDocs(cQuery), getDocs(rQuery)]);
+
+      const failures: Array<{ name: string; reason: any }> = [];
+      if (pRes.status === 'rejected') failures.push({ name: 'products', reason: pRes.reason });
+      if (cRes.status === 'rejected') failures.push({ name: 'customers', reason: cRes.reason });
+      if (rRes.status === 'rejected') failures.push({ name: 'receipts', reason: rRes.reason });
+
+      /*
+       * A refusal is not a fault, and must not hold the delta window hostage.
+       *
+       * The rules legitimately refuse `customers` to a role without
+       * `view_customers`, and that is a *stable* condition — re-reading the same
+       * span tomorrow will be refused too. If a refusal blocked the window from
+       * advancing, that device would re-query an ever-widening span forever and
+       * bill the shop for it. So refusals are tolerated (the window moves, that
+       * collection simply stays as it is) while a real failure holds the window
+       * where it is so the next pass retries the same span.
+       */
+      const hardFailures = failures.filter(f => !isServerRefusal(f.reason));
+
+      const newProducts = pRes.status === 'fulfilled' ? pRes.value.docs.map(d => ({ ...d.data(), id: d.id } as Product)) : [];
+      const newCustomers = cRes.status === 'fulfilled' ? cRes.value.docs.map(d => ({ ...d.data(), id: d.id } as Customer)) : [];
+      const newReceipts = rRes.status === 'fulfilled' ? rRes.value.docs.map(d => ({ ...d.data(), id: d.id } as Receipt)) : [];
 
       // Anti-Ghosting Guard: Prevent network delta-sync from re-injecting items currently pending deletion
       const deletedProductIds = new Set(queuedActionsRef.current.filter(a => a.type === 'delete-product').flatMap(a => a.payload.productIds));
@@ -1321,13 +1523,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
           return merged;
         });
       }
-      const now = Date.now();
-      // Ref first so the next call reads the new window even within this tick;
-      // the state copy is kept for anything rendering the last-sync time.
-      lastSyncedTimestampRef.current = now;
-      setLastSyncedTimestamp(now);
-      secureStorage.setItem('pos_last_synced_timestamp', now);
-
+      if (hardFailures.length === 0) {
+        const now = Date.now();
+        // Ref first so the next call reads the new window even within this tick;
+        // the state copy is kept for anything rendering the last-sync time.
+        lastSyncedTimestampRef.current = now;
+        setLastSyncedTimestamp(now);
+        secureStorage.setItem('pos_last_synced_timestamp', now);
+      } else {
+        /*
+         * The delta poll is the *only* thing that carries another user's write to
+         * this device — all three realtime listeners on this context are disabled
+         * — and every automatic caller passes `silent: true`, which used to route
+         * a failure into total silence: no log, no toast, nothing logged for the
+         * owner. A shop whose delta had been failing for weeks simply never saw
+         * each other's products, stock or customers, and there was no way to find
+         * that out. Report it once per collection per day and leave the window
+         * where it is so the next pass retries the same span.
+         */
+        hardFailures.forEach(({ name, reason }) => {
+          reportAnomaly(
+            `delta_sync_failed_${name}`,
+            `The ${name} delta sync failed with code "${reason?.code || 'unknown'}": ${reason?.message || 'no message'}. Until it succeeds, this device will not see ${name} changes made by other users.`,
+            { userId: user?.uid, businessId, details: { collection: name, errorCode: reason?.code || 'unknown' } }
+          );
+        });
+        if (!silent) console.error('Delta Sync partially failed:', hardFailures.map(f => f.name).join(', '));
+      }
       if ((newProducts.length > 0 || newCustomers.length > 0 || newReceipts.length > 0) && !hasShownSyncToast.current && !silent) {
         toast({ title: "Operational Sync Complete", description: `Successfully synchronized inventory, customer, and recent sales data.` });
         hasShownSyncToast.current = true;
@@ -1575,7 +1797,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         setHasFullSyncedCustomers(true);
         return;
       }
-      console.error("Full Customer Sync Failed:", error);
+      console.warn("Full Customer Sync Failed:", error);
       reportAnomaly('customer_sync_failed', `Full customer sync failed: ${error?.message || error}`, {
         businessId,
         details: { fetched: allFetched.length },
@@ -1614,6 +1836,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
      * of syncing.
      */
     let persisted = true;
+    /**
+     * When this run started asking. Pagination walks `orderBy('name')` with
+     * `startAfter`, so a product created while the walk is in progress can land
+     * at a name behind the cursor and never appear in `allFetched` — present on
+     * the server, absent from the answer. Anything touched locally at or after
+     * this instant is therefore exempt from the deletion reconciliation below.
+     */
+    const runStartedAt = Date.now();
     const BATCH_SIZE = 2000; // Smaller batch for products due to potential image data/complexity
     const cap = isImpersonating ? IMPERSONATION_PRODUCT_CAP : Infinity;
 
@@ -1652,6 +1882,76 @@ export function POSProvider({ children }: { children: ReactNode }) {
           lastDoc = snap.docs[snap.docs.length - 1];
           if (snap.docs.length < BATCH_SIZE) hasMore = false;
           if (allFetched.length >= cap) hasMore = false;
+        }
+      }
+
+      /*
+       * Products the server no longer has must leave this device.
+       *
+       * Every merge in this file is an upsert — this loop, the delta sync, and
+       * `syncProductsToOffline`'s `upsertRows` — and the delta query can only
+       * ever return documents that still exist. So nothing, anywhere, removed a
+       * product that another till had deleted: it stayed in this device's cache
+       * and mirror indefinitely, and this device's own full sync would not drop
+       * it either. That is the other half of "I deleted it and it came back" —
+       * the delete worked, it just never travelled.
+       *
+       * `fetchInitialReceipts` has done exactly this for receipts all along;
+       * products never got the equivalent. This is the simpler case: a complete
+       * uncapped run holds the authoritative id set, where the receipt version
+       * has to reason about its 200-document window.
+       *
+       * Reaching this line is itself the proof that the run was complete: it sits
+       * inside the `try`, directly after the loop, so a throw anywhere in
+       * pagination skips it entirely. That matters more than anything else here —
+       * pruning against a partial `allFetched` would wipe most of the catalogue
+       * off the device, which is far worse than the bug being fixed. Never move
+       * this below a `catch` boundary or into the `finally`.
+       *
+       * Three exemptions, all load-bearing:
+       *  - a capped impersonation peek is 500 of 12,000 products, not a catalogue;
+       *  - a product with a queued create or update is *meant* not to be on the
+       *    server yet, exactly as the receipt version spares a pending sale;
+       *  - anything written locally since `runStartedAt`, for the pagination race
+       *    described where that constant is declared.
+       */
+      if (!isImpersonating) {
+        const serverIds = new Set(allFetched.map(p => p.id));
+        const inFlightIds = new Set<string>(
+          queuedActionsRef.current.flatMap(a => {
+            if (a.type === 'add-product') return [a.payload?.id].filter(Boolean) as string[];
+            if (a.type === 'update-product') return [a.payload?.productId].filter(Boolean) as string[];
+            if (a.type === 'bulk-update-products' || a.type === 'delete-product') return (a.payload?.productIds || []) as string[];
+            return [];
+          })
+        );
+
+        /*
+         * The list is computed from the ref, not inside the `setSyncedProducts`
+         * updater. An updater runs during React's render phase, not at call time,
+         * so collecting ids into an array from inside one leaves that array empty
+         * on the very next line — the mirror purge below would never have run.
+         * Keeping the updater pure also keeps it safe to invoke twice, which
+         * StrictMode does.
+         */
+        const purgedIds = syncedProductsRef.current
+          .filter(local => {
+            if (serverIds.has(local.id)) return false;
+            if (inFlightIds.has(local.id)) return false;
+            const touched = Math.max(
+              safeToDate(local.updatedAt).getTime(),
+              safeToDate(local.createdAt).getTime(),
+            );
+            return touched < runStartedAt;
+          })
+          .map(local => local.id);
+
+        if (purgedIds.length > 0) {
+          const drop = new Set(purgedIds);
+          setSyncedProducts(prev => prev.filter(p => !drop.has(p.id)));
+          if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+            await deleteMultipleProductsFromOffline(purgedIds);
+          }
         }
       }
 
@@ -1719,7 +2019,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
        * session on a shop with a full catalogue. It is now set only on the
        * success path above.
        */
-      console.error("Full Product Sync Failed:", error);
+      console.warn("Full Product Sync Failed:", error);
 
       /*
        * A refusal is retried, and it is never reported as a missing permission.
@@ -1935,7 +2235,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         setHasFullSyncedReceipts(true);
         return;
       }
-      console.error("Full Receipt Sync Failed:", error);
+      console.warn("Full Receipt Sync Failed:", error);
     } finally {
       setIsFullSyncingReceipts(false);
       setHasFullSyncedReceipts(true);
@@ -2000,7 +2300,26 @@ export function POSProvider({ children }: { children: ReactNode }) {
         // ----------------------------------------------------------------
         if (chunk.length > 1 || (chunk.length === 1 && chunk[0].type === 'complete-sale')) {
           
-          const combinedStocks = new Map<string, number>();
+          /*
+           * Units sold per product across this chunk, written as
+           * `increment(-units)`.
+           *
+           * This used to be a map of *absolute* post-sale stock figures that the
+           * selling device computed from its own cached stock, written straight to
+           * Firestore. Two tills selling the same item therefore both wrote a
+           * number derived from a stale read and the later commit erased the
+           * earlier one outright — the shop's stock silently drifted up by
+           * whatever the other till had sold. That is the "stock doesn't update
+           * across users" report, and only a relative write fixes it: an increment
+           * composes with whatever else landed in between.
+           *
+           * A sale queued by a build that predates `quantitySold` has no relative
+           * figure to use, so those fall back to the absolute write via
+           * `legacyAbsoluteStocks` rather than guessing a delta — a wrong guess
+           * here corrupts a stock count permanently.
+           */
+          const combinedSold = new Map<string, number>();
+          const legacyAbsoluteStocks = new Map<string, number>();
           const consolidatedCust = new Map<string, { totalSpent: number, loyaltyPoints?: number, lastPurchaseAt?: Timestamp }>();
           let aggregateSales = 0;
           let aggregateRev = 0;
@@ -2036,8 +2355,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 createdAt: dateVal 
               });
 
-              // Cascade product stock values (LIFO sequence logic applies naturally via Map overwrite)
-              action.payload.productUpdates.forEach((u: any) => combinedStocks.set(u.id, u.newStock));
+              // Cascade product stock movements. Units are *summed*, because two
+              // sales of the same product in one chunk must both come off the shelf
+              // — a map of absolute figures collapsed them to the last one.
+              action.payload.productUpdates.forEach((u: any) => {
+                const units = Number(u.quantitySold);
+                if (Number.isFinite(units) && units > 0) {
+                  combinedSold.set(u.id, (combinedSold.get(u.id) || 0) + units);
+                } else {
+                  legacyAbsoluteStocks.set(u.id, u.newStock);
+                }
+              });
 
               // Cumulate operational metrics
               aggregateSales += 1;
@@ -2067,7 +2395,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
             });
 
             // Step B: Flush all cumulative values from the local aggregation buffer into Firestore batch commands.
-            combinedStocks.forEach((stockVal, pId) => {
+            //
+            // Relative for anything that told us how many units moved, so a
+            // concurrent till's sale is added to rather than overwritten. The
+            // legacy map is only ever populated by actions queued before
+            // `quantitySold` existed, and a product cannot be in both.
+            combinedSold.forEach((units, pId) => {
+              batch.update(doc(firestore, 'products', pId), { stock: increment(-units), updatedAt: serverTimestamp() });
+            });
+
+            legacyAbsoluteStocks.forEach((stockVal, pId) => {
               batch.update(doc(firestore, 'products', pId), { stock: stockVal, updatedAt: serverTimestamp() });
             });
 
@@ -2148,10 +2485,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
             });
 
             // 2. Fast-track locally synchronized stock reductions to avoid edge-desync
-            if (combinedStocks.size > 0) {
+            //
+            // Relative here too, and for a second reason beyond matching the write:
+            // Relative here too, and for a second reason beyond matching the write:
+            // several sales of one product in a chunk are summed, where a map of
+            // absolute figures kept only the last and under-counted the units that
+            // actually left the shelf.
+            if (combinedSold.size > 0 || legacyAbsoluteStocks.size > 0) {
               setSyncedProducts(prev => {
                  const fresh = [...prev];
-                 combinedStocks.forEach((stockVal, productId) => {
+                 combinedSold.forEach((units, productId) => {
+                   const idx = fresh.findIndex(p => p.id === productId);
+                   if (idx !== -1) fresh[idx] = { ...fresh[idx], stock: (Number(fresh[idx].stock) || 0) - units };
+                 });
+                 legacyAbsoluteStocks.forEach((stockVal, productId) => {
                    const idx = fresh.findIndex(p => p.id === productId);
                    if (idx !== -1) fresh[idx] = { ...fresh[idx], stock: stockVal };
                  });
@@ -2187,7 +2534,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
             if (isPermanentError) {
               console.warn("⚠️ Permanent Firestore rejection on aggregate batch. Discarding chunk to unblock queue.");
               chunk.forEach(action => successfullyCommitIds.push(action.id)); // Discard to unblock queue
-              
+
+              /*
+               * A discarded sale chunk is money the shop rang up and Firestore
+               * never took. Nothing recorded that before this, so the same
+               * silence that hid refused product writes hid lost sales too.
+               */
+              reportAnomaly(
+                'queued_write_rejected_complete-sale',
+                `Firestore refused a batch of ${chunk.length} queued sale(s) with code "${execError?.code || 'unknown'}": ${execError?.message || 'no message'}. The batch was discarded, so those sales are lost.`,
+                {
+                  userId: effectiveProfile?.id || user?.uid,
+                  businessId,
+                  details: {
+                    actionType: 'complete-sale',
+                    errorCode: execError?.code || 'unknown',
+                    role: effectiveProfile?.role ?? null,
+                    saleCount: chunk.length,
+                    receiptIds: chunk.map((c: any) => c.payload?.receiptData?.id ?? null),
+                  },
+                }
+              );
+
               toast({
                 title: "Sync Rejection",
                 description: `The server rejected a batch of actions: ${execError.message || 'Permission Denied'}.`,
@@ -2206,57 +2574,130 @@ export function POSProvider({ children }: { children: ReactNode }) {
         else if (chunk.length === 1) {
           const action = chunk[0];
           try {
+            /*
+             * Nothing local happens until the server has agreed.
+             *
+             * Every case below used to mutate `syncedProducts` and the SQLite
+             * mirror *inside* the switch, before `batch.commit()` had been
+             * awaited — and the catch below treats a permanent rejection as a
+             * success, discarding the action. So a delete the rules refused
+             * still emptied both local stores, the product vanished from every
+             * surface, and the only thing that ever contradicted that was the
+             * 24-hour full sync putting it back. That is the "I delete it and it
+             * comes back" report, and the ordering is the whole of it.
+             *
+             * It also fixes a quieter one: `add-product` appended
+             * unconditionally, so a temporary failure (which leaves the action
+             * pending and retried) appended the same row again on every attempt.
+             * A post-commit effect runs exactly once.
+             */
+            let applyLocal: (() => void | Promise<void>) | null = null;
+
             switch (action.type) {
               case 'add-customer': {
                 const cRef = doc(firestore, 'customers', action.payload.id);
                 batch.set(cRef, { ...action.payload, lowercaseName: action.payload.name?.toLowerCase() || '', lowercaseEmail: action.payload.email?.toLowerCase() || '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(1) }, { merge: true });
+                /*
+                 * This was the only create case that seeded nothing locally.
+                 * Once the action left the queue the customer was gone from the
+                 * creating device until a delta pass fetched them back, and they
+                 * reached the SQLite mirror only via the continuity effect after
+                 * that — so a staff member who added someone at the till could
+                 * not find them, and nor could anyone else until the next poll.
+                 * `add-product` has always seeded; customers now match it.
+                 */
+                applyLocal = () => {
+                  setSyncedCustomers(prev => (
+                    prev.some(c => c.id === action.payload.id)
+                      ? prev.map(c => (c.id === action.payload.id ? { ...c, ...action.payload } : c))
+                      : [...prev, action.payload]
+                  ));
+                };
                 break;
               }
               case 'update-customer': {
                 const updateVals = { ...action.payload.values, updatedAt: serverTimestamp() };
                 if (updateVals.name) updateVals.lowercaseName = updateVals.name.toLowerCase();
                 if ('email' in updateVals) updateVals.lowercaseEmail = updateVals.email?.toLowerCase() || '';
-                batch.update(doc(firestore, 'customers', action.payload.id), updateVals); 
+                batch.update(doc(firestore, 'customers', action.payload.id), updateVals);
+                applyLocal = () => {
+                  setSyncedCustomers(prev => prev.map(c => c.id === action.payload.id ? { ...c, ...action.payload.values } : c));
+                };
                 break;
               }
-              case 'delete-customer': 
-                batch.delete(doc(firestore, 'customers', action.payload.id)); 
-                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true }); 
+              case 'delete-customer':
+                batch.delete(doc(firestore, 'customers', action.payload.id));
+                batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalCustomers: increment(-1) }, { merge: true });
+                applyLocal = () => {
+                  setSyncedCustomers(prev => prev.filter(c => c.id !== action.payload.id));
+                };
                 break;
               case 'add-product':
                 batch.set(doc(firestore, 'products', action.payload.id), { ...action.payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(1) }, { merge: true });
-                setSyncedProducts(prev => [...prev, action.payload]);
-                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) syncProductToOffline(businessId, action.payload);
+                applyLocal = () => {
+                  setSyncedProducts(prev => (
+                    prev.some(p => p.id === action.payload.id)
+                      ? prev.map(p => (p.id === action.payload.id ? { ...p, ...action.payload } : p))
+                      : [...prev, action.payload]
+                  ));
+                  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) syncProductToOffline(businessId, action.payload);
+                };
                 break;
               case 'delete-product':
                 action.payload.productIds.forEach((id: string) => batch.delete(doc(firestore, 'products', id)));
                 batch.set(doc(firestore, 'businessInstances', businessId, 'stats', 'overall'), { totalProducts: increment(-action.payload.productIds.length) }, { merge: true });
-                setSyncedProducts(prev => prev.filter(p => !action.payload.productIds.includes(p.id)));
-                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-                  deleteMultipleProductsFromOffline(action.payload.productIds);
-                }
+                applyLocal = async () => {
+                  setSyncedProducts(prev => prev.filter(p => !action.payload.productIds.includes(p.id)));
+                  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+                    /*
+                     * Awaited and checked. On desktop this mirror is the only
+                     * durable product store, so a swallowed DELETE hydrates the
+                     * product back onto the shelf at the next launch — the same
+                     * resurrection, by a different route. The deletion
+                     * reconciliation in `fetchFullProducts` repairs it on the next
+                     * complete sync (the server set no longer holds the id), but
+                     * the owner should hear that disk refused a write either way.
+                     */
+                    const purged = await deleteMultipleProductsFromOffline(action.payload.productIds);
+                    if (!purged) {
+                      reportAnomaly(
+                        'product_cache_delete_failed',
+                        `Deleted ${action.payload.productIds.length} product(s) from Firestore but the local SQLite mirror refused the DELETE. They will reappear on this device until the next full sync reconciles it.`,
+                        { userId: user?.uid, businessId, details: { productIds: action.payload.productIds } }
+                      );
+                    }
+                  }
+                };
                 break;
               case 'update-product':
                 batch.update(doc(firestore, 'products', action.payload.productId), { ...action.payload.values, updatedAt: serverTimestamp() });
-                setSyncedProducts(prev => prev.map(p => p.id === action.payload.productId ? { ...p, ...action.payload.values } : p));
-                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-                  const current = syncedProducts.find(p => p.id === action.payload.productId);
-                  if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
-                }
+                applyLocal = () => {
+                  setSyncedProducts(prev => prev.map(p => p.id === action.payload.productId ? { ...p, ...action.payload.values } : p));
+                  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+                    // Through the ref, not the captured `syncedProducts`: the mirror
+                    // write merges the queued values onto the row it finds, so a
+                    // stale row would write stale sibling fields back to disk.
+                    const current = syncedProductsRef.current.find(p => p.id === action.payload.productId);
+                    if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
+                  }
+                };
                 break;
               case 'bulk-update-products':
                 action.payload.productIds.forEach((id: string) => {
                   batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
                 });
-                setSyncedProducts(prev => prev.map(p => action.payload.productIds.includes(p.id) ? { ...p, ...action.payload.values } : p));
-                if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-                  action.payload.productIds.forEach((id: string) => {
-                    const current = syncedProducts.find(p => p.id === id);
-                    if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
-                  });
-                }
+                applyLocal = () => {
+                  setSyncedProducts(prev => prev.map(p => action.payload.productIds.includes(p.id) ? { ...p, ...action.payload.values } : p));
+                  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+                    action.payload.productIds.forEach((id: string) => {
+                      // Through the ref, for the same reason as `update-product`.
+                      const current = syncedProductsRef.current.find(p => p.id === id);
+                      if (current) syncProductToOffline(businessId, { ...current, ...action.payload.values });
+                    });
+                  }
+                };
                 break;
               case 'add-audit-log': {
                 const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
@@ -2271,26 +2712,52 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
             await batch.commit();
             successfullyCommitIds.push(action.id);
+            await applyLocal?.();
 
           } catch (singularErr: any) {
             console.error(`❌ Standalone sync step failed [${action.type}]:`, singularErr);
-            
+
             // Detect non-retryable permanent errors (e.g. Permission Denied, Not Found, Failed Precondition)
             const errCode = singularErr?.code || '';
             const isPermanentError = ['permission-denied', 'not-found', 'already-exists', 'invalid-argument', 'failed-precondition'].includes(errCode);
-            
+
             if (isPermanentError) {
               console.warn(`⚠️ Permanent Firestore rejection for ${action.type} [ID: ${action.id}]. Discarding to unblock queue.`);
               successfullyCommitIds.push(action.id); // Remove from state queue to unblock remaining actions
-              
+
+              /*
+               * Tell the platform owner. A refused write used to leave nothing
+               * behind but a toast the user dismissed, which is why this has
+               * been reported three times and diagnosed none: `error_logs` is
+               * the channel that reaches the owner, and an anomaly is exactly
+               * this — a condition, not an exception. Keyed by action type so a
+               * refused delete and a refused create are separately visible;
+               * throttled per code per device per day by `reportAnomaly`.
+               */
+              reportAnomaly(
+                `queued_write_rejected_${action.type}`,
+                `Firestore refused a queued ${action.type} with code "${errCode || 'unknown'}": ${singularErr?.message || 'no message'}. The action was discarded, so this write is lost.`,
+                {
+                  userId: effectiveProfile?.id || user?.uid,
+                  businessId,
+                  details: {
+                    actionType: action.type,
+                    errorCode: errCode || 'unknown',
+                    role: effectiveProfile?.role ?? null,
+                    manageInventory: effectiveProfile?.permissions?.manage_inventory ?? null,
+                    entityIds: action.payload?.productIds ?? action.payload?.productId ?? action.payload?.id ?? null,
+                  },
+                }
+              );
+
               toast({
-                title: "Operation Denied",
-                description: `Server rejected: "${action.description || action.type}". Reason: ${singularErr.message || 'Permission Denied'}.`,
+                title: rejectionTitle(action.type),
+                description: `${rejectionBody(action.type)} (${errCode || 'rejected by server'})`,
                 variant: "destructive"
               });
               continue; // Resume execution of the remaining queue
             }
-            
+
             break; // Preserve synchronous safety for temporary network errors
           }
         }
@@ -2448,8 +2915,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const nuclearReset = useCallback(async () => {
-    await resetPOS(); 
-    setQueuedActions([]); 
+    await resetPOS();
+    setQueuedActions([]);
+    // The IndexedDB queue fallback goes with `idb.clear()` below; clear the latch
+    // too, or the next successful localStorage write would try to remove a key
+    // that is already gone.
+    queueFallbackActiveRef.current = false;
     setSyncedProducts([]); 
     setSyncedCustomers([]); 
     setSyncedReceipts([]);
@@ -2891,7 +3362,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // it put the multi-megabyte blobs straight back into localStorage and undid
   // both the quota fix and the reclaim below. SQLite is the durable store there.
   useEffect(() => { secureStorage.setItem(POS_HELD_SALES_KEY, heldSales); }, [heldSales]);
-  useEffect(() => { secureStorage.setItem('pos_queued_actions', queuedActions); }, [queuedActions]);
+  // `pos_queued_actions` used to be written here a second time as well. It is
+  // persisted by the guarded effect near the top of the provider, which also
+  // mirrors it to IndexedDB; a bare duplicate here only re-ran the localStorage
+  // write without the mirror.
 
   // Background online-to-offline syncing effects for instant offline availability on all pages
   useEffect(() => {
@@ -3187,6 +3661,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const expectedProductCountRef = useRef(0);
   useEffect(() => {
     syncedProductCountRef.current = syncedProducts.length;
+    syncedProductsRef.current = syncedProducts;
     // `stats.totalProducts` is maintained by the reconciliation effect above and
     // is the only independent evidence of what the catalogue *should* hold.
     const known = Number((stats as any)?.totalProducts ?? 0);
@@ -3216,7 +3691,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [syncedCustomers, stats]);
 
   useEffect(() => {
-    if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user) return;
+    if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user || !canFetchSubData) return;
 
     const checkFullSyncStatus = async () => {
       const [lastCustSync, lastProdSync, lastReceiptSync, lastProdPeek] = await Promise.all([
@@ -3359,7 +3834,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     checkFullSyncStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted, businessId, firestore, isRealOnline, user, isCacheHydrated]);
+  }, [isMounted, businessId, firestore, isRealOnline, user, isCacheHydrated, canFetchSubData]);
   
   // Initial Delta Sync (Silent Catch-up on mount)
   // Runs once on becoming online. The "no-op → reconnect → effect re-fires"
@@ -3371,7 +3846,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // This used to be the *only* thing that ever ran a delta sync. The foreground
   // poll below is what keeps a long-open till current; see `DELTA_POLL_MS`.
   useEffect(() => {
-    if (!businessId || !isRealOnline || !firestore) return;
+    if (!businessId || !isRealOnline || !firestore || !canFetchSubData) return;
 
     let cancelled = false;
     const timeout = setTimeout(() => {
