@@ -26,7 +26,8 @@
     "test:customer-import": "tsx scripts/check-customer-import.ts",
     "test:launch-funnel": "tsx scripts/check-launch-funnel.ts",
     "test:catalog-state": "tsx scripts/check-catalog-state.ts",
-    "test:i18n": "tsx scripts/check-i18n.ts"
+    "test:i18n": "tsx scripts/check-i18n.ts",
+    "validate:android": "node scripts/validate-android-bundle.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.36",
