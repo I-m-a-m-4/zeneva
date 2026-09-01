@@ -106,7 +106,7 @@ const PaystackSubscriptionButton = ({
 }) => {
     const { toast } = useToast();
     const firestore = useFirestore();
-    const { initializePayment, isScriptLoaded } = usePaystack();
+    const { initializePayment, isSdkReady: isScriptLoaded } = usePaystack();
     const { isImpersonating } = usePOS();
 
     const handleSuccessfulPayment = useCallback(async (transaction: { reference: string }) => {
@@ -173,11 +173,6 @@ const PaystackSubscriptionButton = ({
                 description: 'You cannot initiate billing on behalf of a user. Stop impersonating first.',
             });
             return;
-        }
-        if (!isScriptLoaded) {
-            toast({ title: "Payment gateway is loading...", description: "Please wait a moment and try again." });
-            return;
-        }
         if (isProcessing) return;
         
         // Safety check for keys and email
@@ -269,7 +264,7 @@ const PaystackSubscriptionButton = ({
         <Button
             onClick={handleSubscribe}
             className="w-full"
-            disabled={isProcessing || !isScriptLoaded}
+            disabled={isProcessing}
         >
             {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ArrowRight className="mr-2 h-4 w-4" />}
             {buttonText}

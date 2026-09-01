@@ -139,6 +139,7 @@ export const usePaystack = () => {
           title: 'Payment Gateway Error',
           description: 'Could not connect to payment gateway. Please check your internet connection and try again.',
         });
+        config.onClose?.();
         return;
       }
     }
@@ -149,6 +150,7 @@ export const usePaystack = () => {
         title: 'Payment Gateway Error',
         description: 'Payment system is temporarily unavailable. Please try again.',
       });
+      config.onClose?.();
       return;
     }
 
@@ -183,6 +185,7 @@ export const usePaystack = () => {
         title: 'Payment Error',
         description: 'Could not open the payment gateway. Please try again.',
       });
+      config.onClose?.();
     }
   }, [toast]);
 
