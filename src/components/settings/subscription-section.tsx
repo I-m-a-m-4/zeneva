@@ -173,6 +173,7 @@ const PaystackSubscriptionButton = ({
                 description: 'You cannot initiate billing on behalf of a user. Stop impersonating first.',
             });
             return;
+        }
         if (isProcessing) return;
         
         // Safety check for keys and email
