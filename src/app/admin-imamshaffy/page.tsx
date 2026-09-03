@@ -97,6 +97,7 @@ import {
     ChevronDown,
     ChevronUp,
     DoorOpen,
+    UploadCloud,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -280,6 +281,165 @@ function useCollectionCount(path: string, isCollectionGroup = false): number | n
     }, [firestore, path, isCollectionGroup]);
 
     return total;
+}
+
+function ImportIntelligenceDialog({ open, onOpenChange, importAttempts = [], businesses }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    importAttempts: any[];
+    businesses: BusinessInstance[] | null;
+}) {
+    const importAttemptsTotal = useCollectionCount('import_attempts');
+
+    const sourceLabels: Record<string, string> = {
+        spreadsheet: 'Excel or CSV',
+        paste: 'Paste Data',
+        photo: 'Photo of Stock',
+        invoice: 'Supplier Invoice',
+        text: 'Describe with Text (AI)',
+        desktop: 'Desktop App Software',
+        barcode: 'Scan Barcodes',
+    };
+
+    const actionLabels: Record<string, string> = {
+        opened_modal: 'Opened Import Modal',
+        selected_source: 'Selected Import Source',
+        file_dropped: 'File Dropped',
+        image_dropped: 'Image Dropped',
+        opened_classic_modal: 'Opened Classic CSV Modal',
+        selected_classic_file: 'Selected Classic CSV File',
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <UploadCloud className="h-5 w-5 text-primary" />
+                        Inventory Import Telemetry & Attempts
+                    </DialogTitle>
+                    <DialogDescription>
+                        Real-time tracking of users attempting to import inventory, options selected, and files uploaded.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Total Import Activity</CardDescription>
+                            <CardTitle className="text-2xl font-bold">{importAttemptsTotal ?? importAttempts.length}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[10px] text-muted-foreground">Recorded import interactions across all merchants.</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">File Upload Attempts</CardDescription>
+                            <CardTitle className="text-2xl font-bold">
+                                {importAttempts.filter(a => a.action === 'file_dropped' || a.action === 'image_dropped' || a.action === 'selected_classic_file').length}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[10px] text-muted-foreground">Spreadsheets or Images uploaded by merchants.</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription className="text-xs">Top Import Source Choice</CardDescription>
+                            <CardTitle className="text-xl font-bold capitalize truncate">
+                                {(() => {
+                                    const sources = importAttempts.map(a => a.source).filter(Boolean);
+                                    if (sources.length === 0) return 'Spreadsheet';
+                                    const counts: Record<string, number> = {};
+                                    sources.forEach(s => counts[s] = (counts[s] || 0) + 1);
+                                    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                                    return sourceLabels[top] || top || 'Spreadsheet';
+                                })()}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[10px] text-muted-foreground">Most popular import format chosen by shop owners.</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="space-y-4 mt-2">
+                    <h4 className="text-sm font-bold">Recent Import Logs</h4>
+                    <div className="max-h-72 overflow-auto border rounded-md">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Business Name</TableHead>
+                                    <TableHead>User / Email</TableHead>
+                                    <TableHead>Action</TableHead>
+                                    <TableHead>Source Choice</TableHead>
+                                    <TableHead>File Info</TableHead>
+                                    <TableHead className="text-right">Date / Time</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {importAttempts.map((item, index) => {
+                                    const dateStr = item.timestamp?.toDate 
+                                        ? format(item.timestamp.toDate(), "PPP p")
+                                        : (item.timestamp?.seconds 
+                                            ? format(new Date(item.timestamp.seconds * 1000), "PPP p")
+                                            : 'Just now');
+                                    const biz = businesses?.find(b => b.id === item.businessId);
+
+                                    return (
+                                        <TableRow key={item.id || index}>
+                                            <TableCell className="font-medium max-w-[150px] truncate" title={item.businessName || biz?.name || 'Unknown'}>
+                                                {item.businessName || biz?.name || 'Unknown Business'}
+                                            </TableCell>
+                                            <TableCell className="max-w-[160px] truncate">
+                                                <div className="flex flex-col text-left">
+                                                    <span className="font-semibold text-xs">{item.userName || 'N/A'}</span>
+                                                    <span className="text-[10px] text-muted-foreground">{item.userEmail || 'N/A'}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="text-[10px] capitalize">
+                                                    {actionLabels[item.action] || item.action || 'Opened'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-xs">
+                                                {item.source ? (
+                                                    <Badge variant="secondary" className="text-[10px] capitalize">
+                                                        {sourceLabels[item.source] || item.source}
+                                                    </Badge>
+                                                ) : '—'}
+                                            </TableCell>
+                                            <TableCell className="text-xs max-w-[150px] truncate">
+                                                {item.fileName ? (
+                                                    <div className="flex flex-col">
+                                                        <span className="font-mono text-[11px] truncate" title={item.fileName}>{item.fileName}</span>
+                                                        {item.fileSize && (
+                                                            <span className="text-[9px] text-muted-foreground">{(item.fileSize / 1024).toFixed(1)} KB</span>
+                                                        )}
+                                                    </div>
+                                                ) : '—'}
+                                            </TableCell>
+                                            <TableCell className="text-right text-[10px] text-muted-foreground whitespace-nowrap">
+                                                {dateStr}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                                {importAttempts.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6 text-sm">
+                                            No import activity logged yet.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, totalCreditPackRevenue = 0, payingBusinessesCount, businesses }: {
@@ -2312,7 +2472,7 @@ function BusinessIntelDialog({
 
 function AdminDashboardContent({
     users, businesses, products, receipts, purchases, applications, downloadClicks, grants, checkoutAttempts, branches, onRefresh, isRefreshing,
-    storefrontShares = [], receiptShares = [], onlineOrders = []
+    storefrontShares = [], receiptShares = [], onlineOrders = [], importAttempts = []
 }: {
     users: any[];
     businesses: any[];
@@ -2329,6 +2489,7 @@ function AdminDashboardContent({
     storefrontShares?: any[];
     receiptShares?: any[];
     onlineOrders?: any[];
+    importAttempts?: any[];
 }) {
 
     const firestore = useFirestore();
@@ -2440,6 +2601,7 @@ function AdminDashboardContent({
     const [isTopPerformersOpen, setIsTopPerformersOpen] = useState(false);
     const [isSaaSMetricsOpen, setIsSaaSMetricsOpen] = useState(false);
     const [isDownloadIntelOpen, setIsDownloadIntelOpen] = useState(false);
+    const [isImportIntelOpen, setIsImportIntelOpen] = useState(false);
     const [certificateModalState, setCertificateModalState] = useState<{ open: boolean; title: string; description: string; value: string; icon: any; } | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -3955,6 +4117,25 @@ function AdminDashboardContent({
                                     <p className="text-xs text-pink-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
                                 </CardContent>
                             </Card>
+
+                            <Card className="group cursor-pointer hover:shadow-lg transition-transform hover:-translate-y-1 overflow-hidden relative border-cyan-500/20" onClick={() => setIsImportIntelOpen(true)}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent pointer-events-none" />
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center text-lg">
+                                        Import Activity
+                                        <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-full group-hover:bg-cyan-200 transition-colors">
+                                            <UploadCloud className="h-5 w-5 text-cyan-600 dark:text-cyan-500" />
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 to-cyan-400">
+                                        {importAttempts?.length || 0}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-2">Inventory import attempts & options</p>
+                                    <p className="text-xs text-cyan-600/80 font-semibold mt-4 flex items-center"><UploadCloud className="h-3 w-3 mr-1" /> Click to view import logs</p>
+                                </CardContent>
+                            </Card>
                         </CardContent>
                     </Card>
                     <div className="mb-8">
@@ -5284,6 +5465,13 @@ function AdminDashboardContent({
                 downloadStats={analyticsData.downloadStats}
             />
 
+            <ImportIntelligenceDialog
+                open={isImportIntelOpen}
+                onOpenChange={setIsImportIntelOpen}
+                importAttempts={importAttempts || []}
+                businesses={businesses}
+            />
+
             <SaaSMetricsDetailDialog
                 open={isSaaSMetricsOpen}
                 onOpenChange={setIsSaaSMetricsOpen}
@@ -5491,6 +5679,7 @@ export default function AdminDashboardPage() {
     const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
     const branchesQuery = useMemoFirebase(() => query(collection(firestore, 'branches')), [firestore]);
     const checkoutAttemptsQuery = useMemoFirebase(() => query(collection(firestore, 'checkout_attempts'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const importAttemptsQuery = useMemoFirebase(() => query(collection(firestore, 'import_attempts'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const storefrontSharesQuery = useMemoFirebase(() => query(collection(firestore, 'storefront_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const receiptSharesQuery = useMemoFirebase(() => query(collection(firestore, 'receipt_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     // NOTE: the orderBy on a collectionGroup needs a COLLECTION_GROUP-scoped
@@ -5511,11 +5700,12 @@ export default function AdminDashboardPage() {
     const { data: downloadClicks, isLoading: downloadClicksLoading } = useCollection<any>(downloadClicksQuery);
     const { data: branches, isLoading: branchesLoading } = useCollection<any>(branchesQuery);
     const { data: checkoutAttempts, isLoading: checkoutAttemptsLoading } = useCollection<any>(checkoutAttemptsQuery);
+    const { data: importAttempts, isLoading: importAttemptsLoading } = useCollection<any>(importAttemptsQuery);
     const { data: storefrontShares, isLoading: storefrontSharesLoading } = useCollection<any>(storefrontSharesQuery);
     const { data: receiptShares, isLoading: receiptSharesLoading } = useCollection<any>(receiptSharesQuery);
     const { data: onlineOrders, isLoading: onlineOrdersLoading } = useCollection<any>(onlineOrdersQuery);
 
-    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading || branchesLoading || checkoutAttemptsLoading || storefrontSharesLoading || receiptSharesLoading || onlineOrdersLoading;
+    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading || branchesLoading || checkoutAttemptsLoading || importAttemptsLoading || storefrontSharesLoading || receiptSharesLoading || onlineOrdersLoading;
 
     if (isLoading) {
         return (
@@ -5537,6 +5727,7 @@ export default function AdminDashboardPage() {
         downloadClicks={downloadClicks || []} 
         grants={grants || []} 
         checkoutAttempts={checkoutAttempts || []} 
+        importAttempts={importAttempts || []}
         storefrontShares={storefrontShares || []}
         receiptShares={receiptShares || []}
         onlineOrders={onlineOrders || []}
