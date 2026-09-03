@@ -26,10 +26,10 @@ import { safeToDate } from '@/lib/utils';
 
 export type PlanId = 'starter' | 'pro' | 'business';
 
-/** Maximum products per plan. Free is capped at 50. */
+/** Maximum products per plan. Unlimited products for all plans. */
 export const PRODUCT_LIMITS: Record<PlanId, number> = {
-  starter: 50,
-  pro: 1500,
+  starter: Infinity,
+  pro: Infinity,
   business: Infinity,
 };
 
