@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { writeBatch, collection, doc, serverTimestamp, getDoc, updateDoc } from 'firebase/firestore';
+import { writeBatch, collection, doc, serverTimestamp, getDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { Loader2, UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle, Package } from 'lucide-react';
 import Papa from 'papaparse';
 import { Product } from '@/types';
@@ -18,6 +18,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { useBusiness, usePOS } from '@/context/pos-context';
 import { productLimit } from '@/lib/plan';
 import Link from 'next/link';
+import { track } from '@vercel/analytics';
 
 interface ImportDialogProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
   const { toast } = useToast();
   const firestore = useFirestore();
   const business = useBusiness();
-  const { triggerConfetti, triggerRefresh } = usePOS();
+  const { triggerConfetti, triggerRefresh, currentUserProfile } = usePOS();
 
   const [file, setFile] = React.useState<File | null>(null);
   const [parsedData, setParsedData] = React.useState<ParsedProduct[]>([]);
@@ -57,9 +58,57 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
   const [isImporting, setIsImporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      try {
+        track('inventory_classic_import_modal_opened', {
+          businessId: businessId || business?.id,
+        });
+      } catch (err) {}
+
+      if (firestore && (businessId || business)) {
+        try {
+          addDoc(collection(firestore, 'import_attempts'), {
+            userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
+            userEmail: currentUserProfile?.email || '',
+            userName: currentUserProfile?.name || '',
+            businessId: businessId || business?.id || '',
+            businessName: business?.name || '',
+            action: 'opened_classic_modal',
+            timestamp: serverTimestamp(),
+          });
+        } catch (dbErr) {}
+      }
+    }
+  }, [isOpen, businessId, business, firestore, currentUserProfile]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
+      try {
+        track('inventory_classic_import_file_selected', {
+          fileName: selectedFile.name,
+          fileSize: selectedFile.size,
+          businessId: businessId || business?.id,
+        });
+      } catch (err) {}
+
+      if (firestore && (businessId || business)) {
+        try {
+          addDoc(collection(firestore, 'import_attempts'), {
+            userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
+            userEmail: currentUserProfile?.email || '',
+            userName: currentUserProfile?.name || '',
+            businessId: businessId || business?.id || '',
+            businessName: business?.name || '',
+            action: 'selected_classic_file',
+            fileName: selectedFile.name,
+            fileSize: selectedFile.size,
+            timestamp: serverTimestamp(),
+          });
+        } catch (dbErr) {}
+      }
+
       if (selectedFile.type !== 'text/csv') {
         setError('Invalid file type. Please upload a CSV file.');
         setFile(null);

@@ -33,6 +33,10 @@ import { estimateCredits } from '@/lib/import/pricing';
 import type { ImportSource } from '@/lib/import/types';
 import { FeatureGateUpgradeCard } from '@/components/shared/feature-gate';
 import { Sparkles as SparklesIcon } from 'lucide-react';
+import { track } from '@vercel/analytics';
+import { usePOS } from '@/context/pos-context';
+import { useFirestore } from '@/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 export default function SmartImportDialog({
   isOpen,
@@ -43,6 +47,9 @@ export default function SmartImportDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
+  const { business, currentUserProfile } = usePOS();
+  const firestore = useFirestore();
+
   const importer = useSmartImport(() => {
     onSuccess();
     // Left open on the done screen rather than closing immediately: the queue drains
@@ -58,6 +65,36 @@ export default function SmartImportDialog({
   const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
+
+  // Track when the import modal is opened by a user
+  React.useEffect(() => {
+    if (isOpen) {
+      try {
+        track('inventory_import_modal_opened', {
+          businessId: business?.id,
+          businessName: business?.name,
+        });
+      } catch (trackErr) {
+        console.warn('Failed to track import modal open:', trackErr);
+      }
+
+      if (firestore && (currentUserProfile || business)) {
+        try {
+          addDoc(collection(firestore, 'import_attempts'), {
+            userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
+            userEmail: currentUserProfile?.email || '',
+            userName: currentUserProfile?.name || '',
+            businessId: business?.id || '',
+            businessName: business?.name || '',
+            action: 'opened_modal',
+            timestamp: serverTimestamp(),
+          });
+        } catch (dbErr) {
+          console.error('Failed to log import attempt to Firestore:', dbErr);
+        }
+      }
+    }
+  }, [isOpen, business, currentUserProfile, firestore]);
 
   const close = (open: boolean) => {
     if (!open) {
@@ -226,6 +263,28 @@ export default function SmartImportDialog({
               <SourcePicker
                 creditsLeft={importer.creditsLeft}
                 onPick={(source) => {
+                  try {
+                    track('inventory_import_option_selected', {
+                      source,
+                      businessId: business?.id,
+                    });
+                  } catch (trackErr) {}
+
+                  if (firestore && (currentUserProfile || business)) {
+                    try {
+                      addDoc(collection(firestore, 'import_attempts'), {
+                        userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
+                        userEmail: currentUserProfile?.email || '',
+                        userName: currentUserProfile?.name || '',
+                        businessId: business?.id || '',
+                        businessName: business?.name || '',
+                        action: 'selected_source',
+                        source,
+                        timestamp: serverTimestamp(),
+                      });
+                    } catch (dbErr) {}
+                  }
+
                   if (source === 'barcode') {
                     // The scanner lives on the Inventory page and already searches the
                     // catalogue. Sending people there beats a second scanner here that
@@ -237,11 +296,62 @@ export default function SmartImportDialog({
                   }
                   setPicked(source);
                 }}
-                onFile={importer.loadFile}
+                onFile={(file) => {
+                  try {
+                    track('inventory_import_file_dropped', {
+                      fileName: file.name,
+                      fileType: file.type,
+                      fileSize: file.size,
+                      businessId: business?.id,
+                    });
+                  } catch (trackErr) {}
+
+                  if (firestore && (currentUserProfile || business)) {
+                    try {
+                      addDoc(collection(firestore, 'import_attempts'), {
+                        userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
+                        userEmail: currentUserProfile?.email || '',
+                        userName: currentUserProfile?.name || '',
+                        businessId: business?.id || '',
+                        businessName: business?.name || '',
+                        action: 'file_dropped',
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        timestamp: serverTimestamp(),
+                      });
+                    } catch (dbErr) {}
+                  }
+
+                  importer.loadFile(file);
+                }}
                 onImage={(file) => {
-                  // Open the photo panel with the file already in hand. Which prompt
-                  // to use is the one thing a dropped image cannot tell us, so the
-                  // panel defaults to a stock photo and offers the invoice tile.
+                  try {
+                    track('inventory_import_image_dropped', {
+                      fileName: file.name,
+                      fileType: file.type,
+                      fileSize: file.size,
+                      businessId: business?.id,
+                    });
+                  } catch (trackErr) {}
+
+                  if (firestore && (currentUserProfile || business)) {
+                    try {
+                      addDoc(collection(firestore, 'import_attempts'), {
+                        userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
+                        userEmail: currentUserProfile?.email || '',
+                        userName: currentUserProfile?.name || '',
+                        businessId: business?.id || '',
+                        businessName: business?.name || '',
+                        action: 'image_dropped',
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        timestamp: serverTimestamp(),
+                      });
+                    } catch (dbErr) {}
+                  }
+
                   setHandoff(file);
                   setPicked('photo');
                 }}
