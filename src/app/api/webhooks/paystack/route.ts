@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
 import crypto from 'crypto';
+import { notifyAdminsOfSubscription } from '@/lib/server/notifications';
 
 // Webhooks must never be statically rendered — this handler verifies an HMAC over
 // the raw request body and writes to Firestore.
@@ -140,6 +141,15 @@ export async function POST(request: Request) {
               });
               await batch.commit();
               console.log(`[paystack-webhook] Successfully upgraded business ${targetBusinessId} to ${targetPlan} plan until ${expiresAt.toISOString()}`);
+              
+              notifyAdminsOfSubscription({
+                businessName: businessSnap.data()?.name || 'A Zeneva Store',
+                planId: targetPlan,
+                amount: amountInNaira,
+                currency: data.currency || 'NGN'
+              }).catch(err => {
+                console.error('[paystack-webhook] Failed to send admin subscription notification:', err);
+              });
             }
           }
         }

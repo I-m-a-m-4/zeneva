@@ -193,6 +193,21 @@ export async function POST(req: Request) {
               const newExpiryDate = new Date(startDate);
               newExpiryDate.setMonth(newExpiryDate.getMonth() + monthsToAdd);
 
+              // Extract currency & amount robustly from Dodo payload and metadata
+              let currency = (metadata.currency || pData.currency || pData.settlement_currency || 'NGN').toUpperCase();
+              let rawAmount = pData.total_amount ?? pData.amount ?? pData.settlement_amount ?? pData.price ?? 0;
+              let calculatedAmount = rawAmount > 1000 ? rawAmount / 100 : rawAmount;
+
+              // Fallback pricing if amount is missing or zero
+              if (calculatedAmount <= 0) {
+                if (currency === 'USD') {
+                  calculatedAmount = planId === 'business' ? 30 * monthsToAdd : 10 * monthsToAdd;
+                } else {
+                  currency = 'NGN';
+                  calculatedAmount = planId === 'business' ? 30000 * monthsToAdd : 10000 * monthsToAdd;
+                }
+              }
+
               const batch = adminFirestore.batch();
               
               // 1. Upgrade the business instance
@@ -208,8 +223,8 @@ export async function POST(req: Request) {
               batch.set(purchasesRef, {
                   businessId: businessId,
                   plan: planId,
-                  amount: (pData.total_amount || 0) / 100, // Dodo yields total_amount in fractional units/cents
-                  currency: pData.currency || 'USD',
+                  amount: calculatedAmount,
+                  currency: currency,
                   timestamp: new Date(),
                   reference: pData.payment_id || 'dodo_' + Date.now(),
                   gateway: 'dodopayments'
@@ -219,15 +234,13 @@ export async function POST(req: Request) {
               const historyRef = businessRef.collection('subscription_history').doc();
               batch.set(historyRef, {
                   action: `Subscribed via Dodo for ${monthsToAdd} month(s)`,
-                  amount: (pData.total_amount || 0) / 100,
-                  currency: pData.currency || 'USD',
+                  amount: calculatedAmount,
+                  currency: currency,
                   timestamp: new Date(),
-                  dodo_payment_id: pData.payment_id
+                  dodo_payment_id: pData.payment_id || null
               });
 
               // 4. Idempotency marker, committed atomically with the grant.
-              // create() (not set()) so a concurrent delivery that already
-              // wrote this id fails the entire batch instead of double-granting.
               batch.create(processedRef, {
                   type: event.type,
                   businessId: businessId,
@@ -237,14 +250,14 @@ export async function POST(req: Request) {
               });
 
               await batch.commit();
-              console.log(`[dodo-webhook] Applied plan update to business: ${businessId}`);
+              console.log(`[dodo-webhook] Applied plan update to business: ${businessId} (${planId}, ${currency} ${calculatedAmount})`);
               
               // Notify platform admins/owners about the new subscription
               notifyAdminsOfSubscription({
                 businessName: bData.name || 'Another Business',
                 planId: planId,
-                amount: (pData.total_amount || 0) / 100,
-                currency: pData.currency || 'USD'
+                amount: calculatedAmount,
+                currency: currency
               }).catch(err => {
                 console.error('[dodo-webhook] Failed to send admin subscription notification:', err);
               });
