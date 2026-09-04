@@ -23,16 +23,16 @@ export interface FeatureUpdate {
 }
 
 const DEFAULT_LATEST_UPDATE: FeatureUpdate = {
-  id: 'release_v3_2_8_quick_zen_ai',
-  title: 'Introducing Quick Zen AI',
-  badge: 'v3.2.8 Update',
+  id: 'release_v3_2_10_playstore',
+  title: 'Zeneva is Now Available on Google Play Store!',
+  badge: 'v3.2.10 Update',
   description:
-    'Start an instant assistant session from any screen with the Ctrl key. Dictate sales, audit inventory, and run your store faster — without losing your place.',
+    'You can now download and install Zeneva directly from the Google Play Store on your Android phone or tablet! Manage inventory, process sales, and access Zen AI on the go.',
   videoUrl: '',
   changelogLink: '/notifications',
-  actionText: 'Got it',
-  actionHref: '/ai-insights',
-  releaseVersion: '3.2.8',
+  actionText: 'Get on Play Store',
+  actionHref: 'https://play.google.com/store/apps/details?id=com.zeneva.app',
+  releaseVersion: '3.2.10',
   isActive: true,
 };
 
@@ -94,7 +94,7 @@ export function FeatureUpdateModal() {
             changelogLink: docData.changelogLink || '/notifications',
             actionText: docData.actionText || 'Got it',
             actionHref: docData.actionHref || '',
-            releaseVersion: docData.releaseVersion || '3.2.8',
+            releaseVersion: docData.releaseVersion || '3.2.10',
             isActive: true,
           };
           setUpdate(activeUpdate);
@@ -134,7 +134,11 @@ export function FeatureUpdateModal() {
   const handleAction = () => {
     handleDismiss();
     if (update.actionHref && update.actionText !== 'Got it') {
-      router.push(update.actionHref);
+      if (update.actionHref.startsWith('http://') || update.actionHref.startsWith('https://')) {
+        window.open(update.actionHref, '_blank', 'noopener,noreferrer');
+      } else {
+        router.push(update.actionHref);
+      }
     }
   };
 

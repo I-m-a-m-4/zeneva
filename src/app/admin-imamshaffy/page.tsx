@@ -2715,12 +2715,12 @@ function AdminDashboardContent({
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
 
     // Feature Release Announcement State
-    const [featureTitle, setFeatureTitle] = useState('Introducing Quick Zen AI Assistant');
-    const [featureBadge, setFeatureBadge] = useState('v3.2.8 Update');
-    const [featureDescription, setFeatureDescription] = useState('Press the Ctrl key anywhere to summon Zen AI instantly. Dictate sales, ask for stock audits, or manage inventory in seconds without leaving your current screen.');
+    const [featureTitle, setFeatureTitle] = useState('Zeneva is Now Available on Google Play Store!');
+    const [featureBadge, setFeatureBadge] = useState('v3.2.10 Update');
+    const [featureDescription, setFeatureDescription] = useState('Download Zeneva directly on your Android phone or tablet from the Google Play Store! Manage sales, monitor inventory, and access Zen AI on the go.');
     const [featureVideoUrl, setFeatureVideoUrl] = useState('');
-    const [featureActionText, setFeatureActionText] = useState('Try Zen AI (Ctrl)');
-    const [featureActionHref, setFeatureActionHref] = useState('/ai-insights');
+    const [featureActionText, setFeatureActionText] = useState('Get on Play Store');
+    const [featureActionHref, setFeatureActionHref] = useState('https://play.google.com/store/apps/details?id=com.zeneva.app');
     const [isSavingFeatureUpdate, setIsSavingFeatureUpdate] = useState(false);
 
     // User Management State
