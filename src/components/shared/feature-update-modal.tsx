@@ -23,16 +23,16 @@ export interface FeatureUpdate {
 }
 
 const DEFAULT_LATEST_UPDATE: FeatureUpdate = {
-  id: 'release_v3_2_10_playstore',
+  id: 'release_v3_3_0_playstore',
   title: 'Zeneva is Now Available on Google Play Store!',
-  badge: 'v3.2.10 Update',
+  badge: 'v3.3.0 Update',
   description:
     'You can now download and install Zeneva directly from the Google Play Store on your Android phone or tablet! Manage inventory, process sales, and access Zen AI on the go.',
   videoUrl: '',
   changelogLink: '/notifications',
   actionText: 'Get on Play Store',
   actionHref: 'https://play.google.com/store/apps/details?id=com.zeneva.app',
-  releaseVersion: '3.2.10',
+  releaseVersion: '3.3.0',
   isActive: true,
 };
 

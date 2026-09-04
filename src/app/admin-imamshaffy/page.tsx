@@ -2716,7 +2716,7 @@ function AdminDashboardContent({
 
     // Feature Release Announcement State
     const [featureTitle, setFeatureTitle] = useState('Zeneva is Now Available on Google Play Store!');
-    const [featureBadge, setFeatureBadge] = useState('v3.2.10 Update');
+    const [featureBadge, setFeatureBadge] = useState('v3.3.0 Update');
     const [featureDescription, setFeatureDescription] = useState('Download Zeneva directly on your Android phone or tablet from the Google Play Store! Manage sales, monitor inventory, and access Zen AI on the go.');
     const [featureVideoUrl, setFeatureVideoUrl] = useState('');
     const [featureActionText, setFeatureActionText] = useState('Get on Play Store');
