@@ -8,6 +8,7 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { AppConfig } from '@/lib/config';
 
 export interface FeatureUpdate {
   id: string;
@@ -200,18 +201,18 @@ export function FeatureUpdateModal() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                /* Rich Animated Showcase Canvas */
+                /* Rich Animated Showcase Canvas in Zeneva Signature Warm Orange */
                 <div className="relative w-full h-full flex flex-col justify-center items-center px-6 text-center overflow-hidden">
-                  {/* Ambient Glowing Background Orbs */}
+                  {/* Ambient Glowing Background Orbs in Warm Orange & Amber */}
                   <motion.div
-                    animate={{ scale: [1, 1.25, 1], opacity: [0.3, 0.6, 0.3] }}
+                    animate={{ scale: [1, 1.25, 1], opacity: [0.35, 0.65, 0.35] }}
                     transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-                    className="absolute -top-12 -left-12 w-48 h-48 bg-emerald-500/25 rounded-full blur-3xl pointer-events-none"
+                    className="absolute -top-12 -left-12 w-48 h-48 bg-orange-500/30 rounded-full blur-3xl pointer-events-none"
                   />
                   <motion.div
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.5, 0.2] }}
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.25, 0.55, 0.25] }}
                     transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-                    className="absolute -bottom-12 -right-12 w-56 h-56 bg-teal-500/20 rounded-full blur-3xl pointer-events-none"
+                    className="absolute -bottom-12 -right-12 w-56 h-56 bg-amber-500/25 rounded-full blur-3xl pointer-events-none"
                   />
 
                   {/* Faded Background Typography Watermark */}
@@ -223,7 +224,7 @@ export function FeatureUpdateModal() {
 
                   {/* Hero Animated Content */}
                   <div className="relative z-10 flex flex-col items-center gap-3">
-                    {/* Badge */}
+                    {/* Zeneva Brand Badge with Logo */}
                     <motion.div
                       initial={{ scale: 0.85, opacity: 0, y: 8 }}
                       animate={{ scale: 1, opacity: 1, y: [0, -4, 0] }}
@@ -232,11 +233,11 @@ export function FeatureUpdateModal() {
                         opacity: { duration: 0.4 },
                         y: { duration: 3, repeat: Infinity, ease: 'easeInOut' }
                       }}
-                      className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 shadow-md backdrop-blur-md"
+                      className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-orange-500/20 border border-orange-400/35 text-orange-300 shadow-md backdrop-blur-md"
                     >
-                      <Sparkles className="h-3.5 w-3.5 text-emerald-400 fill-emerald-400" />
+                      <img src={AppConfig.logoIconUrl} alt="Zeneva" className="h-4 w-4" />
                       <span className="text-xs font-semibold tracking-wide">
-                        {update.badge || 'Official Release'}
+                        {update.badge || 'v3.3.0 Update'}
                       </span>
                     </motion.div>
 
@@ -263,8 +264,8 @@ export function FeatureUpdateModal() {
                     </motion.div>
                   </div>
 
-                  {/* Bottom Accent Shimmer Line */}
-                  <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-70" />
+                  {/* Bottom Accent Shimmer Line in Signature Orange */}
+                  <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-orange-500 to-transparent opacity-80" />
                 </div>
               )}
             </div>
