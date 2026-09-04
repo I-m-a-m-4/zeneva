@@ -30,6 +30,17 @@ if (fs.existsSync(tauriConfPath)) {
       w.title = w.title.replace(/v[\d.]+$/, `v${newVersion}`);
     }
   });
+  const parts = newVersion.split('.').map(Number);
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    const major = parts[0];
+    const minor = parts[1];
+    const patch = parts[2];
+    const versionCode = major * 1000000 + minor * 1000 + patch;
+    if (!tauriConf.bundle) tauriConf.bundle = {};
+    if (!tauriConf.bundle.android) tauriConf.bundle.android = {};
+    tauriConf.bundle.android.versionCode = versionCode;
+    console.log(`Updated android.versionCode to ${versionCode}`);
+  }
   fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
   console.log(`Updated tauri.conf.json to ${newVersion}`);
 }
