@@ -117,6 +117,8 @@ export function FeatureUpdateModal() {
     if (typeof window === 'undefined') return;
     const dismissed = localStorage.getItem(`dismissed_update_${updateId}`);
     if (!dismissed) {
+      // Mark as shown immediately so it NEVER pops up a second time on reload/navigation
+      localStorage.setItem(`dismissed_update_${updateId}`, 'true');
       const timer = setTimeout(() => {
         setIsOpen(true);
       }, 1000);
@@ -147,9 +149,6 @@ export function FeatureUpdateModal() {
   const youtubeEmbed = update.videoUrl ? getYouTubeEmbedUrl(update.videoUrl) : null;
   const isDirectVideo = update.videoUrl && !youtubeEmbed && (update.videoUrl.endsWith('.mp4') || update.videoUrl.endsWith('.webm'));
 
-  // Extract clean title keywords for the watermark
-  const watermarkKeyword = update.title.replace(/^introducing\s+/i, '').split(' ')[0] || 'Zen AI';
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -160,10 +159,10 @@ export function FeatureUpdateModal() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleDismiss}
-            className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
           />
 
-          {/* Modal Card - 100% Light Theme matching Image 1 */}
+          {/* Modal Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -175,14 +174,14 @@ export function FeatureUpdateModal() {
             <button
               type="button"
               onClick={handleDismiss}
-              className="absolute top-4 right-4 z-30 h-7 w-7 rounded-full bg-zinc-800/15 hover:bg-zinc-800/25 text-zinc-700 hover:text-zinc-950 flex items-center justify-center transition-all shadow-xs"
+              className="absolute top-3.5 right-3.5 z-30 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all shadow-md backdrop-blur-xs cursor-pointer"
               title="Close"
             >
               <X className="h-4 w-4 stroke-[2.5]" />
             </button>
 
             {/* Top Media / Showcase Area */}
-            <div className="relative w-full aspect-[16/10] bg-gradient-to-b from-white via-zinc-50 to-zinc-100/90 flex flex-col justify-between overflow-hidden border-b border-zinc-100 select-none">
+            <div className="relative w-full aspect-[16/10] bg-gradient-to-br from-zinc-900 via-zinc-950 to-black text-white flex flex-col justify-between overflow-hidden border-b border-zinc-800 select-none">
               {youtubeEmbed ? (
                 <iframe
                   src={youtubeEmbed}
@@ -201,63 +200,76 @@ export function FeatureUpdateModal() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                /* Pure White Showcase Canvas with Faded Repeating Typography Watermark */
-                <>
-                  {/* Faded Watermark in Upper Right */}
-                  <div className="absolute top-4 right-8 flex flex-col items-start opacity-[0.14] pointer-events-none select-none font-bold text-4xl sm:text-5xl tracking-tight text-zinc-900 leading-tight">
-                    <span>{watermarkKeyword}</span>
-                    <span>{watermarkKeyword}</span>
-                    <span>{watermarkKeyword}</span>
-                    <span>{watermarkKeyword}</span>
-                    <span>{watermarkKeyword}</span>
+                /* Rich Animated Showcase Canvas */
+                <div className="relative w-full h-full flex flex-col justify-center items-center px-6 text-center overflow-hidden">
+                  {/* Ambient Glowing Background Orbs */}
+                  <motion.div
+                    animate={{ scale: [1, 1.25, 1], opacity: [0.3, 0.6, 0.3] }}
+                    transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+                    className="absolute -top-12 -left-12 w-48 h-48 bg-emerald-500/25 rounded-full blur-3xl pointer-events-none"
+                  />
+                  <motion.div
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.5, 0.2] }}
+                    transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+                    className="absolute -bottom-12 -right-12 w-56 h-56 bg-teal-500/20 rounded-full blur-3xl pointer-events-none"
+                  />
+
+                  {/* Faded Background Typography Watermark */}
+                  <div className="absolute inset-0 flex flex-col justify-center items-center opacity-[0.05] pointer-events-none select-none font-black text-5xl sm:text-6xl tracking-tighter text-white leading-tight uppercase">
+                    <span>Zeneva</span>
+                    <span>Google Play</span>
+                    <span>Android</span>
                   </div>
 
-                  {/* Centered Hero Headline */}
-                  <div className="flex-1 flex items-center justify-center px-6 relative z-10">
-                    <div className="flex items-center gap-2.5 text-center">
-                      <span className="text-2xl sm:text-3xl font-extrabold text-zinc-900 tracking-tight flex items-center gap-2">
-                        <span>Introducing</span>
-                        <Zap className="h-6 w-6 text-orange-500 fill-orange-500 shrink-0 inline-block" />
-                        <span className="text-zinc-900">{update.title.replace(/^introducing\s+/i, '')}</span>
+                  {/* Hero Animated Content */}
+                  <div className="relative z-10 flex flex-col items-center gap-3">
+                    {/* Badge */}
+                    <motion.div
+                      initial={{ scale: 0.85, opacity: 0, y: 8 }}
+                      animate={{ scale: 1, opacity: 1, y: [0, -4, 0] }}
+                      transition={{
+                        scale: { duration: 0.4 },
+                        opacity: { duration: 0.4 },
+                        y: { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+                      }}
+                      className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 shadow-md backdrop-blur-md"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-emerald-400 fill-emerald-400" />
+                      <span className="text-xs font-semibold tracking-wide">
+                        {update.badge || 'Official Release'}
                       </span>
-                    </div>
+                    </motion.div>
+
+                    {/* Title Text (Without 'Introducing') */}
+                    <motion.h2
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15, duration: 0.4 }}
+                      className="text-2xl sm:text-[28px] font-extrabold tracking-tight text-white max-w-[420px] leading-snug"
+                    >
+                      {update.title.replace(/^introducing\s+/i, '')}
+                    </motion.h2>
+
+                    {/* Feature Pills */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3, duration: 0.4 }}
+                      className="flex flex-wrap justify-center items-center gap-2 mt-1 text-[11px] text-zinc-300"
+                    >
+                      <span className="px-2.5 py-0.5 rounded-md bg-white/10 border border-white/10 backdrop-blur-xs font-medium">📱 Phone & Tablet</span>
+                      <span className="px-2.5 py-0.5 rounded-md bg-white/10 border border-white/10 backdrop-blur-xs font-medium">⚡ Real-time Sync</span>
+                      <span className="px-2.5 py-0.5 rounded-md bg-white/10 border border-white/10 backdrop-blur-xs font-medium">🤖 Zen AI</span>
+                    </motion.div>
                   </div>
 
-                  {/* Realistic Media Controls Bar matching Image 1 */}
-                  <div className="relative z-10 px-4 py-2.5 bg-gradient-to-t from-black/20 via-black/5 to-transparent flex flex-col gap-1.5 text-zinc-700">
-                    {/* Scrub Bar */}
-                    <div className="w-full h-1 bg-zinc-300/80 rounded-full overflow-hidden cursor-pointer">
-                      <div
-                        className="h-full bg-zinc-800 transition-all duration-200"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-
-                    {/* Controls Row */}
-                    <div className="flex items-center justify-between text-[11px] font-medium text-zinc-600">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setIsPlaying(!isPlaying)}
-                          className="hover:text-zinc-900 transition-colors"
-                        >
-                          {isPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
-                        </button>
-                        <span>0:{Math.floor(progress / 7).toString().padStart(2, '0')} / 0:16</span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Volume2 className="h-3.5 w-3.5 hover:text-zinc-900 cursor-pointer transition-colors" />
-                        <Maximize2 className="h-3.5 w-3.5 hover:text-zinc-900 cursor-pointer transition-colors" />
-                        <MoreVertical className="h-3.5 w-3.5 hover:text-zinc-900 cursor-pointer transition-colors" />
-                      </div>
-                    </div>
-                  </div>
-                </>
+                  {/* Bottom Accent Shimmer Line */}
+                  <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-70" />
+                </div>
               )}
             </div>
 
-            {/* Lower Content Area matching Image 1 */}
+            {/* Lower Content Area */}
             <div className="p-6 sm:p-7 bg-white flex flex-col gap-3">
               <h3 className="text-xl sm:text-[22px] font-bold text-zinc-900 tracking-tight">
                 {update.title}
@@ -267,7 +279,7 @@ export function FeatureUpdateModal() {
                 {update.description}
               </p>
 
-              {/* Footer Row matching Image 1 */}
+              {/* Footer Row */}
               <div className="flex items-center justify-between pt-5 mt-2">
                 <button
                   type="button"
@@ -275,7 +287,7 @@ export function FeatureUpdateModal() {
                     handleDismiss();
                     router.push(update.changelogLink || '/notifications');
                   }}
-                  className="text-xs font-semibold text-zinc-700 hover:text-zinc-950 transition-colors"
+                  className="text-xs font-semibold text-zinc-700 hover:text-zinc-950 transition-colors cursor-pointer"
                 >
                   See all updates
                 </button>
