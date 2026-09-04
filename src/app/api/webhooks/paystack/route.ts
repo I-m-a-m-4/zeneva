@@ -52,10 +52,101 @@ export async function POST(request: Request) {
     if (event === 'charge.success') {
       const subaccountCode = data.subaccount?.subaccount_code;
       const amountInNaira = data.amount / 100;
-      const reference = data.reference;
+      const reference = data.reference || '';
       const customerEmail = data.customer?.email || '';
 
-      // 1. Locate Business Instance by Subaccount Code
+      // Check if this is a Zeneva platform subscription payment
+      const metadata = data.metadata || {};
+      const customFields = Array.isArray(metadata.custom_fields) ? metadata.custom_fields : [];
+      const businessIdFromMeta = metadata.business_id || customFields.find((f: any) => f.variable_name === 'business_id')?.value;
+      const planFromMeta = metadata.plan || customFields.find((f: any) => f.variable_name === 'plan')?.value;
+      const isSubscriptionPayment = reference.startsWith('z-') || !!businessIdFromMeta || !!planFromMeta || (!subaccountCode && amountInNaira >= 5000);
+
+      if (isSubscriptionPayment) {
+        console.log(`[paystack-webhook] Processing platform subscription payment for ref: ${reference}`);
+        
+        let targetBusinessId = businessIdFromMeta || '';
+        let targetPlan = (planFromMeta || '').toLowerCase();
+
+        // If businessId not in metadata, extract from reference z-{bizPrefix}-{timestamp}
+        if (!targetBusinessId && reference.startsWith('z-')) {
+          const parts = reference.split('-');
+          if (parts.length >= 2) {
+            const bizPrefix = parts[1];
+            const bizSnap = await adminFirestore.collection('businessInstances').get();
+            const match = bizSnap.docs.find(d => d.id.substring(0, 6) === bizPrefix || d.id.startsWith(bizPrefix));
+            if (match) targetBusinessId = match.id;
+          }
+        }
+
+        // If businessId still not found, check by customer email
+        if (!targetBusinessId && customerEmail) {
+          const userSnap = await adminFirestore.collection('users').where('email', '==', customerEmail).limit(1).get();
+          if (!userSnap.empty) {
+            targetBusinessId = userSnap.docs[0].data()?.businessId || '';
+          }
+        }
+
+        // If targetPlan not provided, deduce plan from amount paid
+        if (!targetPlan) {
+          if (amountInNaira >= 25000) {
+            targetPlan = 'business';
+          } else {
+            targetPlan = 'pro';
+          }
+        }
+
+        if (targetBusinessId) {
+          // Check if already processed
+          const existingPurchase = await adminFirestore.collection('purchases').where('reference', '==', reference).limit(1).get();
+          if (existingPurchase.empty) {
+            const businessRef = adminFirestore.collection('businessInstances').doc(targetBusinessId);
+            const businessSnap = await businessRef.get();
+            if (businessSnap.exists) {
+              const currentExpiry = businessSnap.data()?.trialExpiresAt?.toDate ? businessSnap.data()?.trialExpiresAt.toDate() : null;
+              const startDate = currentExpiry && currentExpiry > new Date() ? currentExpiry : new Date();
+              
+              let months = 1;
+              if (amountInNaira >= 80000) months = 12;
+              else if (amountInNaira >= 45000) months = 6;
+              else if (amountInNaira >= 24000 && targetPlan === 'pro') months = 3;
+              else if (amountInNaira >= 70000 && targetPlan === 'business') months = 3;
+
+              const expiresAt = new Date(startDate);
+              expiresAt.setMonth(expiresAt.getMonth() + months);
+
+              const batch = adminFirestore.batch();
+              batch.update(businessRef, {
+                plan: targetPlan,
+                trialExpiresAt: expiresAt,
+                accessLevel: null,
+                updatedAt: new Date()
+              });
+              batch.set(adminFirestore.collection('purchases').doc(), {
+                businessId: targetBusinessId,
+                plan: targetPlan,
+                amount: amountInNaira,
+                currency: data.currency || 'NGN',
+                reference,
+                timestamp: new Date(),
+                verifiedServerSide: true,
+                source: 'paystack-webhook'
+              });
+              batch.set(businessRef.collection('subscription_history').doc(), {
+                action: `Subscribed to ${targetPlan} plan via Paystack Webhook`,
+                amount: amountInNaira,
+                currency: data.currency || 'NGN',
+                timestamp: new Date()
+              });
+              await batch.commit();
+              console.log(`[paystack-webhook] Successfully upgraded business ${targetBusinessId} to ${targetPlan} plan until ${expiresAt.toISOString()}`);
+            }
+          }
+        }
+        return new NextResponse('Subscription webhook processed', { status: 200 });
+      }
+
+      // 1. Locate Business Instance by Subaccount Code (For Storefront / POS Checkout)
       let businessDoc: any = null;
       let businessId = '';
 

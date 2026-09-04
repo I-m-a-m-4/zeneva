@@ -70,3 +70,61 @@ export async function revokeUserSessions(uid: string, idToken?: string) {
     await adminAuth.revokeRefreshTokens(uid);
     return { revoked: true, uid };
 }
+
+/**
+ * Manually set or repair a business subscription plan from Super Admin.
+ */
+export async function manuallySetBusinessPlan(params: {
+    idToken?: string;
+    businessId?: string;
+    userEmail?: string;
+    plan: 'starter' | 'pro' | 'business' | 'lifetime';
+    monthsToAdd?: number;
+}) {
+    const { idToken, businessId: rawBizId, userEmail, plan, monthsToAdd = 1 } = params;
+    await requireSuperAdmin(idToken);
+
+    const { adminFirestore } = await import('@/firebase/admin');
+
+    if (!adminFirestore) {
+        throw new Error("Firebase Admin not initialized.");
+    }
+
+    let targetBusinessId = rawBizId;
+
+    if (!targetBusinessId && userEmail) {
+        const userSnap = await adminFirestore.collection('users').where('email', '==', userEmail).limit(1).get();
+        if (!userSnap.empty) {
+            targetBusinessId = userSnap.docs[0].data()?.businessId;
+        }
+    }
+
+    if (!targetBusinessId) {
+        throw new Error("Could not locate business for the given ID or Email.");
+    }
+
+    const businessRef = adminFirestore.collection('businessInstances').doc(targetBusinessId);
+    const businessSnap = await businessRef.get();
+    if (!businessSnap.exists) {
+        throw new Error("Business record not found.");
+    }
+
+    const currentExpiry = businessSnap.data()?.trialExpiresAt?.toDate ? businessSnap.data()?.trialExpiresAt.toDate() : null;
+    const startDate = currentExpiry && currentExpiry > new Date() ? currentExpiry : new Date();
+    const newExpiry = new Date(startDate);
+    newExpiry.setMonth(newExpiry.getMonth() + monthsToAdd);
+
+    await businessRef.update({
+        plan: plan,
+        trialExpiresAt: plan === 'lifetime' ? new Date('2099-12-31') : newExpiry,
+        accessLevel: null,
+        updatedAt: new Date()
+    });
+
+    return {
+        success: true,
+        businessId: targetBusinessId,
+        plan,
+        expiresAt: (plan === 'lifetime' ? new Date('2099-12-31') : newExpiry).toISOString()
+    };
+}
