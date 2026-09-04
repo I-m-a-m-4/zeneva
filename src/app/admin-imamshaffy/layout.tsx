@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { useNativeNotifications } from '@/hooks/use-native-notifications';
+import { playNotificationSound } from '@/lib/sound';
 
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
@@ -149,6 +150,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             
             // Only notify if it's new and within the last 60 seconds
             if (!isNaN(time) && time > lastViewedTime && (Date.now() - time) < 60000) {
+              playNotificationSound();
               notify(
                 'New Support Message', 
                 data.lastMessage || 'A user sent a new support message.',

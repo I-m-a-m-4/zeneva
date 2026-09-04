@@ -31,6 +31,7 @@
  */
 
 import { openExternal } from '@/lib/platform';
+import { playNotificationSound } from '@/lib/sound';
 
 export type NativeNotificationRequest = {
   /**
@@ -265,6 +266,8 @@ export async function triggerNativeNotification(request: NativeNotificationReque
         // Storage full or blocked: desktop tap-through is lost, the popup is not.
       }
     }
+
+    playNotificationSound();
 
     sendNotification({
       title: request.title,

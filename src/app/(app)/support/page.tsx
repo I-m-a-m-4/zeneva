@@ -33,6 +33,7 @@ import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic
 import { useI18n } from '@/context/i18n-context';
 import { ToastAction } from '@/components/ui/toast';
 import { idToken } from '@/lib/id-token';
+import { playNotificationSound } from '@/lib/sound';
 
 /**
  * How many messages of a support thread are loaded. The listener was
@@ -705,6 +706,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                 setTimeout(() => scrollToBottom('auto'), 50);
             } else if (allMessages.length > prevMessageCountRef.current) {
                 scrollToBottom('smooth');
+                const lastMsg = allMessages[allMessages.length - 1];
+                if (lastMsg?.senderId === 'admin') {
+                    playNotificationSound();
+                }
             }
             prevMessageCountRef.current = allMessages.length;
         }

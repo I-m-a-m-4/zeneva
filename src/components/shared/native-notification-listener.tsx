@@ -28,6 +28,7 @@ import {
 } from '@/lib/native-notifications';
 import { resolveNotificationLink } from '@/lib/notification-links';
 import { safeToDate } from '@/lib/utils';
+import { playNotificationSound } from '@/lib/sound';
 
 /**
  * How recent a document has to be to raise a popup.
@@ -97,6 +98,7 @@ export function NativeNotificationListener() {
             const createdAt = data.createdAt ? safeToDate(data.createdAt).getTime() : Date.now();
             if (Number.isFinite(createdAt) && Date.now() - createdAt > FRESHNESS_WINDOW_MS) return;
 
+            playNotificationSound();
             void triggerNativeNotification({
               key: change.doc.id,
               title: data.title,
