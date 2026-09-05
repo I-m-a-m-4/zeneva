@@ -18,7 +18,7 @@ import { ProductTour } from '@/components/ProductTour';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck, Bug
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck, Bug, Wallet
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -103,6 +103,7 @@ const navItems = [
   { href: '/online-orders', icon: Globe, label: 'Online Orders', labelKey: 'nav.onlineOrders', roles: ['admin', 'manager'] },
   { href: '/receipts', icon: FileText, label: 'Receipts', labelKey: 'nav.receipts', roles: ['admin', 'manager', 'vendor_operator'] },
   { href: '/invoices', icon: FileDigit, label: 'Invoices', labelKey: 'nav.invoices', roles: ['admin', 'manager'] },
+  { href: '/expenses', icon: Wallet, label: 'Expenses & Purchases', labelKey: 'nav.expensesPurchases', roles: ['admin', 'manager', 'vendor_operator', 'owner'] },
   { href: '/reports', icon: BarChart2, label: 'Reports', labelKey: 'nav.reports', roles: ['admin', 'owner'] },
   { href: '/ai-insights', icon: AiInsightsIcon, label: 'Zen AI', labelKey: 'nav.zenAi', roles: ['admin', 'manager'] },
   { href: '/customers', icon: Users, label: 'Customers', labelKey: 'nav.customers', roles: ['admin', 'manager', 'vendor_operator'] },
@@ -648,6 +649,8 @@ export default function AuthenticatedLayout({
       '/online-orders': ['admin', 'manager', 'owner', 'super-admin'],
       '/receipts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
       '/invoices': ['admin', 'manager', 'owner', 'super-admin'],
+      '/expenses': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+      '/purchases': ['admin', 'manager', 'owner', 'super-admin'],
       '/reports': ['admin', 'owner', 'super-admin'],
       '/ai-insights': ['admin', 'manager', 'owner', 'super-admin'],
       '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
@@ -1260,6 +1263,8 @@ export default function AuthenticatedLayout({
     '/online-orders': ['admin', 'manager', 'owner', 'super-admin'],
     '/receipts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/invoices': ['admin', 'manager', 'owner', 'super-admin'],
+    '/expenses': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
+    '/purchases': ['admin', 'manager', 'owner', 'super-admin'],
     '/reports': ['admin', 'owner', 'super-admin'],
     '/ai-insights': ['admin', 'manager', 'owner', 'super-admin'],
     '/customers': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],

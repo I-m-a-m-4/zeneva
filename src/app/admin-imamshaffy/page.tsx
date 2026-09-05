@@ -172,11 +172,15 @@ import {
   internalOwnerIds,
   billingCurrencyByBusiness,
   isCreditPackPurchase,
+  monthlyPriceNgn,
   purchasePlanMonthlyNgn,
   splitPurchases,
   subscriptionRunRate,
   toNgn,
 } from '@/lib/platform-revenue';
+import { effectivePlan } from '@/lib/plan';
+import { safeToDate } from '@/lib/utils';
+import DevicePlatformAdoptionSection, { classifyUserPlatform } from '@/components/admin/device-platform-section';
 import { LOCALES, resolveLocale, getLocaleDefinition } from '@/lib/i18n/config';
 import type { BusinessInstance, UserProfile, Purchase, Receipt, Product } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -442,7 +446,7 @@ function ImportIntelligenceDialog({ open, onOpenChange, importAttempts = [], bus
     );
 }
 
-function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, totalCreditPackRevenue = 0, payingBusinessesCount, businesses }: {
+function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutAttempts = [], totalSubscriptionRevenue, totalCreditPackRevenue = 0, payingBusinessesCount, businesses, mrr = 0, arr = 0, mrrDescription = '', arrDescription = '' }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     validPurchases: any[];
@@ -457,6 +461,10 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
     totalCreditPackRevenue?: number;
     payingBusinessesCount: number;
     businesses: BusinessInstance[] | null;
+    mrr?: number;
+    arr?: number;
+    mrrDescription?: string;
+    arrDescription?: string;
 }) {
     // The attempts list is capped at ADMIN_LOG_LIMIT rows, so the tab heading is
     // counted on the server rather than taken from the loaded array.
@@ -474,6 +482,28 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                         Detailed breakdown of active subscriptions, MRR contributions, ARR target, and Customer Lifetime Value (LTV).
                     </DialogDescription>
                 </DialogHeader>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    <Card className="border-emerald-500/30 bg-emerald-500/5">
+                        <CardHeader className="pb-1">
+                            <CardDescription className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Monthly Recurring Revenue (MRR)</CardDescription>
+                            <CardTitle className="text-2xl font-bold text-foreground">₦{Math.round(mrr).toLocaleString()}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[11px] text-muted-foreground">{mrrDescription || 'Active subscription run rate'}</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-blue-500/30 bg-blue-500/5">
+                        <CardHeader className="pb-1">
+                            <CardDescription className="text-xs font-semibold text-blue-600 dark:text-blue-400">Annualized Run Rate (ARR)</CardDescription>
+                            <CardTitle className="text-2xl font-bold text-foreground">₦{Math.round(arr).toLocaleString()}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[11px] text-muted-foreground">{arrDescription || 'Annualized MRR projection'}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 py-2">
                     <Card>
                         <CardHeader className="pb-2">
@@ -2188,12 +2218,38 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             </p>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground font-bold">Device Type</Label>
-                            <div className="mt-1 flex items-center gap-1.5 font-medium">
-                                {user.deviceType === 'Desktop App' && <Laptop className="h-4 w-4 text-blue-500" />}
-                                {user.deviceType === 'Web' && <Globe className="h-4 w-4 text-zinc-500" />}
-                                {user.deviceType === 'Mobile' && <Smartphone className="h-4 w-4 text-emerald-500" />}
-                                <span>{user.deviceType || 'Unknown'}</span>
+                            <Label className="text-xs text-muted-foreground font-bold">App & Device Platforms</Label>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 font-medium">
+                                {(() => {
+                                    const { hasMicrosoftApp, hasMobileApp, hasWeb, isCrossPlatform } = classifyUserPlatform(user);
+                                    return (
+                                        <>
+                                            {hasMicrosoftApp && (
+                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 text-xs">
+                                                    <Laptop className="h-3 w-3 mr-1" /> Microsoft App
+                                                </Badge>
+                                            )}
+                                            {hasMobileApp && (
+                                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 text-xs">
+                                                    <Smartphone className="h-3 w-3 mr-1" /> Mobile App
+                                                </Badge>
+                                            )}
+                                            {hasWeb && (
+                                                <Badge variant="outline" className="bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 text-xs">
+                                                    <Globe className="h-3 w-3 mr-1" /> Web
+                                                </Badge>
+                                            )}
+                                            {isCrossPlatform && (
+                                                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-semibold text-xs">
+                                                    ✨ PC + Mobile
+                                                </Badge>
+                                            )}
+                                            {!hasMicrosoftApp && !hasMobileApp && !hasWeb && (
+                                                <span className="text-xs text-muted-foreground">{user.deviceType || 'Web Browser'}</span>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                         <div>
@@ -2727,6 +2783,7 @@ function AdminDashboardContent({
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<'active' | 'joined' | 'name'>('active');
     const [filterPlan, setFilterPlan] = useState<'all' | 'starter' | 'pro' | 'business' | 'lifetime'>('all');
+    const [filterPlatform, setFilterPlatform] = useState<string>('all');
 
     const userOptions = useMemo(() => (users || []).map(user => {
         const bizName = businesses?.find(b => b.id === user.businessId)?.name;
@@ -2807,7 +2864,19 @@ function AdminDashboardContent({
             });
         }
 
-        // 3. Sort
+        // 3. Filter by Platform / Device
+        if (filterPlatform !== 'all') {
+            result = result.filter(u => {
+                const pInfo = classifyUserPlatform(u);
+                if (filterPlatform === 'microsoft') return pInfo.hasMicrosoftApp;
+                if (filterPlatform === 'mobile') return pInfo.hasMobileApp;
+                if (filterPlatform === 'multi') return pInfo.isCrossPlatform;
+                if (filterPlatform === 'web') return pInfo.hasWeb && !pInfo.hasMicrosoftApp && !pInfo.hasMobileApp;
+                return true;
+            });
+        }
+
+        // 4. Sort
         return [...result].sort((a, b) => {
             if (sortBy === 'active') { // Most recent first
                 const dateA = a.lastSeen?.toDate ? a.lastSeen.toDate() : new Date(0);
@@ -2821,7 +2890,7 @@ function AdminDashboardContent({
                 return a.name.localeCompare(b.name);
             }
         });
-    }, [users, businesses, searchQuery, filterPlan, sortBy]);
+    }, [users, businesses, searchQuery, filterPlan, filterPlatform, sortBy]);
 
     const platformAnalytics = useMemo(() => {
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
@@ -3089,11 +3158,13 @@ function AdminDashboardContent({
         // so this page and the cap table's valuation exclude the same accounts.
         const excludedUserIds = internalOwnerIds(allUsers);
 
-        const validPurchases = (purchases || []).filter(p => {
-            const biz = activeBusinesses.find(b => b.id === p.businessId);
-            if (biz && excludedUserIds.has(biz.ownerId)) return false;
-            return true;
-        });
+        const validPurchases = (purchases || [])
+            .filter(p => {
+                const biz = activeBusinesses.find(b => b.id === p.businessId);
+                if (biz && excludedUserIds.has(biz.ownerId)) return false;
+                return true;
+            })
+            .sort((a, b) => safeToDate(b.timestamp).getTime() - safeToDate(a.timestamp).getTime());
 
         /*
          * Plan payments and one-off Zen AI credit packs both land in `purchases`,
@@ -3119,40 +3190,104 @@ function AdminDashboardContent({
             return payingBusinessIds.has(b.id);
         });
 
-        // MRR is read off the subscriptions that are live right now, at list price
-        // — not summed from the last 30 days of payments, which is wrong in both
-        // directions: an annual subscriber who paid in January contributes nothing
-        // in March despite still paying us, and one who just paid twelve months up
-        // front contributes a year of revenue to a single month. Same helper the
-        // cap table's valuation card uses, so the two cannot disagree.
-        // Calculate dynamic MRR and ARR from actual Firestore purchases
+        const billingCurrencies = billingCurrencyByBusiness(validPurchases);
+
+        // Calculate dynamic MRR and ARR from actual Firestore purchases & active subscriptions
         let dynamicMrr = 0;
         let dynamicArr = 0;
         let activePaidSubscriptionsCount = 0;
+        let annualSubsCount = 0;
+        let monthlySubsCount = 0;
+        let annualMrr = 0;
+        let monthlyMrr = 0;
 
-        // Group valid purchases by businessId to find the latest subscription payment
+        // Group valid purchases by businessId and userId to find the latest subscription payment
         const latestPurchaseByBusiness = new Map<string, any>();
+        const latestPurchaseByUser = new Map<string, any>();
         for (const p of subscriptionPurchases) {
-            const existing = latestPurchaseByBusiness.get(p.businessId);
-            if (!existing || (p.timestamp?.seconds || 0) > (existing.timestamp?.seconds || 0)) {
-                latestPurchaseByBusiness.set(p.businessId, p);
+            const pTime = safeToDate(p.timestamp).getTime();
+            if (p.businessId) {
+                const existing = latestPurchaseByBusiness.get(p.businessId);
+                const existingTime = existing ? safeToDate(existing.timestamp).getTime() : 0;
+                if (!existing || pTime >= existingTime) {
+                    latestPurchaseByBusiness.set(p.businessId, p);
+                }
+            }
+            if (p.userId) {
+                const existing = latestPurchaseByUser.get(p.userId);
+                const existingTime = existing ? safeToDate(existing.timestamp).getTime() : 0;
+                if (!existing || pTime >= existingTime) {
+                    latestPurchaseByUser.set(p.userId, p);
+                }
             }
         }
 
-        // For each active business, see what they actually paid
+        const countedPurchaseKeys = new Set<string>();
+
+        // For each active business, see what they actually paid or what plan they are on
         for (const b of activeBusinesses || []) {
             if (b.status === 'deleted') continue;
             if (b.ownerId && excludedUserIds.has(b.ownerId)) continue;
             if (b.accessLevel === 'lifetime') continue;
 
-            const latestPurchase = latestPurchaseByBusiness.get(b.id);
+            const latestPurchase = latestPurchaseByBusiness.get(b.id) || 
+                                   (b.ownerId ? latestPurchaseByUser.get(b.ownerId) : null);
+            const isPlanActive = effectivePlan(b) !== 'starter' || b.plan === 'pro' || b.plan === 'business';
+
             if (latestPurchase) {
+                const pKey = latestPurchase.id || latestPurchase.reference || `${b.id}_${latestPurchase.timestamp}`;
+                countedPurchaseKeys.add(pKey);
                 const amount = toNgn(latestPurchase.amount, latestPurchase.currency);
-                // Assume amount > 50000 is an annual subscription, otherwise monthly
-                const isAnnual = amount > 50000;
+                // Assume amount >= 50000 or explicit annual in plan/text is an annual subscription, otherwise monthly
+                const isAnnual = amount >= 50000 || String(latestPurchase.plan || '').toLowerCase().includes('annual');
                 const mrrContribution = isAnnual ? (amount / 12) : amount;
                 const arrContribution = isAnnual ? amount : (amount * 12);
 
+                if (isAnnual) {
+                    annualSubsCount += 1;
+                    annualMrr += mrrContribution;
+                } else {
+                    monthlySubsCount += 1;
+                    monthlyMrr += mrrContribution;
+                }
+
+                dynamicMrr += mrrContribution;
+                dynamicArr += arrContribution;
+                activePaidSubscriptionsCount += 1;
+            } else if (isPlanActive) {
+                // Fallback to standard plan list price so paid subscribers are NEVER missed even if payment record was detached
+                const planPrice = monthlyPriceNgn(effectivePlan(b), billingCurrencies?.get(b.id));
+                if (planPrice > 0) {
+                    monthlySubsCount += 1;
+                    monthlyMrr += planPrice;
+                    dynamicMrr += planPrice;
+                    dynamicArr += planPrice * 12;
+                    activePaidSubscriptionsCount += 1;
+                }
+            }
+        }
+
+        // Also check if there are standalone active subscription purchases not yet mapped to a business
+        for (const p of subscriptionPurchases) {
+            const pKey = p.id || p.reference;
+            if (pKey && countedPurchaseKeys.has(pKey)) continue;
+            const pTime = safeToDate(p.timestamp).getTime();
+            if (!pTime) continue;
+            const daysAgo = (Date.now() - pTime) / (1000 * 60 * 60 * 24);
+            const amount = toNgn(p.amount, p.currency);
+            const isAnnual = amount >= 50000 || String(p.plan || '').toLowerCase().includes('annual');
+            const isFresh = isAnnual ? daysAgo <= 365 : daysAgo <= 35;
+
+            if (isFresh && amount > 0) {
+                const mrrContribution = isAnnual ? (amount / 12) : amount;
+                const arrContribution = isAnnual ? amount : (amount * 12);
+                if (isAnnual) {
+                    annualSubsCount += 1;
+                    annualMrr += mrrContribution;
+                } else {
+                    monthlySubsCount += 1;
+                    monthlyMrr += mrrContribution;
+                }
                 dynamicMrr += mrrContribution;
                 dynamicArr += arrContribution;
                 activePaidSubscriptionsCount += 1;
@@ -3161,6 +3296,14 @@ function AdminDashboardContent({
 
         const mrr = dynamicMrr;
         const arr = dynamicArr;
+
+        const mrrDescription = activePaidSubscriptionsCount > 0
+            ? `${annualSubsCount > 0 ? `₦${Math.round(annualMrr).toLocaleString()} (Annual: ${annualSubsCount}) + ` : ''}₦${Math.round(monthlyMrr).toLocaleString()} (Monthly: ${monthlySubsCount}) · ${activePaidSubscriptionsCount} active sub${activePaidSubscriptionsCount === 1 ? '' : 's'}`
+            : '0 active subscriptions';
+
+        const arrDescription = activePaidSubscriptionsCount > 0
+            ? `₦${Math.round(arr).toLocaleString()} Annualized Run Rate (${activePaidSubscriptionsCount} paying stores)`
+            : 'No active paid subscriptions';
 
         const usersByDate = (activeUsers || []).reduce((acc, user) => {
             if (user.createdAt?.seconds) {
@@ -3296,7 +3439,7 @@ function AdminDashboardContent({
 
         return {
             totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold,
-            totalReceipts, platformAOV, mrr, arr, ltv, activeUsers, inactiveUsers,
+            totalReceipts, platformAOV, mrr, arr, mrrDescription, arrDescription, annualSubsCount, monthlySubsCount, annualMrr, monthlyMrr, ltv, activeUsers, inactiveUsers,
             newUserGrowth, revenueGrowth, categoryData, activeSubscriptions,
             trialingUsers, planDistributionData, userRoleData, totalSubscriptionRevenue,
             totalCreditPackRevenue, totalCompanyRevenue,
@@ -3875,7 +4018,7 @@ function AdminDashboardContent({
                             <StatCard title="Active Stores" value={platformAnalytics.totalActiveBusinesses} icon={Building} description="Currently active businesses" />
                         </button>
                         <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="MRR" value={`₦${analyticsData.mrr.toLocaleString()}`} icon={DollarSign} description="₦8.5k (Annual) + ₦50 (Monthly)" />
+                            <StatCard title="MRR" value={`₦${Math.round(analyticsData.mrr).toLocaleString()}`} icon={DollarSign} description={analyticsData.mrrDescription} />
                         </button>
                         <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" />
@@ -3890,7 +4033,7 @@ function AdminDashboardContent({
 
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 mt-4">
                         <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="ARR" value={`₦${analyticsData.arr.toLocaleString()}`} icon={TrendingUp} description="₦102k promo (₦112k list value)" />
+                            <StatCard title="ARR" value={`₦${Math.round(analyticsData.arr).toLocaleString()}`} icon={TrendingUp} description={analyticsData.arrDescription} />
                         </button>
                         <button onClick={() => setIsSaaSMetricsOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="LTV" value={`₦${analyticsData.ltv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Crown} description="Est. Lifetime Value" />
@@ -3918,6 +4061,16 @@ function AdminDashboardContent({
                         receipts={convertedReceipts || []}
                         storefrontShares={storefrontShares}
                         receiptShares={receiptShares}
+                    />
+
+                    {/* App & Device Platform Ecosystem (Microsoft App vs Mobile App vs Web) */}
+                    <DevicePlatformAdoptionSection
+                        users={users || []}
+                        businesses={businesses || []}
+                        onSelectUser={(u) => {
+                            setSelectedUserForDetail(u);
+                            setIsUserDetailOpen(true);
+                        }}
                     />
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -4449,7 +4602,7 @@ function AdminDashboardContent({
                                                 className="pl-8"
                                             />
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-wrap gap-2">
                                             <Select value={filterPlan} onValueChange={(v: any) => setFilterPlan(v)}>
                                                 <SelectTrigger className="w-[130px]">
                                                     <div className="flex items-center gap-2">
@@ -4463,6 +4616,21 @@ function AdminDashboardContent({
                                                     <SelectItem value="pro">Pro</SelectItem>
                                                     <SelectItem value="business">Business</SelectItem>
                                                     <SelectItem value="lifetime">Lifetime</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <Select value={filterPlatform} onValueChange={(v: any) => setFilterPlatform(v)}>
+                                                <SelectTrigger className="w-[145px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <Laptop className="h-4 w-4" />
+                                                        <SelectValue />
+                                                    </div>
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Devices</SelectItem>
+                                                    <SelectItem value="microsoft">Microsoft App</SelectItem>
+                                                    <SelectItem value="mobile">Mobile App</SelectItem>
+                                                    <SelectItem value="multi">Cross-Device</SelectItem>
+                                                    <SelectItem value="web">Web Browser</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
@@ -4517,16 +4685,36 @@ function AdminDashboardContent({
                                                                 ) : <Badge variant="outline">N/A</Badge>}
                                                             </TableCell>
                                                             <TableCell>
-                                                                {user.deviceType ? (
-                                                                    <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs font-normal">
-                                                                        {user.deviceType === 'Desktop App' && <Laptop className="h-3.5 w-3.5 text-blue-500" />}
-                                                                        {user.deviceType === 'Web' && <Globe className="h-3.5 w-3.5 text-zinc-500" />}
-                                                                        {user.deviceType === 'Mobile' && <Smartphone className="h-3.5 w-3.5 text-emerald-500" />}
-                                                                        <span>{user.deviceType}</span>
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <span className="text-muted-foreground text-xs">Unknown</span>
-                                                                )}
+                                                                {(() => {
+                                                                    const { hasMicrosoftApp, hasMobileApp, hasWeb, isCrossPlatform } = classifyUserPlatform(user);
+                                                                    return (
+                                                                        <div className="flex flex-wrap items-center gap-1">
+                                                                            {hasMicrosoftApp && (
+                                                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                                                                                    <Laptop className="h-3 w-3 mr-1 inline" /> MS App
+                                                                                </Badge>
+                                                                            )}
+                                                                            {hasMobileApp && (
+                                                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
+                                                                                    <Smartphone className="h-3 w-3 mr-1 inline" /> Mobile
+                                                                                </Badge>
+                                                                            )}
+                                                                            {isCrossPlatform && (
+                                                                                <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-semibold" title="Active on both Microsoft Desktop & Mobile apps">
+                                                                                    ✨ Both
+                                                                                </Badge>
+                                                                            )}
+                                                                            {hasWeb && !hasMicrosoftApp && !hasMobileApp && (
+                                                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800">
+                                                                                    <Globe className="h-3 w-3 mr-1 inline" /> Web
+                                                                                </Badge>
+                                                                            )}
+                                                                            {!hasMicrosoftApp && !hasMobileApp && !hasWeb && (
+                                                                                <span className="text-muted-foreground text-xs">{user.deviceType || 'Web'}</span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </TableCell>
                                                             <TableCell>
                                                                 {(() => {
@@ -5475,6 +5663,10 @@ function AdminDashboardContent({
             <SaaSMetricsDetailDialog
                 open={isSaaSMetricsOpen}
                 onOpenChange={setIsSaaSMetricsOpen}
+                mrr={analyticsData.mrr}
+                arr={analyticsData.arr}
+                mrrDescription={analyticsData.mrrDescription}
+                arrDescription={analyticsData.arrDescription}
                 validPurchases={analyticsData.validPurchases || []}
                 checkoutAttempts={checkoutAttempts}
                 totalSubscriptionRevenue={analyticsData.totalSubscriptionRevenue || 0}
@@ -5671,7 +5863,7 @@ export default function AdminDashboardPage() {
     const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const grantsQuery = useMemoFirebase(() => query(collection(firestore, 'grants'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
-    const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases'), orderBy('timestamp', 'desc')), [firestore]);
+    const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases')), [firestore]);
     // Deliberately unbounded: one doc per visitor (not per click), and it backs
     // an all-time platform breakdown, so a limit would silently change the
     // windows/macos/android split. It is also not growing — its only writer is

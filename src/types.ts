@@ -95,7 +95,7 @@ export interface UserProfile {
     suspendedBy?: string;
     lastSeen?: any;
     permissions?: Record<string, boolean>;
-    branchId?: string;
+    platformsUsed?: string[];
     totalUsageSeconds?: number; // cumulative app usage in seconds (tracked by useSessionTracker)
     pagesVisited?: number; // cumulative page views (tracked by UserActivityTracker)
     pageViews?: Record<string, number>; // per-route view counts; keys normalised by routeKey()
@@ -830,3 +830,92 @@ export interface BusinessStats {
     updatedAt: any;
 }
 
+// --- Expenses & Procurement Management ---
+
+export type ExpenseCategory =
+    | 'rent'
+    | 'utilities'
+    | 'salaries'
+    | 'logistics'
+    | 'marketing'
+    | 'maintenance'
+    | 'packaging'
+    | 'inventory_freight'
+    | 'petty_cash'
+    | 'taxes'
+    | 'miscellaneous';
+
+export type ExpensePaymentMethod = 'cash' | 'bank_transfer' | 'pos_card' | 'personal_funds' | 'other';
+
+export interface Expense {
+    id: string;
+    businessId: string;
+    amount: number;
+    category: ExpenseCategory | string;
+    paymentMethod: ExpensePaymentMethod;
+    description: string;
+    date: any; // Timestamp or ISO string
+    paidBy?: string; // User display name or ID
+    receiptUrl?: string; // Optional bill/receipt reference or URL
+    isPaidFromDrawer?: boolean; // Whether cash was deducted from daily till / register
+    status?: 'paid' | 'pending';
+    branchId?: string;
+    createdAt?: any;
+    updatedAt?: any;
+}
+
+export interface Supplier {
+    id: string;
+    businessId: string;
+    name: string;
+    contactPerson?: string;
+    email?: string;
+    phone: string;
+    address?: string;
+    paymentTerms?: string; // e.g. "Immediate", "Net 15", "Net 30", "Cash on Delivery"
+    notes?: string;
+    totalPurchases?: number;
+    outstandingBalance?: number; // Total unpaid debt to supplier
+    branchId?: string;
+    createdAt?: any;
+    updatedAt?: any;
+}
+
+export interface PurchaseOrderItem {
+    productId?: string;
+    productName: string;
+    sku?: string;
+    quantityOrdered: number;
+    quantityReceived: number;
+    unitCost: number;
+    totalCost: number;
+}
+
+export type PurchaseOrderStatus = 'draft' | 'ordered' | 'received' | 'cancelled';
+export type PurchasePaymentStatus = 'unpaid' | 'partially_paid' | 'paid';
+
+export interface SupplierPurchase {
+    id: string;
+    businessId: string;
+    purchaseNumber: string; // e.g., "PO-1001"
+    supplierId: string;
+    supplierName: string;
+    supplierPhone?: string;
+    orderDate: any;
+    deliveryDate?: any;
+    status: PurchaseOrderStatus;
+    paymentStatus: PurchasePaymentStatus;
+    paymentMethod?: ExpensePaymentMethod;
+    items: PurchaseOrderItem[];
+    totalAmount: number;
+    amountPaid: number;
+    balanceDue: number;
+    notes?: string;
+    autoUpdateStockOnReceive?: boolean; // Automatically increments product.stock on 'received'
+    autoUpdateCostPrice?: boolean; // Updates product.costPrice with unitCost
+    branchId?: string;
+    createdAt?: any;
+    updatedAt?: any;
+    createdByName?: string;
+    createdById?: string;
+}

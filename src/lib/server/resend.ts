@@ -66,7 +66,7 @@ async function hasOptedOutOfMarketing(to: string): Promise<boolean> {
       .where('email', '==', to)
       .limit(5)
       .get();
-    return snapshot.docs.some(doc => doc.data()?.marketingOptOut === true);
+    return snapshot.docs.some((doc: any) => doc.data()?.marketingOptOut === true);
   } catch (error) {
     // A failed lookup must not become a licence to mail. Treating an error as
     // "not opted out" is the one wrong answer here, so fail closed.

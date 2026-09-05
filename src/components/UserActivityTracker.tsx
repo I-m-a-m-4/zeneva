@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { getCountryFromIP } from '@/lib/utils';
 import { useAuth, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp, onSnapshot, writeBatch, increment } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, onSnapshot, writeBatch, increment, arrayUnion } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { usePathname } from 'next/navigation';
 import { AppConfig } from '@/lib/config';
@@ -296,12 +296,22 @@ export function UserActivityTracker() {
                         !!(window as any).__TAURI_METADATA__ || 
                         typeof (window as any).rpc !== 'undefined'
                     );
-                    const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+                    const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+                    
                     let deviceType = 'Web';
+                    let platformTag = 'Web';
                     if (isTauriEnv) {
-                        deviceType = isMobile ? 'Mobile App' : 'Desktop App';
+                        if (isMobile) {
+                            deviceType = 'Mobile App';
+                            platformTag = 'Mobile App';
+                        } else {
+                            deviceType = 'Desktop App';
+                            platformTag = 'Microsoft App';
+                        }
                     } else {
                         deviceType = isMobile ? 'Mobile' : 'Web';
+                        platformTag = isMobile ? 'Mobile Web' : 'Web';
                     }
 
                     // Detect country from IP once per session
@@ -347,6 +357,7 @@ export function UserActivityTracker() {
                         lastSeen: serverTimestamp(),
                         status: 'active',
                         deviceType,
+                        platformsUsed: arrayUnion(deviceType, platformTag),
                         userAgent: navigator.userAgent,
                         country: country || 'Unknown',
                         appVersion: AppConfig.version || 'unknown',

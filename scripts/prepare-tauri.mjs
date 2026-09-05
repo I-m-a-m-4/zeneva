@@ -129,7 +129,7 @@ const stubs = [
     // the component surfaces a warning that the accounts survived the purge.
     {
         path: 'src/actions/admin-actions.ts',
-        content: `export async function deleteBusinessUsersAuth() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function revokeUserSessions() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n`,
+        content: `export async function deleteBusinessUsersAuth() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function revokeUserSessions() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function manuallySetBusinessPlan() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n`,
     },
 
     // admin-imamshaffy/page.tsx dynamically imports broadcastNotification;

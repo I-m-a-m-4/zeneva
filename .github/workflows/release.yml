@@ -94,6 +94,7 @@ jobs:
           fi
 
       - name: Build frontend
+        shell: bash
         env:
           IS_TAURI: true
         run: |

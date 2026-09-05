@@ -29,6 +29,7 @@ import {
   Activity,
   ChevronDown,
   Coins,
+  Truck,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -690,6 +691,14 @@ function InventoryPageContent() {
               <Button size="sm" variant="outline" className="h-9 gap-1" id="tour-import-products" onClick={() => setIsImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5" />
                 <span className="sm:whitespace-nowrap">{t('common.import')}</span>
+              </Button>
+            )}
+            {canManageStock && (
+              <Button size="sm" asChild variant="outline" className="h-9 gap-1">
+                <Link href="/expenses?tab=purchases">
+                  <Truck className="h-3.5 w-3.5 text-primary" />
+                  <span className="sm:whitespace-nowrap">Purchases & Restock</span>
+                </Link>
               </Button>
             )}
             {canManageStock && (

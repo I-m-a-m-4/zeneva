@@ -45,6 +45,10 @@ export interface UserProfile {
     surveyCompleted?: boolean;
     status?: 'active' | 'inactive' | 'deleted';
     lastSeen?: any;
+    deviceType?: string;
+    platformsUsed?: string[];
+    country?: string;
+    language?: string;
     appVersion?: string;
 }
 

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, FileText, TrendingUp, TrendingDown, Coins, PieChart, Percent, ArrowUpRight, ArrowDownRight, Layers, Download } from 'lucide-react';
-import type { Receipt, Product } from '@/types';
+import type { Receipt, Product, Expense } from '@/types';
 import ProfitLossChart from './profit-loss-chart';
 import TopItemsPanel from './top-items-panel';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,10 @@ interface ProfitLossStatementProps {
     receipts: Receipt[];
     products: Product[];
     currencySymbol: string;
+    expenses?: Expense[];
 }
 
-export default function ProfitLossStatement({ receipts, products, currencySymbol }: ProfitLossStatementProps) {
+export default function ProfitLossStatement({ receipts, products, currencySymbol, expenses = [] }: ProfitLossStatementProps) {
     const { t } = useI18n();
     const financialSummary = React.useMemo(() => {
         let grossRevenue = 0;
@@ -59,7 +60,19 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
         });
 
         const grossProfit = grossRevenue - totalCogs;
-        const netProfit = grossProfit - totalDiscounts;
+
+        // Operating Expenses tracking
+        let totalOperatingExpenses = 0;
+        const expenseCategoryTotals: Record<string, number> = {};
+
+        expenses.forEach(exp => {
+            const amt = Number(exp.amount) || 0;
+            totalOperatingExpenses += amt;
+            const cat = String(exp.category || 'miscellaneous');
+            expenseCategoryTotals[cat] = (expenseCategoryTotals[cat] || 0) + amt;
+        });
+
+        const netProfit = grossProfit - totalDiscounts - totalOperatingExpenses;
         const grossMarginPct = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
         const netMarginPct = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
 
@@ -81,13 +94,15 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             totalCogs,
             grossProfit,
             totalDiscounts,
+            totalOperatingExpenses,
+            expenseCategoryTotals,
             netProfit,
             grossMarginPct,
             netMarginPct,
             totalItemsSold,
             categoryList
         };
-    }, [receipts, products, t]);
+    }, [receipts, products, expenses, t]);
 
     const { business } = usePOS();
     const { toast } = useToast();
@@ -168,7 +183,12 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             ["Gross Profit", formatCurrencyForPDF(financialSummary.grossProfit), `${financialSummary.grossMarginPct.toFixed(1)}%`],
             ["", "", ""],
             ["Operating Expenses", "", ""],
-            ["  Total Operating Expenses", formatCurrencyForPDF(0), "0.0%"],
+            ...Object.entries(financialSummary.expenseCategoryTotals).map(([cat, amt]) => [
+                `  ${cat.replace(/_/g, ' ')}`,
+                `(${formatCurrencyForPDF(amt)})`,
+                `${financialSummary.grossRevenue > 0 ? ((amt / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`
+            ]),
+            ["  Total Operating Expenses", `(${formatCurrencyForPDF(financialSummary.totalOperatingExpenses)})`, `${financialSummary.grossRevenue > 0 ? ((financialSummary.totalOperatingExpenses / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
             ["", "", ""],
             ["Net Operating Profit", formatCurrencyForPDF(financialSummary.netProfit), `${financialSummary.netMarginPct.toFixed(1)}%`]
         ];
@@ -356,10 +376,25 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             <TableRow className="bg-muted/20">
                                 <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">{t('reports.plsOperatingExpenses')}</TableCell>
                             </TableRow>
-                            <TableRow className="hover:bg-muted/30">
-                                <TableCell className="ps-8 text-muted-foreground">{t('reports.plsTotalOperatingExpenses')}</TableCell>
-                                <TableCell className="text-right font-medium text-muted-foreground">(0.00)</TableCell>
-                                <TableCell className="text-right font-mono text-muted-foreground">0.0%</TableCell>
+                            {Object.entries(financialSummary.expenseCategoryTotals).length > 0 ? (
+                                Object.entries(financialSummary.expenseCategoryTotals).map(([cat, amt]) => (
+                                    <TableRow key={cat} className="hover:bg-muted/30">
+                                        <TableCell className="ps-8 text-muted-foreground capitalize">{cat.replace(/_/g, ' ')}</TableCell>
+                                        <TableCell className="text-right font-medium text-rose-600 dark:text-rose-400">({amt.toLocaleString(undefined, { minimumFractionDigits: 2 })})</TableCell>
+                                        <TableCell className="text-right font-mono text-muted-foreground">
+                                            {financialSummary.grossRevenue > 0 ? ((amt / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : null}
+                            <TableRow className="hover:bg-muted/30 font-medium">
+                                <TableCell className="ps-8 text-foreground">{t('reports.plsTotalOperatingExpenses')}</TableCell>
+                                <TableCell className="text-right font-bold text-rose-600 dark:text-rose-400">
+                                    ({financialSummary.totalOperatingExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-muted-foreground">
+                                    {financialSummary.grossRevenue > 0 ? ((financialSummary.totalOperatingExpenses / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
+                                </TableCell>
                             </TableRow>
                             
                             {/* Net Profit Section */}

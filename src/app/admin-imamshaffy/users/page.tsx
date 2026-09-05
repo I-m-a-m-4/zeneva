@@ -108,14 +108,52 @@ function useCurrentUserProfile() {
   return { profile: userProfile, isLoading };
 }
 
-const DeviceIcon = ({ device }: { device?: string }) => {
-  if (!device) return <span className="text-muted-foreground">—</span>;
-  const Icon = device.includes('Desktop') ? Laptop : device.includes('Mobile') ? Smartphone : Globe;
+const UserPlatformsBadges = ({ user }: { user: UserProfile }) => {
+  const platforms = user.platformsUsed && user.platformsUsed.length > 0
+    ? user.platformsUsed
+    : user.deviceType ? [user.deviceType] : [];
+
+  if (!platforms.length) return <span className="text-muted-foreground">—</span>;
+
+  const ua = (user.userAgent || '').toLowerCase();
+  const hasDesktop = platforms.some(p => {
+    const s = String(p).toLowerCase();
+    return s.includes('desktop') || s.includes('microsoft') || s.includes('windows');
+  }) || (ua.includes('windows') && (ua.includes('tauri') || user.deviceType === 'Desktop App'));
+
+  const hasMobile = platforms.some(p => {
+    const s = String(p).toLowerCase();
+    return s.includes('mobile app') || s.includes('android') || s.includes('ios');
+  }) || ((ua.includes('android') || ua.includes('iphone') || ua.includes('mobile')) && (ua.includes('tauri') || user.deviceType === 'Mobile App'));
+
+  const hasWeb = platforms.some(p => {
+    const s = String(p).toLowerCase();
+    return s.includes('web') && !s.includes('desktop app');
+  }) || (!hasDesktop && !hasMobile);
+
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-      <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-      <span className="text-xs">{device}</span>
-    </span>
+    <div className="flex flex-col gap-0.5">
+      <div className="flex flex-wrap items-center gap-1">
+        {hasDesktop && (
+          <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400" title="Microsoft / Windows App">
+            <Laptop className="h-3 w-3" /> Microsoft App
+          </span>
+        )}
+        {hasMobile && (
+          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400" title="Mobile App (Android/iOS)">
+            <Smartphone className="h-3 w-3" /> Mobile App
+          </span>
+        )}
+        {hasWeb && (
+          <span className="inline-flex items-center gap-1 rounded bg-zinc-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400" title="Web Browser">
+            <Globe className="h-3 w-3" /> Web
+          </span>
+        )}
+      </div>
+      {hasDesktop && hasMobile && (
+        <span className="text-[9px] font-bold text-amber-500">⚡ Cross-Device (PC + Mobile)</span>
+      )}
+    </div>
   );
 };
 
@@ -185,6 +223,7 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [planFilter, setPlanFilter] = React.useState('all');
   const [segmentFilter, setSegmentFilter] = React.useState('all');
+  const [platformFilter, setPlatformFilter] = React.useState('all');
   const [sortBy, setSortBy] = React.useState<'active' | 'joined' | 'name' | 'usage'>('active');
 
   // UI gate only; src/actions/admin-guard.ts is the real one, and firestore.rules
@@ -230,6 +269,32 @@ export default function UsersPage() {
     
     const conversionRate = all.length > 0 ? (registered.length / all.length) * 100 : 0;
     const abandonmentRate = all.length > 0 ? (incomplete.length / all.length) * 100 : 0;
+
+    const microsoftCount = all.filter(u => {
+      const p = (u.platformsUsed || []).map(x => String(x).toLowerCase());
+      const ua = (u.userAgent || '').toLowerCase();
+      return p.some(x => x.includes('desktop') || x.includes('microsoft') || x.includes('windows')) || u.deviceType === 'Desktop App' || (ua.includes('windows') && ua.includes('tauri'));
+    }).length;
+
+    const mobileCount = all.filter(u => {
+      const p = (u.platformsUsed || []).map(x => String(x).toLowerCase());
+      const ua = (u.userAgent || '').toLowerCase();
+      return p.some(x => x.includes('mobile app') || x.includes('android') || x.includes('ios')) || u.deviceType === 'Mobile App' || ((ua.includes('android') || ua.includes('iphone')) && ua.includes('tauri'));
+    }).length;
+
+    const multiCount = all.filter(u => {
+      const p = (u.platformsUsed || []).map(x => String(x).toLowerCase());
+      const ua = (u.userAgent || '').toLowerCase();
+      const hasD = p.some(x => x.includes('desktop') || x.includes('microsoft') || x.includes('windows')) || u.deviceType === 'Desktop App' || (ua.includes('windows') && ua.includes('tauri'));
+      const hasM = p.some(x => x.includes('mobile app') || x.includes('android') || x.includes('ios')) || u.deviceType === 'Mobile App' || ((ua.includes('android') || ua.includes('iphone')) && ua.includes('tauri'));
+      return hasD && hasM;
+    }).length;
+
+    const webCount = all.length - (all.filter(u => {
+      const p = (u.platformsUsed || []).map(x => String(x).toLowerCase());
+      const ua = (u.userAgent || '').toLowerCase();
+      return p.some(x => x.includes('desktop') || x.includes('microsoft') || x.includes('windows') || x.includes('mobile app')) || u.deviceType === 'Desktop App' || u.deviceType === 'Mobile App';
+    }).length);
     
     return { 
       total: all.length, 
@@ -239,7 +304,11 @@ export default function UsersPage() {
       abandonmentRate,
       counts, 
       outdated, 
-      blocked 
+      blocked,
+      microsoftCount,
+      mobileCount,
+      multiCount,
+      webCount
     };
   }, [users]);
 
@@ -255,6 +324,19 @@ export default function UsersPage() {
       if (statusFilter !== 'all' && (u.status || 'active') !== statusFilter) return false;
       if (planFilter !== 'all' && planOf(u, bizIndex).toLowerCase() !== planFilter) return false;
       if (segmentFilter !== 'all' && segmentOf(u) !== segmentFilter) return false;
+
+      if (platformFilter !== 'all') {
+        const platforms = (u.platformsUsed && u.platformsUsed.length > 0 ? u.platformsUsed : u.deviceType ? [u.deviceType] : []).map(p => String(p).toLowerCase());
+        const ua = (u.userAgent || '').toLowerCase();
+        const hasDesktop = platforms.some(p => p.includes('desktop') || p.includes('microsoft') || p.includes('windows')) || (ua.includes('windows') && (ua.includes('tauri') || u.deviceType === 'Desktop App'));
+        const hasMobile = platforms.some(p => p.includes('mobile app') || p.includes('android') || p.includes('ios')) || ((ua.includes('android') || ua.includes('iphone') || ua.includes('mobile')) && (ua.includes('tauri') || u.deviceType === 'Mobile App'));
+        const hasWeb = platforms.some(p => p.includes('web') && !p.includes('desktop app')) || (!hasDesktop && !hasMobile);
+
+        if (platformFilter === 'microsoft' && !hasDesktop) return false;
+        if (platformFilter === 'mobile' && !hasMobile) return false;
+        if (platformFilter === 'multi' && (!hasDesktop || !hasMobile)) return false;
+        if (platformFilter === 'web' && (!hasWeb || hasDesktop || hasMobile)) return false;
+      }
 
       if (!term) return true;
       const business = u.businessId ? bizIndex.get(u.businessId) : undefined;
@@ -273,7 +355,7 @@ export default function UsersPage() {
       const key = sortBy === 'joined' ? 'createdAt' : 'lastSeen';
       return (toDate((b as any)[key])?.getTime() ?? 0) - (toDate((a as any)[key])?.getTime() ?? 0);
     });
-  }, [users, accountTypeFilter, bizIndex, search, roleFilter, statusFilter, planFilter, segmentFilter, sortBy]);
+  }, [users, accountTypeFilter, bizIndex, search, roleFilter, statusFilter, planFilter, segmentFilter, platformFilter, sortBy]);
 
   const handleExport = () => {
     const rows = [
@@ -435,6 +517,16 @@ export default function UsersPage() {
                       <SelectItem value="pro">Pro</SelectItem>
                       <SelectItem value="business">Business</SelectItem>
                       <SelectItem value="lifetime">Lifetime</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                    <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="Platform" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Devices</SelectItem>
+                      <SelectItem value="microsoft">🪟 Microsoft App ({summary.microsoftCount})</SelectItem>
+                      <SelectItem value="mobile">📱 Mobile App ({summary.mobileCount})</SelectItem>
+                      <SelectItem value="multi">⚡ Cross-Device ({summary.multiCount})</SelectItem>
+                      <SelectItem value="web">🌐 Web Browser</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>

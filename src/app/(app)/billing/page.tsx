@@ -148,7 +148,9 @@ function BillingPage() {
                     </TableHeader>
                     <TableBody>
                         {subscriptionHistory && subscriptionHistory.length > 0 ? (
-                            subscriptionHistory.map(item => (
+                            subscriptionHistory
+                              .filter(item => !(item.amount === 0 && !item.action.includes('Admin Grant')))
+                              .map(item => (
                                 <TableRow key={item.id}>
                                     <TableCell className="font-medium">{item.action}</TableCell>
                                     {/*

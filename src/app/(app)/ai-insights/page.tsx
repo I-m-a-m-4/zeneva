@@ -553,13 +553,13 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
       {/* ── Sidebar Rail ── */}
       <div
-        className={`bg-muted/30 border-r border-border flex flex-col transition-all duration-300 z-30
+        className={`bg-orange-50/50 dark:bg-orange-950/10 border-r border-border flex flex-col transition-all duration-300 z-30
           max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:w-64 max-md:shadow-2xl
           ${sidebarOpen ? 'max-md:translate-x-0 md:w-64' : 'max-md:-translate-x-full md:w-0 md:border-r-0'}
           md:relative md:flex-shrink-0 overflow-hidden`}
       >
         <div className="p-4 border-b border-border flex items-center gap-2 w-64">
-          <Button onClick={handleNewChat} className="flex-1 justify-start gap-2 hover:bg-muted" variant="outline">
+          <Button onClick={handleNewChat} className="flex-1 justify-start gap-2 border-dashed hover:text-foreground" variant="outline">
             <SquarePen className="w-4 h-4 text-orange-500" /> New Chat
           </Button>
           <button

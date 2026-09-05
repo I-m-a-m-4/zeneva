@@ -1591,18 +1591,18 @@ function SettingsPageContent() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />{t('settings.privacyTitle', { defaultValue: 'Privacy & Data' })}</CardTitle>
-                        <CardDescription>{t('settings.privacyDescription', { defaultValue: 'Manage your data and privacy preferences.' })}</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />Privacy & Data</CardTitle>
+                        <CardDescription>Manage your data and privacy preferences.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 gap-4">
                             <div className="space-y-0.5">
-                                <Label className="text-base text-stone-900">{t('settings.dataExportTitle', { defaultValue: 'Data Export' })}</Label>
-                                <p className="text-sm text-muted-foreground">{t('settings.dataExportDesc', { defaultValue: 'Download a copy of your personal and business data to fulfill GDPR portability requirements.' })}</p>
+                                <Label className="text-base text-stone-900">Data Export</Label>
+                                <p className="text-sm text-muted-foreground">Download a copy of your personal and business data.</p>
                             </div>
                             <Button onClick={handleExportData} disabled={isExporting} variant="outline" className="shrink-0 gap-2">
                                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                                {isExporting ? t('settings.exportingData', { defaultValue: 'Sending Email...' }) : t('settings.exportData', { defaultValue: 'Export Data' })}
+                                {isExporting ? 'Sending Email...' : 'Export Data'}
                             </Button>
                         </div>
                     </CardContent>

@@ -77,6 +77,9 @@ const en = {
     onlineOrders: 'Online Orders',
     receipts: 'Receipts',
     invoices: 'Invoices',
+    expenses: 'Expenses',
+    purchases: 'Purchases',
+    expensesPurchases: 'Expenses & Purchases',
     reports: 'Reports',
     zenAi: 'Zen AI',
     customers: 'Customers',
@@ -1514,6 +1517,12 @@ const en = {
     kpiCustomersBought_one: '{formatted} bought in this period',
     kpiCustomersBought_other: '{formatted} bought in this period',
     kpiCustomersHint: 'Total customers on file',
+    kpiOperatingExpenses: 'Operating Expenses',
+    kpiOperatingExpensesHint: 'Overheads & business bills',
+    kpiStockPurchases: 'Stock Purchases',
+    kpiStockPurchasesHint: 'Inventory procurement spend',
+    kpiTotalOutflow: 'Money Going Out',
+    kpiTotalOutflowHint: 'Everything you spend — bills, salaries, fuel, and restocking inventory',
 
     gateVisualName: 'Advanced Visual Analytics',
     gateVisualBody:
@@ -2296,4 +2305,12 @@ const en = {
 
 export default en;
 
-export type Messages = typeof en;
+type RecursivePartial<T> = {
+  [P in keyof T]?: T[P] extends (infer U)[]
+    ? RecursivePartial<U>[]
+    : T[P] extends object | undefined
+    ? RecursivePartial<T[P]>
+    : T[P];
+};
+
+export type Messages = RecursivePartial<typeof en>;
