@@ -44,7 +44,7 @@
       }
     },
     "android": {
-      "versionCode": 3003000
+      "versionCode": 3003001
     }
   },
   "plugins": {
