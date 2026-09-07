@@ -15,6 +15,9 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { useBranch } from '@/context/branch-context';
+import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
+import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 
 interface ImportCustomersDialogProps {
   isOpen: boolean;
@@ -44,12 +47,14 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
    * appeared under none of them once the list is branch-filtered.
    */
   const { activeBranchId } = useBranch();
+  const { business } = usePOS();
 
   const [file, setFile] = React.useState<File | null>(null);
   const [parsedData, setParsedData] = React.useState<ParsedCustomerWithEmail[]>([]);
   const [isParsing, setIsParsing] = React.useState(false);
   const [isImporting, setIsImporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
   const [generatePlaceholderEmail, setGeneratePlaceholderEmail] = React.useState(true);
   const existingEmails = React.useMemo(() => new Set(existingCustomers.map(c => c.email.toLowerCase())), [existingCustomers]);
 
@@ -162,6 +167,10 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
 
   const handleImport = async () => {
     if (!businessId || !firestore || parsedData.length === 0) return;
+    if (business && isCoreFeatureBlocked(business)) {
+        setShowUpgradeOverlay(true);
+        return;
+    }
     setIsImporting(true);
     try {
       const customersRef = collection(firestore, 'customers');
@@ -341,6 +350,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
           </Button>
         </DialogFooter>
       </DialogContent>
+      <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
     </Dialog>
     </>
   );

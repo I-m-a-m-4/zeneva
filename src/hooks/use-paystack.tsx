@@ -44,7 +44,8 @@ export interface PaystackHookConfig {
   amount: number;
   currency?: string;
   reference?: string;
-  onSuccess?: (reference: string) => void;
+  ref?: string;
+  onSuccess?: (response: { reference: string; [key: string]: any } | string) => void;
   onClose?: () => void;
   plan?: string;
   metadata?: PaystackMetadata;
@@ -159,13 +160,14 @@ export const usePaystack = () => {
       email: config.email,
       amount: config.amount,
       currency: config.currency || 'NGN',
-      ref: config.reference,
+      ref: config.reference || config.ref,
       plan: config.plan,
       metadata: config.metadata,
       subaccount: config.subaccount,
-      callback: (response) => {
+      callback: (response: any) => {
         if (config.onSuccess) {
-          config.onSuccess(response.reference);
+          // Pass the full response object with reference guaranteed
+          config.onSuccess(response);
         }
       },
       onClose: () => {
@@ -189,7 +191,7 @@ export const usePaystack = () => {
     }
   }, [toast]);
 
-  return { isSdkReady, initializePayment };
+  return { isSdkReady, isScriptLoaded: isSdkReady, initializePayment };
 };
 
 export default usePaystack;

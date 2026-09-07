@@ -118,6 +118,7 @@ type BusinessLike = {
   accessLevel?: string | null;
   status?: string | null;
   trialExpiresAt?: any;
+  createdAt?: any;
 } | null | undefined;
 
 /** True when the business bought Pro or Business (regardless of expiry). */
@@ -139,6 +140,58 @@ export function isPaidPlanExpired(business: BusinessLike): boolean {
   const expiry = safeToDate(business.trialExpiresAt);
   if (!expiry || Number.isNaN(expiry.getTime())) return false;
   return expiry.getTime() <= Date.now();
+}
+
+/**
+ * Number of days remaining in the 30-day trial for Starter users.
+ * Paid plans or lifetime access return 0.
+ */
+export function getTrialDaysRemaining(business: BusinessLike): number {
+  if (!business) return 0;
+  if (business.accessLevel === 'lifetime') return 0;
+  if (isPaidPlan(business)) return 0;
+  if (business.plan && business.plan !== 'starter') return 0;
+
+  const created = safeToDate(business.createdAt);
+  if (!created || Number.isNaN(created.getTime()) || created.getTime() === 0) return 0;
+
+  const now = new Date();
+  const diffTime = now.getTime() - created.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  const remaining = 30 - diffDays;
+  return Math.max(0, remaining);
+}
+
+/**
+ * True when a Starter plan is older than 30 days.
+ */
+export function isTrialExpired(business: BusinessLike): boolean {
+  if (!business) return false;
+  if (business.accessLevel === 'lifetime') return false;
+  if (isPaidPlan(business)) return false;
+  if (business.plan && business.plan !== 'starter') return false;
+
+  const created = safeToDate(business.createdAt);
+  // If we have no createdAt, we assume it's an old account and the trial is expired.
+  if (!created || Number.isNaN(created.getTime()) || created.getTime() === 0) return true;
+
+  const now = new Date();
+  const diffTime = now.getTime() - created.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 30;
+}
+
+/**
+ * Core features (Checkout, Adding Products, etc) are blocked if the user is 
+ * on an expired trial (Starter) or a lapsed paying plan.
+ */
+export function isCoreFeatureBlocked(business: BusinessLike): boolean {
+  if (!business) return true;
+  if (business.accessLevel === 'lifetime') return false;
+  if (isPaidPlanExpired(business)) return true;
+  if (isTrialExpired(business)) return true;
+  return false;
 }
 
 /**

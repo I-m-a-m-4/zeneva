@@ -197,6 +197,7 @@ export default function AchievementsPage() {
         businesses: businesses || [],
         internalOwners: internalOwnerIds(users || []),
         billingCurrencies: billingCurrencyByBusiness(purchases || []),
+        purchases: purchases || [],
     });
     const arr = mrr * 12;
 

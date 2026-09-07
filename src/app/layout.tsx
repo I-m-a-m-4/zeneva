@@ -13,6 +13,7 @@ import { I18nProvider } from '@/context/i18n-context';
 import { LocaleSync } from '@/components/shared/locale-sync';
 import { UserActivityTracker } from '@/components/UserActivityTracker';
 import { GlobalAnnouncement } from '@/components/GlobalAnnouncement';
+import { PromoToastWindow } from '@/components/marketing/promo-toast-window';
 import InstallPrompt from '@/components/pwa/install-prompt';
 import { TauriUpdater } from '@/components/TauriUpdater';
 import { UpdatePrompt } from '@/components/update-prompt';
@@ -335,6 +336,7 @@ export default function RootLayout({
               <PushClickTracker />
               <NativeNotificationListener />
               <GlobalAnnouncement />
+              <PromoToastWindow />
               <Loader />
               <InstallPrompt />
               <TauriUpdater />

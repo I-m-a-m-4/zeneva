@@ -114,15 +114,23 @@ export default function LoginPage() {
         // AuthLayout handles the redirection once auth state changes
         void trackLaunchStage('login_succeeded', 'google-popup');
       } catch (popupError: any) {
+        const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
+        
+        if (popupError?.code === 'auth/internal-error') {
+            // Firebase internal errors are usually transient. Wait briefly and retry once.
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            await signInWithPopup(auth, provider);
+            void trackLaunchStage('login_succeeded', 'google-popup');
+            return;
+        }
+
         if (
-          popupError?.code === 'auth/popup-blocked' ||
           popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
-          popupError?.code === 'auth/internal-error' ||
-          popupError?.code === 'auth/network-request-failed'
+          (popupError?.code === 'auth/popup-blocked' && !isDesktop) || 
+          (!isDesktop && popupError?.code === 'auth/network-request-failed')
         ) {
-          // The webview cannot host a popup. This branch navigates the whole
-          // shell away, so the event is recorded *before* the call — nothing
-          // after it is guaranteed to run.
+          // The webview cannot host a popup, or mobile browser blocked it.
+          // This branch navigates the whole shell away.
           void trackLaunchStage(
             'login_failed',
             `popup-fallback:${popupError?.code ?? 'unknown'}`,
@@ -133,8 +141,15 @@ export default function LoginPage() {
         }
       }
     } catch (error: any) {
-      console.error("Google auth error:", error);
       const isCancellation =
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.code === 'auth/user-cancelled' ||
+        error?.code === 'auth/redirect-cancelled-by-user';
+
+      if (!isCancellation) {
+          console.error("Google auth error:", error);
+      }
         error?.code === 'auth/popup-closed-by-user' ||
         error?.code === 'auth/cancelled-popup-request' ||
         error?.code === 'auth/user-cancelled' ||
@@ -145,6 +160,8 @@ export default function LoginPage() {
       if (!isCancellation) {
         const errorDesc = error?.code === 'auth/internal-error'
           ? t('auth.googleTemporaryIssue')
+          : error?.code === 'auth/popup-blocked'
+          ? t('auth.popupBlocked')
           : (error.message || t('auth.tryAgainShort'));
         toast({
           variant: "destructive",

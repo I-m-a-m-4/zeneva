@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { collection, doc, addDoc, serverTimestamp, writeBatch, query, where, getDocs, limit } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShoppingBag } from 'lucide-react';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import type { BusinessInstance, CartItem, OnlineOrder } from '@/types';
 import usePaystack from '@/hooks/use-paystack';
 import { apiBase } from '@/lib/platform';
@@ -116,18 +117,19 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
         return { orderId: newOrderRef.id, finalCustomerName: customerName };
     }
 
-    const handleSuccessfulPayment = React.useCallback(async (transaction: { reference: string }) => {
+    const handleSuccessfulPayment = React.useCallback(async (transaction: any) => {
         toast({ title: "Processing...", description: "Verifying your payment securely." });
         try {
             const isUSD = business?.settings?.currency === 'USD';
             const exchangeRate = business?.settings?.usdToNgnRate || 1500;
             const expectedPaystackAmount = isUSD ? Math.round(total * exchangeRate * 100) : Math.round(total * 100);
+            const paymentRef = typeof transaction === 'string' ? transaction : (transaction?.reference || transaction?.ref || '');
 
             const verifyResponse = await fetch(`${apiBase()}/api/paystack/verify-transaction`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    reference: transaction.reference, 
+                    reference: paymentRef, 
                     expectedAmount: expectedPaystackAmount, 
                     businessId: business?.id,
                     currency: isUSD ? 'NGN' : (business?.settings?.currency || 'NGN')
@@ -158,6 +160,11 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
 
         if (!name || !email || !address || !phone || (shippingOptions.length > 0 && !selectedShipping)) {
             toast({ variant: 'destructive', title: 'Missing Information', description: 'Please fill out all required fields, including shipping.' });
+            return;
+        }
+
+        if (isCoreFeatureBlocked(business)) {
+            toast({ variant: 'destructive', title: 'Store Unavailable', description: 'This store is currently not accepting new orders.' });
             return;
         }
 

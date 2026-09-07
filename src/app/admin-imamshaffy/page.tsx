@@ -180,7 +180,8 @@ import {
 } from '@/lib/platform-revenue';
 import { effectivePlan } from '@/lib/plan';
 import { safeToDate } from '@/lib/utils';
-import DevicePlatformAdoptionSection, { classifyUserPlatform } from '@/components/admin/device-platform-section';
+import DevicePlatformAdoptionSection, { classifyUserPlatform, isVersionLatest, isVersionOutdated } from '@/components/admin/device-platform-section';
+import { AppConfig } from '@/lib/config';
 import { LOCALES, resolveLocale, getLocaleDefinition } from '@/lib/i18n/config';
 import type { BusinessInstance, UserProfile, Purchase, Receipt, Product } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -294,6 +295,8 @@ function ImportIntelligenceDialog({ open, onOpenChange, importAttempts = [], bus
     businesses: BusinessInstance[] | null;
 }) {
     const importAttemptsTotal = useCollectionCount('import_attempts');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedSourceFilter, setSelectedSourceFilter] = useState<string>('all');
 
     const sourceLabels: Record<string, string> = {
         spreadsheet: 'Excel or CSV',
@@ -303,137 +306,264 @@ function ImportIntelligenceDialog({ open, onOpenChange, importAttempts = [], bus
         text: 'Describe with Text (AI)',
         desktop: 'Desktop App Software',
         barcode: 'Scan Barcodes',
+        dropzone: 'Drop Anything Here',
     };
 
     const actionLabels: Record<string, string> = {
-        opened_modal: 'Opened Import Modal',
-        selected_source: 'Selected Import Source',
-        file_dropped: 'File Dropped',
-        image_dropped: 'Image Dropped',
-        opened_classic_modal: 'Opened Classic CSV Modal',
-        selected_classic_file: 'Selected Classic CSV File',
+        opened_modal: 'Opened Importer',
+        selected_source: 'Selected Method',
+        clicked_dropzone: 'Clicked Dropzone',
+        file_dropped: 'Uploaded File',
+        image_dropped: 'Uploaded Image',
+        opened_classic_modal: 'Opened Classic CSV',
+        selected_classic_file: 'Selected Classic CSV',
+        committed_import: 'Completed Import',
     };
+
+    // Calculate source method breakdowns
+    const sourceBreakdowns = useMemo(() => {
+        const counts: Record<string, { count: number; uniqueUsers: Set<string> }> = {
+            spreadsheet: { count: 0, uniqueUsers: new Set() },
+            paste: { count: 0, uniqueUsers: new Set() },
+            photo: { count: 0, uniqueUsers: new Set() },
+            invoice: { count: 0, uniqueUsers: new Set() },
+            text: { count: 0, uniqueUsers: new Set() },
+            barcode: { count: 0, uniqueUsers: new Set() },
+            dropzone: { count: 0, uniqueUsers: new Set() },
+        };
+
+        importAttempts.forEach((attempt) => {
+            const src = attempt.source || (attempt.action === 'file_dropped' ? 'spreadsheet' : attempt.action === 'image_dropped' ? 'photo' : '');
+            const uid = attempt.userId || attempt.userEmail || 'anon';
+            if (src && counts[src]) {
+                counts[src].count++;
+                counts[src].uniqueUsers.add(uid);
+            }
+        });
+
+        return counts;
+    }, [importAttempts]);
+
+    const filteredAttempts = useMemo(() => {
+        return importAttempts.filter((item) => {
+            const biz = businesses?.find(b => b.id === item.businessId);
+            const bizName = (item.businessName || biz?.name || '').toLowerCase();
+            const email = (item.userEmail || '').toLowerCase();
+            const name = (item.userName || '').toLowerCase();
+            const source = (item.source || '').toLowerCase();
+            const file = (item.fileName || '').toLowerCase();
+            const query = searchQuery.toLowerCase().trim();
+
+            const matchesSearch = !query || 
+                bizName.includes(query) || 
+                email.includes(query) || 
+                name.includes(query) || 
+                source.includes(query) || 
+                file.includes(query);
+
+            const matchesSource = selectedSourceFilter === 'all' || 
+                item.source === selectedSourceFilter || 
+                (selectedSourceFilter === 'spreadsheet' && (item.action === 'file_dropped' || item.action === 'selected_classic_file')) ||
+                (selectedSourceFilter === 'photo' && item.action === 'image_dropped');
+
+            return matchesSearch && matchesSource;
+        });
+    }, [importAttempts, businesses, searchQuery, selectedSourceFilter]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw]">
-                <DialogHeader>
+            <DialogContent className="max-w-4xl sm:max-w-5xl w-[95vw] max-h-[90vh] flex flex-col">
+                <DialogHeader className="shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         <UploadCloud className="h-5 w-5 text-primary" />
-                        Inventory Import Telemetry & Attempts
+                        Inventory Import Telemetry & Method Choices
                     </DialogTitle>
                     <DialogDescription>
-                        Real-time tracking of users attempting to import inventory, options selected, and files uploaded.
+                        Real-time tracking of which methods merchants click to import products into Zeneva, who clicked it, and files uploaded.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardDescription className="text-xs">Total Import Activity</CardDescription>
-                            <CardTitle className="text-2xl font-bold">{importAttemptsTotal ?? importAttempts.length}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-[10px] text-muted-foreground">Recorded import interactions across all merchants.</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardDescription className="text-xs">File Upload Attempts</CardDescription>
-                            <CardTitle className="text-2xl font-bold">
-                                {importAttempts.filter(a => a.action === 'file_dropped' || a.action === 'image_dropped' || a.action === 'selected_classic_file').length}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-[10px] text-muted-foreground">Spreadsheets or Images uploaded by merchants.</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardDescription className="text-xs">Top Import Source Choice</CardDescription>
-                            <CardTitle className="text-xl font-bold capitalize truncate">
-                                {(() => {
-                                    const sources = importAttempts.map(a => a.source).filter(Boolean);
-                                    if (sources.length === 0) return 'Spreadsheet';
-                                    const counts: Record<string, number> = {};
-                                    sources.forEach(s => counts[s] = (counts[s] || 0) + 1);
-                                    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-                                    return sourceLabels[top] || top || 'Spreadsheet';
-                                })()}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-[10px] text-muted-foreground">Most popular import format chosen by shop owners.</p>
-                        </CardContent>
-                    </Card>
-                </div>
+                <div className="overflow-y-auto space-y-4 pr-1">
+                    {/* Top Summary Stats */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-1">
+                        <Card className="bg-muted/30 border-border/80">
+                            <CardHeader className="pb-1.5 pt-3">
+                                <CardDescription className="text-xs">Total Import Interactions</CardDescription>
+                                <CardTitle className="text-2xl font-black text-primary">{importAttemptsTotal ?? importAttempts.length}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="pb-3">
+                                <p className="text-[10px] text-muted-foreground">Clicks, uploads, and modal opens across all merchants.</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-muted/30 border-border/80">
+                            <CardHeader className="pb-1.5 pt-3">
+                                <CardDescription className="text-xs">File Upload Attempts</CardDescription>
+                                <CardTitle className="text-2xl font-black text-emerald-600">
+                                    {importAttempts.filter(a => a.action === 'file_dropped' || a.action === 'image_dropped' || a.action === 'selected_classic_file').length}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pb-3">
+                                <p className="text-[10px] text-muted-foreground">Spreadsheets or photos actively uploaded by shop owners.</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-muted/30 border-border/80">
+                            <CardHeader className="pb-1.5 pt-3">
+                                <CardDescription className="text-xs">Top Method Preferred</CardDescription>
+                                <CardTitle className="text-xl font-black capitalize truncate text-orange-600">
+                                    {(() => {
+                                        const sources = importAttempts.map(a => a.source).filter(Boolean);
+                                        if (sources.length === 0) return 'Spreadsheet';
+                                        const counts: Record<string, number> = {};
+                                        sources.forEach(s => counts[s] = (counts[s] || 0) + 1);
+                                        const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                                        return sourceLabels[top] || top || 'Spreadsheet';
+                                    })()}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pb-3">
+                                <p className="text-[10px] text-muted-foreground">Most popular import option chosen by shop owners.</p>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                <div className="space-y-4 mt-2">
-                    <h4 className="text-sm font-bold">Recent Import Logs</h4>
-                    <div className="max-h-72 overflow-auto border rounded-md">
+                    {/* Method Choices Breakdown Grid */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Import Methods Chosen by Merchants</h4>
+                            <span className="text-[11px] text-muted-foreground">Click a card to filter logs</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                            {[
+                                { id: 'spreadsheet', label: 'Excel / CSV', emoji: '📄', count: sourceBreakdowns.spreadsheet.count, users: sourceBreakdowns.spreadsheet.uniqueUsers.size },
+                                { id: 'paste', label: 'Paste Data', emoji: '📋', count: sourceBreakdowns.paste.count, users: sourceBreakdowns.paste.uniqueUsers.size },
+                                { id: 'photo', label: 'Stock Photo', emoji: '📸', count: sourceBreakdowns.photo.count, users: sourceBreakdowns.photo.uniqueUsers.size },
+                                { id: 'invoice', label: 'Supplier Invoice', emoji: '🧾', count: sourceBreakdowns.invoice.count, users: sourceBreakdowns.invoice.uniqueUsers.size },
+                                { id: 'text', label: 'Describe AI', emoji: '💬', count: sourceBreakdowns.text.count, users: sourceBreakdowns.text.uniqueUsers.size },
+                                { id: 'barcode', label: 'Scan Barcodes', emoji: '🔍', count: sourceBreakdowns.barcode.count, users: sourceBreakdowns.barcode.uniqueUsers.size },
+                                { id: 'dropzone', label: 'Dropzone', emoji: '☁️', count: sourceBreakdowns.dropzone.count, users: sourceBreakdowns.dropzone.uniqueUsers.size },
+                            ].map((m) => {
+                                const isSelected = selectedSourceFilter === m.id;
+                                return (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => setSelectedSourceFilter(isSelected ? 'all' : m.id)}
+                                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                                            isSelected 
+                                                ? 'border-primary bg-primary/10 ring-1 ring-primary' 
+                                                : 'border-border/70 bg-card hover:bg-muted/40'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-base">{m.emoji}</span>
+                                            <span className="font-bold text-xs">{m.count}</span>
+                                        </div>
+                                        <p className="text-[11px] font-bold mt-1 truncate">{m.label}</p>
+                                        <p className="text-[9px] text-muted-foreground">{m.users} {m.users === 1 ? 'merchant' : 'merchants'}</p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Filter and Search Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2">
+                        <div className="relative flex-1 max-w-sm">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by business, email, user, or file..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-8 text-xs h-8"
+                            />
+                        </div>
+                        {selectedSourceFilter !== 'all' && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setSelectedSourceFilter('all')}
+                                className="text-xs h-8 text-muted-foreground"
+                            >
+                                Showing {sourceLabels[selectedSourceFilter] || selectedSourceFilter} · Clear filter
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Recent Import Logs Table */}
+                    <div className="border rounded-xl overflow-hidden bg-card">
                         <Table>
                             <TableHeader>
-                                <TableRow>
-                                    <TableHead>Business Name</TableHead>
-                                    <TableHead>User / Email</TableHead>
-                                    <TableHead>Action</TableHead>
-                                    <TableHead>Source Choice</TableHead>
-                                    <TableHead>File Info</TableHead>
-                                    <TableHead className="text-right">Date / Time</TableHead>
+                                <TableRow className="bg-muted/40">
+                                    <TableHead className="text-xs font-bold">Business Name</TableHead>
+                                    <TableHead className="text-xs font-bold">User / Merchant</TableHead>
+                                    <TableHead className="text-xs font-bold">Action</TableHead>
+                                    <TableHead className="text-xs font-bold">Method Chosen</TableHead>
+                                    <TableHead className="text-xs font-bold">File Info</TableHead>
+                                    <TableHead className="text-right text-xs font-bold">Date / Time</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {importAttempts.map((item, index) => {
+                                {filteredAttempts.map((item, index) => {
                                     const dateStr = item.timestamp?.toDate 
-                                        ? format(item.timestamp.toDate(), "PPP p")
+                                        ? format(item.timestamp.toDate(), "MMM d, yyyy · h:mm a")
                                         : (item.timestamp?.seconds 
-                                            ? format(new Date(item.timestamp.seconds * 1000), "PPP p")
+                                            ? format(new Date(item.timestamp.seconds * 1000), "MMM d, yyyy · h:mm a")
                                             : 'Just now');
                                     const biz = businesses?.find(b => b.id === item.businessId);
 
                                     return (
-                                        <TableRow key={item.id || index}>
-                                            <TableCell className="font-medium max-w-[150px] truncate" title={item.businessName || biz?.name || 'Unknown'}>
+                                        <TableRow key={item.id || index} className="hover:bg-muted/20">
+                                            <TableCell className="font-semibold text-xs max-w-[150px] truncate" title={item.businessName || biz?.name || 'Unknown'}>
                                                 {item.businessName || biz?.name || 'Unknown Business'}
                                             </TableCell>
-                                            <TableCell className="max-w-[160px] truncate">
+                                            <TableCell className="max-w-[180px] truncate">
                                                 <div className="flex flex-col text-left">
-                                                    <span className="font-semibold text-xs">{item.userName || 'N/A'}</span>
-                                                    <span className="text-[10px] text-muted-foreground">{item.userEmail || 'N/A'}</span>
+                                                    <span className="font-semibold text-xs text-foreground">{item.userName || biz?.ownerName || 'Merchant'}</span>
+                                                    <span className="text-[10px] text-muted-foreground truncate" title={item.userEmail || biz?.ownerEmail}>{item.userEmail || biz?.ownerEmail || 'No email logged'}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="text-[10px] capitalize">
+                                                <Badge variant="outline" className="text-[10px] font-medium capitalize">
                                                     {actionLabels[item.action] || item.action || 'Opened'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-xs">
                                                 {item.source ? (
-                                                    <Badge variant="secondary" className="text-[10px] capitalize">
+                                                    <Badge variant="secondary" className="text-[10px] font-semibold">
                                                         {sourceLabels[item.source] || item.source}
                                                     </Badge>
-                                                ) : '—'}
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">—</span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-xs max-w-[150px] truncate">
                                                 {item.fileName ? (
                                                     <div className="flex flex-col">
-                                                        <span className="font-mono text-[11px] truncate" title={item.fileName}>{item.fileName}</span>
+                                                        <span className="font-mono text-[11px] truncate text-foreground font-medium" title={item.fileName}>{item.fileName}</span>
                                                         {item.fileSize && (
                                                             <span className="text-[9px] text-muted-foreground">{(item.fileSize / 1024).toFixed(1)} KB</span>
                                                         )}
                                                     </div>
-                                                ) : '—'}
+                                                ) : item.metadata?.created != null ? (
+                                                    <span className="text-[10px] font-mono text-emerald-600 font-bold">
+                                                        +{item.metadata.created} products
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">—</span>
+                                                )}
                                             </TableCell>
-                                            <TableCell className="text-right text-[10px] text-muted-foreground whitespace-nowrap">
+                                            <TableCell className="text-right text-[10px] text-muted-foreground whitespace-nowrap font-mono">
                                                 {dateStr}
                                             </TableCell>
                                         </TableRow>
                                     );
                                 })}
-                                {importAttempts.length === 0 && (
+                                {filteredAttempts.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6 text-sm">
-                                            No import activity logged yet.
+                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-10 text-sm">
+                                            {searchQuery || selectedSourceFilter !== 'all' 
+                                                ? 'No import attempts match your search or filter.' 
+                                                : 'No import activity logged yet.'}
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -2253,6 +2383,28 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             </div>
                         </div>
                         <div>
+                            <Label className="text-xs text-muted-foreground font-bold">App Version & Release Status</Label>
+                            <div className="mt-1 flex items-center gap-2">
+                                {user.appVersion ? (
+                                    isVersionLatest(user.appVersion) ? (
+                                        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-xs font-mono font-bold flex items-center gap-1.5">
+                                            <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                            v{user.appVersion} (Latest Release)
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs font-mono font-semibold flex items-center gap-1.5">
+                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                            v{user.appVersion} (Outdated · Latest is v{AppConfig.version})
+                                        </Badge>
+                                    )
+                                ) : (
+                                    <Badge variant="outline" className="bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 text-xs flex items-center gap-1.5">
+                                        <Globe className="h-3.5 w-3.5 opacity-60" /> Web Browser (No native app build)
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+                        <div>
                             {/* Labelled "Login Location (IP)" until now, but the value
                                 is `country` and `UserProfile.ip` has no writer anywhere
                                 in the app — so the label promised an address that was
@@ -2839,7 +2991,46 @@ function AdminDashboardContent({
     };
 
     const processedUsers = useMemo(() => {
-        let result = users || [];
+        let baseUsers = users || [];
+        
+        // Deduplicate users by email, merging their platform footprints
+        const userMap = new Map<string, typeof baseUsers[0]>();
+        
+        for (const u of baseUsers) {
+            if (!u.email) continue;
+            const key = u.email.toLowerCase();
+            const existing = userMap.get(key);
+            
+            if (!existing) {
+                userMap.set(key, { ...u, platformsUsed: [...(u.platformsUsed || (u.deviceType ? [u.deviceType] : []))] });
+            } else {
+                // Merge platforms
+                const existingPlatforms = existing.platformsUsed || [];
+                const newPlatforms = u.platformsUsed || (u.deviceType ? [u.deviceType] : []);
+                existing.platformsUsed = Array.from(new Set([...existingPlatforms, ...newPlatforms]));
+                
+                // Merge user agents for classification
+                if ((u as any).userAgent) {
+                    (existing as any).userAgent = ((existing as any).userAgent || '') + ' ' + (u as any).userAgent;
+                }
+                
+                // Keep the most recent lastLoginAt and businessId
+                const existingDate = safeToDate(existing.lastLoginAt)?.getTime() || 0;
+                const newDate = safeToDate(u.lastLoginAt)?.getTime() || 0;
+                if (newDate > existingDate) {
+                    existing.lastLoginAt = u.lastLoginAt;
+                    existing.businessId = u.businessId; // Prefer the tenant of the most recent login
+                    existing.id = u.id; // Keep primary id of the active one
+                }
+                
+                // Keep best name
+                if (u.name && (!existing.name || u.name.length > existing.name.length)) {
+                    existing.name = u.name;
+                }
+            }
+        }
+        
+        let result = Array.from(userMap.values());
 
         // 1. Search
         if (searchQuery) {
@@ -3135,7 +3326,7 @@ function AdminDashboardContent({
     const analyticsData = useMemo(() => {
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
         const allUsers = users || [];
-        const activeUsers = allUsers.filter(u => u.status === 'active' || u.status === undefined || !u.status);
+        const activeUsers = allUsers.filter(u => u.status === 'active' || u.status === 'minimized' || u.status === undefined || !u.status);
         const inactiveUsers = allUsers.filter(u => u.status === 'inactive');
 
         const totalUsers = activeUsers.length;
@@ -3160,6 +3351,9 @@ function AdminDashboardContent({
 
         const validPurchases = (purchases || [])
             .filter(p => {
+                const ngnAmount = toNgn(p.amount, p.currency);
+                if (ngnAmount <= 0) return false;
+                if (p.userId && excludedUserIds.has(p.userId)) return false;
                 const biz = activeBusinesses.find(b => b.id === p.businessId);
                 if (biz && excludedUserIds.has(biz.ownerId)) return false;
                 return true;
@@ -3185,14 +3379,14 @@ function AdminDashboardContent({
 
         const platformAOV = totalReceipts > 0 ? (platformGmv / totalReceipts) : 0;
 
-        const payingBusinessIds = new Set(subscriptionPurchases.map(p => p.businessId));
+        const payingBusinessIds = new Set(subscriptionPurchases.map(p => p.businessId).filter(Boolean));
         const payingBusinesses = activeBusinesses?.filter(b => {
             return payingBusinessIds.has(b.id);
         });
 
         const billingCurrencies = billingCurrencyByBusiness(validPurchases);
 
-        // Calculate dynamic MRR and ARR from actual Firestore purchases & active subscriptions
+        // Calculate dynamic MRR and ARR strictly from verified Firestore purchases with real money received
         let dynamicMrr = 0;
         let dynamicArr = 0;
         let activePaidSubscriptionsCount = 0;
@@ -3201,7 +3395,7 @@ function AdminDashboardContent({
         let annualMrr = 0;
         let monthlyMrr = 0;
 
-        // Group valid purchases by businessId and userId to find the latest subscription payment
+        // Group valid subscription purchases by businessId and userId to find the latest subscription payment
         const latestPurchaseByBusiness = new Map<string, any>();
         const latestPurchaseByUser = new Map<string, any>();
         for (const p of subscriptionPurchases) {
@@ -3224,7 +3418,7 @@ function AdminDashboardContent({
 
         const countedPurchaseKeys = new Set<string>();
 
-        // For each active business, see what they actually paid or what plan they are on
+        // For each active business, calculate MRR/ARR strictly from actual verified payments received
         for (const b of activeBusinesses || []) {
             if (b.status === 'deleted') continue;
             if (b.ownerId && excludedUserIds.has(b.ownerId)) continue;
@@ -3232,16 +3426,45 @@ function AdminDashboardContent({
 
             const latestPurchase = latestPurchaseByBusiness.get(b.id) || 
                                    (b.ownerId ? latestPurchaseByUser.get(b.ownerId) : null);
-            const isPlanActive = effectivePlan(b) !== 'starter' || b.plan === 'pro' || b.plan === 'business';
 
+            // ONLY businesses that have a verified purchase with real money received can be counted.
+            // No predictive fallback for unverified / unpaid accounts.
             if (latestPurchase) {
+                const amount = toNgn(latestPurchase.amount, latestPurchase.currency);
+                if (amount <= 0) continue;
+
                 const pKey = latestPurchase.id || latestPurchase.reference || `${b.id}_${latestPurchase.timestamp}`;
                 countedPurchaseKeys.add(pKey);
-                const amount = toNgn(latestPurchase.amount, latestPurchase.currency);
-                // Assume amount >= 50000 or explicit annual in plan/text is an annual subscription, otherwise monthly
-                const isAnnual = amount >= 50000 || String(latestPurchase.plan || '').toLowerCase().includes('annual');
-                const mrrContribution = isAnnual ? (amount / 12) : amount;
-                const arrContribution = isAnnual ? amount : (amount * 12);
+
+                const planText = String(latestPurchase.plan || '').toLowerCase();
+                const pTime = safeToDate(latestPurchase.timestamp).getTime();
+                const expiryDate = b.trialExpiresAt ? safeToDate(b.trialExpiresAt) : null;
+                const daysAgo = pTime ? (Date.now() - pTime) / (1000 * 60 * 60 * 24) : 999;
+
+                // Determine cycle duration in months from payment amount / plan
+                let cycleMonths = 1;
+                if (planText.includes('annual') || planText.includes('12m') || planText.includes('1 year') || amount >= 80000) {
+                    cycleMonths = 12;
+                } else if (planText.includes('6m') || planText.includes('6 month') || amount >= 45000) {
+                    cycleMonths = 6;
+                } else if (planText.includes('3m') || planText.includes('3 month') || (amount >= 24000 && amount < 45000)) {
+                    cycleMonths = 3;
+                } else if (expiryDate && pTime && expiryDate.getTime() > pTime) {
+                    const diffMonths = Math.round((expiryDate.getTime() - pTime) / (1000 * 60 * 60 * 24 * 30.4));
+                    if (diffMonths >= 11) cycleMonths = 12;
+                    else if (diffMonths >= 5) cycleMonths = 6;
+                    else if (diffMonths >= 2) cycleMonths = 3;
+                }
+
+                // Check if the subscription is still fresh/active
+                const maxActiveDays = cycleMonths * 31 + 5;
+                const isFresh = (expiryDate && expiryDate.getTime() > Date.now()) || daysAgo <= maxActiveDays;
+                if (!isFresh) continue;
+
+                // Real cash-based contributions (no predictive hypothetical list-price markups)
+                const isAnnual = cycleMonths === 12;
+                const mrrContribution = Math.round(amount / cycleMonths);
+                const arrContribution = isAnnual ? amount : Math.round(mrrContribution * 12);
 
                 if (isAnnual) {
                     annualSubsCount += 1;
@@ -3254,16 +3477,6 @@ function AdminDashboardContent({
                 dynamicMrr += mrrContribution;
                 dynamicArr += arrContribution;
                 activePaidSubscriptionsCount += 1;
-            } else if (isPlanActive) {
-                // Fallback to standard plan list price so paid subscribers are NEVER missed even if payment record was detached
-                const planPrice = monthlyPriceNgn(effectivePlan(b), billingCurrencies?.get(b.id));
-                if (planPrice > 0) {
-                    monthlySubsCount += 1;
-                    monthlyMrr += planPrice;
-                    dynamicMrr += planPrice;
-                    dynamicArr += planPrice * 12;
-                    activePaidSubscriptionsCount += 1;
-                }
             }
         }
 
@@ -3273,14 +3486,28 @@ function AdminDashboardContent({
             if (pKey && countedPurchaseKeys.has(pKey)) continue;
             const pTime = safeToDate(p.timestamp).getTime();
             if (!pTime) continue;
-            const daysAgo = (Date.now() - pTime) / (1000 * 60 * 60 * 24);
             const amount = toNgn(p.amount, p.currency);
-            const isAnnual = amount >= 50000 || String(p.plan || '').toLowerCase().includes('annual');
-            const isFresh = isAnnual ? daysAgo <= 365 : daysAgo <= 35;
+            if (amount <= 0) continue;
 
-            if (isFresh && amount > 0) {
-                const mrrContribution = isAnnual ? (amount / 12) : amount;
-                const arrContribution = isAnnual ? amount : (amount * 12);
+            const planText = String(p.plan || '').toLowerCase();
+            let cycleMonths = 1;
+            if (planText.includes('annual') || planText.includes('12m') || planText.includes('1 year') || amount >= 80000) {
+                cycleMonths = 12;
+            } else if (planText.includes('6m') || planText.includes('6 month') || amount >= 45000) {
+                cycleMonths = 6;
+            } else if (planText.includes('3m') || planText.includes('3 month') || (amount >= 24000 && amount < 45000)) {
+                cycleMonths = 3;
+            }
+
+            const maxActiveDays = cycleMonths * 31 + 5;
+            const daysAgo = pTime ? (Date.now() - pTime) / (1000 * 60 * 60 * 24) : 999;
+            const isFresh = daysAgo <= maxActiveDays;
+
+            if (isFresh) {
+                const isAnnual = cycleMonths === 12;
+                const mrrContribution = Math.round(amount / cycleMonths);
+                const arrContribution = isAnnual ? amount : Math.round(mrrContribution * 12);
+
                 if (isAnnual) {
                     annualSubsCount += 1;
                     annualMrr += mrrContribution;
@@ -3298,16 +3525,17 @@ function AdminDashboardContent({
         const arr = dynamicArr;
 
         const mrrDescription = activePaidSubscriptionsCount > 0
-            ? `${annualSubsCount > 0 ? `₦${Math.round(annualMrr).toLocaleString()} (Annual: ${annualSubsCount}) + ` : ''}₦${Math.round(monthlyMrr).toLocaleString()} (Monthly: ${monthlySubsCount}) · ${activePaidSubscriptionsCount} active sub${activePaidSubscriptionsCount === 1 ? '' : 's'}`
+            ? `${annualSubsCount > 0 ? `₦${Math.round(annualMrr).toLocaleString()} (Annual: ${annualSubsCount})` : ''}${annualSubsCount > 0 && monthlySubsCount > 0 ? ' + ' : ''}${monthlySubsCount > 0 ? `₦${Math.round(monthlyMrr).toLocaleString()} (Monthly: ${monthlySubsCount})` : ''} · ${activePaidSubscriptionsCount} active sub${activePaidSubscriptionsCount === 1 ? '' : 's'}`
             : '0 active subscriptions';
 
         const arrDescription = activePaidSubscriptionsCount > 0
-            ? `₦${Math.round(arr).toLocaleString()} Annualized Run Rate (${activePaidSubscriptionsCount} paying stores)`
+            ? `₦${Math.round(arr).toLocaleString()} Annualized Run Rate (${activePaidSubscriptionsCount} paying store${activePaidSubscriptionsCount === 1 ? '' : 's'})`
             : 'No active paid subscriptions';
 
         const usersByDate = (activeUsers || []).reduce((acc, user) => {
-            if (user.createdAt?.seconds) {
-                const date = format(new Date(user.createdAt.seconds * 1000), 'MMM d');
+            const d = safeToDate(user.createdAt);
+            if (d && !isNaN(d.getTime())) {
+                const date = format(d, 'MMM d');
                 acc[date] = (acc[date] || 0) + 1;
             }
             return acc;
@@ -3321,8 +3549,9 @@ function AdminDashboardContent({
          * that hid pack sales would show a day with revenue as a day with none.
          */
         const revenueByDate = validPurchases.reduce((acc, purchase) => {
-            if (purchase.timestamp?.seconds) {
-                const date = format(new Date(purchase.timestamp.seconds * 1000), 'MMM d');
+            const d = safeToDate(purchase.timestamp);
+            if (d && !isNaN(d.getTime())) {
+                const date = format(d, 'MMM d');
                 acc[date] = (acc[date] || 0) + toNgn(purchase.amount, purchase.currency);
             }
             return acc;
@@ -3419,7 +3648,7 @@ function AdminDashboardContent({
         }
 
         // LTV = Total Subscription Revenue / Total Paying Customers
-        const payingBusinessesCount = payingBusinesses?.length || 0;
+        const payingBusinessesCount = payingBusinessIds.size;
         const ltv = payingBusinessesCount > 0 ? totalSubscriptionRevenue / payingBusinessesCount : 0;
 
         // --- DOWNLOAD TELEMETRY INTELLIGENCE ---

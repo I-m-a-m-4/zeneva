@@ -109,9 +109,19 @@ const PaystackSubscriptionButton = ({
     const { initializePayment, isSdkReady: isScriptLoaded } = usePaystack();
     const { isImpersonating } = usePOS();
 
-    const handleSuccessfulPayment = useCallback(async (transaction: { reference: string }) => {
+    const handleSuccessfulPayment = useCallback(async (transaction: any) => {
         if (!firestore || !userProfile || !businessInstance) {
             toast({ variant: 'destructive', title: 'Error', description: 'Session expired. Please refresh and try again.' });
+            setProcessingPlan(null);
+            return;
+        }
+
+        const paymentRef = typeof transaction === 'string'
+            ? transaction
+            : (transaction?.reference || transaction?.ref || '');
+
+        if (!paymentRef) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Payment reference missing. Please contact support.' });
             setProcessingPlan(null);
             return;
         }
@@ -129,7 +139,7 @@ const PaystackSubscriptionButton = ({
 
             const result = await activateSubscription({
                 idToken: await idToken(),
-                reference: transaction.reference,
+                reference: paymentRef,
                 planId: plan.planId,
                 cycleId: cycle.id,
                 currency,

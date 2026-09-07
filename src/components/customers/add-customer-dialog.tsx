@@ -21,6 +21,8 @@ import type { Customer } from '@/types';
 import { usePOS } from '@/context/pos-context';
 import { getIndustryConfig } from '@/lib/industry';
 import { Loader2 } from 'lucide-react';
+import { isCoreFeatureBlocked } from '@/lib/plan';
+import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 
 interface AddCustomerDialogProps {
   isOpen: boolean;
@@ -32,15 +34,14 @@ interface AddCustomerDialogProps {
 export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, customers }: AddCustomerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { triggerRefresh, addToQueue } = usePOS();
+  const { triggerRefresh, addToQueue, business } = usePOS();
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [code, setCode] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
   const isSavingRef = React.useRef(false);
-
-
+  const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
 
   const resetForm = () => {
     setName('');
@@ -56,6 +57,10 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
     if (!name) {
       toast({ title: 'Missing fields', description: 'Customer name is required.', variant: 'destructive' });
       return;
+    }
+    if (business && isCoreFeatureBlocked(business)) {
+        setShowUpgradeOverlay(true);
+        return;
     }
     if (!businessId) {
       toast({ title: 'Error', description: 'Business ID is missing.', variant: 'destructive' });
@@ -177,6 +182,7 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
         </form>
       </DialogContent>
       </Dialog>
+      <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
     </>
   );
 }

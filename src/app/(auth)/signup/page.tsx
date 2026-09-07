@@ -262,9 +262,11 @@ export default function SignupPage() {
       try {
         result = await signInWithPopup(auth, provider);
       } catch (popupError: any) {
+        const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
+
         if (
-          popupError?.code === 'auth/popup-blocked' ||
-          popupError?.code === 'auth/operation-not-supported-in-this-environment'
+          popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
+          (popupError?.code === 'auth/popup-blocked' && !isDesktop)
         ) {
           // Browser blocked the popup — fall back to redirect silently.
           // Recorded before the call, which navigates the whole shell away.
@@ -309,11 +311,14 @@ export default function SignupPage() {
       }
 
     } catch (error: any) {
-      console.error("Google auth error:", error);
       const isCancellation =
         error?.code === 'auth/popup-closed-by-user' ||
         error?.code === 'auth/cancelled-popup-request' ||
         error?.code === 'auth/user-cancelled';
+
+      if (!isCancellation) {
+          console.error("Google auth error:", error);
+      }
 
       void trackLaunchStage('signup_failed', `google:${error?.code ?? 'unknown'}`);
 

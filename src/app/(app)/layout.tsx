@@ -37,7 +37,7 @@ import { FeatureUpdateModal } from '@/components/shared/feature-update-modal';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate, getCountryFromIP } from '@/lib/utils';
-import { isPaidPlan } from '@/lib/plan';
+import { isPaidPlan, getTrialDaysRemaining, isPaidPlanExpired } from '@/lib/plan';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
@@ -214,6 +214,9 @@ export default function AuthenticatedLayout({
   const [ipCountry, setIpCountry] = React.useState<string | null>(null);
 
   const [showCeoMessage, setShowCeoMessage] = React.useState(false);
+  const [hasUnreadAdminMessage, setHasUnreadAdminMessage] = React.useState(false);
+  const [unreadAdminMessageText, setUnreadAdminMessageText] = React.useState<string | null>(null);
+  const [showSupportPopup, setShowSupportPopup] = React.useState(false);
   
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -233,6 +236,9 @@ export default function AuthenticatedLayout({
   }, [pathname]);
 
   const isPremium = businessInstance?.plan === 'pro' || businessInstance?.plan === 'business';
+  
+  const trialDaysRemaining = businessInstance ? getTrialDaysRemaining(businessInstance) : null;
+  const showTrialWarning = !isPremium && !isPaidPlanExpired(businessInstance) && trialDaysRemaining !== null && (trialDaysRemaining <= 7);
 
   React.useEffect(() => {
     getCountryFromIP().then(country => {
@@ -805,10 +811,31 @@ export default function AuthenticatedLayout({
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (typeof window === 'undefined') return;
+
+      // Clear badge when user is actively on the support page.
+      if (pathname === '/support') {
+        setHasUnreadAdminMessage(false);
+        localStorage.setItem('zeneva_last_viewed_support_user', Date.now().toString());
+      }
       
       const lastViewedTimeStr = localStorage.getItem('zeneva_last_viewed_support_user');
       const lastViewedTime = lastViewedTimeStr ? parseInt(lastViewedTimeStr) : 0;
 
+      let anyUnread = false;
+      let unreadMsg = null;
+
+      snapshot.docs.forEach((snapDoc) => {
+        const data = snapDoc.data();
+        // Any thread whose last message was from admin and is unread by the user
+        // should keep the badge lit — regardless of when it arrived.
+        if (data.lastMessageSender === 'admin' && !data.isReadByUser) {
+          anyUnread = true;
+          unreadMsg = data.lastMessage;
+        }
+      });
+      setUnreadAdminMessageText(unreadMsg);
+
+      // Also handle real-time arrivals for the OS notification.
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified') {
           const data = change.doc.data();
@@ -820,18 +847,22 @@ export default function AuthenticatedLayout({
               : new Date(data.lastMessageAt);
             const time = date.getTime();
             
-            // Only notify if it's new, less than 60 seconds old, and we're not currently on the support page
+            // Only pop OS notification for messages < 60 s old and not on /support
             if (!isNaN(time) && time > lastViewedTime && (Date.now() - time) < 60000 && pathname !== '/support') {
               notify(
                 'New Message from Zeneva Support', 
                 data.lastMessage || 'You have a new message from our team.',
                 '/support'
               );
+              setShowSupportPopup(true);
+              setTimeout(() => setShowSupportPopup(false), 6000); // 6 seconds auto-hide
               localStorage.setItem('zeneva_last_viewed_support_user', Date.now().toString());
             }
           }
         }
       });
+
+      setHasUnreadAdminMessage(anyUnread);
     }, terminalListenerErrorHandler('Support notifications', () => unsubscribe()));
 
     return () => unsubscribe();
@@ -1443,7 +1474,7 @@ export default function AuthenticatedLayout({
                           <Link href={link.href} className="relative">
                             <link.icon className="h-5 w-5" />
                             <span className="group-data-[state=collapsed]:hidden">{t(link.labelKey)}</span>
-                            {isSupport && showCeoMessage && (
+                            {isSupport && (showCeoMessage || hasUnreadAdminMessage) && (
                               <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
@@ -1456,7 +1487,7 @@ export default function AuthenticatedLayout({
 
                     if (isSupport) {
                       return (
-                        <Popover key={link.href} open={showCeoMessage} onOpenChange={setShowCeoMessage}>
+                        <Popover key={link.href} open={showCeoMessage || showSupportPopup} onOpenChange={(v) => { setShowCeoMessage(v); if (!v) setShowSupportPopup(false); }}>
                           <PopoverTrigger asChild>
                             {content}
                           </PopoverTrigger>
@@ -1469,7 +1500,11 @@ export default function AuthenticatedLayout({
                                 <span className="text-xs font-bold">Bello Imam, CEO</span>
                             </div>
                             <div className="p-3 text-xs text-muted-foreground bg-background">
-                                <p className="line-clamp-2">"Hey! I'm Bello Imam, CEO of Zeneva. I read all messages in this direct line personally..."</p>
+                                <p className="line-clamp-2">{
+                                  showCeoMessage
+                                    ? (activeBroadcast?.message || "Hey! I'm Bello Imam, CEO of Zeneva. I read all messages in this direct line personally...")
+                                    : (unreadAdminMessageText || "Hey! I'm Bello Imam, CEO of Zeneva. I read all messages in this direct line personally...")
+                                }</p>
                             </div>
                           </PopoverContent>
                         </Popover>
@@ -1541,6 +1576,17 @@ export default function AuthenticatedLayout({
               </SidebarFooter>
             </Sidebar>
             <div className="flex-1 flex flex-col overflow-hidden bg-background relative">
+              {showTrialWarning && (
+                <div className="bg-orange-50 border-b border-orange-200 px-4 py-2 flex items-center justify-between z-20">
+                  <div className="flex items-center gap-2 text-orange-800 text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>Your trial expires in {trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'}. Upgrade your plan to continue using Zeneva.</span>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-7 text-xs bg-orange-100 border-orange-200 text-orange-800 hover:bg-orange-200" asChild>
+                    <Link href="/settings/billing">Upgrade Now</Link>
+                  </Button>
+                </div>
+              )}
               <header className="no-print flex h-16 shrink-0 items-center gap-2 sm:gap-4 border-b bg-background px-2 sm:px-6 z-10">
                 <SidebarTrigger className="hidden md:flex" />
                 <BusinessHealthIndicator />

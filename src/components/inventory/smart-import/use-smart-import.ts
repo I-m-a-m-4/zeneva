@@ -27,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePOS, useBusiness } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { productLimit } from '@/lib/plan';
+import { productLimit, isCoreFeatureBlocked } from '@/lib/plan';
 import type { Product } from '@/types';
 
 import { mapColumns, applyAiMapping, setMapping } from '@/lib/import/column-map';
@@ -541,6 +541,13 @@ export function useSmartImport(onFinished: () => void) {
    * existing products adds nothing to the total, and refusing it would be wrong.
    */
   const limitCheck = React.useMemo(() => {
+    if (business && isCoreFeatureBlocked(business)) {
+      return {
+        ok: false as const,
+        message: `Your trial has expired or your plan has lapsed. Please upgrade to import products.`,
+        isBlocked: true as const,
+      };
+    }
     const limit = productLimit(business);
     if (limit === Infinity) return { ok: true as const };
     const after = catalogue.length + plan.create.length;

@@ -37,6 +37,7 @@ export function ConsoleGuard() {
       'hydration mismatch',
       'some attributes of the server rendered HTML',
       'Hydration failed',
+      'Firestore (11.10.0)',
       // Firestore transport noise. These are routine when the SDK retries and
       // recovers, so users should never see them - but when the client gets
       // stuck offline on a machine with working internet, they are the only
@@ -47,7 +48,6 @@ export function ConsoleGuard() {
             'QUIC_NETWORK_IDLE_TIMEOUT',
             'transport errored',
             'WebChannelConnection RPC',
-            'Firestore (11.10.0)',
             'firestore.googleapis.com',
             'google.firestore.v1.Firestore',
             '400 (Bad Request)',

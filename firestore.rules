@@ -668,5 +668,23 @@ service cloud.firestore {
       allow create: if isUserAuthenticated();
       allow read, update, delete: if isSuperAdmin();
     }
+
+    // Telemetry for inventory import options and file uploads
+    match /import_attempts/{attemptId} {
+      allow create: if isUserAuthenticated();
+      allow read, update, delete: if isSuperAdmin();
+    }
+
+    // Zen AI conversational chat sessions
+    match /ai_sessions/{sessionId} {
+      allow get, list: if isSuperAdmin() ||
+                          (isUserAuthenticated() && resource.data.get('userId', 'none') == request.auth.uid);
+      allow create: if isSuperAdmin() ||
+                       (isUserAuthenticated() && request.resource.data.get('userId', 'none') == request.auth.uid);
+      allow update: if isSuperAdmin() ||
+                       (isUserAuthenticated() && resource.data.get('userId', 'none') == request.auth.uid);
+      allow delete: if isSuperAdmin() ||
+                       (isUserAuthenticated() && resource.data.get('userId', 'none') == request.auth.uid);
+    }
   }
 }

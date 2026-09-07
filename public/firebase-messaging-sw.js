@@ -27,8 +27,8 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = notification.title || data.title || 'Zeneva';
   const notificationOptions = {
     body: notification.body || data.body || '',
-    icon: '/zeneva.png', // path to your app logo
-    badge: '/badges/pos-professional.png', // small monochrome icon preferably
+    icon: '/icon.svg', // path to your app logo
+    badge: '/icon.svg', // small monochrome icon preferably
     // Without this, `event.notification.data` is undefined in the click handler
     // below and both the deep link and the campaign id are lost.
     data: data,

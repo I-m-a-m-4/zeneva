@@ -919,3 +919,24 @@ export interface SupplierPurchase {
     createdByName?: string;
     createdById?: string;
 }
+
+export type PromoToastColor = 'blue' | 'orange' | 'emerald' | 'purple' | 'amber';
+export type PromoToastMode = 'poster' | 'card';
+export type PromoToastTargetPlatform = 'all' | 'desktop' | 'web';
+
+export interface PromoToastConfig {
+    id: string; // Campaign ID, e.g. "promo-wps-2026-v1"
+    enabled: boolean;
+    displayMode: PromoToastMode; // 'poster' = full image graphic, 'card' = banner image + copy + button
+    imageUrl: string; // custom image designed by admin
+    badgeText: string; // e.g. "59% OFF" or "EXCLUSIVE OFFER"
+    title: string; // e.g. "Upgrade to Zeneva Pro"
+    description: string; // e.g. "Get unlimited stores, offline sync & AI stock insights."
+    buttonText: string; // e.g. "Get my OFFER"
+    targetUrl: string; // e.g. "/settings?tab=subscription" or checkout link
+    themeColor: PromoToastColor; // blue (WPS style), orange (Zeneva), emerald, purple, amber
+    targetPlatform: PromoToastTargetPlatform; // all, desktop, web
+    cooldownHours: number; // e.g. 24
+    autoShowDelaySec: number; // e.g. 3
+    updatedAt?: any;
+}

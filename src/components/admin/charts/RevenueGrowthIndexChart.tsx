@@ -7,6 +7,8 @@ import { Activity } from 'lucide-react';
 import { TimeframePicker, type Timeframe } from '@/components/reports/timeframe-picker';
 import { subDays, startOfDay, format, eachDayOfInterval } from 'date-fns';
 import type { Purchase } from '@/types';
+import { safeToDate } from '@/lib/utils';
+import { toNgn } from '@/lib/platform-revenue';
 
 interface RevenueGrowthIndexChartProps {
   purchases: Purchase[];
@@ -32,11 +34,11 @@ export default function RevenueGrowthIndexChart({ purchases }: RevenueGrowthInde
     });
 
     purchases.forEach(p => {
-      const date = p.timestamp?.toDate ? p.timestamp.toDate() : new Date(p.timestamp || 0);
-      if (date >= limitDate) {
+      const date = safeToDate(p.timestamp);
+      if (date && !isNaN(date.getTime()) && date >= limitDate) {
         const dayKey = format(date, 'MMM d');
         if (dailyData[dayKey] !== undefined) {
-          dailyData[dayKey] += p.amount || 0;
+          dailyData[dayKey] += toNgn(p.amount, p.currency);
         }
       }
     });

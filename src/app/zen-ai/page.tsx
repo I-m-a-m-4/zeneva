@@ -257,7 +257,7 @@ function Ghost({ href, children }: { href: string; children: React.ReactNode }) 
 /**
  * The eight capability groups, in the same order and with the same framing as
  * `/ai-insights/use-cases` — grouped by the question an owner actually has,
- * not by tool name. A list of 42 camelCase identifiers tells nobody what to
+ * not by tool name. A list of 44 camelCase identifiers tells nobody what to
  * type.
  *
  * `accent` is only ever cyan / aqua / magenta. The primary is deliberately
@@ -636,7 +636,7 @@ function Hero() {
           </motion.div>
 
           <p className="zia-caption mt-8" style={{ color: 'rgba(255,255,255,.5)' }}>
-            42 tools over your own data · included in every plan · no card to try
+            44 tools over your own data · included in every plan · no card to try
           </p>
         </div>
       </div>
@@ -651,7 +651,7 @@ function Capabilities() {
       <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-12">
         <div className="max-w-3xl">
           <Eyebrow tone="light">What you can ask</Eyebrow>
-          <h2 className="zia-display-lg mt-6">One assistant. Forty-two tools.</h2>
+          <h2 className="zia-display-lg mt-6">One assistant. Forty-four tools.</h2>
           <p className="zia-body-md zia-measure mt-6" style={{ color: 'var(--zia-ink-soft)' }}>
             Grouped by the question you actually have, not by what the tools are
             called. Every line below is backed by something Zen AI can really

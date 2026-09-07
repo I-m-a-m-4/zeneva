@@ -236,27 +236,110 @@ export function subscriptionRunRate({
   businesses,
   internalOwners,
   billingCurrencies,
+  purchases,
 }: {
   businesses: SubscriberLike[];
   /** Owner uids to leave out — see `internalOwnerIds`. */
   internalOwners: Set<string>;
   /** Optional; from `billingCurrencyByBusiness`. Absent means the naira list. */
   billingCurrencies?: Map<string, string>;
+  /** Optional purchases collection to ensure only real verified cash payments are counted. */
+  purchases?: Array<any>;
 }): RunRate {
-  let mrr = 0;
-  let activeSubscriptions = 0;
   let lifetimeAccounts = 0;
 
   for (const b of businesses) {
     if (b.status === 'deleted') continue;
     if (b.ownerId && internalOwners.has(b.ownerId)) continue;
-
-    // Lifetime access reports as Business but never pays again. Counting it at
-    // ₦30,000/month would invent recurring revenue that does not exist.
     if (b.accessLevel === 'lifetime') {
       lifetimeAccounts += 1;
-      continue;
     }
+  }
+
+  // When purchase records are available, verify strictly against real money received
+  if (purchases && purchases.length > 0) {
+    const validPurchases = purchases.filter((p) => {
+      const ngnAmount = toNgn(p.amount, p.currency);
+      if (ngnAmount <= 0) return false;
+      if (p.userId && internalOwners.has(p.userId)) return false;
+      return true;
+    });
+
+    const { subscriptions: subscriptionPurchases } = splitPurchases(validPurchases);
+
+    const latestPurchaseByBusiness = new Map<string, any>();
+    const latestPurchaseByUser = new Map<string, any>();
+    for (const p of subscriptionPurchases) {
+      const pTime = safeToDate(p.timestamp).getTime();
+      if (p.businessId) {
+        const existing = latestPurchaseByBusiness.get(p.businessId);
+        const existingTime = existing ? safeToDate(existing.timestamp).getTime() : 0;
+        if (!existing || pTime >= existingTime) {
+          latestPurchaseByBusiness.set(p.businessId, p);
+        }
+      }
+      if (p.userId) {
+        const existing = latestPurchaseByUser.get(p.userId);
+        const existingTime = existing ? safeToDate(existing.timestamp).getTime() : 0;
+        if (!existing || pTime >= existingTime) {
+          latestPurchaseByUser.set(p.userId, p);
+        }
+      }
+    }
+
+    let mrr = 0;
+    let activeSubscriptions = 0;
+
+    for (const b of businesses) {
+      if (b.status === 'deleted') continue;
+      if (b.ownerId && internalOwners.has(b.ownerId)) continue;
+      if (b.accessLevel === 'lifetime') continue;
+
+      const latestPurchase = latestPurchaseByBusiness.get(b.id) ||
+                             (b.ownerId ? latestPurchaseByUser.get(b.ownerId) : null);
+
+      if (latestPurchase) {
+        const amount = toNgn(latestPurchase.amount, latestPurchase.currency);
+        if (amount <= 0) continue;
+
+        const planText = String(latestPurchase.plan || '').toLowerCase();
+        const pTime = safeToDate(latestPurchase.timestamp).getTime();
+        const expiryDate = b.trialExpiresAt ? safeToDate(b.trialExpiresAt) : null;
+        const daysAgo = pTime ? (Date.now() - pTime) / (1000 * 60 * 60 * 24) : 999;
+
+        let cycleMonths = 1;
+        if (planText.includes('annual') || planText.includes('12m') || planText.includes('1 year') || amount >= 80000) {
+          cycleMonths = 12;
+        } else if (planText.includes('6m') || planText.includes('6 month') || amount >= 45000) {
+          cycleMonths = 6;
+        } else if (planText.includes('3m') || planText.includes('3 month') || (amount >= 24000 && amount < 45000)) {
+          cycleMonths = 3;
+        } else if (expiryDate && pTime && expiryDate.getTime() > pTime) {
+          const diffMonths = Math.round((expiryDate.getTime() - pTime) / (1000 * 60 * 60 * 24 * 30.4));
+          if (diffMonths >= 11) cycleMonths = 12;
+          else if (diffMonths >= 5) cycleMonths = 6;
+          else if (diffMonths >= 2) cycleMonths = 3;
+        }
+
+        const maxActiveDays = cycleMonths * 31 + 5;
+        const isFresh = (expiryDate && expiryDate.getTime() > Date.now()) || daysAgo <= maxActiveDays;
+        if (!isFresh) continue;
+
+        mrr += Math.round(amount / cycleMonths);
+        activeSubscriptions += 1;
+      }
+    }
+
+    return { mrr, activeSubscriptions, lifetimeAccounts };
+  }
+
+  let mrr = 0;
+  let activeSubscriptions = 0;
+
+  for (const b of businesses) {
+    if (b.status === 'deleted') continue;
+    if (b.ownerId && internalOwners.has(b.ownerId)) continue;
+    if (b.accessLevel === 'lifetime') continue;
 
     const price = monthlyPriceNgn(effectivePlan(b), billingCurrencies?.get(b.id));
     if (price <= 0) continue;

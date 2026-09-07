@@ -182,6 +182,68 @@ export default function InventoryPage() {
     );
 }
 
+function InventoryValuation({ products, currencySymbol }: { products: Product[], currencySymbol: string }) {
+  const { t } = useI18n();
+  const metrics = React.useMemo(() => {
+    let atCost = 0, atRetail = 0, units = 0, missingCost = 0, skus = 0;
+    for (const p of products) {
+      if (isService(p)) continue; // Skip services for valuation
+      const stock = Math.max(0, p.stock ?? 0);
+      units += stock;
+      atRetail += stock * (p.price ?? 0);
+      skus++;
+      if (p.costPrice != null) {
+        atCost += stock * p.costPrice;
+      } else {
+        missingCost++;
+      }
+    }
+    return { atCost, atRetail, units, skus, missingCost, potentialProfit: atRetail - atCost };
+  }, [products]);
+
+  if (products.length === 0) return null;
+
+  return (
+    <Card className="mb-6 bg-gradient-to-br from-primary/5 to-transparent border-primary/10 overflow-hidden shadow-sm">
+      <CardHeader className="py-3 px-4 border-b bg-background/50 backdrop-blur-sm flex flex-row items-center justify-between">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Layers className="h-4 w-4 text-primary" />
+          Inventory Valuation
+        </CardTitle>
+        {metrics.missingCost > 0 && (
+          <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50 gap-1 font-medium">
+            <AlertCircle className="h-3 w-3" /> {metrics.missingCost} item(s) missing cost price
+          </Badge>
+        )}
+      </CardHeader>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Coins className="h-3 w-3" /> Retail Value</p>
+            <p className="text-lg font-bold tracking-tight">{currencySymbol}{metrics.atRetail.toLocaleString()}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Box className="h-3 w-3" /> Cost Value</p>
+            <p className="text-lg font-bold tracking-tight">{currencySymbol}{metrics.atCost.toLocaleString()}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3 w-3 rotate-180" /> Potential Profit</p>
+            <p className="text-lg font-bold tracking-tight text-green-600">{currencySymbol}{metrics.potentialProfit.toLocaleString()}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="h-3 w-3" /> Units on Hand</p>
+            <p className="text-lg font-bold tracking-tight">{metrics.units.toLocaleString()}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><BarcodeIcon className="h-3 w-3" /> Unique SKUs</p>
+            <p className="text-lg font-bold tracking-tight">{metrics.skus.toLocaleString()}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function InventoryPageContent() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -573,6 +635,11 @@ function InventoryPageContent() {
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== DEFAULT_SORT_BY ? 1 : 0);
   return (
     <div className="flex flex-col flex-1 w-full pb-16 md:pb-0">
+      
+      {canManageStock && products && (
+        <InventoryValuation products={products} currencySymbol={currencySymbol} />
+      )}
+
       <div className="flex items-center sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3.5 gap-4 z-10 border-b mb-4">
         <div className="flex flex-col flex-1">
           <div className="relative flex items-center gap-2">
@@ -694,9 +761,9 @@ function InventoryPageContent() {
               </Button>
             )}
             {canManageStock && (
-              <Button size="sm" asChild variant="outline" className="h-9 gap-1">
+              <Button size="sm" asChild variant="outline" className="group h-9 gap-1">
                 <Link href="/expenses?tab=purchases">
-                  <Truck className="h-3.5 w-3.5 text-primary" />
+                  <Truck className="h-3.5 w-3.5 text-primary group-hover:text-white" />
                   <span className="sm:whitespace-nowrap">Purchases & Restock</span>
                 </Link>
               </Button>

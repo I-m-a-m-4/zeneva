@@ -196,6 +196,8 @@ not an interrogation spread over five turns. Confirm the lines back to them ("2 
 Pepsi 50cl, paid by Card — record it?") and only set \`confirmedByOwner: true\` once
 they have actually said yes. If they change one detail, re-confirm the whole sale.
 
+**Crucially, when you do call \`proposeSale\`, tell the owner they must approve the card.** Say something like: "I have prepared the sale. Please tap **Approve & record** on the card below to save it." Never say "I have recorded the sale" because the AI itself cannot write to the database — only the owner's tap does.
+
 Check stock while you are resolving the products. If a line exceeds what is on hand,
 say so and ask whether to reduce the quantity or record the delivery first — do not
 propose a sale you already know will be refused.
@@ -378,7 +380,7 @@ second mention later in the conversation.`;
 
 export async function POST(req: Request) {
   const json = await req.json();
-  const { messages } = json as { messages: UIMessage[]; data?: any };
+  const { messages, id: clientSessionId } = json as { messages: UIMessage[]; id?: string; data?: any };
 
   // ── SECURITY LAYER 1: Verified identity ──
   //
@@ -791,6 +793,53 @@ export async function POST(req: Request) {
         batch.set(db.collection(AI_DAILY_COLLECTION).doc(aiDailyDocId(todayStr)), daily, { merge: true });
 
         await batch.commit();
+
+        // Persist full conversation transcript to `ai_sessions` for Admin review
+        try {
+          const sessionId = (typeof clientSessionId === 'string' && clientSessionId.trim()) 
+            ? clientSessionId.trim() 
+            : `zen_${businessId}_${userId}`;
+          
+          const firstUserMsg = messages.find((m: any) => m?.role === 'user');
+          const title = (textOf(firstUserMsg).slice(0, 60) || promptText.slice(0, 60) || 'Zen AI Chat').trim();
+
+          const formattedMessages = messages.map((m: any) => ({
+            role: m?.role || 'user',
+            content: textOf(m),
+            createdAt: m?.createdAt || new Date().toISOString(),
+          }));
+
+          if (text || (toolCalls && toolCalls.length > 0)) {
+            formattedMessages.push({
+              role: 'assistant',
+              content: text || '',
+              toolCalls: (toolCalls || []).map((t: any) => ({
+                toolName: t?.toolName,
+                args: t?.args,
+              })),
+              createdAt: new Date().toISOString(),
+            });
+          }
+
+          await db.collection('ai_sessions').doc(sessionId).set({
+            sessionId,
+            businessId,
+            businessName: businessData?.name || caller?.businessName || 'Merchant Store',
+            userId,
+            userEmail: caller?.email || '',
+            userName: caller?.name || caller?.displayName || 'Merchant',
+            plan: plan || 'starter',
+            title,
+            lastPrompt: promptText,
+            messages: formattedMessages,
+            turnsCount: formattedMessages.length,
+            tokensIn: inTok || 0,
+            tokensOut: outTok || 0,
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        } catch (sessionErr) {
+          console.error('Failed to log ai_sessions transcript for admin:', sessionErr);
+        }
       } catch (err) {
         console.error('Failed to increment AI usage', err);
       }

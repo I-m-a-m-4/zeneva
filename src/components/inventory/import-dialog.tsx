@@ -8,17 +8,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp, getDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { logImportTelemetry } from '@/lib/import/telemetry';
 import { Loader2, UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle, Package } from 'lucide-react';
 import Papa from 'papaparse';
 import { Product } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
 import { useBusiness, usePOS } from '@/context/pos-context';
-import { productLimit } from '@/lib/plan';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import Link from 'next/link';
 import { track } from '@vercel/analytics';
+import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 
 interface ImportDialogProps {
   isOpen: boolean;
@@ -49,65 +51,46 @@ const HEADER_MAPPINGS: { [key: string]: string[] } = {
 export default function ImportDialog({ isOpen, onOpenChange, onSuccess, businessId, products }: ImportDialogProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
   const business = useBusiness();
-  const { triggerConfetti, triggerRefresh, currentUserProfile } = usePOS();
+  const { triggerConfetti, triggerRefresh } = usePOS();
 
   const [file, setFile] = React.useState<File | null>(null);
   const [parsedData, setParsedData] = React.useState<ParsedProduct[]>([]);
   const [isParsing, setIsParsing] = React.useState(false);
   const [isImporting, setIsImporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
-      try {
-        track('inventory_classic_import_modal_opened', {
-          businessId: businessId || business?.id,
-        });
-      } catch (err) {}
-
-      if (firestore && (businessId || business)) {
-        try {
-          addDoc(collection(firestore, 'import_attempts'), {
-            userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
-            userEmail: currentUserProfile?.email || '',
-            userName: currentUserProfile?.name || '',
-            businessId: businessId || business?.id || '',
-            businessName: business?.name || '',
-            action: 'opened_classic_modal',
-            timestamp: serverTimestamp(),
-          });
-        } catch (dbErr) {}
-      }
+      logImportTelemetry(firestore, {
+        userId: user?.uid || 'anonymous',
+        userEmail: user?.email || '',
+        userName: user?.displayName || '',
+        businessId: businessId || business?.id || '',
+        businessName: business?.name || '',
+        action: 'opened_classic_modal',
+        source: 'spreadsheet',
+      });
     }
-  }, [isOpen, businessId, business, firestore, currentUserProfile]);
+  }, [isOpen, businessId, business, firestore, user]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      try {
-        track('inventory_classic_import_file_selected', {
-          fileName: selectedFile.name,
-          fileSize: selectedFile.size,
-          businessId: businessId || business?.id,
-        });
-      } catch (err) {}
-
-      if (firestore && (businessId || business)) {
-        try {
-          addDoc(collection(firestore, 'import_attempts'), {
-            userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
-            userEmail: currentUserProfile?.email || '',
-            userName: currentUserProfile?.name || '',
-            businessId: businessId || business?.id || '',
-            businessName: business?.name || '',
-            action: 'selected_classic_file',
-            fileName: selectedFile.name,
-            fileSize: selectedFile.size,
-            timestamp: serverTimestamp(),
-          });
-        } catch (dbErr) {}
-      }
+      logImportTelemetry(firestore, {
+        userId: user?.uid || 'anonymous',
+        userEmail: user?.email || '',
+        userName: user?.displayName || '',
+        businessId: businessId || business?.id || '',
+        businessName: business?.name || '',
+        action: 'selected_classic_file',
+        source: 'spreadsheet',
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        fileType: selectedFile.type,
+      });
 
       if (selectedFile.type !== 'text/csv') {
         setError('Invalid file type. Please upload a CSV file.');
@@ -195,17 +178,8 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
         });
         return;
     }
-    
-    const limit = productLimit(business);
-    const currentProductCount = products.length;
-
-    if (limit !== Infinity && currentProductCount + parsedData.length > limit) {
-        toast({
-            variant: 'destructive',
-            title: 'Product Limit Exceeded',
-            description: `This import of ${parsedData.length} products would exceed your plan's limit of ${limit}. You currently have ${currentProductCount} products.`,
-            duration: 8000,
-        });
+    if (isCoreFeatureBlocked(business)) {
+        setShowUpgradeOverlay(true);
         return;
     }
 
@@ -401,6 +375,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
           </Button>
         </DialogFooter>
       </DialogContent>
+      <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
     </Dialog>
     </>
   );

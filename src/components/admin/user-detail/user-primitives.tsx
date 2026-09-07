@@ -58,20 +58,26 @@ export function userLanguage(raw: unknown) {
  * Goes through `toDate`, unlike the original which required a real Timestamp and
  * rendered a plain Date as "Never".
  */
-export const UserPresence = ({ lastSeen }: { lastSeen: any }) => {
+export const UserPresence = ({ lastSeen, status }: { lastSeen: any, status?: string }) => {
     const lastSeenDate = toDate(lastSeen);
     if (!lastSeenDate) {
         return <span className="text-muted-foreground text-xs">Never</span>;
     }
 
     const isOnline = lastSeenDate > new Date(Date.now() - 5 * 60 * 1000);
+    const isMinimized = isOnline && status === 'minimized';
 
     return (
         <div className="flex items-center gap-2">
             {isOnline ? (
-                <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                <span className="relative flex h-2.5 w-2.5 group">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isMinimized ? 'bg-amber-400' : 'bg-green-400'} opacity-75`}></span>
+                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isMinimized ? 'bg-amber-500' : 'bg-green-500'}`}></span>
+                    {isMinimized && (
+                        <div className="absolute left-full ml-2 hidden group-hover:block whitespace-nowrap bg-black text-white text-[10px] px-1.5 py-0.5 rounded shadow z-50">
+                            App Minimized
+                        </div>
+                    )}
                 </span>
             ) : (
                 <span className="relative flex h-2.5 w-2.5">

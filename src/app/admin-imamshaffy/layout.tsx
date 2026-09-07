@@ -5,7 +5,7 @@ import { useUser, useFirestore } from '@/firebase';
 import { terminalListenerErrorHandler } from '@/firebase/retry';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap, Clapperboard, PieChart, MoreHorizontal, Mail, Smartphone, Database } from 'lucide-react';
+import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap, Clapperboard, PieChart, MoreHorizontal, Mail, Smartphone, Database, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { useNativeNotifications } from '@/hooks/use-native-notifications';
 import { playNotificationSound } from '@/lib/sound';
+import { INTERNAL_ACCOUNT_EMAILS } from '@/lib/platform-revenue';
 
+const ADMIN_EMAILS = INTERNAL_ACCOUNT_EMAILS;
 const ADMIN_EMAIL = 'belloimam431@gmail.com';
 
 /**
@@ -37,6 +39,7 @@ const navLinks = [
   { href: '/admin-imamshaffy/outreach', label: 'Email', icon: Mail },
   { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
   { href: '/admin-imamshaffy/marketing', label: 'Studio', icon: Clapperboard },
+  { href: '/admin-imamshaffy/promos', label: 'Promo Popups', icon: Sparkles },
   { href: '/admin-imamshaffy/notifications', label: 'Alerts', icon: Bell, primary: true },
   { href: '/admin-imamshaffy/support', label: 'Support', icon: MessageSquare, primary: true },
   { href: '/admin-imamshaffy/ai-usage', label: 'AI Usage', icon: Zap },
@@ -59,6 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isDarkMode = resolvedTheme === 'dark';
 
   const [unreadErrorCount, setUnreadErrorCount] = useState(0);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { notify } = useNativeNotifications();
 
@@ -122,7 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Support Messages Notifications
   useEffect(() => {
-    if (!firestore || !user || user.email !== ADMIN_EMAIL) return;
+    if (!firestore || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) return;
 
     const q = query(
       collection(firestore, 'supportThreads'),
@@ -140,7 +144,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (change.type === 'added' || change.type === 'modified') {
           const data = change.doc.data();
           // Avoid notifying for messages sent by the admin themselves
-          if (data.lastMessageSender === 'admin') return;
+          if (data.lastMessageSender === 'admin' || data.lastMessageSenderId === 'admin' || data.isReadByAdmin === true) return;
           
           if (data.lastMessageAt) {
             const date = typeof data.lastMessageAt.toDate === 'function'
@@ -151,9 +155,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             // Only notify if it's new and within the last 60 seconds
             if (!isNaN(time) && time > lastViewedTime && (Date.now() - time) < 60000) {
               playNotificationSound();
+              const sender = data.userName || 'A user';
+              const text = data.lastMessageSnippet || data.lastMessage || 'Sent a new support message.';
               notify(
-                'New Support Message', 
-                data.lastMessage || 'A user sent a new support message.',
+                `Support: ${sender}`, 
+                text,
                 '/admin-imamshaffy/support'
               );
               // Update last viewed so we don't double-notify
@@ -167,6 +173,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => unsubscribe();
   }, [firestore, user, notify]);
 
+  // Support unread badge
+  useEffect(() => {
+    if (!firestore || !user || !user.email || !ADMIN_EMAILS.includes(user.email)) return;
+
+    const q = query(
+      collection(firestore, 'supportThreads'),
+      orderBy('lastMessageAt', 'desc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.isReadByAdmin === false && data.lastMessageSenderId !== 'admin') {
+          count++;
+        }
+      });
+      setUnreadSupportCount(count);
+    }, terminalListenerErrorHandler('Support unread badge', () => unsubscribe()));
+
+    return () => unsubscribe();
+  }, [firestore, user]);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && pathname === '/admin-imamshaffy/developer-logs') {
       localStorage.setItem('zeneva_last_viewed_errors', Date.now().toString());
@@ -174,6 +204,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
     if (typeof window !== 'undefined' && pathname === '/admin-imamshaffy/support') {
       localStorage.setItem('zeneva_last_viewed_support', Date.now().toString());
+      setUnreadSupportCount(0);
     }
   }, [pathname]);
 
@@ -267,6 +298,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {unreadErrorCount}
                   </Badge>
                 )}
+                {link.label === 'Support' && unreadSupportCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="h-5 min-w-5 px-1.5 py-0 flex items-center justify-center text-[10px] font-black rounded-full animate-pulse bg-orange-500 text-white border-0"
+                  >
+                    {unreadSupportCount > 9 ? '9+' : unreadSupportCount}
+                  </Badge>
+                )}
               </Link>
             ))}
           </nav>
@@ -328,6 +367,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <link.icon
                       className={cn('h-5 w-5', active ? 'text-primary' : 'text-muted-foreground')}
                     />
+                    {link.label === 'Support' && unreadSupportCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] text-white font-bold">
+                        {unreadSupportCount > 9 ? '9+' : unreadSupportCount}
+                      </span>
+                    )}
                   </div>
                   <span
                     className={cn(

@@ -47,7 +47,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { usePOS } from '@/context/pos-context';
-import { effectivePlan, productLimit } from '@/lib/plan';
+import { effectivePlan, productLimit, isCoreFeatureBlocked } from '@/lib/plan';
 import { logAuditEvent } from '@/lib/audit';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -57,7 +57,7 @@ import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { useI18n } from '@/context/i18n-context';
 
 import { Combobox } from '@/components/ui/combobox';
-
+import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 /**
  * Built per render rather than at module scope because every message here is
  * user-visible and has to come from the active catalogue. `t` is memoised on
@@ -107,6 +107,7 @@ export default function AddProductPage() {
   const [expiryDateInput, setExpiryDateInput] = React.useState("");
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [isTauri, setIsTauri] = React.useState(false);
+  const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
 
   // Variant Builder State
   const [variantAttributes, setVariantAttributes] = React.useState<{ name: string; values: string }[]>([{ name: 'Size', values: 'S, M, L' }]);
@@ -343,6 +344,13 @@ export default function AddProductPage() {
       isSubmitting.current = false;
       setIsSaving(false);
       router.push('/inventory');
+      return;
+    }
+
+    if (isCoreFeatureBlocked(business)) {
+      setShowUpgradeOverlay(true);
+      isSubmitting.current = false;
+      setIsSaving(false);
       return;
     }
 
@@ -1101,6 +1109,7 @@ export default function AddProductPage() {
           });
         }}
       />
+      <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
     </Form>
   );
 }

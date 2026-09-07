@@ -26,7 +26,9 @@ import AIChat from '@/components/support/ai-chat';
 import { cn } from '@/lib/utils';
 import { usePOS } from '@/context/pos-context';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Edit2, Maximize2, Minimize2 } from 'lucide-react';
 import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic';
@@ -645,7 +647,13 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     };
                     return getMs(b.lastMessageAt || b.createdAt) - getMs(a.lastMessageAt || a.createdAt);
                 });
-                setThread(sorted[0]);
+                const activeThread = sorted[0];
+                setThread(activeThread);
+                // When the user opens the support page, clear the unread admin badge
+                // by marking isReadByUser: true on any thread with a pending admin message.
+                if (firestore && activeThread?.id && activeThread?.isReadByUser === false) {
+                    updateDoc(doc(firestore, 'supportThreads', activeThread.id), { isReadByUser: true }).catch(() => {});
+                }
             }
             setIsLoading(false);
         }
@@ -659,6 +667,16 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
         () => (firestore && thread) ? query(collection(firestore, 'supportThreads', thread.id, 'messages'), orderBy('createdAt', 'desc'), limit(SUPPORT_MESSAGE_LIMIT)) : null,
         [firestore, thread]
     );
+
+    const safeFormatFullTime = (val: any) => {
+        if (!val) return '';
+        try {
+            const date = val.toDate ? val.toDate() : new Date(val);
+            return format(date, 'PPpp');
+        } catch (e) {
+            return '';
+        }
+    };
 
     const safeFormatTime = (val: any) => {
         if (!val) return '';
@@ -720,7 +738,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             messages.forEach((msg: any) => {
                 if (msg.senderId === 'admin' && !msg.isSeen) {
                     const msgRef = doc(firestore, `supportThreads/${thread.id}/messages`, msg.id);
-                    updateDoc(msgRef, { isSeen: true }).catch(err => {
+                    updateDoc(msgRef, { isSeen: true, isDelivered: true }).catch(err => {
                         console.warn("Failed to mark message as seen:", err);
                     });
                 }
@@ -825,7 +843,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     subject: 'Direct CEO Chat',
                     status: 'open',
                     lastMessageAt: serverTimestamp(),
+                    lastMessage: typedCaption || '📷 Sent an image',
                     lastMessageSnippet: typedCaption || '📷 Sent an image',
+                    lastMessageSender: 'user',
+                    lastMessageSenderId: userProfile.id,
                     isReadByAdmin: false,
                     createdAt: serverTimestamp(),
                 };
@@ -844,11 +865,26 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                 text: typedCaption || '📷 Sent an image'
             });
 
+            try {
+                fetch('/api/support/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: typedCaption || '📷 Sent an image', 
+                        userName: userProfile.name || currentBusiness?.name || 'Unknown User', 
+                        businessName: currentBusiness?.name 
+                    })
+                }).catch(e => console.error("Error calling notify API:", e));
+            } catch(e) {}
+
             // Update thread snippet metadata
             const threadRef = doc(firestore, 'supportThreads', currentThread.id);
             await setDoc(threadRef, {
                 lastMessageAt: serverTimestamp(),
+                lastMessage: typedCaption || '📷 Sent an image',
                 lastMessageSnippet: typedCaption || '📷 Sent an image',
+                lastMessageSender: 'user',
+                lastMessageSenderId: userProfile.id,
                 isReadByAdmin: false,
                 status: 'open'
             }, { merge: true });
@@ -889,7 +925,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                     subject: 'Direct CEO Chat',
                     status: 'open',
                     lastMessageAt: serverTimestamp(),
+                    lastMessage: message,
                     lastMessageSnippet: message,
+                    lastMessageSender: 'user',
+                    lastMessageSenderId: userProfile.id,
                     isReadByAdmin: false,
                     createdAt: serverTimestamp(),
                 };
@@ -923,7 +962,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
             const threadRef = doc(firestore, 'supportThreads', currentThread.id);
             await setDoc(threadRef, {
                 lastMessageAt: serverTimestamp(),
+                lastMessage: message,
                 lastMessageSnippet: message,
+                lastMessageSender: 'user',
+                lastMessageSenderId: userProfile.id,
                 isReadByAdmin: false,
                 status: 'open'
             }, { merge: true });
@@ -1005,7 +1047,10 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                 subject: 'Direct CEO Chat',
                                 status: 'open',
                                 lastMessageAt: serverTimestamp(),
-                                lastMessageSnippet: '🎙️ Sent a voice note',
+                                lastMessage: `🎙️ Voice note (${recordingSeconds}s)`,
+                                lastMessageSnippet: `🎙️ Voice note (${recordingSeconds}s)`,
+                                lastMessageSender: 'user',
+                                lastMessageSenderId: userProfile.id,
                                 isReadByAdmin: false,
                                 createdAt: serverTimestamp(),
                             };
@@ -1023,9 +1068,24 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                             createdAt: serverTimestamp(),
                         });
 
+                        try {
+                            fetch('/api/support/notify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    message: `🎙️ Voice note (${recordingSeconds}s)`, 
+                                    userName: userProfile.name || currentBusiness?.name || 'Unknown User', 
+                                    businessName: currentBusiness?.name 
+                                })
+                            }).catch(e => console.error("Error calling notify API:", e));
+                        } catch(e) {}
+
                         const threadRef = doc(firestore, 'supportThreads', currentThread.id);
                         await setDoc(threadRef, {
                             lastMessageSnippet: `🎙️ Voice note (${recordingSeconds}s)`,
+                            lastMessage: `🎙️ Voice note (${recordingSeconds}s)`,
+                            lastMessageSender: 'user',
+                            lastMessageSenderId: userProfile.id,
                             lastMessageAt: serverTimestamp(),
                             isReadByAdmin: false,
                             status: 'open'
@@ -1190,13 +1250,30 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
 
                                         {msg.text && (
                                             <div className="text-sm leading-relaxed whitespace-pre-wrap break-words prose prose-sm dark:prose-invert max-w-none">
-                                                <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        a: ({node, ...props}) => <a {...props} className="text-orange-600 hover:text-orange-700 hover:underline break-all" target="_blank" rel="noopener noreferrer" />
+                                                    }}
+                                                >
+                                                    {msg.text}
+                                                </ReactMarkdown>
                                             </div>
                                         )}
 
                                      <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-75">
                                          {msg.updatedAt && <span className="italic font-medium text-slate-500 dark:text-slate-400 me-0.5">{t('support.edited')} •</span>}
                                          <span>{safeFormatTime(msg.createdAt)}</span>
+                                         <Popover>
+                                             <PopoverTrigger asChild>
+                                                 <button className="text-slate-400 hover:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 rounded outline-none p-0.5" aria-label="View full time">
+                                                     <Info className="h-2.5 w-2.5" />
+                                                 </button>
+                                             </PopoverTrigger>
+                                             <PopoverContent className="w-auto p-2 text-xs font-medium" align="end" side="top">
+                                                 {safeFormatFullTime(msg.createdAt)}
+                                             </PopoverContent>
+                                         </Popover>
                                          {isUser && (
                                              msg.isUploading || msg.isPending || !msg.createdAt ? (
                                                  <Clock className="h-3 w-3 text-slate-500 animate-pulse" />
@@ -1238,7 +1315,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                                 value={message} 
                                 onChange={(e) => setMessage(e.target.value)} 
                                 disabled={isSending} 
-                                className="flex-1 min-h-[60px] md:min-h-[40px] max-h-[120px] md:max-h-[80px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-none rounded-lg text-sm"
+                                className="flex-1 min-h-[60px] md:min-h-[40px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-y rounded-lg text-sm"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();
@@ -1279,7 +1356,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                             <Textarea 
                                 value={editMessageText}
                                 onChange={(e) => setEditMessageText(e.target.value)}
-                                className="min-h-[100px] w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                                className="min-h-[100px] w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-y"
                                 placeholder={t('support.editMessagePlaceholder')}
                             />
                         </div>
@@ -1449,7 +1526,7 @@ export default function SupportPage() {
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Side: Direct Line to the CEO */}
-                <div className={`${isChatMaximized ? 'lg:col-span-3 h-[85vh]' : 'lg:col-span-2 h-[70vh]'} flex flex-col transition-all duration-300`}>
+                <div className={`${isChatMaximized ? 'lg:col-span-3 min-h-[85vh]' : 'lg:col-span-2 min-h-[80vh]'} flex flex-col transition-all duration-300 resize-y overflow-hidden border border-transparent pb-1`}>
                     <div className="flex items-center justify-between mb-4 pb-2 border-b">
                         <div>
                             <div className="flex items-center gap-2">

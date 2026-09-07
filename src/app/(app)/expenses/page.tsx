@@ -511,18 +511,34 @@ export default function ExpensesAndPurchasesPage() {
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(firestore, 'expenses'), payload);
-
-      if (currentUserProfile) {
-        await logAuditEvent(firestore, business.id, currentUserProfile, {
-          action: 'inventory.edit',
-          entity: { type: 'business', id: business.id, name: 'Expense Created' },
-          details: { title: payload.title, amount: payload.amount, category: payload.category }
+      if (editingExpense) {
+        await updateDoc(doc(firestore, 'expenses', editingExpense.id), {
+          title: payload.title,
+          amount: payload.amount,
+          category: payload.category,
+          paymentMethod: payload.paymentMethod,
+          date: payload.date,
+          recipient: payload.recipient || null,
+          notes: payload.notes || null,
+          deductFromCashDrawer: payload.deductFromCashDrawer,
+          updatedAt: serverTimestamp(),
         });
+        toast({ title: 'Expense Updated', description: `${payload.title} has been updated.` });
+      } else {
+        await addDoc(collection(firestore, 'expenses'), payload);
+        if (currentUserProfile) {
+          await logAuditEvent(firestore, business.id, currentUserProfile, {
+            action: 'inventory.edit',
+            entity: { type: 'business', id: business.id, name: 'Expense Created' },
+            details: { title: payload.title, amount: payload.amount, category: payload.category }
+          });
+        }
+        toast({ title: 'Expense Recorded', description: `${payload.title} (${currencySymbol}${payload.amount.toLocaleString()}) logged.` });
       }
 
-      toast({ title: 'Expense Recorded', description: `${payload.title} (${currencySymbol}${payload.amount.toLocaleString()}) logged.` });
       setIsAddExpenseOpen(false);
+      setIsEditExpenseOpen(false);
+      setEditingExpense(null);
       resetExpenseForm();
     } catch (err: any) {
       console.error(err);
@@ -889,7 +905,8 @@ export default function ExpensesAndPurchasesPage() {
 
       {/* ======================== COMBINED OUTFLOW KPI CARDS ======================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-primary shadow-xs">
+        {/* ROW 1 */}
+        <Card className="shadow-xs">
           <CardHeader className="pb-2">
             <CardDescription className="text-xs uppercase font-medium">Total Cash Outflow</CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
@@ -903,7 +920,7 @@ export default function ExpensesAndPurchasesPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-amber-500 shadow-xs">
+        <Card className="shadow-xs">
           <CardHeader className="pb-2">
             <CardDescription className="text-xs uppercase font-medium">Operating Overheads</CardDescription>
             <CardTitle className="text-2xl font-bold text-amber-600 dark:text-amber-400">
@@ -911,13 +928,45 @@ export default function ExpensesAndPurchasesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              {currencySymbol}{metrics.expensesFromDrawer.toLocaleString()} from cash drawer till
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <TrendingDown className="h-3 w-3" />
+              All-time operational expenses
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500 shadow-xs">
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs uppercase font-medium">Expenses This Month</CardDescription>
+            <CardTitle className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+              {currencySymbol}{metrics.monthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              Total expenses for current month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs uppercase font-medium">Drawer / Till Outflow</CardDescription>
+            <CardTitle className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+              {currencySymbol}{metrics.expensesFromDrawer.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Wallet className="h-3 w-3" />
+              Cash deducted from daily till
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* ROW 2 */}
+        <Card className="shadow-xs">
           <CardHeader className="pb-2">
             <CardDescription className="text-xs uppercase font-medium">Stock Procurement</CardDescription>
             <CardTitle className="text-2xl font-bold text-blue-600 dark:text-blue-400">
@@ -925,22 +974,54 @@ export default function ExpensesAndPurchasesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Package className="h-3 w-3" />
               {purchases.length} restock purchase bills
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-rose-500 shadow-xs">
+        <Card className="shadow-xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Accounts Payable (Debt Owed)</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium">Paid to Suppliers</CardDescription>
+            <CardTitle className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {currencySymbol}{metrics.totalPurchasesPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              Total procurement bills settled
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs uppercase font-medium">Accounts Payable (Debt)</CardDescription>
             <CardTitle className="text-2xl font-bold text-rose-600 dark:text-rose-400">
               {currencySymbol}{metrics.totalSupplierDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">
-              {suppliers.length} active suppliers
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Outstanding bills owed to suppliers
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs uppercase font-medium">Active Suppliers</CardDescription>
+            <CardTitle className="text-2xl font-bold text-foreground">
+              {suppliers.length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              Vendors managing your inventory
             </p>
           </CardContent>
         </Card>

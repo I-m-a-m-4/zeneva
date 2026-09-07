@@ -97,11 +97,13 @@ export default function SourcePicker({
   onPick,
   onFile,
   onImage,
+  onDropzoneClick,
   creditsLeft,
 }: {
   onPick: (source: ImportSource) => void;
   onFile: (file: File) => void;
   onImage: (file: File) => void;
+  onDropzoneClick?: () => void;
   creditsLeft: number | null;
 }) {
   const [dragging, setDragging] = React.useState(false);
@@ -160,11 +162,17 @@ export default function SourcePicker({
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        onClick={() => fileRef.current?.click()}
+        onClick={() => {
+          onDropzoneClick?.();
+          fileRef.current?.click();
+        }}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click();
+          if (e.key === 'Enter' || e.key === ' ') {
+            onDropzoneClick?.();
+            fileRef.current?.click();
+          }
         }}
         className={cn(
           'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors',
@@ -199,15 +207,14 @@ export default function SourcePicker({
             key={tile.source}
             type="button"
             onClick={() => {
-              // The spreadsheet tile has no panel of its own — the file input *is* the
-              // interaction — so it opens the picker directly. Routing it through
-              // `onPick` looked like a dead tile: the dialog had nothing to show and the
-              // press appeared to do nothing at all.
+              // Always record telemetry on which method the merchant clicked
+              onPick(tile.source);
+
+              // The spreadsheet tile triggers file picker immediately
               if (tile.source === 'spreadsheet') {
                 fileRef.current?.click();
                 return;
               }
-              onPick(tile.source);
             }}
             className="group relative flex flex-col items-start gap-1.5 rounded-lg border bg-card p-3 text-start transition-colors hover:border-primary/60 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >

@@ -58,6 +58,8 @@ import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { isCoreFeatureBlocked } from '@/lib/plan';
+import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 import {
     Table,
     TableBody,
@@ -148,6 +150,7 @@ function EditProductContent() {
     const firestore = useFirestore();
 
     const productSchema = React.useMemo(() => makeProductSchema(t), [t]);
+    const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
 
     const productDocRef = useMemoFirebase(() => (firestore && productId ? doc(firestore, 'products', productId) : null), [firestore, productId]);
     const { data: remoteProduct, isLoading: isRemoteProductLoading } = useDoc<Product>(productDocRef);
@@ -358,6 +361,13 @@ function EditProductContent() {
         isSubmitting.current = true;
         setIsSaving(true);
         if (!product || !currentUserProfile || !business) {
+            isSubmitting.current = false;
+            setIsSaving(false);
+            return;
+        }
+
+        if (isCoreFeatureBlocked(business)) {
+            setShowUpgradeOverlay(true);
             isSubmitting.current = false;
             setIsSaving(false);
             return;
@@ -1208,6 +1218,7 @@ function EditProductContent() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
         </Form>
     );
 }

@@ -5,7 +5,8 @@ import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
-import { hasProFeatures } from "@/lib/plan";
+import { hasProFeatures, isCoreFeatureBlocked } from "@/lib/plan";
+import { UpgradeOverlay } from "@/components/shared/upgrade-overlay";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useBusiness } from '@/context/pos-context';
@@ -82,7 +83,21 @@ function ReviewPageContent() {
         createdAt: backdatedAt || new Date(), // Use a real date for optimistic display
     }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdatedAt]);
 
+    const isAutoPromptedRef = React.useRef(false);
+    const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
+
     const handleCompleteSale = React.useCallback(() => {
+        if (isCoreFeatureBlocked(business)) {
+            setShowUpgradeOverlay(true);
+            return;
+        }
+
+        if (!canCompleteSale) {
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
+            return;
+        }
+
+        setIsCompleting(true);
         if (checkoutStartedRef.current) return;
         
         if (!business || !user || cart.length === 0 || !products || !currentUserProfile) {
@@ -565,6 +580,8 @@ function ReviewPageContent() {
                     </div>
                 </div>
             </div>
+            
+            <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
         </div>
     )
 }

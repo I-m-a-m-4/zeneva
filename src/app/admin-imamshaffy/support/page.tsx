@@ -1,30 +1,35 @@
 
 'use client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
+import { Suspense } from 'react';
 import { createPortal } from 'react-dom';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, serverTimestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, orderBy, doc, addDoc, serverTimestamp, updateDoc, deleteDoc, where, getDocs } from 'firebase/firestore';
 import type { SupportThread, SupportMessage, UserProfile } from '@/types';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNowStrict, isToday, isYesterday } from 'date-fns';
-import { Loader2, Send, MessageSquare, Archive, Check, CheckCheck, Trash2, Paperclip, Mic, Image as ImageIcon, Play, Pause, X, MoreVertical, Edit2, Clock, ArrowLeft, Megaphone, Eye, Sparkles, Mail } from 'lucide-react';
+import { Loader2, Send, MessageSquare, Archive, Check, CheckCheck, Trash2, Paperclip, Mic, Image as ImageIcon, Play, Pause, X, MoreVertical, Edit2, Clock, ArrowLeft, Megaphone, Eye, Sparkles, Mail, Info } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ToastAction } from '@/components/ui/toast';
 import { acquireMicStream, describeMicError, pickAudioMimeType } from '@/lib/mic';
 import { useI18n } from '@/context/i18n-context';
 import { Bot } from 'lucide-react';
 import { sendDirectUserPush } from '@/actions/notifications';
 import { adminApiFetch } from '@/lib/admin-api';
+import { playNotificationSound } from '@/lib/sound';
 
 interface AISupportLog {
     id: string;
@@ -229,6 +234,21 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
         [firestore, thread.id]
     );
     const { data: messages, isLoading } = useCollection<any>(messagesQuery);
+
+    const userDocRef = useMemoFirebase(
+        () => (firestore && thread.userId) ? doc(firestore, 'users', thread.userId) : null,
+        [firestore, thread.userId]
+    );
+    const { data: threadUser } = useDoc<UserProfile>(userDocRef);
+
+    const isUserOnline = React.useMemo(() => {
+        if (!threadUser?.lastSeen) return false;
+        const lastSeenDate = typeof (threadUser.lastSeen as any).toDate === 'function'
+            ? (threadUser.lastSeen as any).toDate()
+            : new Date(threadUser.lastSeen as any);
+        return Boolean(lastSeenDate && (Date.now() - lastSeenDate.getTime()) < 5 * 60 * 1000);
+    }, [threadUser?.lastSeen]);
+
     const scrollAreaRef = React.useRef<HTMLDivElement>(null);
     const prevMessageCountRef = React.useRef(0);
 
@@ -246,6 +266,10 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                 setTimeout(() => scrollToBottom('auto'), 50);
             } else if (messages.length > prevMessageCountRef.current) {
                 scrollToBottom('smooth');
+                const lastMsg = messages[messages.length - 1];
+                if (lastMsg && lastMsg.senderId !== 'admin') {
+                    playNotificationSound();
+                }
             }
             prevMessageCountRef.current = messages.length;
         }
@@ -348,8 +372,14 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
 
             const threadRef = doc(firestore, 'supportThreads', thread.id);
             await updateDoc(threadRef, {
+                lastMessage: payload.text,
                 lastMessageSnippet: payload.text,
                 lastMessageAt: serverTimestamp(),
+                lastMessageSender: 'admin',
+                lastMessageSenderId: 'admin',
+                isReadByAdmin: true,
+                // Mark unread for the user so the sidebar badge lights up on their end.
+                isReadByUser: false,
             });
 
             if (thread.userId) {
@@ -368,11 +398,12 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                 // `undefined(...)`). That took the whole reply handler down with it,
                 // even though the reply document had already been written.
                 try {
+                    const token = await import('firebase/auth').then(({ getAuth }) => getAuth().currentUser?.getIdToken());
                     sendDirectUserPush(thread.userId, {
                         title: '💬 New Message from Support',
                         body: payload.text,
                         url: '/support'
-                    }).catch((err) => console.warn('Support push error:', err));
+                    }, token).catch((err) => console.warn('Support push error:', err));
                 } catch (err) {
                     console.warn('Support push unavailable:', err);
                 }
@@ -473,8 +504,11 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
             });
             const threadRef = doc(firestore, 'supportThreads', thread.id);
             await updateDoc(threadRef, {
+                lastMessage: editMessageText,
                 lastMessageSnippet: editMessageText,
-                lastMessageAt: serverTimestamp()
+                lastMessageAt: serverTimestamp(),
+                lastMessageSender: 'admin',
+                lastMessageSenderId: 'admin',
             });
             setEditModalOpen(false);
             setEditMessageId(null);
@@ -531,8 +565,12 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
 
                         const threadRef = doc(firestore, 'supportThreads', thread.id);
                         await updateDoc(threadRef, {
+                            lastMessage: `🎙️ Voice note (${recordingSeconds}s)`,
                             lastMessageSnippet: `🎙️ Voice note (${recordingSeconds}s)`,
                             lastMessageAt: serverTimestamp(),
+                            lastMessageSender: 'admin',
+                            lastMessageSenderId: 'admin',
+                            isReadByAdmin: true,
                         });
 
                         toast({ variant: 'success', title: 'Voice Note Sent' });
@@ -594,6 +632,16 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
         }
     };
 
+    const safeFormatFullTime = (val: any) => {
+        if (!val) return '';
+        try {
+            const date = val.toDate ? val.toDate() : new Date(val);
+            return format(date, 'PPpp');
+        } catch (e) {
+            return '';
+        }
+    };
+
     return (
         // `relative` scopes the edit panel below, which is `absolute inset-0`:
         // without a positioned ancestor it escaped the pane entirely.
@@ -610,7 +658,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
             {/* Thread header. Every text node here is width-capped: `userEmail`
                 printed raw was pushing the header past the screen edge on a
                 phone, which is what dragged the whole pane sideways. */}
-            <div className="p-2.5 md:p-4 bg-white dark:bg-slate-900 border-b flex items-center gap-2 md:gap-3 z-10 shadow-sm">
+            <div className="p-2.5 md:p-4 bg-white dark:bg-slate-900 border-b flex flex-wrap items-center gap-2 md:gap-3 z-10 shadow-sm">
                 <Button
                     variant="ghost"
                     size="icon"
@@ -624,9 +672,20 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                     {initialsOf(thread.userName)}
                 </span>
                 <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-bold text-sm md:text-base text-slate-800 dark:text-white">
-                        {thread.userName || thread.userEmail || 'Unknown user'}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="truncate font-bold text-sm md:text-base text-slate-800 dark:text-white">
+                            {thread.userName || thread.userEmail || 'Unknown user'}
+                        </h3>
+                        {isUserOnline && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 px-1.5 py-0.5 rounded-full">
+                                <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                                </span>
+                                Online
+                            </span>
+                        )}
+                    </div>
                     <p className="truncate text-[11px] md:text-xs text-muted-foreground">
                         {thread.subject}{thread.userEmail ? ` • ${thread.userEmail}` : ''}
                     </p>
@@ -654,6 +713,33 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                     }}
                 >
                     {selectionMode ? 'Cancel Selection' : 'Select Messages'}
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-medium shrink-0"
+                    onClick={async () => {
+                        toast({ title: 'Exporting...', description: 'Generating PDF document.' });
+                        try {
+                            const html2pdf = (await import('html2pdf.js')).default;
+                            const element = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') || scrollAreaRef.current;
+                            if (!element) return;
+                            const opt = {
+                                margin: 10,
+                                filename: `Zeneva_Chat_${thread.userName || 'User'}.pdf`,
+                                image: { type: 'jpeg', quality: 0.98 },
+                                html2canvas: { scale: 2, useCORS: true, logging: false },
+                                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                            };
+                            await html2pdf().set(opt).from(element).save();
+                            toast({ title: 'Success', description: 'Chat exported as PDF.' });
+                        } catch (err) {
+                            console.error('PDF export failed:', err);
+                            toast({ variant: 'destructive', title: 'Export Failed', description: 'Could not generate PDF.' });
+                        }
+                    }}
+                >
+                    Export PDF
                 </Button>
             </div>
 
@@ -747,7 +833,14 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
 
                                       {msg.text && (
                                           <div className="text-sm leading-relaxed whitespace-pre-wrap break-words prose prose-sm dark:prose-invert max-w-none">
-                                              <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                              <ReactMarkdown
+                                                  remarkPlugins={[remarkGfm]}
+                                                  components={{
+                                                      a: ({node, ...props}) => <a {...props} className="text-orange-600 hover:text-orange-700 hover:underline break-all" target="_blank" rel="noopener noreferrer" />
+                                                  }}
+                                              >
+                                                  {msg.text}
+                                              </ReactMarkdown>
                                           </div>
                                       )}
 
@@ -755,9 +848,38 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                                     <div className="flex items-center justify-end gap-1 mt-1 text-[9px] opacity-75">
                                         {msg.updatedAt && <span className="italic font-medium text-slate-500 dark:text-slate-400 mr-0.5">Edited •</span>}
                                         <span>{safeFormatTime(msg.createdAt)}</span>
-                                        {isAdmin && (
-                                            msg.isSeen ? <CheckCheck className="h-3.5 w-3.5 text-blue-500" /> : <Check className="h-3.5 w-3.5 text-slate-400" />
-                                        )}
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <button className="text-slate-400 hover:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 rounded outline-none p-0.5" aria-label="View full time">
+                                                    <Info className="h-2.5 w-2.5" />
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-2 text-xs font-medium" align="end" side="top">
+                                                {safeFormatFullTime(msg.createdAt)}
+                                            </PopoverContent>
+                                        </Popover>
+                                        {isAdmin && (() => {
+                                            const getMs = (val: any) => {
+                                                if (!val) return 0;
+                                                if (typeof val.toDate === 'function') return val.toDate().getTime();
+                                                if (val.seconds) return val.seconds * 1000;
+                                                const d = new Date(val);
+                                                return isNaN(d.getTime()) ? 0 : d.getTime();
+                                            };
+                                            const isDelivered = Boolean(
+                                                msg.isDelivered ||
+                                                isUserOnline ||
+                                                (threadUser?.lastSeen && msg.createdAt && getMs(threadUser.lastSeen) >= getMs(msg.createdAt))
+                                            );
+
+                                            if (msg.isSeen) {
+                                                return <CheckCheck className="h-3.5 w-3.5 text-blue-500" title="Seen" />;
+                                            }
+                                            if (isDelivered) {
+                                                return <CheckCheck className="h-3.5 w-3.5 text-slate-400" title="Delivered" />;
+                                            }
+                                            return <Check className="h-3.5 w-3.5 text-slate-400" title="Sent" />;
+                                        })()}
                                     </div>
                                  </div>
                             </div>
@@ -850,7 +972,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                                 value={reply}
                                 onChange={(e) => setReply(e.target.value)}
                                 disabled={isSending}
-                                className="flex-1 min-w-0 min-h-[40px] h-[40px] max-h-[80px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-none rounded-lg text-sm"
+                                className="flex-1 min-w-0 min-h-[40px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-y rounded-lg text-sm"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();
@@ -892,7 +1014,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                             <Textarea 
                                 value={editMessageText}
                                 onChange={(e) => setEditMessageText(e.target.value)}
-                                className="min-h-[100px] w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                                className="min-h-[100px] w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-y"
                                 placeholder="Edit your reply text..."
                             />
                         </div>
@@ -941,7 +1063,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
 
                                 <div>
                                     <div className="text-[11px] font-bold text-[#ea580c] uppercase tracking-widest">
-                                        A Note From Zeneva Support
+                                        A Note From Zeneva CEO
                                     </div>
                                     <h2 className="text-xl font-extrabold text-stone-900 mt-1">
                                         Response to your support ticket
@@ -1046,8 +1168,9 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
 }
 
 
-export default function AdminSupportPage() {
+function AdminSupportContent() {
     const firestore = useFirestore();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
     const [selectedThread, setSelectedThread] = React.useState<SupportThread | null>(null);
     /**
@@ -1057,6 +1180,9 @@ export default function AdminSupportPage() {
      * way back to the tab strip.
      */
     const [activeTab, setActiveTab] = React.useState('inbox');
+    const [inboxSearch, setInboxSearch] = React.useState('');
+    const [allUsers, setAllUsers] = React.useState<any[]>([]);
+    const [isUsersLoading, setIsUsersLoading] = React.useState(false);
 
     // This is a simplified user object for the admin.
     const adminUser = { id: 'admin', name: 'Zeneva Support', email: 'support@zeneva.com' } as UserProfile;
@@ -1085,6 +1211,43 @@ export default function AdminSupportPage() {
     );
     const { data: threads, isLoading } = useCollection<SupportThread>(threadsQuery);
 
+    React.useEffect(() => {
+        const userId = searchParams?.get('userId');
+        if (userId && threads && !isLoading) {
+            const existingThread = threads.find(t => t.userId === userId);
+            if (existingThread) {
+                setSelectedThread(existingThread);
+            } else {
+                // Creates an ephemeral selectedThread so they can type a message.
+                // The actual document gets written when they hit Send.
+                setSelectedThread({
+                    id: `${userId}_admin_initiated`,
+                    userId: userId,
+                    userName: 'User ' + userId,
+                    subject: 'A Note From Zeneva CEO',
+                    status: 'open',
+                    lastMessageSnippet: '',
+                    lastMessageAt: new Date(),
+                    createdAt: new Date(),
+                    unreadCount: 0,
+                    isReadByAdmin: true
+                } as SupportThread);
+            }
+            // Remove userId from URL so it doesn't stay stuck
+            window.history.replaceState(null, '', '/admin-imamshaffy/support');
+        }
+    }, [searchParams, threads, isLoading]);
+
+    // Eagerly fetch all users so admin can start chats proactively
+    React.useEffect(() => {
+        if (!firestore) return;
+        setIsUsersLoading(true);
+        getDocs(query(collection(firestore, 'users'), orderBy('lastSeen', 'desc')))
+            .then(snap => setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+            .catch(console.error)
+            .finally(() => setIsUsersLoading(false));
+    }, [firestore]);
+
     const aiLogsQuery = useMemoFirebase(
         () => query(collection(firestore, 'ai_support_logs'), orderBy('createdAt', 'desc')),
         [firestore]
@@ -1109,6 +1272,16 @@ export default function AdminSupportPage() {
         if (!threads) return 0;
         return threads.filter(t => !t.isReadByAdmin).length;
     }, [threads]);
+
+    const prevUnreadRef = React.useRef<number | null>(null);
+    React.useEffect(() => {
+        if (unreadCount !== undefined && unreadCount !== null) {
+            if (prevUnreadRef.current !== null && unreadCount > prevUnreadRef.current) {
+                playNotificationSound();
+            }
+            prevUnreadRef.current = unreadCount;
+        }
+    }, [unreadCount]);
 
     /**
      * True when the phone is showing a conversation rather than the list.
@@ -1182,60 +1355,130 @@ export default function AdminSupportPage() {
                             "col-span-1 h-full min-h-0 flex-col",
                             selectedThread ? 'hidden md:flex' : 'flex',
                         )}>
+                            {/* Search / filter box */}
+                            <div className="mb-2">
+                                <Input
+                                    placeholder="Search users or conversations..."
+                                    value={inboxSearch}
+                                    onChange={e => setInboxSearch(e.target.value)}
+                                    className="h-9 text-sm"
+                                />
+                            </div>
                             <ScrollArea className="flex-1 border rounded-lg bg-card">
                                 {isLoading && <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div>}
-                                {threads && threads.length > 0 ? (
-                                    threads.map(thread => {
-                                        const unread = !thread.isReadByAdmin;
-                                        const when = conversationTime(thread.lastMessageAt) || 'now';
-                                        return (
-                                            <button
-                                                key={thread.id}
-                                                onClick={() => setSelectedThread(thread)}
-                                                className={cn(
-                                                    "flex w-full items-start gap-3 px-3 py-2.5 text-left border-b last:border-b-0 transition-colors hover:bg-muted",
-                                                    selectedThread?.id === thread.id && 'bg-muted',
-                                                )}
-                                            >
-                                                <span className={cn(
-                                                    "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase",
-                                                    unread ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
-                                                )}>
-                                                    {initialsOf(thread.userName)}
-                                                </span>
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="flex items-baseline justify-between gap-2">
-                                                        <span className={cn("min-w-0 truncate text-sm", unread ? 'font-bold text-primary' : 'font-semibold')}>
-                                                            {thread.userName || thread.userEmail || 'Unknown user'}
+                                {(() => {
+                                    const q = inboxSearch.toLowerCase();
+                                    // Users with existing threads
+                                    const filteredThreads = (threads || []).filter(t =>
+                                        !q ||
+                                        (t.userName || '').toLowerCase().includes(q) ||
+                                        (t.userEmail || '').toLowerCase().includes(q) ||
+                                        (t.lastMessageSnippet || '').toLowerCase().includes(q)
+                                    );
+                                    // Users without threads (only show when search is active or as a section)
+                                    const threadUserIds = new Set((threads || []).map(t => t.userId));
+                                    const usersWithoutThread = allUsers.filter(u =>
+                                        !threadUserIds.has(u.id) &&
+                                        (!q || (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q))
+                                    );
+
+                                    return (
+                                        <>
+                                            {filteredThreads.length > 0 && filteredThreads.map(thread => {
+                                                const unread = !thread.isReadByAdmin;
+                                                const when = conversationTime(thread.lastMessageAt) || 'now';
+                                                return (
+                                                    <button
+                                                        key={thread.id}
+                                                        onClick={() => setSelectedThread(thread)}
+                                                        className={cn(
+                                                            "flex w-full items-start gap-3 px-3 py-2.5 text-left border-b last:border-b-0 transition-colors hover:bg-muted",
+                                                            selectedThread?.id === thread.id && 'bg-muted',
+                                                        )}
+                                                    >
+                                                        <span className={cn(
+                                                            "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase",
+                                                            unread ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+                                                        )}>
+                                                            {initialsOf(thread.userName)}
                                                         </span>
-                                                        <span className={cn("shrink-0 text-[10px]", unread ? 'font-semibold text-primary' : 'text-muted-foreground')}>
-                                                            {when}
+                                                        <span className="min-w-0 flex-1">
+                                                            <span className="flex items-baseline justify-between gap-2">
+                                                                <span className={cn("min-w-0 truncate text-sm", unread ? 'font-bold text-primary' : 'font-semibold')}>
+                                                                    {thread.userName || thread.userEmail || 'Unknown user'}
+                                                                </span>
+                                                                <span className={cn("shrink-0 text-[10px]", unread ? 'font-semibold text-primary' : 'text-muted-foreground')}>
+                                                                    {when}
+                                                                </span>
+                                                            </span>
+                                                            <span className="mt-0.5 flex items-center gap-1.5">
+                                                                <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? 'text-foreground' : 'text-muted-foreground')}>
+                                                                    {stripMarkdown(thread.lastMessageSnippet) || thread.subject}
+                                                                </span>
+                                                                {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                                                            </span>
+                                                            <span className="mt-1 flex items-center gap-1.5">
+                                                                <Badge
+                                                                    variant={thread.status === 'open' ? 'default' : 'secondary'}
+                                                                    className="h-4 shrink-0 px-1.5 text-[9px] uppercase shadow-none"
+                                                                >
+                                                                    {thread.status}
+                                                                </Badge>
+                                                                <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
+                                                                    {thread.subject}
+                                                                </span>
+                                                            </span>
                                                         </span>
-                                                    </span>
-                                                    <span className="mt-0.5 flex items-center gap-1.5">
-                                                        <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? 'text-foreground' : 'text-muted-foreground')}>
-                                                            {stripMarkdown(thread.lastMessageSnippet) || thread.subject}
-                                                        </span>
-                                                        {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                                                    </span>
-                                                    <span className="mt-1 flex items-center gap-1.5">
-                                                        <Badge
-                                                            variant={thread.status === 'open' ? 'default' : 'secondary'}
-                                                            className="h-4 shrink-0 px-1.5 text-[9px] uppercase shadow-none"
+                                                    </button>
+                                                );
+                                            })}
+                                            {/* All other users who haven't messaged yet */}
+                                            {usersWithoutThread.length > 0 && (
+                                                <>
+                                                    <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 sticky top-0">
+                                                        {inboxSearch ? 'Other Users' : 'All Users — Start a Chat'}
+                                                    </div>
+                                                    {usersWithoutThread.map(u => (
+                                                        <button
+                                                            key={u.id}
+                                                            onClick={() => setSelectedThread({
+                                                                id: `${u.id}_admin_initiated`,
+                                                                userId: u.id,
+                                                                userName: u.name || u.email || 'User',
+                                                                userEmail: u.email,
+                                                                subject: 'A Note From Zeneva CEO',
+                                                                status: 'open',
+                                                                lastMessageSnippet: '',
+                                                                lastMessageAt: new Date(),
+                                                                createdAt: new Date(),
+                                                                unreadCount: 0,
+                                                                isReadByAdmin: true
+                                                            } as SupportThread)}
+                                                            className={cn(
+                                                                "flex w-full items-start gap-3 px-3 py-2.5 text-left border-b last:border-b-0 transition-colors hover:bg-muted",
+                                                                selectedThread?.userId === u.id && 'bg-muted',
+                                                            )}
                                                         >
-                                                            {thread.status}
-                                                        </Badge>
-                                                        <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
-                                                            {thread.subject}
-                                                        </span>
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        );
-                                    })
-                                ) : (
-                                    !isLoading && <div className="p-4 text-center text-muted-foreground">No support tickets found.</div>
-                                )}
+                                                            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-bold uppercase">
+                                                                {initialsOf(u.name || u.email || 'U')}
+                                                            </span>
+                                                            <span className="min-w-0 flex-1">
+                                                                <span className="block truncate text-sm font-semibold">{u.name || u.email || 'Unnamed User'}</span>
+                                                                <span className="block truncate text-[10px] text-muted-foreground">{u.email}</span>
+                                                                <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-orange-500 font-semibold">
+                                                                    <MessageSquare className="h-3 w-3" /> Tap to message
+                                                                </span>
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </>
+                                            )}
+                                            {filteredThreads.length === 0 && usersWithoutThread.length === 0 && !isLoading && (
+                                                <div className="p-4 text-center text-muted-foreground text-sm">No results found.</div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </ScrollArea>
                         </div>
                         <div className={cn(
@@ -1438,5 +1681,13 @@ export default function AdminSupportPage() {
                 </TabsContent>
             </Tabs>
         </div>
+    );
+}
+
+export default function AdminSupportPage() {
+    return (
+        <Suspense fallback={<div className="p-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
+            <AdminSupportContent />
+        </Suspense>
     );
 }

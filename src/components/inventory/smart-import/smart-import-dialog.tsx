@@ -35,8 +35,8 @@ import { FeatureGateUpgradeCard } from '@/components/shared/feature-gate';
 import { Sparkles as SparklesIcon } from 'lucide-react';
 import { track } from '@vercel/analytics';
 import { usePOS } from '@/context/pos-context';
-import { useFirestore } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
+import { logImportTelemetry } from '@/lib/import/telemetry';
 
 export default function SmartImportDialog({
   isOpen,
@@ -47,7 +47,8 @@ export default function SmartImportDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
-  const { business, currentUserProfile } = usePOS();
+  const { business } = usePOS();
+  const { user } = useUser();
   const firestore = useFirestore();
 
   const importer = useSmartImport(() => {
@@ -56,6 +57,22 @@ export default function SmartImportDialog({
     // in the background and closing on commit makes a large import look like it did
     // nothing. The owner closes it when they have read the summary.
   });
+
+  /** Track any import interaction with complete merchant context */
+  const trackImport = React.useCallback((
+    action: string,
+    extra?: { source?: string; fileName?: string; fileSize?: number; fileType?: string; metadata?: Record<string, any> }
+  ) => {
+    logImportTelemetry(firestore, {
+      userId: user?.uid || 'anonymous',
+      userEmail: user?.email || '',
+      userName: user?.displayName || '',
+      businessId: business?.id || '',
+      businessName: business?.name || '',
+      action,
+      ...extra,
+    });
+  }, [firestore, user, business]);
 
   /** Which input panel is showing, before any data exists. `null` = the picker. */
   const [picked, setPicked] = React.useState<ImportSource | null>(null);
@@ -69,32 +86,9 @@ export default function SmartImportDialog({
   // Track when the import modal is opened by a user
   React.useEffect(() => {
     if (isOpen) {
-      try {
-        track('inventory_import_modal_opened', {
-          businessId: business?.id,
-          businessName: business?.name,
-        });
-      } catch (trackErr) {
-        console.warn('Failed to track import modal open:', trackErr);
-      }
-
-      if (firestore && (currentUserProfile || business)) {
-        try {
-          addDoc(collection(firestore, 'import_attempts'), {
-            userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
-            userEmail: currentUserProfile?.email || '',
-            userName: currentUserProfile?.name || '',
-            businessId: business?.id || '',
-            businessName: business?.name || '',
-            action: 'opened_modal',
-            timestamp: serverTimestamp(),
-          });
-        } catch (dbErr) {
-          console.error('Failed to log import attempt to Firestore:', dbErr);
-        }
-      }
+      trackImport('opened_modal');
     }
-  }, [isOpen, business, currentUserProfile, firestore]);
+  }, [isOpen, trackImport]);
 
   const close = (open: boolean) => {
     if (!open) {
@@ -253,6 +247,12 @@ export default function SmartImportDialog({
                   if (!importer.limitCheck.ok) {
                     setShowUpgradeModal(true);
                   } else {
+                    trackImport('committed_import', {
+                      metadata: {
+                        created: importer.plan.create.length,
+                        updated: importer.plan.addStock.length + importer.plan.overwrite.length,
+                      },
+                    });
                     importer.commit();
                   }
                 }}
@@ -262,28 +262,11 @@ export default function SmartImportDialog({
             {stage === 'pick' && picked === null && (
               <SourcePicker
                 creditsLeft={importer.creditsLeft}
+                onDropzoneClick={() => {
+                  trackImport('clicked_dropzone', { source: 'dropzone' });
+                }}
                 onPick={(source) => {
-                  try {
-                    track('inventory_import_option_selected', {
-                      source,
-                      businessId: business?.id,
-                    });
-                  } catch (trackErr) {}
-
-                  if (firestore && (currentUserProfile || business)) {
-                    try {
-                      addDoc(collection(firestore, 'import_attempts'), {
-                        userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
-                        userEmail: currentUserProfile?.email || '',
-                        userName: currentUserProfile?.name || '',
-                        businessId: business?.id || '',
-                        businessName: business?.name || '',
-                        action: 'selected_source',
-                        source,
-                        timestamp: serverTimestamp(),
-                      });
-                    } catch (dbErr) {}
-                  }
+                  trackImport('selected_source', { source });
 
                   if (source === 'barcode') {
                     // The scanner lives on the Inventory page and already searches the
@@ -297,60 +280,22 @@ export default function SmartImportDialog({
                   setPicked(source);
                 }}
                 onFile={(file) => {
-                  try {
-                    track('inventory_import_file_dropped', {
-                      fileName: file.name,
-                      fileType: file.type,
-                      fileSize: file.size,
-                      businessId: business?.id,
-                    });
-                  } catch (trackErr) {}
-
-                  if (firestore && (currentUserProfile || business)) {
-                    try {
-                      addDoc(collection(firestore, 'import_attempts'), {
-                        userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
-                        userEmail: currentUserProfile?.email || '',
-                        userName: currentUserProfile?.name || '',
-                        businessId: business?.id || '',
-                        businessName: business?.name || '',
-                        action: 'file_dropped',
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        timestamp: serverTimestamp(),
-                      });
-                    } catch (dbErr) {}
-                  }
+                  trackImport('file_dropped', {
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    source: 'spreadsheet',
+                  });
 
                   importer.loadFile(file);
                 }}
                 onImage={(file) => {
-                  try {
-                    track('inventory_import_image_dropped', {
-                      fileName: file.name,
-                      fileType: file.type,
-                      fileSize: file.size,
-                      businessId: business?.id,
-                    });
-                  } catch (trackErr) {}
-
-                  if (firestore && (currentUserProfile || business)) {
-                    try {
-                      addDoc(collection(firestore, 'import_attempts'), {
-                        userId: currentUserProfile?.id || currentUserProfile?.uid || 'anonymous',
-                        userEmail: currentUserProfile?.email || '',
-                        userName: currentUserProfile?.name || '',
-                        businessId: business?.id || '',
-                        businessName: business?.name || '',
-                        action: 'image_dropped',
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        timestamp: serverTimestamp(),
-                      });
-                    } catch (dbErr) {}
-                  }
+                  trackImport('image_dropped', {
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    source: 'photo',
+                  });
 
                   setHandoff(file);
                   setPicked('photo');

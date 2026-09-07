@@ -13,8 +13,14 @@ export async function POST(req: Request) {
   const auth = await requireSuperAdmin(req);
   if (!auth.ok) return auth.res;
 
+  let body;
   try {
-    const body = await req.json();
+    body = await req.json();
+  } catch (err) {
+    return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400, headers: corsHeaders });
+  }
+
+  try {
     const { to, userName, subject, message, mediaUrl, mediaUrls, messages } = body ?? {};
 
     if (!to || (!message && !mediaUrl && (!messages || messages.length === 0))) {
@@ -116,7 +122,7 @@ export async function POST(req: Request) {
 
                     <!-- SUBTITLE & TITLE -->
                     <div style="font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700; color: #ea580c; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;">
-                      A Note From Zeneva Support
+                      A Note From Zeneva CEO
                     </div>
                     <h1 style="margin: 0 0 20px 0; font-family: 'DM Sans', sans-serif; font-size: 22px; font-weight: 800; color: #1c1917; line-height: 1.3;">
                       Response to your support ticket

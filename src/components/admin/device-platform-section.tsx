@@ -14,7 +14,11 @@ import {
     ShieldCheck, 
     CheckCircle2, 
     Activity,
-    Layers
+    Layers,
+    Rocket,
+    Sparkles,
+    AlertTriangle,
+    ArrowUpCircle
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +30,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDistanceToNow } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
+import { AppConfig } from '@/lib/config';
 import type { UserProfile, BusinessInstance } from '@/types';
 
 export interface UserPlatformClassification {
@@ -35,6 +40,20 @@ export interface UserPlatformClassification {
     isCrossPlatform: boolean;
     primaryCategory: 'microsoft' | 'mobile' | 'cross' | 'web';
     platformsList: string[];
+}
+
+export function isVersionLatest(appVersion?: string): boolean {
+    if (!appVersion) return false;
+    const v = appVersion.replace(/^v/i, '').trim();
+    const current = (AppConfig.version || '').replace(/^v/i, '').trim();
+    return Boolean(v) && v === current;
+}
+
+export function isVersionOutdated(appVersion?: string): boolean {
+    if (!appVersion) return false;
+    const v = appVersion.replace(/^v/i, '').trim();
+    const current = (AppConfig.version || '').replace(/^v/i, '').trim();
+    return Boolean(v) && v !== 'unknown' && v !== current;
 }
 
 export function classifyUserPlatform(user: UserProfile): UserPlatformClassification {
@@ -84,6 +103,8 @@ export function classifyUserPlatform(user: UserProfile): UserPlatformClassificat
     };
 }
 
+export type PlatformCohortTab = 'all' | 'latest' | 'outdated' | 'microsoft' | 'mobile' | 'cross' | 'web';
+
 interface DevicePlatformAdoptionSectionProps {
     users: UserProfile[];
     businesses: BusinessInstance[];
@@ -96,7 +117,7 @@ export default function DevicePlatformAdoptionSection({
     onSelectUser
 }: DevicePlatformAdoptionSectionProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedTab, setSelectedTab] = useState<'all' | 'microsoft' | 'mobile' | 'cross' | 'web'>('all');
+    const [selectedTab, setSelectedTab] = useState<PlatformCohortTab>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
     const businessMap = useMemo(() => {
@@ -119,6 +140,8 @@ export default function DevicePlatformAdoptionSection({
         }));
     }, [activeUsers, businessMap]);
 
+    const latestCohort = useMemo(() => classifiedUsers.filter(c => isVersionLatest(c.user.appVersion)), [classifiedUsers]);
+    const outdatedCohort = useMemo(() => classifiedUsers.filter(c => isVersionOutdated(c.user.appVersion)), [classifiedUsers]);
     const microsoftCohort = useMemo(() => classifiedUsers.filter(c => c.info.hasMicrosoftApp), [classifiedUsers]);
     const mobileCohort = useMemo(() => classifiedUsers.filter(c => c.info.hasMobileApp), [classifiedUsers]);
     const crossCohort = useMemo(() => classifiedUsers.filter(c => c.info.isCrossPlatform), [classifiedUsers]);
@@ -128,14 +151,21 @@ export default function DevicePlatformAdoptionSection({
     const mobileRecent = useMemo(() => mobileCohort.filter(c => c.lastSeenTime >= oneDayAgo).length, [mobileCohort, oneDayAgo]);
     const crossRecent = useMemo(() => crossCohort.filter(c => c.lastSeenTime >= oneDayAgo).length, [crossCohort, oneDayAgo]);
 
+    const totalInstalledAppUsers = useMemo(() => {
+        return classifiedUsers.filter(c => c.info.hasMicrosoftApp || c.info.hasMobileApp || c.user.appVersion).length;
+    }, [classifiedUsers]);
+
     const nativeAppUsersCount = useMemo(() => {
         return classifiedUsers.filter(c => c.info.hasMicrosoftApp || c.info.hasMobileApp).length;
     }, [classifiedUsers]);
 
     const nativeAppPenetration = ((nativeAppUsersCount / totalCount) * 100).toFixed(1);
     const crossAdoptionRate = ((crossCohort.length / totalCount) * 100).toFixed(1);
+    const upgradeRate = totalInstalledAppUsers > 0 
+        ? ((latestCohort.length / totalInstalledAppUsers) * 100).toFixed(1) 
+        : '0.0';
 
-    const handleOpenCohort = (tab: 'all' | 'microsoft' | 'mobile' | 'cross' | 'web') => {
+    const handleOpenCohort = (tab: PlatformCohortTab) => {
         setSelectedTab(tab);
         setSearchQuery('');
         setIsModalOpen(true);
@@ -143,7 +173,9 @@ export default function DevicePlatformAdoptionSection({
 
     const filteredCohortList = useMemo(() => {
         let list = classifiedUsers;
-        if (selectedTab === 'microsoft') list = microsoftCohort;
+        if (selectedTab === 'latest') list = latestCohort;
+        else if (selectedTab === 'outdated') list = outdatedCohort;
+        else if (selectedTab === 'microsoft') list = microsoftCohort;
         else if (selectedTab === 'mobile') list = mobileCohort;
         else if (selectedTab === 'cross') list = crossCohort;
         else if (selectedTab === 'web') list = webOnlyCohort;
@@ -153,9 +185,10 @@ export default function DevicePlatformAdoptionSection({
         return list.filter(c => 
             (c.user.name || '').toLowerCase().includes(q) ||
             (c.user.email || '').toLowerCase().includes(q) ||
+            (c.user.appVersion || '').toLowerCase().includes(q) ||
             (c.business?.name || '').toLowerCase().includes(q)
         );
-    }, [classifiedUsers, selectedTab, microsoftCohort, mobileCohort, crossCohort, webOnlyCohort, searchQuery]);
+    }, [classifiedUsers, selectedTab, latestCohort, outdatedCohort, microsoftCohort, mobileCohort, crossCohort, webOnlyCohort, searchQuery]);
 
     return (
         <div className="space-y-4">
@@ -276,6 +309,95 @@ export default function DevicePlatformAdoptionSection({
                         </div>
                     </div>
 
+                    {/* App Version & Upgrade Status Cards */}
+                    <div className="rounded-xl border border-border/70 bg-gradient-to-r from-emerald-500/5 via-background to-amber-500/5 p-3.5 space-y-3 shadow-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                    <Rocket className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                        App Release & Version Upgrades
+                                        <Badge variant="secondary" className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 py-0 px-1.5 border border-emerald-500/30">
+                                            Latest: v{AppConfig.version}
+                                        </Badge>
+                                    </h4>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Monitor merchants that have updated to the latest build versus those on older native releases.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenCohort('latest')}
+                                    className="h-7 text-xs gap-1.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                                >
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                    Upgraded ({latestCohort.length})
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenCohort('outdated')}
+                                    className="h-7 text-xs gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                                >
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                    Outdated ({outdatedCohort.length})
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-0.5">
+                            {/* Upgraded Card */}
+                            <div 
+                                onClick={() => handleOpenCohort('latest')}
+                                className="group cursor-pointer rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 hover:bg-emerald-500/15 hover:border-emerald-500/50 transition-all active:scale-[0.99]"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                                        <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Upgraded to Latest (v{AppConfig.version})
+                                    </span>
+                                    <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 font-bold">
+                                        {upgradeRate}% updated
+                                    </Badge>
+                                </div>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <span className="text-2xl font-black text-foreground">{latestCohort.length}</span>
+                                    <span className="text-xs text-muted-foreground">merchants on v{AppConfig.version}</span>
+                                </div>
+                                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 truncate">
+                                    <CheckCircle2 className="h-3 w-3 inline" /> Up-to-date with newest features & fixes · Click to inspect
+                                </p>
+                            </div>
+
+                            {/* Outdated Card */}
+                            <div 
+                                onClick={() => handleOpenCohort('outdated')}
+                                className="group cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 hover:bg-amber-500/15 hover:border-amber-500/50 transition-all active:scale-[0.99]"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" /> Outdated App Versions (&lt; v{AppConfig.version})
+                                    </span>
+                                    <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-500/10 text-[10px] px-1.5 py-0 font-bold">
+                                        {outdatedCohort.length} pending
+                                    </Badge>
+                                </div>
+                                <div className="mt-2 flex items-baseline gap-2">
+                                    <span className="text-2xl font-black text-foreground">{outdatedCohort.length}</span>
+                                    <span className="text-xs text-muted-foreground">merchants on older builds</span>
+                                </div>
+                                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1 truncate">
+                                    <AlertTriangle className="h-3 w-3 inline" /> Running legacy builds (v3.2.x, v3.1.x) · Click to inspect
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Proportional Stacked Bar */}
                     <div className="space-y-1.5 pt-1">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -381,20 +503,26 @@ export default function DevicePlatformAdoptionSection({
                                 onValueChange={(v: any) => setSelectedTab(v)}
                                 className="w-full sm:w-auto"
                             >
-                                <TabsList className="h-8 text-xs">
-                                    <TabsTrigger value="all" className="text-xs py-1 px-2.5">
+                                <TabsList className="h-8 text-xs flex-wrap">
+                                    <TabsTrigger value="all" className="text-xs py-1 px-2">
                                         All ({classifiedUsers.length})
                                     </TabsTrigger>
-                                    <TabsTrigger value="microsoft" className="text-xs py-1 px-2.5 text-blue-600 dark:text-blue-400">
+                                    <TabsTrigger value="latest" className="text-xs py-1 px-2 text-emerald-600 dark:text-emerald-400 font-bold">
+                                        🚀 Upgraded ({latestCohort.length})
+                                    </TabsTrigger>
+                                    <TabsTrigger value="outdated" className="text-xs py-1 px-2 text-amber-600 dark:text-amber-400 font-bold">
+                                        ⚠️ Outdated ({outdatedCohort.length})
+                                    </TabsTrigger>
+                                    <TabsTrigger value="microsoft" className="text-xs py-1 px-2 text-blue-600 dark:text-blue-400">
                                         🪟 Microsoft ({microsoftCohort.length})
                                     </TabsTrigger>
-                                    <TabsTrigger value="mobile" className="text-xs py-1 px-2.5 text-emerald-600 dark:text-emerald-400">
+                                    <TabsTrigger value="mobile" className="text-xs py-1 px-2 text-emerald-600 dark:text-emerald-400">
                                         📱 Mobile ({mobileCohort.length})
                                     </TabsTrigger>
-                                    <TabsTrigger value="cross" className="text-xs py-1 px-2.5 text-amber-600 dark:text-amber-400">
+                                    <TabsTrigger value="cross" className="text-xs py-1 px-2 text-amber-600 dark:text-amber-400">
                                         ⚡ Both ({crossCohort.length})
                                     </TabsTrigger>
-                                    <TabsTrigger value="web" className="text-xs py-1 px-2.5">
+                                    <TabsTrigger value="web" className="text-xs py-1 px-2">
                                         🌐 Web Only ({webOnlyCohort.length})
                                     </TabsTrigger>
                                 </TabsList>
@@ -403,7 +531,7 @@ export default function DevicePlatformAdoptionSection({
                             <div className="relative w-full sm:w-64">
                                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search users or stores..."
+                                    placeholder="Search users, stores, or version..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="pl-8 h-8 text-xs"
@@ -419,6 +547,7 @@ export default function DevicePlatformAdoptionSection({
                                             <TableHead className="text-xs">User / Email</TableHead>
                                             <TableHead className="text-xs">Store / Business</TableHead>
                                             <TableHead className="text-xs">Plan</TableHead>
+                                            <TableHead className="text-xs">App Version</TableHead>
                                             <TableHead className="text-xs">Active Devices & Apps</TableHead>
                                             <TableHead className="text-xs">Last Seen</TableHead>
                                             <TableHead className="text-xs text-right">Actions</TableHead>
@@ -450,6 +579,28 @@ export default function DevicePlatformAdoptionSection({
                                                                 )
                                                             ) : (
                                                                 <span className="text-muted-foreground text-[10px]">—</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="py-2.5">
+                                                            {isVersionLatest(user.appVersion) ? (
+                                                                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px] font-mono font-bold flex items-center gap-1 w-fit">
+                                                                    <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                                                    v{user.appVersion} (Latest)
+                                                                </Badge>
+                                                            ) : isVersionOutdated(user.appVersion) ? (
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] font-mono font-semibold flex items-center gap-1 w-fit">
+                                                                        <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                                                        v{user.appVersion}
+                                                                    </Badge>
+                                                                    <span className="text-[9px] text-amber-600/90 dark:text-amber-400/90 font-medium">
+                                                                        Update pending
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                                    <Globe className="h-3 w-3 opacity-60" /> Web
+                                                                </span>
                                                             )}
                                                         </TableCell>
                                                         <TableCell className="py-2.5">
@@ -505,7 +656,7 @@ export default function DevicePlatformAdoptionSection({
                                             })
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-8 text-xs text-muted-foreground">
+                                                <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
                                                     No users found matching this platform filter.
                                                 </TableCell>
                                             </TableRow>

@@ -132,11 +132,12 @@ export function computeRevenueSnapshot({
   }
 
   // MRR from who is subscribed right now, at list price — the same helper the
-  // admin dashboard's SaaS tiles use, so the two surfaces cannot disagree.
+  // MRR from who is subscribed right now, based on verified purchases.
   const { mrr, activeSubscriptions, lifetimeAccounts } = subscriptionRunRate({
     businesses,
     internalOwners: internalOwnerIds,
     billingCurrencies: billingCurrencyByBusiness(purchases),
+    purchases,
   });
 
   // Only closed rounds. A planned round is a hope, and adding its cash to the

@@ -379,6 +379,7 @@ export function AuditSection({ user, active }: { user: UserProfile; active: bool
 
 export function SupportSection({ user, active }: { user: UserProfile; active: boolean }) {
     const firestore = useFirestore();
+    const router = useRouter();
 
     // The one query here with a real composite index behind it.
     const threads = useLazyQuery(
@@ -426,6 +427,12 @@ export function SupportSection({ user, active }: { user: UserProfile; active: bo
 
     return (
         <div className="space-y-4">
+            <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => router.push(`/admin-imamshaffy/support?userId=${user.id}`)}>
+                    <MessageSquare className="h-4 w-4 mr-2" /> Message User
+                </Button>
+            </div>
+            
             <SectionState isLoading={busy} error={err} empty={nothing} emptyText="This user has never contacted support or searched help." />
 
             {!busy && !nothing && (

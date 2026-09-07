@@ -323,7 +323,7 @@ function UserDetailContent() {
                                     <Field label="Onboarding survey">
                                         {user.surveyCompleted ? 'Completed' : 'Not completed'}
                                     </Field>
-                                    <Field label="Last seen"><UserPresence lastSeen={user.lastSeen} /></Field>
+                                    <Field label="Last seen"><UserPresence lastSeen={user.lastSeen} status={(user as any).status} /></Field>
                                 </div>
                             </Card>
 

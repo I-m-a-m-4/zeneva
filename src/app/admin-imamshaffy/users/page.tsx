@@ -157,6 +157,22 @@ const UserPlatformsBadges = ({ user }: { user: UserProfile }) => {
   );
 };
 
+const DeviceIcon = ({ device }: { device?: string | null }) => {
+  const d = (device || '').toLowerCase();
+  const Icon = d.includes('desktop')
+    ? Laptop
+    : d.includes('mobile')
+    ? Smartphone
+    : Globe;
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title={device || 'Web'}>
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{device || 'Web'}</span>
+    </span>
+  );
+};
+
 const StatTile = ({ label, value, hint }: { label: string; value: string | number; hint?: string }) => (
   <Card className="p-3">
     <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -177,7 +193,7 @@ const COLUMNS = [
   { key: 'segment', label: 'Segment', className: 'hidden lg:table-cell min-w-[100px]' },
   { key: 'status', label: 'Status', className: 'min-w-[90px]' },
   { key: 'device', label: 'Device', className: 'hidden xl:table-cell min-w-[130px]' },
-  { key: 'version', label: 'Version', className: 'hidden xl:table-cell min-w-[110px]' },
+  { key: 'version', label: 'Version', className: 'hidden lg:table-cell min-w-[120px]' },
   { key: 'actions', label: '', className: 'w-[80px] text-right' },
 ];
 
@@ -264,7 +280,15 @@ export default function UsersPage() {
     const registered = all.filter(u => Boolean(u.email || u.name || u.phone));
     const incomplete = all.filter(u => !u.email && !u.name && !u.phone);
     const counts = segmentCounts(registered);
-    const outdated = all.filter(u => u.appVersion && u.appVersion !== AppConfig.version).length;
+    const curVersion = (AppConfig.version || '').replace(/^v/i, '').trim();
+    const upgraded = all.filter(u => {
+      const v = (u.appVersion || '').replace(/^v/i, '').trim();
+      return Boolean(v) && v === curVersion;
+    }).length;
+    const outdated = all.filter(u => {
+      const v = (u.appVersion || '').replace(/^v/i, '').trim();
+      return Boolean(v) && v !== 'unknown' && v !== curVersion;
+    }).length;
     const blocked = all.filter(u => u.status === 'inactive' || u.status === 'suspended').length;
     
     const conversionRate = all.length > 0 ? (registered.length / all.length) * 100 : 0;
@@ -303,6 +327,7 @@ export default function UsersPage() {
       conversionRate,
       abandonmentRate,
       counts, 
+      upgraded,
       outdated, 
       blocked,
       microsoftCount,
@@ -326,16 +351,24 @@ export default function UsersPage() {
       if (segmentFilter !== 'all' && segmentOf(u) !== segmentFilter) return false;
 
       if (platformFilter !== 'all') {
-        const platforms = (u.platformsUsed && u.platformsUsed.length > 0 ? u.platformsUsed : u.deviceType ? [u.deviceType] : []).map(p => String(p).toLowerCase());
-        const ua = (u.userAgent || '').toLowerCase();
-        const hasDesktop = platforms.some(p => p.includes('desktop') || p.includes('microsoft') || p.includes('windows')) || (ua.includes('windows') && (ua.includes('tauri') || u.deviceType === 'Desktop App'));
-        const hasMobile = platforms.some(p => p.includes('mobile app') || p.includes('android') || p.includes('ios')) || ((ua.includes('android') || ua.includes('iphone') || ua.includes('mobile')) && (ua.includes('tauri') || u.deviceType === 'Mobile App'));
-        const hasWeb = platforms.some(p => p.includes('web') && !p.includes('desktop app')) || (!hasDesktop && !hasMobile);
+        const v = (u.appVersion || '').replace(/^v/i, '').trim();
+        const cur = (AppConfig.version || '').replace(/^v/i, '').trim();
+        if (platformFilter === 'latest') {
+          if (!v || v !== cur) return false;
+        } else if (platformFilter === 'outdated') {
+          if (!v || v === 'unknown' || v === cur) return false;
+        } else {
+          const platforms = (u.platformsUsed && u.platformsUsed.length > 0 ? u.platformsUsed : u.deviceType ? [u.deviceType] : []).map(p => String(p).toLowerCase());
+          const ua = (u.userAgent || '').toLowerCase();
+          const hasDesktop = platforms.some(p => p.includes('desktop') || p.includes('microsoft') || p.includes('windows')) || (ua.includes('windows') && (ua.includes('tauri') || u.deviceType === 'Desktop App'));
+          const hasMobile = platforms.some(p => p.includes('mobile app') || p.includes('android') || p.includes('ios')) || ((ua.includes('android') || ua.includes('iphone') || ua.includes('mobile')) && (ua.includes('tauri') || u.deviceType === 'Mobile App'));
+          const hasWeb = platforms.some(p => p.includes('web') && !p.includes('desktop app')) || (!hasDesktop && !hasMobile);
 
-        if (platformFilter === 'microsoft' && !hasDesktop) return false;
-        if (platformFilter === 'mobile' && !hasMobile) return false;
-        if (platformFilter === 'multi' && (!hasDesktop || !hasMobile)) return false;
-        if (platformFilter === 'web' && (!hasWeb || hasDesktop || hasMobile)) return false;
+          if (platformFilter === 'microsoft' && !hasDesktop) return false;
+          if (platformFilter === 'mobile' && !hasMobile) return false;
+          if (platformFilter === 'multi' && (!hasDesktop || !hasMobile)) return false;
+          if (platformFilter === 'web' && (!hasWeb || hasDesktop || hasMobile)) return false;
+        }
       }
 
       if (!term) return true;
@@ -450,9 +483,10 @@ export default function UsersPage() {
 
             {canManageUsers && (
               <>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
                   <StatTile label="Total accounts" value={summary.total.toLocaleString()} hint={`${summary.registeredCount} registered · ${summary.incompleteCount} visitors`} />
                   <StatTile label="Registered" value={`${summary.registeredCount.toLocaleString()} (${summary.conversionRate.toFixed(1)}%)`} hint="Completion rate" />
+                  <StatTile label={`Upgraded (v${AppConfig.version})`} value={summary.upgraded.toLocaleString()} hint={`${summary.outdated} on older builds`} />
                   <StatTile label="Incomplete" value={`${summary.incompleteCount.toLocaleString()} (${summary.abandonmentRate.toFixed(1)}%)`} hint="Drop-off rate" />
                   <StatTile label="Power users" value={summary.counts.power} hint="Active 7d, 5h+ total" />
                   <StatTile label="Active" value={summary.counts.active} hint="Seen in last 7 days" />
@@ -520,9 +554,11 @@ export default function UsersPage() {
                     </SelectContent>
                   </Select>
                   <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                    <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="Platform" /></SelectTrigger>
+                    <SelectTrigger className="h-9 w-[180px] text-xs"><SelectValue placeholder="Platform / Version" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Devices</SelectItem>
+                      <SelectItem value="all">All Devices & Versions</SelectItem>
+                      <SelectItem value="latest">🚀 Upgraded to v{AppConfig.version} ({summary.upgraded})</SelectItem>
+                      <SelectItem value="outdated">⚠️ Outdated App ({summary.outdated})</SelectItem>
                       <SelectItem value="microsoft">🪟 Microsoft App ({summary.microsoftCount})</SelectItem>
                       <SelectItem value="mobile">📱 Mobile App ({summary.mobileCount})</SelectItem>
                       <SelectItem value="multi">⚡ Cross-Device ({summary.multiCount})</SelectItem>
@@ -644,13 +680,20 @@ export default function UsersPage() {
                             <DeviceIcon device={user.deviceType} />
                             {user.country && <div className="text-[10px] text-muted-foreground">{user.country}</div>}
                           </TableCell>
-                          <TableCell className="hidden xl:table-cell">
+                          <TableCell className="hidden lg:table-cell">
                             {user.appVersion ? (
-                              <Badge variant={outdated ? 'destructive' : 'default'} className="whitespace-nowrap font-mono text-[10px]">
-                                v{user.appVersion}
+                              <Badge 
+                                variant="outline" 
+                                className={
+                                  outdated 
+                                    ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-mono text-[10px] whitespace-nowrap font-semibold" 
+                                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-mono text-[10px] whitespace-nowrap font-bold"
+                                }
+                              >
+                                {outdated ? '⚠️' : '✓'} v{user.appVersion} {outdated ? '· Outdated' : '· Latest'}
                               </Badge>
                             ) : (
-                              <span className="text-xs italic text-muted-foreground">Unknown</span>
+                              <span className="text-xs italic text-muted-foreground">Web</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right" onClick={e => e.stopPropagation()}>

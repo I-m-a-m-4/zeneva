@@ -15,8 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Zap, TrendingUp, AlertTriangle, Search, PlusCircle, CheckCircle2, Wrench, Users,
   ShieldAlert, Timer, Coins, MessageSquare, RefreshCw, ShieldCheck, Gauge, Activity,
-  ScrollText, Gift, CreditCard,
+  ScrollText, Gift, CreditCard, Eye, Copy, Bot, MessageCircle, User, Sparkles,
 } from 'lucide-react';
+import { Markdown } from '@/components/ai-insights/markdown';
 import {
   ZEN_TOOL_COUNT, ZEN_TOOL_NAMES, ZEN_READ_TOOL_NAMES, ZEN_WRITE_TOOL_NAMES, labelForTool,
 } from '@/components/ai-insights/zen-status';
@@ -107,6 +108,18 @@ function ledgerTime(ts: any): string {
   });
 }
 
+function formatSessionTime(ts: any): string {
+  const at = ts?.toDate ? ts.toDate() : ts instanceof Date ? ts : (ts?.seconds ? new Date(ts.seconds * 1000) : null);
+  if (!at || Number.isNaN(at.getTime())) return 'Recently';
+  return at.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /**
  * The window immediately before the selected one, same length.
  *
@@ -132,6 +145,28 @@ type WindowTotals = {
   businesses: number;
   toolCalls: number;
 };
+
+function extractMessageText(msg: any, defaultFallback?: string): string {
+  if (typeof msg?.content === 'string' && msg.content.trim()) return msg.content;
+  
+  if (Array.isArray(msg?.parts)) {
+    const textParts = msg.parts
+      .filter((p: any) => p.type === 'text' && typeof p.text === 'string' && p.text.trim())
+      .map((p: any) => p.text);
+      
+    if (textParts.length > 0) return textParts.join('\n\n');
+    
+    // If no text parts, try to format any tool calls for visibility
+    const toolCall = msg.parts.find((p: any) => (p.type && p.type.startsWith('tool-')) || p.toolCallId);
+    if (toolCall) {
+      if (toolCall.output) return `[Tool Result: ${toolCall.type || 'Unknown'}]\n${JSON.stringify(toolCall.output, null, 2)}`;
+      if (toolCall.input) return `[Called Tool: ${toolCall.type || 'Unknown'}]\n${JSON.stringify(toolCall.input, null, 2)}`;
+      return `[Tool Call: ${toolCall.type || 'Unknown'}]`;
+    }
+  }
+  
+  return defaultFallback || JSON.stringify(msg, null, 2);
+}
 
 function foldDays(docs: AiDailyStats[]): WindowTotals {
   const turns = docs.reduce((s, d) => s + (d.count ?? 0), 0);
@@ -186,6 +221,13 @@ export default function AdminAIUsage() {
   const [ledger, setLedger] = useState<AiCreditLedgerEntry[]>([]);
 
   const [unansweredQueries, setUnansweredQueries] = useState<any[]>([]);
+  // User chat sessions & transcript inspector
+  const [userAiSessions, setUserAiSessions] = useState<any[]>([]);
+  const [selectedSessionForModal, setSelectedSessionForModal] = useState<any | null>(null);
+  const [isTranscriptModalOpen, setIsTranscriptModalOpen] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [chatPlanFilter, setChatPlanFilter] = useState('all');
+  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const todayStr = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
@@ -223,7 +265,7 @@ export default function AdminAIUsage() {
       const priorChunks: string[][] = [];
       for (let i = 0; i < prior.length; i += 10) priorChunks.push(prior.slice(i, i + 10));
 
-      const [globalDoc, dailySnaps, priorSnaps, bSnap, unansweredSnap, ledgerSnap] = await Promise.all([
+      const [globalDoc, dailySnaps, priorSnaps, bSnap, unansweredSnap, ledgerSnap, aiSessionsSnap] = await Promise.all([
         getDoc(doc(firestore, 'platform_stats', 'ai_usage_global')),
         Promise.all(
           chunks.map((ids) =>
@@ -251,6 +293,9 @@ export default function AdminAIUsage() {
          */
         getDocs(
           query(collection(firestore, AI_CREDIT_LEDGER_COLLECTION), orderBy('timestamp', 'desc'), limit(40)),
+        ).catch(() => null),
+        getDocs(
+          query(collection(firestore, 'ai_sessions'), orderBy('updatedAt', 'desc'), limit(150)),
         ).catch(() => null),
       ]);
 
@@ -283,6 +328,9 @@ export default function AdminAIUsage() {
         ledgerSnap
           ? ledgerSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as AiCreditLedgerEntry)
           : [],
+      );
+      setUserAiSessions(
+        aiSessionsSnap ? aiSessionsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
       );
     } catch (error) {
       console.error('Failed to load AI usage:', error);
@@ -640,6 +688,49 @@ export default function AdminAIUsage() {
     () => businessRows.filter((b) => (b.name || '').toLowerCase().includes(searchTerm.toLowerCase())),
     [businessRows, searchTerm],
   );
+
+  const filteredAiSessions = useMemo(() => {
+    const filtered = userAiSessions.filter((session) => {
+      const q = chatSearchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        (session.businessName && session.businessName.toLowerCase().includes(q)) ||
+        (session.businessId && session.businessId.toLowerCase().includes(q)) ||
+        (session.userEmail && session.userEmail.toLowerCase().includes(q)) ||
+        (session.userName && session.userName.toLowerCase().includes(q)) ||
+        (session.lastPrompt && session.lastPrompt.toLowerCase().includes(q)) ||
+        (session.title && session.title.toLowerCase().includes(q));
+
+      const matchesPlan =
+        chatPlanFilter === 'all' ||
+        (session.plan && session.plan.toLowerCase() === chatPlanFilter.toLowerCase());
+
+      return matchesSearch && matchesPlan;
+    });
+
+    const grouped = new Map<string, any>();
+    for (const session of filtered) {
+      const bMatch = businessRows.find(b => b.id === session.businessId);
+      const storeName = bMatch?.name || session.businessName || 'Unnamed Store';
+      
+      if (!grouped.has(session.businessId)) {
+        grouped.set(session.businessId, {
+          ...session,
+          businessName: storeName,
+          allSessions: [session],
+          totalTurnsCount: session.turnsCount || (session.messages?.length ? Math.ceil(session.messages.length / 2) : 1),
+          totalTokens: (session.tokensIn || 0) + (session.tokensOut || 0),
+          bMatchTokens: bMatch?.windowTokens || 0,
+        });
+      } else {
+        const existing = grouped.get(session.businessId);
+        existing.allSessions.push(session);
+        existing.totalTurnsCount += session.turnsCount || (session.messages?.length ? Math.ceil(session.messages.length / 2) : 1);
+        existing.totalTokens += (session.tokensIn || 0) + (session.tokensOut || 0);
+      }
+    }
+    return Array.from(grouped.values());
+  }, [userAiSessions, chatSearchQuery, chatPlanFilter]);
 
   const activeToday = businessRows.filter((b) => b.todayUsage > 0).length;
   const rangeLabel = RANGES.find((r) => r.days === rangeDays)?.label ?? `${rangeDays} days`;
@@ -1755,6 +1846,153 @@ export default function AdminAIUsage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── User AI Conversations & Inquiries (Zen AI Inspector) ── */}
+      <Card className="border-slate-200 shadow-sm overflow-hidden">
+        <CardHeader className="border-b border-slate-100 pb-4 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <CardTitle className="text-xl">User AI Conversations & Inquiries</CardTitle>
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200">
+                  {filteredAiSessions.length} {filteredAiSessions.length === 1 ? 'session' : 'sessions'}
+                </Badge>
+              </div>
+              <CardDescription className="mt-1">
+                Real-time visibility into what merchants are asking Zen AI, which stores are chatting, and complete conversation transcripts.
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search prompts, stores, users..."
+                  className="pl-9 bg-white text-sm"
+                  value={chatSearchQuery}
+                  onChange={(e) => setChatSearchQuery(e.target.value)}
+                />
+              </div>
+              <select
+                value={chatPlanFilter}
+                onChange={(e) => setChatPlanFilter(e.target.value)}
+                className="h-10 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="all">All Plans</option>
+                <option value="starter">Starter</option>
+                <option value="growth">Growth</option>
+                <option value="scale">Scale</option>
+                <option value="free">Free</option>
+              </select>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {filteredAiSessions.length === 0 ? (
+            <div className="py-12 px-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                <MessageCircle className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-medium text-slate-700">No AI conversations found</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                {chatSearchQuery || chatPlanFilter !== 'all'
+                  ? 'No conversations match the current search or plan filter.'
+                  : 'As merchants ask questions or interact with Zen AI in their POS and inventory, their questions and full chat transcripts will appear here in real time.'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-slate-600">
+                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-3.5 font-medium">Store / Business</th>
+                    <th className="px-6 py-3.5 font-medium">Merchant User</th>
+                    <th className="px-6 py-3.5 font-medium">Plan</th>
+                    <th className="px-6 py-3.5 font-medium min-w-[280px]">Latest Question / Inquiry</th>
+                    <th className="px-6 py-3.5 font-medium text-center">Turns</th>
+                    <th className="px-6 py-3.5 font-medium text-center">Tokens & Cost</th>
+                    <th className="px-6 py-3.5 font-medium text-center">Last Active</th>
+                    <th className="px-6 py-3.5 font-medium text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filteredAiSessions.map((session) => {
+                    const totalTokens = session.totalTokens || session.bMatchTokens || 0;
+                    const costEstimate = estimateCostUsd(totalTokens, 0); // Using simple total for display
+                    return (
+                      <tr key={session.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-slate-900 leading-tight">
+                            {session.businessName || 'Unnamed Store'}
+                          </div>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            {session.businessId || 'No ID'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-medium text-slate-800 text-xs">
+                            {session.userName || 'Shop Operator'}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {session.userEmail || '—'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge variant="outline" className="capitalize text-xs font-normal">
+                            {session.plan || 'starter'}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="bg-slate-50 border border-slate-100 rounded-lg p-2 max-w-md">
+                            <p className="text-xs font-medium text-slate-800 line-clamp-2">
+                              "{session.lastPrompt || session.title || 'Conversation started'}"
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs">
+                            {session.totalTurnsCount} turns
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="text-xs font-medium text-slate-700">
+                            {formatTokens(totalTokens)} tok
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {formatUsd(costEstimate)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-500">
+                          {formatSessionTime(session.updatedAt || session.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs text-slate-700 hover:text-orange-600 hover:border-orange-200"
+                            onClick={() => {
+                              setSelectedSessionForModal(session);
+                              setIsTranscriptModalOpen(true);
+                            }}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Inspect Chat
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Per-tenant table ── */}
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="border-b border-slate-100 pb-4">
@@ -2012,10 +2250,144 @@ export default function AdminAIUsage() {
         </CardContent>
       </Card>
 
+      {/* ── Conversation Transcript Modal ── */}
+      <Dialog open={isTranscriptModalOpen} onOpenChange={setIsTranscriptModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-6">
+          <DialogHeader className="border-b pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg">
+                    {selectedSessionForModal?.businessName || 'Store'} Chat Transcript
+                  </DialogTitle>
+                  <DialogDescription className="text-xs mt-0.5">
+                    User: {selectedSessionForModal?.userName || 'Operator'} ({selectedSessionForModal?.userEmail || 'No email'}) • Plan: <span className="capitalize font-medium text-slate-700">{selectedSessionForModal?.plan || 'starter'}</span>
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 mt-3 pt-2 border-t border-slate-100">
+              <div>Store ID: <span className="font-mono text-slate-700">{selectedSessionForModal?.businessId}</span></div>
+              <div>Updated: <span className="font-medium text-slate-700">{formatSessionTime(selectedSessionForModal?.updatedAt || selectedSessionForModal?.createdAt)}</span></div>
+              <div>Tokens: <span className="font-medium text-slate-700">{formatTokens((selectedSessionForModal?.tokensIn || 0) + (selectedSessionForModal?.tokensOut || 0))}</span></div>
+              <div>Est. Cost: <span className="font-medium text-slate-700">{formatUsd(estimateCostUsd(selectedSessionForModal?.tokensIn || 0, selectedSessionForModal?.tokensOut || 0))}</span></div>
+            </div>
+          </DialogHeader>
+
+          {/* Chat Messages Body */}
+          <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-1">
+            {(!selectedSessionForModal?.allSessions || selectedSessionForModal.allSessions.length === 0) ? (
+              <div className="p-8 text-center text-slate-400 text-sm">
+                No recorded messages in this session.
+              </div>
+            ) : (
+              selectedSessionForModal.allSessions.slice().reverse().flatMap((sess: any, sIdx: number) => {
+                const msgs = sess.messages || [];
+                return [
+                  <div key={`sep-${sIdx}`} className="flex items-center gap-4 my-6">
+                    <div className="h-px bg-slate-200 flex-1" />
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                      {formatSessionTime(sess.updatedAt || sess.createdAt)}
+                    </span>
+                    <div className="h-px bg-slate-200 flex-1" />
+                  </div>,
+                  ...msgs.map((msg: any, mIdx: number) => {
+                    const isUser = msg.role === 'user';
+                    const isAssistant = msg.role === 'assistant';
+                    const isTool = msg.role === 'tool';
+                    return (
+                      <div
+                        key={`msg-${sIdx}-${mIdx}`}
+                        className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+                      >
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold ${
+                            isUser
+                              ? 'bg-slate-900 text-white'
+                              : isTool
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-orange-100 text-orange-600'
+                          }`}
+                        >
+                          {isUser ? <User className="w-3.5 h-3.5" /> : isTool ? <Wrench className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+                        </div>
+
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm leading-relaxed ${
+                            isUser
+                              ? 'bg-slate-900 text-white rounded-tr-none'
+                              : isTool
+                              ? 'bg-amber-50/80 text-amber-950 border border-amber-200 text-xs font-mono rounded-tl-none'
+                              : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
+                          }`}
+                        >
+                          <div className="text-[10px] font-semibold uppercase tracking-wider mb-1 opacity-70">
+                            {isUser ? (sess.userName || 'Merchant') : isTool ? 'Tool Result' : 'Zen AI'}
+                          </div>
+                          <div className="whitespace-pre-wrap break-words [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4">
+                            <Markdown className={isUser ? "text-white [&_strong]:text-white [&_a]:text-blue-200" : ""}>
+                              {extractMessageText(msg, isUser && mIdx === 0 && sess.lastPrompt ? sess.lastPrompt : undefined)}
+                            </Markdown>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ];
+              })
+            )}
+          </div>
+
+          <div className="border-t pt-3 flex justify-between items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5"
+              onClick={() => {
+                if (!selectedSessionForModal?.allSessions) return;
+                const transcriptText = selectedSessionForModal.allSessions.slice().reverse()
+                  .flatMap((sess: any) => {
+                    const messages = sess.messages || [];
+                    const sessionPrefix = `--- Session: ${formatSessionTime(sess.updatedAt || sess.createdAt)} ---\n`;
+                    const msgsText = messages.map((m: any) => `[${m.role?.toUpperCase()}]: ${extractMessageText(m)}`).join('\n\n');
+                    return sessionPrefix + msgsText;
+                  })
+                  .join('\n\n\n');
+                navigator.clipboard.writeText(transcriptText);
+                setCopiedSessionId(selectedSessionForModal.id);
+                setTimeout(() => setCopiedSessionId(null), 2000);
+                toast({ title: 'Transcript copied to clipboard' });
+              }}
+            >
+              {copiedSessionId === selectedSessionForModal?.id ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy Transcript
+                </>
+              )}
+            </Button>
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsTranscriptModalOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <p className="text-[11px] text-slate-400 text-center leading-relaxed max-w-2xl mx-auto pb-4">
-        Prompt text is never stored. Intents and keywords are derived as each turn arrives — the
-        keyword list can only ever record words from a fixed retail vocabulary, so customer names and
-        order details have no path into this page even when they are typed into the chat.
+        Conversations and inquiries are captured in real-time to help administrators understand merchant pain points, improve Zen AI responses, and provide prompt support.
       </p>
     </div>
   );

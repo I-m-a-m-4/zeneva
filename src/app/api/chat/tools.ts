@@ -608,6 +608,40 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
     // INVENTORY — read
     // ═══════════════════════════════════════════════════════════════════════
 
+    queryExpenses: tool({
+      description: 'Retrieve operating expenses logged by the business. Use this to read the expenses data.',
+      inputSchema: z.object({
+        limit: z.number().min(1).max(200).default(50).describe('Max results to fetch.'),
+      }),
+      execute: async ({ limit }) => {
+        try {
+          const snap = await db.collection('expenses')
+            .where('businessId', '==', businessId)
+            .limit(limit)
+            .get();
+          const expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          return { type: 'EXPENSES_LIST', total: expenses.length, expenses };
+        } catch (e: any) { return fail('Failed to query expenses', e); }
+      }
+    }),
+
+    queryPurchases: tool({
+      description: 'Retrieve supplier purchase orders logged by the business. Use this to read the purchases data.',
+      inputSchema: z.object({
+        limit: z.number().min(1).max(200).default(50).describe('Max results to fetch.'),
+      }),
+      execute: async ({ limit }) => {
+        try {
+          const snap = await db.collection('supplier_purchases')
+            .where('businessId', '==', businessId)
+            .limit(limit)
+            .get();
+          const purchases = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          return { type: 'PURCHASES_LIST', total: purchases.length, purchases };
+        } catch (e: any) { return fail('Failed to query purchases', e); }
+      }
+    }),
+
     queryProducts: tool({
       description:
         'Search and retrieve products from inventory (stock levels, prices, categories). Returns product cards. READ-ONLY. If the user named a product loosely or you are unsure which item they mean, use findSimilarProducts instead.',

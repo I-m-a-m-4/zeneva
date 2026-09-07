@@ -68,11 +68,11 @@ export async function sendNotificationToUser(
                 title: payload.title,
                 body: payload.body,
                 // zeneva.space, not zeneva.app — the latter is not a host we serve.
-                imageUrl: 'https://zeneva.space/zeneva.png',
+                imageUrl: 'https://zeneva.space/icon.svg',
             },
             data: {
                 url,
-                icon: '/zeneva.png',
+                icon: '/icon.svg',
                 campaignId: campaignId || '',
             },
             // Without this, the Firebase Android SDK defaults to an
@@ -84,13 +84,25 @@ export async function sendNotificationToUser(
                 notification: {
                     defaultVibrateTimings: true,
                     defaultSound: true,
+                    sound: 'default',
                 },
                 data: {
                     url,
                     campaignId: campaignId || '',
                 },
             },
+            apns: {
+                payload: {
+                    aps: {
+                        sound: 'default',
+                    }
+                }
+            },
             webpush: {
+                notification: {
+                    icon: 'https://zeneva.space/icon.svg',
+                    badge: 'https://zeneva.space/icon.svg',
+                },
                 fcmOptions: {
                     link: `https://zeneva.space${url.startsWith('/') ? url : '/' + url}`,
                 },
@@ -104,7 +116,7 @@ export async function sendNotificationToUser(
         if (response.failureCount > 0) {
             const failedTokens: string[] = [];
             const tokensToDelete: any[] = [];
-            
+
             response.responses.forEach((resp: any, idx: number) => {
                 if (!resp.success) {
                     failedTokens.push(tokens[idx]);
@@ -115,11 +127,11 @@ export async function sendNotificationToUser(
                     }
                 }
             });
-            
+
             if (failedTokens.length > 0) {
                 console.log('List of tokens that caused failures: ' + failedTokens);
             }
-            
+
             if (tokensToDelete.length > 0) {
                 console.log(`User ${userId} uninstalled the app or revoked tokens. Deleting ${tokensToDelete.length} invalid tokens.`);
                 // Delete invalid tokens from Firestore
@@ -129,11 +141,11 @@ export async function sendNotificationToUser(
                     batch.delete(tokenRef);
                 });
                 await batch.commit();
-                
+
                 // If they have no valid tokens left, we can mark them as uninstalled
                 const remainingTokensCount = tokens.length - tokensToDelete.length;
                 if (remainingTokensCount === 0) {
-                     await adminFirestore.collection('users').doc(userId).update({ hasUninstalledApp: true, uninstalledAt: new Date() });
+                    await adminFirestore.collection('users').doc(userId).update({ hasUninstalledApp: true, uninstalledAt: new Date() });
                 }
             }
         }
@@ -217,7 +229,7 @@ export async function broadcastToAllDevices(payload: {
             notification: {
                 title: payload.title,
                 body: payload.body,
-                imageUrl: 'https://zeneva.space/zeneva.png',
+                imageUrl: 'https://zeneva.space/icon.svg',
             },
             data: {
                 url,
@@ -240,6 +252,10 @@ export async function broadcastToAllDevices(payload: {
                 },
             },
             webpush: {
+                notification: {
+                    icon: 'https://zeneva.space/icon.svg',
+                    badge: 'https://zeneva.space/icon.svg',
+                },
                 fcmOptions: {
                     link: `https://zeneva.space${url.startsWith('/') ? url : '/' + url}`,
                 },
