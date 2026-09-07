@@ -193,7 +193,7 @@ export interface Supplier {
 
 // ======================== MAIN UNIFIED HUB ========================
 
-export default function ExpensesAndPurchasesPage() {
+function ExpensesAndPurchasesContent() {
   const searchParams = useSearchParams();
   const initialTabParam = searchParams.get('tab');
 
@@ -2129,5 +2129,20 @@ export default function ExpensesAndPurchasesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function ExpensesAndPurchasesPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-64 items-center justify-center">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm">Loading Expenses & Purchases...</p>
+        </div>
+      </div>
+    }>
+      <ExpensesAndPurchasesContent />
+    </React.Suspense>
   );
 }

@@ -77,7 +77,7 @@ const signupVideoSlides = [
   }
 ];
 
-export default function SignupPage() {
+function SignupPageContent() {
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
@@ -667,4 +667,16 @@ export default function SignupPage() {
       </div>
     </div>
   )
+}
+
+export default function SignupPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-screen w-full items-center justify-center flex-col gap-2 bg-background">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <SignupPageContent />
+    </React.Suspense>
+  );
 }
