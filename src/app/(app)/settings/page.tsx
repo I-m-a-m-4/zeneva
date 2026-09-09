@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, serverTimestamp, deleteDoc, collection, onSnapshot, query, orderBy, Timestamp, addDoc } from "firebase/firestore";
-import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star, Download, Info, Gauge } from 'lucide-react';
+import { Briefcase, Percent, Loader2, RefreshCw, Trash2, Globe, Landmark, Upload, Building, CreditCard, Banknote, ShieldQuestion, Palette, Truck, Package, Plus, MapPin, Award, Bell, Monitor, Smartphone, Tablet, Shield, ShieldCheck, LogOut, Star, Download, Info, Gauge, ShoppingCart } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     Select,
@@ -238,6 +238,9 @@ function SettingsPageContent() {
     const [closeTime, setCloseTime] = React.useState('18:00');
     const [preventSalesOutsideHours, setPreventSalesOutsideHours] = React.useState(false);
 
+    // POS Settings
+    const [allowPosPriceOverride, setAllowPosPriceOverride] = React.useState(false);
+
     // Effect to populate form fields when business data loads
     React.useEffect(() => {
         if (business?.settings) {
@@ -275,6 +278,8 @@ function SettingsPageContent() {
             setOpenTime(business.settings?.operatingHours?.openTime || '08:00');
             setCloseTime(business.settings?.operatingHours?.closeTime || '18:00');
             setPreventSalesOutsideHours(business.settings?.operatingHours?.preventSalesOutsideHours || false);
+
+            setAllowPosPriceOverride(business.settings?.allowPosPriceOverride || false);
         }
     }, [business]);
 
@@ -1671,6 +1676,33 @@ function SettingsPageContent() {
                             disabled={isSaving["operating-hours"]}
                         >
                             {isSaving["operating-hours"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('settings.saveHours')}
+                        </Button>
+                    </CardFooter>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-primary" />{t('settings.posSettings') || 'POS & Inventory'}</CardTitle>
+                        <CardDescription>{t('settings.posSettingsDescription') || 'Configure point of sale rules and checkout behavior.'}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label className="text-base text-stone-900">{t('settings.posPriceOverride') || 'Allow Price Override at Checkout'}</Label>
+                                <p className="text-sm text-muted-foreground">{t('settings.posPriceOverrideDescription') || 'When enabled, cashiers can click on a product price in the cart to negotiate and manually change the price for that specific sale.'}</p>
+                            </div>
+                            <Switch checked={allowPosPriceOverride} onCheckedChange={setAllowPosPriceOverride} />
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                        <Button
+                            type="button"
+                            onClick={() => handleSettingsSubmit('pos', {
+                                'settings.allowPosPriceOverride': allowPosPriceOverride
+                            })}
+                            disabled={isSaving["pos"]}
+                        >
+                            {isSaving["pos"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('common.save')}
                         </Button>
                     </CardFooter>
                 </Card>

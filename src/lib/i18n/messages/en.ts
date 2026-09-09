@@ -1012,6 +1012,8 @@ const en = {
     barcodeGeneratedHint: "This barcode is generated from the product's SKU.",
     addSkuForBarcode: 'Add an SKU to generate a barcode for this product.',
     stockHistoryTitle: 'Stock Adjustment & Sales History',
+    salesTrend: '6-Month Sales Volume Trend',
+    salesTrendHint: 'Track units sold month-by-month over the last 6 months to analyze demand trends.',
     serviceHistoryTitle: 'Service Activity & Sales History',
     stockHistoryHint:
       'Track manual additions, sales, and changes to stock quantity. Changes made offline will appear as "Syncing".',

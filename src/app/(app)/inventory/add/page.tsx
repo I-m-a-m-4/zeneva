@@ -105,6 +105,7 @@ export default function AddProductPage() {
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
 
   const [expiryDateInput, setExpiryDateInput] = React.useState("");
+  const [entryDateInput, setEntryDateInput] = React.useState("");
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [isTauri, setIsTauri] = React.useState(false);
   const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
@@ -383,6 +384,15 @@ export default function AddProductPage() {
         }
       }
 
+      // Parse backdate entry date if provided
+      let customCreatedAt: Date | undefined;
+      if (entryDateInput) {
+        const parsedEntry = new Date(entryDateInput);
+        if (!isNaN(parsedEntry.getTime())) {
+          customCreatedAt = parsedEntry;
+        }
+      }
+
       // 1. Prepare data
       const newProductId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
 
@@ -390,6 +400,7 @@ export default function AddProductPage() {
         ...values,
         id: newProductId,
         businessId: userProfile.businessId,
+        ...(customCreatedAt ? { createdAt: customCreatedAt } : {}),
       };
 
       // Remove undefined values
@@ -831,16 +842,78 @@ export default function AddProductPage() {
                   {categoryType === 'product' && (
                     <FormField
                       control={form.control}
-                      name="stock"
+                      name="expiryDate"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('inventory.stock')}</FormLabel>
+                        <FormItem className="flex flex-col pt-2">
+                          <FormLabel>{t('inventory.expiryDate')}</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="25" {...field} value={field.value ?? ''} />
+                            <Input
+                                type="date"
+                                value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val ? new Date(val) : undefined);
+                                }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
+                    />
+                  )}
+                  {categoryType === 'product' && (
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => {
+                        const currentStock = 0; // It's a new product, so current stock is always 0
+                        const newTotal = typeof field.value === 'number' ? field.value : parseInt(field.value || '0', 10);
+                        const addedAmount = newTotal;
+
+                        return (
+                          <FormItem className="sm:col-span-2 md:col-span-4">
+                            <FormLabel>{t('inventory.stock')}</FormLabel>
+                            
+                            {/* Visual Math UI similar to Quick Restock */}
+                            {typeof field.value !== 'undefined' && field.value !== '' && (
+                                <div className="flex items-center justify-between px-4 py-3 bg-muted rounded-lg mb-4">
+                                    <div className="text-center">
+                                        <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Current</p>
+                                        <p className="text-xl font-bold">0</p>
+                                    </div>
+                                    <div className="text-xl font-light text-muted-foreground">+</div>
+                                    <div className="text-center">
+                                        <p className="text-xs text-primary mb-1 uppercase tracking-wider font-semibold">Adding</p>
+                                        <p className="text-xl font-bold text-primary">{addedAmount > 0 ? `+${addedAmount}` : addedAmount}</p>
+                                    </div>
+                                    <div className="text-xl font-light text-muted-foreground">=</div>
+                                    <div className="text-center">
+                                        <p className="text-xs text-green-600 mb-1 uppercase tracking-wider font-semibold">New Total</p>
+                                        <p className="text-xl font-bold text-green-600">{newTotal}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <FormControl>
+                              <Input 
+                                  type="number" 
+                                  placeholder="25" 
+                                  {...field} 
+                                  value={field.value ?? ''} 
+                                  onChange={(e) => {
+                                      // Update the total stock
+                                      const val = e.target.value;
+                                      field.onChange(val === '' ? undefined : parseInt(val, 10));
+                                  }}
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs">
+                                Enter initial stock quantity.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )
+                      }}
                     />
                   )}
                   <FormField
@@ -882,8 +955,8 @@ export default function AddProductPage() {
                     )}
                   />
                 </div>
-                {categoryType === 'product' && (
-                  <div className="mt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                  {categoryType === 'product' && (
                     <div className="space-y-2">
                       <FormLabel>{t('inventory.expiryDate')}</FormLabel>
                       <FormControl>
@@ -896,10 +969,177 @@ export default function AddProductPage() {
                       </FormControl>
                       <p className="text-[0.8rem] text-muted-foreground">{t('inventory.expiryFormatHint')}</p>
                     </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <FormLabel className="flex items-center justify-between text-xs font-semibold">
+                      <span>Entry Date (Backdate)</span>
+                      <span className="text-[11px] text-muted-foreground font-normal">Optional</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="datetime-local"
+                        value={entryDateInput}
+                        onChange={(e) => setEntryDateInput(e.target.value)}
+                      />
+                    </FormControl>
+                    <p className="text-[0.8rem] text-muted-foreground">Pick a past date if recording items brought in on previous days.</p>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
+
+            {categoryType === 'product' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Product Type & Variants</CardTitle>
+                  <CardDescription>Does this item come in multiple sizes, colors, or options?</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="grid grid-cols-2 gap-4"
+                      >
+                        <Label
+                          htmlFor="type-single"
+                          className={cn(
+                            "flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                            field.value === 'single' && "border-primary bg-primary/5"
+                          )}
+                        >
+                          <RadioGroupItem value="single" id="type-single" className="sr-only" />
+                          <span className="font-semibold text-sm">Single Product</span>
+                          <span className="text-xs text-muted-foreground text-center mt-1">Standard standalone inventory item</span>
+                        </Label>
+
+                        <Label
+                          htmlFor="type-variant"
+                          className={cn(
+                            "flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                            field.value === 'variant' && "border-primary bg-primary/5"
+                          )}
+                        >
+                          <RadioGroupItem value="variant" id="type-variant" className="sr-only" />
+                          <span className="font-semibold text-sm">Has Variants</span>
+                          <span className="text-xs text-muted-foreground text-center mt-1">Options like Size, Color, Flavor</span>
+                        </Label>
+                      </RadioGroup>
+                    )}
+                  />
+
+                  {form.watch('type') === 'variant' && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Variant Options</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setVariantAttributes(prev => [...prev, { name: '', values: '' }])}
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> Add Option
+                        </Button>
+                      </div>
+
+                      {variantAttributes.map((attr, idx) => (
+                        <div key={idx} className="flex gap-2 items-start">
+                          <Input
+                            placeholder="Option Name (e.g. Size)"
+                            value={attr.name}
+                            onChange={(e) => {
+                              const updated = [...variantAttributes];
+                              updated[idx].name = e.target.value;
+                              setVariantAttributes(updated);
+                            }}
+                            className="w-1/3"
+                          />
+                          <Input
+                            placeholder="Values separated by commas (e.g. S, M, L, XL)"
+                            value={attr.values}
+                            onChange={(e) => {
+                              const updated = [...variantAttributes];
+                              updated[idx].values = e.target.value;
+                              setVariantAttributes(updated);
+                            }}
+                            className="flex-1"
+                          />
+                          {variantAttributes.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setVariantAttributes(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-destructive"
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+
+                      {variantMatrix.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Generated Variants ({variantMatrix.length})
+                          </Label>
+                          <div className="border rounded-md divide-y divide-border overflow-hidden">
+                            {variantMatrix.map((item, index) => (
+                              <div key={index} className="p-3 bg-muted/30 grid grid-cols-1 md:grid-cols-4 gap-2 items-center text-xs">
+                                <span className="font-semibold text-sm">{item.combo}</span>
+                                <div className="flex flex-col">
+                                  <span className="text-muted-foreground">SKU</span>
+                                  <Input
+                                    size={1}
+                                    className="h-7 text-xs"
+                                    value={item.sku}
+                                    onChange={(e) => {
+                                      const updated = [...variantMatrix];
+                                      updated[index].sku = e.target.value;
+                                      setVariantMatrix(updated);
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-muted-foreground">Price</span>
+                                  <Input
+                                    type="number"
+                                    className="h-7 text-xs"
+                                    value={item.price}
+                                    onChange={(e) => {
+                                      const updated = [...variantMatrix];
+                                      updated[index].price = parseFloat(e.target.value) || 0;
+                                      setVariantMatrix(updated);
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-muted-foreground">Stock</span>
+                                  <Input
+                                    type="number"
+                                    className="h-7 text-xs"
+                                    value={item.stock}
+                                    onChange={(e) => {
+                                      const updated = [...variantMatrix];
+                                      updated[index].stock = parseInt(e.target.value) || 0;
+                                      setVariantMatrix(updated);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
           <div className="grid auto-rows-max items-start gap-4 lg:gap-8">
             <Card>

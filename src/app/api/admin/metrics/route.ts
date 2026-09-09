@@ -51,16 +51,16 @@ export async function GET(req: Request) {
             db.collectionGroup('branches').get()
         ]);
 
-        const users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const businesses = businessesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const products = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const applications = applicationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const grants = grantsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const receipts = receiptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const purchases = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const downloadClicks = downloadClicksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const checkoutAttempts = checkoutAttemptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const branches = branchesSnap.docs.map(doc => ({ id: doc.id, businessId: doc.ref.parent.parent?.id, ...doc.data() }));
+        const users = usersSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const businesses = businessesSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const products = productsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const applications = applicationsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const grants = grantsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const receipts = receiptsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const purchases = purchasesSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const downloadClicks = downloadClicksSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const checkoutAttempts = checkoutAttemptsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const branches = branchesSnap.docs.map((doc: any) => ({ id: doc.id, businessId: doc.ref.parent.parent?.id, ...doc.data() }));
 
         const payload = {
             users,

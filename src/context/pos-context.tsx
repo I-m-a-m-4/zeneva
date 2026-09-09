@@ -210,6 +210,7 @@ interface POSContextType {
   addToCart: (product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => void;
   removeFromCart: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
+  updateCartItemPrice: (cartItemId: string, newPrice?: number, newCostPrice?: number) => void;
   clearCart: () => void;
   selectedCustomer: Customer | null;
   selectCustomer: (customer: Customer | null) => void;
@@ -3347,6 +3348,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setCart(prev => prev.map(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId ? { ...item, quantity } : item));
   }, [removeFromCart, cart, toast]);
 
+  const updateCartItemPrice = useCallback((cartItemId: string, newPrice?: number, newCostPrice?: number) => {
+    setCart(prev => prev.map(item => {
+      if ((item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId) {
+        return {
+          ...item,
+          isPriceOverride: newPrice !== undefined ? true : item.isPriceOverride,
+          product: newPrice !== undefined ? { ...item.product, price: newPrice } : item.product,
+          costPriceOverride: newCostPrice,
+        };
+      }
+      return item;
+    }));
+  }, []);
+
   const clearCart = useCallback(() => setCart([]), []);
 
   // --- Effects ---
@@ -4279,7 +4294,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isUserLoading: isUserLoading || (!!user && !profile), 
     user, firestore,
     isProfileReady,
-    cart, addToCart, removeFromCart, updateQuantity, clearCart,
+    cart, addToCart, removeFromCart, updateQuantity, updateCartItemPrice, clearCart,
     selectedCustomer, selectCustomer: setSelectedCustomer,
     subtotal, tax, taxRate, discount, total, setTax: setTaxRate, setDiscount,
       paymentMethod,

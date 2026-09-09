@@ -54,6 +54,8 @@ export interface CartItem {
     multiplier?: number;
     isPriceOverride?: boolean;
     originalPrice?: number;
+    costPriceOverride?: number;
+    originalCostPrice?: number;
     addedViaBarcode?: boolean;
 }
 
@@ -589,6 +591,7 @@ export interface BusinessInstance {
             closeTime: string; // HH:mm
             preventSalesOutsideHours: boolean;
         };
+        allowPosPriceOverride?: boolean;
     };
 }
 

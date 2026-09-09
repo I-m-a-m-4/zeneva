@@ -30,7 +30,22 @@ import {
   ChevronDown,
   Coins,
   Truck,
+  PackagePlus,
+  Sparkles
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  CartesianGrid,
+  Legend,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -83,6 +98,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
+import { QuickRestockModal } from '@/components/inventory/quick-restock-modal';
 import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { useBranch } from '@/context/branch-context';
@@ -278,12 +294,16 @@ function InventoryPageContent() {
   const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = React.useState(false);
+  const [bulkEditInitialMode, setBulkEditInitialMode] = React.useState<'grid' | 'ai'>('grid');
+  const [bulkEditInitialInstruction, setBulkEditInitialInstruction] = React.useState<string>('');
   const [searchTerm, setSearchTerm] = React.useState('');
   const [quickEditProduct, setQuickEditProduct] = React.useState<Product | null>(null);
+  const [quickRestockProduct, setQuickRestockProduct] = React.useState<Product | null>(null);
   const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('all');
   const [healthFilter, setHealthFilter] = React.useState<'all'|'missing-image'|'out-of-stock'|'low-stock'|'negative'|'missing-cost-price'>('all');
+  const [analyticsPeriod, setAnalyticsPeriod] = React.useState<'30d' | '90d' | '6m' | '1y' | 'all'>('30d');
   const [isManualSearching, setIsManualSearching] = React.useState(false);
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
@@ -458,7 +478,7 @@ function InventoryPageContent() {
       if (p.costPrice === undefined || p.costPrice === null || p.costPrice === 0) { missingCost++; isUnhealthy = true; }
       if (!isService(p)) {
         if (p.stock === 0) { oos++; isUnhealthy = true; }
-        if (p.stock !== undefined && p.stock > 0 && p.stock <= 5) { low++; isUnhealthy = true; }
+        if (p.stock !== undefined && p.stock > 0 && p.stock <= (p.lowStockThreshold ?? 5)) { low++; isUnhealthy = true; }
         if (p.stock !== undefined && p.stock < 0) { neg++; isUnhealthy = true; }
       }
       if (isUnhealthy) total++;
@@ -480,15 +500,190 @@ function InventoryPageContent() {
     return { missingImages: missing, outOfStock: oos, lowStock: low, negativeStock: neg, missingCostPrice: missingCost, total, score, availabilityScore, completenessScore, accuracyScore, costCompletenessScore };
   }, [products]);
 
+  const analyticsData = React.useMemo(() => {
+    if (!products || products.length === 0) {
+      return {
+        totalItems: 0,
+        totalUnits: 0,
+        totalRetailValue: 0,
+        totalCostValue: 0,
+        potentialProfit: 0,
+        marginPercent: 0,
+        outOfStockCount: 0,
+        belowReorderCount: 0,
+        topSellers: [],
+        categoryData: [],
+        fastMoversLow: [],
+        slowMovers: [],
+        expiringSoon: [],
+        stockFlow: []
+      };
+    }
+
+    let totalUnits = 0;
+    let totalRetailValue = 0;
+    let totalCostValue = 0;
+    let outOfStockCount = 0;
+    let belowReorderCount = 0;
+    const expiringSoon: Product[] = [];
+    const categoryMap = new Map<string, { name: string; value: number; stock: number }>();
+
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+    const periodCutoff = new Date();
+    if (analyticsPeriod === '30d') periodCutoff.setDate(now.getDate() - 30);
+    else if (analyticsPeriod === '90d') periodCutoff.setDate(now.getDate() - 90);
+    else if (analyticsPeriod === '6m') periodCutoff.setMonth(now.getMonth() - 6);
+    else if (analyticsPeriod === '1y') periodCutoff.setFullYear(now.getFullYear() - 1);
+    else if (analyticsPeriod === 'all') periodCutoff.setTime(0);
+
+    const productSalesMap = new Map<string, { product: Product; totalQuantity: number; totalRevenue: number }>();
+
+    products.forEach(p => {
+      productSalesMap.set(p.id, { product: p, totalQuantity: 0, totalRevenue: 0 });
+
+      const stock = p.stock || 0;
+      const price = p.retailPrice || p.price || 0;
+      const cost = p.costPrice || 0;
+      const reorderThreshold = p.lowStockThreshold ?? 5;
+
+      totalUnits += stock;
+      totalRetailValue += stock * price;
+      totalCostValue += stock * cost;
+
+      if (stock <= 0) outOfStockCount++;
+      if (stock > 0 && stock <= reorderThreshold) belowReorderCount++;
+
+      const catName = p.category?.trim() || 'Uncategorized';
+      if (!categoryMap.has(catName)) {
+        categoryMap.set(catName, { name: catName, value: 0, stock: 0 });
+      }
+      const catEntry = categoryMap.get(catName)!;
+      catEntry.value += stock * price;
+      catEntry.stock += stock;
+
+      if (p.expiryDate) {
+        const expDate = p.expiryDate instanceof Date ? p.expiryDate : (p.expiryDate as any).toDate ? (p.expiryDate as any).toDate() : new Date(p.expiryDate);
+        if (expDate <= thirtyDaysFromNow) {
+          expiringSoon.push(p);
+        }
+      }
+    });
+
+    expiringSoon.sort((a, b) => {
+      const dA = a.expiryDate instanceof Date ? a.expiryDate : new Date(a.expiryDate as any);
+      const dB = b.expiryDate instanceof Date ? b.expiryDate : new Date(b.expiryDate as any);
+      return dA.getTime() - dB.getTime();
+    });
+
+    if (receipts && receipts.length > 0) {
+      receipts.forEach(r => {
+        const rDate = r.createdAt ? (r.createdAt.toDate ? r.createdAt.toDate() : new Date(r.createdAt)) : null;
+        if (rDate && rDate >= periodCutoff) {
+          if (r.items && Array.isArray(r.items)) {
+            r.items.forEach(item => {
+              if (item.productId && productSalesMap.has(item.productId)) {
+                const entry = productSalesMap.get(item.productId)!;
+                entry.totalQuantity += (item.quantity || 1);
+                entry.totalRevenue += (item.quantity || 1) * (item.price || 0);
+              }
+            });
+          }
+        }
+      });
+    }
+
+    const allSalesEntries = Array.from(productSalesMap.values());
+
+    const topSellers = allSalesEntries
+      .filter(entry => entry.totalQuantity > 0)
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 7);
+
+    const fastMoversLow = allSalesEntries
+      .filter(entry => entry.totalQuantity >= 2 && entry.product.stock <= (entry.product.lowStockThreshold ?? 5))
+      .map(entry => entry.product);
+
+    const slowMovers = allSalesEntries
+      .filter(entry => entry.totalQuantity === 0 && (entry.product.stock || 0) > 0)
+      .sort((a, b) => ((b.product.stock || 0) * (b.product.price || 0)) - ((a.product.stock || 0) * (a.product.price || 0)))
+      .slice(0, 5)
+      .map(entry => entry.product);
+
+    const categoryData = Array.from(categoryMap.values())
+      .filter(c => c.value > 0 || c.stock > 0)
+      .sort((a, b) => b.value - a.value);
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const numMonths = analyticsPeriod === '30d' ? 1 : analyticsPeriod === '90d' ? 3 : analyticsPeriod === '1y' ? 12 : 6;
+    const stockFlow: { month: string; salesUnits: number; restockUnits: number }[] = [];
+    
+    for (let i = numMonths - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthLabel = numMonths <= 3 
+        ? `${d.getDate()} ${monthNames[d.getMonth()]}`
+        : `${monthNames[d.getMonth()]}`;
+      const targetMonth = d.getMonth();
+      const targetYear = d.getFullYear();
+
+      let salesUnits = 0;
+      if (receipts) {
+        receipts.forEach(r => {
+          const rDate = r.createdAt ? (r.createdAt.toDate ? r.createdAt.toDate() : new Date(r.createdAt)) : null;
+          if (rDate && rDate.getMonth() === targetMonth && rDate.getFullYear() === targetYear) {
+            if (r.items) {
+              r.items.forEach(item => { salesUnits += (item.quantity || 1); });
+            }
+          }
+        });
+      }
+
+      let restockUnits = 0;
+      products.forEach(p => {
+        const pDate = p.createdAt ? (p.createdAt.toDate ? p.createdAt.toDate() : new Date(p.createdAt)) : null;
+        if (pDate && pDate.getMonth() === targetMonth && pDate.getFullYear() === targetYear) {
+          restockUnits += (p.stock || 0);
+        }
+      });
+
+      stockFlow.push({
+        month: monthLabel,
+        salesUnits,
+        restockUnits
+      });
+    }
+
+    const potentialProfit = totalRetailValue - totalCostValue;
+    const marginPercent = totalRetailValue > 0 ? (potentialProfit / totalRetailValue) * 100 : 0;
+
+    return {
+      totalItems: products.length,
+      totalUnits,
+      totalRetailValue,
+      totalCostValue,
+      potentialProfit,
+      marginPercent,
+      outOfStockCount,
+      belowReorderCount,
+      topSellers,
+      categoryData,
+      fastMoversLow,
+      slowMovers,
+      expiringSoon,
+      stockFlow
+    };
+  }, [products, receipts, analyticsPeriod]);
+
   const displayedProducts = React.useMemo(() => {
     if (activeTab === 'all') return filteredProducts;
 
-    // Health tab filtering. Mirrors healthMetrics above exactly — a tile that
-    // counts 4 and a table that lists 7 is worse than either alone.
     return filteredProducts.filter(p => {
       if (healthFilter === 'missing-image') return !p.imageUrl;
       if (healthFilter === 'out-of-stock') return !isService(p) && p.stock === 0;
-      if (healthFilter === 'low-stock') return !isService(p) && p.stock !== undefined && p.stock > 0 && p.stock <= 5;
+      if (healthFilter === 'low-stock') return !isService(p) && p.stock !== undefined && p.stock > 0 && p.stock <= (p.lowStockThreshold ?? 5);
       if (healthFilter === 'negative') return !isService(p) && p.stock !== undefined && p.stock < 0;
       if (healthFilter === 'missing-cost-price') return p.costPrice === undefined || p.costPrice === null || p.costPrice === 0;
 
@@ -672,21 +867,27 @@ function InventoryPageContent() {
         </div>
         <div className="hidden md:flex items-center gap-2">
             {selectedProductIds.length > 0 && canManageStock && (
-              <>
-                <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => setIsBulkEditDialogOpen(true)}>
-                  <Edit className="h-3.5 w-3.5" />
-                  <span className="sm:whitespace-nowrap">
-                    {t('inventory.bulkEditCount', { count: selectedProductIds.length })}
-                  </span>
-                </Button>
-                <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="sm:whitespace-nowrap">
-                    {t('inventory.deleteCount', { count: selectedProductIds.length })}
-                  </span>
-                </Button>
-              </>
-            )}
+               <>
+                 <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => { setBulkEditInitialMode('grid'); setBulkEditInitialInstruction(''); setIsBulkEditDialogOpen(true); }}>
+                   <Edit className="h-3.5 w-3.5" />
+                   <span className="sm:whitespace-nowrap">
+                     {t('inventory.bulkEditCount', { count: selectedProductIds.length })}
+                   </span>
+                 </Button>
+                 <Button variant="default" size="sm" className="h-9 gap-1 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground hover:bg-primary/90" onClick={() => { setBulkEditInitialMode('ai'); setBulkEditInitialInstruction(''); setIsBulkEditDialogOpen(true); }}>
+                   <Sparkles className="h-3.5 w-3.5" />
+                   <span className="sm:whitespace-nowrap">
+                     AI Bulk Edit
+                   </span>
+                 </Button>
+                 <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                   <Trash2 className="h-3.5 w-3.5" />
+                   <span className="sm:whitespace-nowrap">
+                     {t('inventory.deleteCount', { count: selectedProductIds.length })}
+                   </span>
+                 </Button>
+               </>
+             )}
 
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
@@ -895,6 +1096,14 @@ function InventoryPageContent() {
                   </DropdownMenuItem>
                 )}
 
+                {canManageStock && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/inventory/suppliers">
+                      <Truck className="me-2 h-4 w-4" /> Suppliers & Purchase Orders
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+
                 <DropdownMenuSeparator />
 
                 {canManageStock && (
@@ -910,16 +1119,311 @@ function InventoryPageContent() {
       </div>
 
       <div className="w-full mb-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:max-w-md">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:max-w-lg">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="all">{t('inventory.tabAllProducts')}</TabsTrigger>
             <TabsTrigger value="health" className="flex items-center gap-1.5">
               {t('inventory.tabHealth')}
               {healthMetrics.total > 0 && <span className="flex h-2 w-2 rounded-full bg-red-500" />}
             </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-1.5">
+              Analytics
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
+
+      {activeTab === 'analytics' && (
+        <div className="space-y-6 mb-6">
+          {/* Header Controls: Time Period Filter */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/60 p-4 rounded-xl border">
+            <div>
+              <h2 className="text-lg font-bold tracking-tight">Inventory Analytics & Insights</h2>
+              <p className="text-xs text-muted-foreground">Deep dive into stock valuation, movement trends, category distribution, and restock priorities.</p>
+            </div>
+            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border text-xs">
+              <span className="text-[11px] font-semibold text-muted-foreground px-2">Period:</span>
+              {[
+                { id: '30d', label: '30 Days' },
+                { id: '90d', label: '90 Days' },
+                { id: '6m', label: '6 Months' },
+                { id: '1y', label: '1 Year' },
+                { id: 'all', label: 'All Time' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setAnalyticsPeriod(p.id as any)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md font-medium transition-all",
+                    analyticsPeriod === p.id 
+                      ? "bg-background text-foreground shadow-sm font-semibold" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Top 6 KPI Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <Card className="bg-card/50 backdrop-blur-sm border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Products</p>
+                <p className="text-2xl font-bold mt-1">{analyticsData.totalItems}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{analyticsData.totalUnits.toLocaleString()} units in stock</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 backdrop-blur-sm border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Retail Valuation</p>
+                <p className="text-xl font-bold mt-1 text-emerald-600 truncate">{currencySymbol}{analyticsData.totalRetailValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Total retail value</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 backdrop-blur-sm border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Cost Valuation</p>
+                <p className="text-xl font-bold mt-1 text-blue-600 truncate">{currencySymbol}{analyticsData.totalCostValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Total capital invested</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 backdrop-blur-sm border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Profit Potential</p>
+                <p className="text-xl font-bold mt-1 text-teal-600 truncate">{currencySymbol}{analyticsData.potentialProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">~{analyticsData.marginPercent.toFixed(1)}% Gross Margin</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 backdrop-blur-sm border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Reorder Alerts</p>
+                <p className="text-2xl font-bold mt-1 text-amber-500">{analyticsData.belowReorderCount}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Below reorder point</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 backdrop-blur-sm border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Stockouts</p>
+                <p className="text-2xl font-bold mt-1 text-rose-500">{analyticsData.outOfStockCount}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Zero stock remaining</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Charts Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Stock Movement Flow Chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center justify-between">
+                  <span>Stock Flow Movement</span>
+                  <Badge variant="outline" className="text-xs font-normal">Sales vs Restocks</Badge>
+                </CardTitle>
+                <CardDescription>Units sold (outflow) vs. Units restocked (inflow) in period</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData.stockFlow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="month" fontSize={11} tickLine={false} />
+                    <YAxis fontSize={11} tickLine={false} />
+                    <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                    <Bar dataKey="salesUnits" name="Units Sold" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="restockUnits" name="Units Restocked" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Top Selling Products */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center justify-between">
+                  <span>Top Selling Products</span>
+                  <Badge variant="outline" className="text-xs font-normal">By Quantity</Badge>
+                </CardTitle>
+                <CardDescription>Best-performing inventory items in selected period</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[280px]">
+                {analyticsData.topSellers.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart layout="vertical" data={analyticsData.topSellers.map(s => ({ name: s.product.name, units: s.totalQuantity }))} margin={{ top: 10, right: 20, left: 30, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis type="number" fontSize={11} tickLine={false} />
+                      <YAxis dataKey="name" type="category" fontSize={11} width={90} tickLine={false} />
+                      <RechartsTooltip contentStyle={{ borderRadius: '8px' }} />
+                      <Bar dataKey="units" name="Units Sold" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                    No sales recorded for this time period
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Category Capital Distribution */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">Inventory Valuation by Category</CardTitle>
+                <CardDescription>Where your capital is currently tied up across product categories</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analyticsData.categoryData.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div className="h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={analyticsData.categoryData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={85}
+                            paddingAngle={2}
+                          >
+                            {analyticsData.categoryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'][index % 7]} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip formatter={(val: any) => `${currencySymbol}${Number(val).toLocaleString()}`} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-2">
+                      {analyticsData.categoryData.map((cat, idx) => {
+                        const pct = analyticsData.totalRetailValue > 0 
+                          ? ((cat.value / analyticsData.totalRetailValue) * 100).toFixed(1)
+                          : '0';
+                        return (
+                          <div key={cat.name} className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/40 border">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'][idx % 7] }} />
+                              <span className="font-medium truncate max-w-[150px]">{cat.name}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold">{currencySymbol}{cat.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                              <span className="text-muted-foreground ml-2">({pct}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-sm text-muted-foreground">No category data available</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Actionable Intelligence Widgets */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Fast Movers Running Low */}
+            <Card className="border-amber-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                  <span>⚡</span> Fast Movers Needing Restock
+                </CardTitle>
+                <CardDescription>High sales velocity items low on stock</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {analyticsData.fastMoversLow.length > 0 ? (
+                  analyticsData.fastMoversLow.map(p => (
+                    <div key={p.id} className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-semibold">{p.name}</p>
+                        <p className="text-[11px] text-muted-foreground">Reorder Point: {p.lowStockThreshold ?? 5} units</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="destructive" className="text-[10px]">
+                          {p.stock} remaining
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">All fast-moving products have healthy stock levels 👍</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Slow Moving / Stagnant Capital */}
+            <Card className="border-blue-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <span>💤</span> Slow-Moving Capital
+                </CardTitle>
+                <CardDescription>High value stock with 0 sales in period</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {analyticsData.slowMovers.length > 0 ? (
+                  analyticsData.slowMovers.map(p => (
+                    <div key={p.id} className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-semibold">{p.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{p.stock} in stock</p>
+                      </div>
+                      <div className="text-right font-medium">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">
+                          {currencySymbol}{((p.stock || 0) * (p.price || 0)).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No slow-moving inventory detected</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Expiring Soon */}
+            <Card className="border-rose-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                  <span>⏳</span> Expiring Soon (Next 30 Days)
+                </CardTitle>
+                <CardDescription>Stock approaching expiration</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {analyticsData.expiringSoon.length > 0 ? (
+                  analyticsData.expiringSoon.slice(0, 5).map((p) => {
+                    const expDate = p.expiryDate instanceof Date ? p.expiryDate : new Date(p.expiryDate as any);
+                    const daysRemaining = Math.ceil((expDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <div key={p.id} className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-semibold">{p.name}</p>
+                          <p className="text-[11px] text-muted-foreground">Stock: {p.stock || 0} units</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={daysRemaining <= 7 ? 'destructive' : 'secondary'} className="text-[10px]">
+                            {daysRemaining <= 0 ? 'EXPIRED' : `${daysRemaining}d left`}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No products expiring soon 🎉</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'health' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -1081,7 +1585,64 @@ function InventoryPageContent() {
         </DialogContent>
       </Dialog>
 
-      <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
+      {activeTab === 'health' && displayedProducts.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-primary/10 to-blue-500/10 border border-primary/20 rounded-xl p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary/20 text-primary rounded-xl shrink-0">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                Fix {displayedProducts.length} {healthFilter === 'missing-cost-price' ? 'Missing Cost Price' : healthFilter === 'out-of-stock' ? 'Out of Stock' : healthFilter === 'low-stock' ? 'Low Stock' : healthFilter === 'negative' ? 'Negative Stock' : healthFilter === 'missing-image' ? 'Missing Image' : 'Inventory Health'} Issues
+                <Badge variant="secondary" className="text-[10px] font-medium">{displayedProducts.length} affected</Badge>
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Select all affected items or use Zeneva AI to bulk estimate cost prices, reset stock levels, or adjust reorder thresholds in seconds.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedProductIds(displayedProducts.map(p => p.id));
+                toast({ title: "Selected issue products", description: `${displayedProducts.length} products selected for bulk editing.` });
+              }}
+              className="text-xs flex-1 sm:flex-none"
+            >
+              Select All ({displayedProducts.length})
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const allIds = displayedProducts.map(p => p.id);
+                setSelectedProductIds(allIds);
+                setBulkEditInitialMode('ai');
+                if (healthFilter === 'missing-cost-price') {
+                  setBulkEditInitialInstruction('Estimate cost prices at a 30% margin off the selling price');
+                } else if (healthFilter === 'negative') {
+                  setBulkEditInitialInstruction('Set stock to 0 for these products');
+                } else if (healthFilter === 'low-stock') {
+                  setBulkEditInitialInstruction('Set low-stock alert to 15 for these products');
+                } else if (healthFilter === 'out-of-stock') {
+                  setBulkEditInitialInstruction('Set stock to 25 for these products');
+                } else {
+                  setBulkEditInitialInstruction('');
+                }
+                setIsBulkEditDialogOpen(true);
+              }}
+              className="text-xs gap-1.5 flex-1 sm:flex-none bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Fix with AI & Bulk Edit
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {activeTab !== 'analytics' && (
+        <Card className="flex-1 flex flex-col min-h-0 w-full overflow-hidden mb-2">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             {t('inventory.productsTitle')}
@@ -1300,6 +1861,9 @@ function InventoryPageContent() {
                                 <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>
                                   <Edit className="me-2 h-4 w-4" /> {t('inventory.quickEdit')}
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setQuickRestockProduct(product)}>
+                                  <PackagePlus className="me-2 h-4 w-4" /> Quick Restock
+                                </DropdownMenuItem>
                               </>
                             )}
                             <DropdownMenuItem onSelect={() => setBarcodeProduct(product)} disabled={!product.sku}>
@@ -1417,6 +1981,7 @@ function InventoryPageContent() {
           </CardFooter>
         )}
       </Card>
+      )}
       
       {business && (
         <SmartImportDialog
@@ -1454,12 +2019,21 @@ function InventoryPageContent() {
         />
       )}
 
+      {quickRestockProduct && (
+        <QuickRestockModal
+          product={quickRestockProduct}
+          onClose={() => setQuickRestockProduct(null)}
+        />
+      )}
+
       {isBulkEditDialogOpen && (
         <BulkEditDialog
           productIds={selectedProductIds}
           isOpen={isBulkEditDialogOpen}
           onOpenChange={setIsBulkEditDialogOpen}
           onSuccess={handleBulkEditSuccess}
+          initialMode={bulkEditInitialMode}
+          initialInstruction={bulkEditInitialInstruction}
         />
       )}
 

@@ -24,9 +24,18 @@ interface BulkEditDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSuccess: () => void;
+  initialMode?: 'grid' | 'ai';
+  initialInstruction?: string;
 }
 
-export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuccess }: BulkEditDialogProps) {
+export default function BulkEditDialog({
+  productIds,
+  isOpen,
+  onOpenChange,
+  onSuccess,
+  initialMode = 'grid',
+  initialInstruction = '',
+}: BulkEditDialogProps) {
   const { products, currentUserProfile, currencySymbol, triggerRefresh } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -36,13 +45,8 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
 
   /**
    * Which half of the dialog is showing.
-   *
-   * The hand-editing grid stays the default: it is what somebody who ticked six
-   * products came here for, and it costs nothing. The instruction tab is the answer to
-   * the case this grid cannot serve at all — a thousand cost prices, where the rows
-   * are not the point and typing is not an option.
    */
-  const [mode, setMode] = React.useState<'grid' | 'ai'>('grid');
+  const [mode, setMode] = React.useState<'grid' | 'ai'>(initialMode);
 
   const productsToEdit = React.useMemo(() => {
     if (!products) return [];
@@ -51,6 +55,7 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
 
   React.useEffect(() => {
     if (isOpen) {
+      setMode(initialMode);
       const initialEdits: Record<string, { stock: number; price: number }> = {};
       productsToEdit.forEach(p => {
         if (p) {
@@ -59,7 +64,7 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
       });
       setEditedProducts(initialEdits);
     }
-  }, [isOpen, productsToEdit]);
+  }, [isOpen, initialMode, productsToEdit]);
 
   const handleFieldChange = (productId: string, field: 'stock' | 'price', value: string) => {
     const numericValue = field === 'stock' ? parseInt(value, 10) : parseFloat(value);
@@ -165,6 +170,7 @@ export default function BulkEditDialog({ productIds, isOpen, onOpenChange, onSuc
           <div className="py-2">
             <AiBulkEdit
               selectedIds={productIds}
+              initialInstruction={initialInstruction}
               onDone={() => {
                 onSuccess();
                 onOpenChange(false);

@@ -29,7 +29,6 @@ interface QuickEditDialogProps {
 const makeQuickEditSchema = (t: (key: string) => string) => z.object({
   price: z.coerce.number().min(0, t('inventory.valPricePositive')),
   costPrice: z.coerce.number().min(0, t('inventory.valCostPositive')).optional(),
-  stock: z.coerce.number().int(t('inventory.valStockWhole')).min(0),
   material: z.string().optional(),
   variantValue: z.string().optional(),
   baseUnit: z.string().optional(),
@@ -61,7 +60,6 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
     defaultValues: {
       price: 0,
       costPrice: 0,
-      stock: 0,
       material: '',
       variantValue: '',
       baseUnit: '',
@@ -80,7 +78,6 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
       form.reset({
         price: product.price || 0,
         costPrice: product.costPrice || 0,
-        stock: product.stock || 0,
         material: (product as any).material || '',
         variantValue: product.variantValue || '',
         baseUnit: product.baseUnit || '',
@@ -105,7 +102,6 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
       if (canManageProduct) {
         dataToUpdate.price = values.price;
         dataToUpdate.costPrice = values.costPrice;
-        dataToUpdate.stock = values.stock;
         dataToUpdate.material = values.material;
         dataToUpdate.variantValue = values.variantValue;
         dataToUpdate.baseUnit = values.baseUnit;
@@ -115,29 +111,6 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
         dataToUpdate.brand = values.brand;
         dataToUpdate.packaging = values.packaging;
         dataToUpdate.spiceLevel = values.spiceLevel;
-
-        if (values.stock !== product.stock) {
-          addToQueue({
-            type: 'add-audit-log',
-            payload: {
-              businessId: business.id,
-              userId: userProfile.id,
-              userName: userProfile.name,
-              userEmail: userProfile.email,
-              userRole: userProfile.role,
-              action: 'product.stock_adjustment',
-              entityType: 'Product',
-              entityId: product.id,
-              details: {
-                entityName: product.name,
-                oldStock: product.stock,
-                newStock: values.stock,
-                adjustment: values.stock - (product.stock || 0),
-                reason: 'Manual Quick Edit'
-              }
-            }
-          }, `Logging stock adjustment for ${product.name}`);
-        }
 
         /*
          * Price and cost changes, recorded as a before/after pair.
@@ -163,7 +136,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
           addToQueue({
             type: 'add-audit-log',
             payload: {
-              businessId: business.id,
+              businessId: business?.id || '',
               userId: userProfile.id,
               userName: userProfile.name,
               userEmail: userProfile.email,
@@ -247,27 +220,7 @@ export default function QuickEditDialog({ product, userProfile, isOpen, onOpenCh
                 </FormItem>
               )}
             />
-            {product?.categoryType !== 'service' && (
-              <FormField
-                control={form.control}
-                name="stock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('inventory.stock')}</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} disabled={!canManageProduct} />
-                    </FormControl>
-                    {product?.type === 'composite' && (
-                      <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200 mt-1">
-                        {t('inventory.compositeStockNote')}
-                      </p>
-                    )}
-                    {!canManageProduct && <p className="text-xs text-muted-foreground pt-1">{t('inventory.noStockPermission')}</p>}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+
             <div className="grid grid-cols-2 gap-4 border-t pt-4">
                 <FormField
                     control={form.control}

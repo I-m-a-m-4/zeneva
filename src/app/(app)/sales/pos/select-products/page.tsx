@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -25,6 +25,7 @@ import { ImageDialog } from "@/components/shared/image-dialog";
 import { CatalogUnavailable } from "@/components/shared/catalog-unavailable";
 import HeldSalesDrawer from "@/components/pos/held-sales-drawer";
 import { useI18n } from "@/context/i18n-context";
+import { Label } from "@/components/ui/label";
 
 
 function ProductCardSkeleton() {
@@ -137,18 +138,116 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
 
 ProductItem.displayName = 'ProductItem';
 
+const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeFromCart, updateCartItemPrice, t, allowPosPriceOverride }: any) => {
+    const [isEditingPrice, setIsEditingPrice] = React.useState(false);
+    const [editSalePrice, setEditSalePrice] = React.useState(item.product.price.toString());
+    const [editCostPrice, setEditCostPrice] = React.useState(item.costPriceOverride ?? item.product.costPrice ?? '0');
+
+    const handleSavePrices = () => {
+        const parsedSale = parseFloat(editSalePrice);
+        const parsedCost = parseFloat(editCostPrice);
+        if (!isNaN(parsedSale) && parsedSale >= 0) {
+            updateCartItemPrice(
+                cartItemId, 
+                parsedSale, 
+                !isNaN(parsedCost) && parsedCost >= 0 ? parsedCost : undefined
+            );
+        }
+        setIsEditingPrice(false);
+    };
+
+    return (
+        <div className="flex justify-between items-center py-1">
+            <div className="flex-1 me-4">
+                <p className="font-medium text-sm line-clamp-1">
+                    {item.product.name}
+                    {item.unit && <Badge variant="secondary" className="ms-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
+                </p>
+                {allowPosPriceOverride ? (
+                    <Dialog open={isEditingPrice} onOpenChange={setIsEditingPrice}>
+                        <DialogTrigger asChild>
+                            <p className="text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors underline decoration-dotted underline-offset-2">
+                                <span className="mr-0.5">{currencySymbol}</span>
+                                {(item.product.price * item.quantity).toLocaleString()}
+                            </p>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[350px]">
+                            <DialogHeader>
+                                <DialogTitle>{t('pos.editPriceTitle') || "Edit Item Price"}</DialogTitle>
+                            </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="salePrice">{t('pos.salePrice') || "Sale Price"}</Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
+                                    <Input
+                                        id="salePrice"
+                                        type="number"
+                                        className="pl-8"
+                                        value={editSalePrice}
+                                        onChange={(e) => setEditSalePrice(e.target.value)}
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="costPrice">{t('pos.costPriceOverride') || "Cost Price"}</Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
+                                    <Input
+                                        id="costPrice"
+                                        type="number"
+                                        className="pl-8"
+                                        value={editCostPrice}
+                                        onChange={(e) => setEditCostPrice(e.target.value)}
+                                        min="0"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">Override the cost price for this specific transaction to calculate profit accurately.</p>
+                            </div>
+                        </div>
+                            <DialogFooter>
+                                <Button onClick={handleSavePrices}>{t('common.save') || "Save"}</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                ) : (
+                    <p className="text-xs text-muted-foreground">
+                        <span className="mr-0.5">{currencySymbol}</span>
+                        {(item.product.price * item.quantity).toLocaleString()}
+                    </p>
+                )}
+            </div>
+            <div className="flex items-center gap-2">
+                <Input
+                    type="number"
+                    value={item.quantity}
+                    onChange={(e) => updateQuantity(cartItemId, parseInt(e.target.value))}
+                    className="w-16 h-8 text-center"
+                    min="1"
+                />
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeFromCart(cartItemId)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+            </div>
+        </div>
+    );
+};
+
 const CartContents = () => {
-    const { 
+    const {
         cart, 
         removeFromCart, 
-        updateQuantity, 
+        updateQuantity,
+        updateCartItemPrice,
         subtotal, 
         currencySymbol, 
         clearCart,
         holdCurrentSale,
         heldSales,
         resumeHeldSale,
-        deleteHeldSale
+        deleteHeldSale,
+        business
     } = usePOS();
     const { t } = useI18n();
 
@@ -199,27 +298,17 @@ const CartContents = () => {
                     {cart.map(item => {
                         const cartItemId = item.unit ? `${item.product.id}-${item.unit}` : item.product.id;
                         return (
-                            <div key={cartItemId} className="flex justify-between items-center">
-                                <div className="flex-1 me-4">
-                                    <p className="font-medium text-sm line-clamp-1">
-                                        {item.product.name}
-                                        {item.unit && <Badge variant="secondary" className="ms-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground"><span className="mr-0.5">{currencySymbol}</span>{(item.product.price * item.quantity).toLocaleString()}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        type="number"
-                                        value={item.quantity}
-                                        onChange={(e) => updateQuantity(cartItemId, parseInt(e.target.value))}
-                                        className="w-16 h-8 text-center"
-                                        min="1"
-                                    />
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeFromCart(cartItemId)}>
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                </div>
-                            </div>
+                            <CartItemRow 
+                                key={cartItemId}
+                                item={item}
+                                cartItemId={cartItemId}
+                                currencySymbol={currencySymbol}
+                                updateQuantity={updateQuantity}
+                                removeFromCart={removeFromCart}
+                                updateCartItemPrice={updateCartItemPrice}
+                                t={t}
+                                allowPosPriceOverride={business?.settings?.allowPosPriceOverride ?? false}
+                            />
                         );
                     })}
                     <Separator />

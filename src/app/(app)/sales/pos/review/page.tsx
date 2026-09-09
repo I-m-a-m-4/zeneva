@@ -156,7 +156,7 @@ function ReviewPageContent() {
         
         const itemsForReceipt = cart.map(cartItem => {
             const masterProduct = products.find(p => p.id === cartItem.product.id);
-            const costPrice = masterProduct?.costPrice || 0;
+            const costPrice = cartItem.costPriceOverride ?? (masterProduct?.costPrice || 0);
             
             // SECURITY: If not a manual override, use the price from the master product list
             let finalPrice = cartItem.product.price;

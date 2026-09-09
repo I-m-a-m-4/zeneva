@@ -55,25 +55,36 @@ import {
 } from '@/lib/import/bulk-ops';
 
 const EXAMPLES = [
+  'Estimate cost prices at a 30% margin off selling price',
   'Raise all my cost prices by 8%',
   'Set a 35% margin on everything in Drinks',
   'Round all my selling prices to the nearest 50',
   'Cut prices 10% on anything with stock over 100',
+  'Set stock to 0 for these products',
+  'Set low-stock alert to 15 for these products',
 ];
 
 export default function AiBulkEdit({
   selectedIds,
   onDone,
+  initialInstruction = '',
 }: {
   /** Products the owner has ticked. Substituted when the instruction says "these". */
   selectedIds: string[];
   onDone: () => void;
+  initialInstruction?: string;
 }) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { products, currencySymbol, addToQueue, currentUserProfile, triggerRefresh } = usePOS();
 
-  const [instruction, setInstruction] = React.useState('');
+  const [instruction, setInstruction] = React.useState(initialInstruction);
+
+  React.useEffect(() => {
+    if (initialInstruction) {
+      setInstruction(initialInstruction);
+    }
+  }, [initialInstruction]);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [preview, setPreview] = React.useState<BulkPreview | null>(null);

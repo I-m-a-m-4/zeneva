@@ -64,6 +64,7 @@ import { DashboardCarousel } from '@/components/home/dashboard-carousel';
 import { ZenAIInsights } from '@/components/home/zen-ai-insights';
 import { PricingPlans } from '@/components/home/pricing-plans';
 import { SecurityBadges } from '@/components/home/security-badges';
+import { NativeRedirectHandler } from '@/components/home/native-redirect-handler';
 
 // `question`/`answer` stay English on purpose: they are what the FAQPage
 // JSON-LD below publishes to crawlers, and the static export is prerendered in
@@ -218,6 +219,7 @@ export default function Home() {
                         type="application/ld+json"
                         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
                     />
+                    <NativeRedirectHandler />
                     <MarketingHeader />
 
                     {/* Main Hero Section */}

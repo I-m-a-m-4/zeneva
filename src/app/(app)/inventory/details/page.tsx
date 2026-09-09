@@ -19,7 +19,10 @@ import {
     Layers,
     QrCode,
     AlertCircle,
-    Info
+    Info,
+    CalendarIcon,
+    ArrowDownLeft,
+    ArrowUpRight
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -58,6 +61,10 @@ import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, subMonths, subDays, startOfMonth, parseISO } from 'date-fns';
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { isCoreFeatureBlocked } from '@/lib/plan';
 import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 import {
@@ -104,8 +111,10 @@ const makeProductSchema = (t: (key: string) => string) => z.object({
     costPrice: z.coerce.number().min(0, t('inventory.valCostPositive')).optional(),
     stock: z.coerce.number().int(t('inventory.valStockWhole')),
     sku: z.string().optional(),
+    expiryDate: z.date().optional(),
     category: z.string().optional(),
     categoryType: z.enum(['product', 'service']).default('product'),
+    lowStockThreshold: z.coerce.number().min(0).optional(),
 
     // Advanced Features
     type: z.enum(['single', 'variant', 'composite']).default('single'),
@@ -279,6 +288,7 @@ function EditProductContent() {
     }, [queuedActions, stockLogs, product?.id]);
 
     const [logFilter, setLogFilter] = React.useState('all');
+    const [salesPeriod, setSalesPeriod] = React.useState<'30d' | '90d' | '6m' | '1y' | 'all'>('6m');
 
     const filteredLogs = React.useMemo(() => {
         if (logFilter === 'all') return combinedLogs;
@@ -289,6 +299,61 @@ function EditProductContent() {
             return true;
         });
     }, [combinedLogs, logFilter]);
+
+    const salesData = React.useMemo(() => {
+        const salesLogs = combinedLogs.filter((log: any) => log.action === 'product.sale');
+        const dataMap: Record<string, number> = {};
+
+        if (salesPeriod === '30d') {
+            for (let i = 29; i >= 0; i--) {
+                const d = subDays(new Date(), i);
+                dataMap[format(d, 'dd MMM')] = 0;
+            }
+            salesLogs.forEach((log: any) => {
+                if (!log.createdAt) return;
+                const d = log.createdAt.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
+                const key = format(d, 'dd MMM');
+                if (dataMap[key] !== undefined) {
+                    const soldQty = log.details?.adjustment ? Math.abs(log.details.adjustment) : 0;
+                    dataMap[key] += soldQty;
+                }
+            });
+        } else if (salesPeriod === '90d') {
+            for (let i = 11; i >= 0; i--) {
+                const d = subDays(new Date(), i * 7);
+                dataMap[format(d, 'dd MMM')] = 0;
+            }
+            salesLogs.forEach((log: any) => {
+                if (!log.createdAt) return;
+                const d = log.createdAt.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
+                const key = format(d, 'dd MMM');
+                if (dataMap[key] !== undefined) {
+                    const soldQty = log.details?.adjustment ? Math.abs(log.details.adjustment) : 0;
+                    dataMap[key] += soldQty;
+                }
+            });
+        } else {
+            const numMonths = salesPeriod === '6m' ? 5 : salesPeriod === '1y' ? 11 : 23;
+            for (let i = numMonths; i >= 0; i--) {
+                const d = subMonths(new Date(), i);
+                dataMap[format(d, 'MMM yy')] = 0;
+            }
+            salesLogs.forEach((log: any) => {
+                if (!log.createdAt) return;
+                const d = log.createdAt.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
+                const key = format(d, 'MMM yy');
+                if (dataMap[key] !== undefined) {
+                    const soldQty = log.details?.adjustment ? Math.abs(log.details.adjustment) : 0;
+                    dataMap[key] += soldQty;
+                }
+            });
+        }
+
+        return Object.keys(dataMap).map(key => ({
+            name: key,
+            sold: dataMap[key]
+        }));
+    }, [combinedLogs, salesPeriod]);
 
 
 
@@ -326,7 +391,11 @@ function EditProductContent() {
 
     React.useEffect(() => {
         if (product) {
-            form.reset(product);
+            form.reset({
+                ...product,
+                categoryType: product.categoryType || 'product',
+                type: product.type || 'single'
+            });
             if (product.imageUrl) {
                 setImagePreview(product.imageUrl);
             }
@@ -778,13 +847,107 @@ function EditProductContent() {
                                     {categoryType === 'product' && (
                                         <FormField
                                             control={form.control}
+                                            name="expiryDate"
+                                            render={({ field }) => (
+                                                <FormItem className="flex flex-col pt-2">
+                                                    <FormLabel>{t('inventory.expiryDate')}</FormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            type="date"
+                                                            disabled={!canManageProduct}
+                                                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                field.onChange(val ? new Date(val) : undefined);
+                                                            }}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    )}
+                                    {categoryType === 'product' && (
+                                        <FormField
+                                            control={form.control}
                                             name="stock"
+                                            render={({ field }) => {
+                                                const currentStock = product?.stock || 0;
+                                                // The field.value here is the NEW TOTAL the user wants.
+                                                // We calculate "adding" by subtracting current stock from the new total.
+                                                const newTotal = typeof field.value === 'number' ? field.value : parseInt(field.value || '0', 10);
+                                                const addedAmount = newTotal - currentStock;
+
+                                                return (
+                                                    <FormItem className="sm:col-span-2 md:col-span-4">
+                                                        <FormLabel>{t('inventory.stock')}</FormLabel>
+                                                        
+                                                        {/* Visual Math UI similar to Quick Restock */}
+                                                        {product && (
+                                                            <div className="flex items-center justify-between px-4 py-3 bg-muted rounded-lg mb-4">
+                                                                <div className="text-center">
+                                                                    <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Current</p>
+                                                                    <p className="text-xl font-bold">{currentStock}</p>
+                                                                </div>
+                                                                <div className="text-xl font-light text-muted-foreground">+</div>
+                                                                <div className="text-center">
+                                                                    <p className="text-xs text-primary mb-1 uppercase tracking-wider font-semibold">Adding</p>
+                                                                    <p className="text-xl font-bold text-primary">{addedAmount > 0 ? `+${addedAmount}` : addedAmount}</p>
+                                                                </div>
+                                                                <div className="text-xl font-light text-muted-foreground">=</div>
+                                                                <div className="text-center">
+                                                                    <p className="text-xs text-green-600 mb-1 uppercase tracking-wider font-semibold">New Total</p>
+                                                                    <p className="text-xl font-bold text-green-600">{newTotal}</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <FormControl>
+                                                            <Input 
+                                                                type="number" 
+                                                                placeholder="25" 
+                                                                {...field} 
+                                                                disabled={!canManageProduct} 
+                                                                onChange={(e) => {
+                                                                    // Update the total stock
+                                                                    field.onChange(parseInt(e.target.value || '0', 10));
+                                                                }}
+                                                            />
+                                                        </FormControl>
+                                                        <FormDescription className="text-xs">
+                                                            {product ? "Enter the new total stock amount. The 'Adding' value will adjust automatically." : "Enter initial stock quantity."}
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )
+                                            }}
+                                        />
+                                    )}
+                                    {categoryType === 'product' && (
+                                        <FormField
+                                            control={form.control}
+                                            name="lowStockThreshold"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>{t('inventory.stock')}</FormLabel>
+                                                    <FormLabel className="flex items-center gap-1.5">
+                                                        Reorder Point
+                                                        <TooltipProvider>
+                                                            <Tooltip delayDuration={300}>
+                                                                <TooltipTrigger asChild>
+                                                                    <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="max-w-[250px]">
+                                                                    <p>We'll alert you when stock falls to or below this level.</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    </FormLabel>
                                                     <FormControl>
-                                                        <Input type="number" placeholder="25" {...field} disabled={!canManageProduct} />
+                                                        <Input type="number" placeholder="5" {...field} value={field.value ?? ''} disabled={!canManageProduct} />
                                                     </FormControl>
+                                                    <FormDescription className="text-xs">
+                                                        Minimum threshold for low stock alert
+                                                    </FormDescription>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
@@ -1046,6 +1209,68 @@ function EditProductContent() {
                                 <div className="space-y-1">
                                     <CardTitle className="text-base flex items-center gap-2">
                                         <HistoryIcon className="h-4 w-4 text-primary" />
+                                        {salesPeriod === '30d' ? '30-Day Sales Volume Trend' : salesPeriod === '90d' ? '90-Day Sales Volume Trend' : salesPeriod === '6m' ? '6-Month Sales Volume Trend' : salesPeriod === '1y' ? '1-Year Sales Volume Trend' : 'All-Time Sales Volume Trend'}
+                                    </CardTitle>
+                                    <CardDescription className="text-xs">
+                                        {salesPeriod === '30d' ? 'Track daily units sold over the last 30 days' : salesPeriod === '90d' ? 'Track weekly units sold over the last 90 days' : salesPeriod === '6m' ? 'Track units sold month-by-month over the last 6 months' : salesPeriod === '1y' ? 'Track units sold month-by-month over the last 12 months' : 'Track historical units sold over time'}
+                                    </CardDescription>
+                                </div>
+                                <div className="flex items-center gap-1 bg-background/80 p-1 rounded-lg border text-xs self-start sm:self-auto">
+                                    {[
+                                        { id: '30d', label: '30 Days' },
+                                        { id: '90d', label: '90 Days' },
+                                        { id: '6m', label: '6 Months' },
+                                        { id: '1y', label: '1 Year' },
+                                        { id: 'all', label: 'All Time' },
+                                    ].map((p) => (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => setSalesPeriod(p.id as any)}
+                                            className={cn(
+                                                "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all",
+                                                salesPeriod === p.id 
+                                                    ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-6 pb-2">
+                            <div className="h-[200px] w-full">
+                                {salesData.every(d => d.sold === 0) ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm">
+                                        <p>No sales data available yet.</p>
+                                    </div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={salesData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
+                                            <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tickMargin={8} stroke="#888888" />
+                                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}`} stroke="#888888" />
+                                            <RechartsTooltip 
+                                                cursor={{ stroke: '#2563eb', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                            />
+                                            <Line type="monotone" dataKey="sold" name="Quantity Sold" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: 'white' }} activeDot={{ r: 6, stroke: '#2563eb', strokeWidth: 2, fill: '#2563eb' }} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {(categoryType === 'product' || categoryType === 'service') && (
+                    <Card className="border-primary/10 shadow-sm overflow-hidden mt-4">
+                        <CardHeader className="bg-primary/5 pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <HistoryIcon className="h-4 w-4 text-primary" />
                                         {categoryType === 'service' ? t('inventory.serviceHistoryTitle') : t('inventory.stockHistoryTitle')}
                                     </CardTitle>
                                     <CardDescription className="text-xs">
@@ -1144,12 +1369,17 @@ function EditProductContent() {
                                                     </TableCell>
                                                     <TableCell>
                                                         {adjustment !== undefined ? (
-                                                            <Badge 
-                                                                variant={isAddition ? "success" : "destructive"} 
-                                                                className="text-[10px] h-5"
-                                                            >
-                                                                {isAddition ? '+' : ''}{adjustment}
-                                                            </Badge>
+                                                            <div className={cn(
+                                                                "flex items-center gap-1 font-bold text-sm",
+                                                                isAddition ? "text-green-600" : "text-red-600"
+                                                            )}>
+                                                                {isAddition ? (
+                                                                    <ArrowDownLeft className="h-4 w-4" />
+                                                                ) : (
+                                                                    <ArrowUpRight className="h-4 w-4" />
+                                                                )}
+                                                                <span>{Math.abs(adjustment)}</span>
+                                                            </div>
                                                         ) : (
                                                             <span className="text-xs text-muted-foreground">{t('inventory.updatedLabel')}</span>
                                                         )}

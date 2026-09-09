@@ -183,14 +183,14 @@ export function isTrialExpired(business: BusinessLike): boolean {
 }
 
 /**
- * Core features (Checkout, Adding Products, etc) are blocked if the user is 
- * on an expired trial (Starter) or a lapsed paying plan.
+ * Core features (Checkout, Adding Products, etc) are available for all active businesses.
+ * Lapsed paid plans downgrade to Starter rather than blocking POS sales.
  */
 export function isCoreFeatureBlocked(business: BusinessLike): boolean {
-  if (!business) return true;
+  if (!business) return false;
+  if (business.status === 'deleted' || business.status === 'blocked') return true;
   if (business.accessLevel === 'lifetime') return false;
-  if (isPaidPlanExpired(business)) return true;
-  if (isTrialExpired(business)) return true;
+  // Paid plans or free starter plans are allowed to run core POS operations
   return false;
 }
 
