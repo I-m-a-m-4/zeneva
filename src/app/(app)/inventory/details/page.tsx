@@ -184,7 +184,6 @@ function EditProductContent() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
     const [stockLogs, setStockLogs] = React.useState<AuditLog[]>([]);
     const [isLogsLoading, setIsLogsLoading] = React.useState(true);
-    const [stockAdjustmentMode, setStockAdjustmentMode] = React.useState<'add' | 'set'>('add');
     const [quantityToAddInput, setQuantityToAddInput] = React.useState<string>('');
 
     // Category Management
@@ -883,49 +882,20 @@ function EditProductContent() {
                                                     <FormItem className="sm:col-span-2 md:col-span-4 border border-border/60 p-4 rounded-2xl bg-card shadow-sm">
                                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                                                             <div>
-                                                                <FormLabel className="text-base font-semibold">{t('inventory.stock')}</FormLabel>
-                                                                <p className="text-xs text-muted-foreground">Manage stock levels for this item</p>
+                                                                <FormLabel className="text-base font-semibold">
+                                                                    {product ? "+ Add / Restock Stock" : t('inventory.stock')}
+                                                                </FormLabel>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {product ? "Enter the quantity of new stock purchased/added" : "Manage initial stock level for this item"}
+                                                                </p>
                                                             </div>
-                                                            {product && (
-                                                                <div className="inline-flex p-1 bg-muted rounded-xl border border-border/50 self-start sm:self-auto">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setStockAdjustmentMode('add');
-                                                                            const curTotal = typeof field.value === 'number' ? field.value : parseInt(field.value || '0', 10);
-                                                                            const diff = curTotal - currentStock;
-                                                                            setQuantityToAddInput(diff !== 0 ? diff.toString() : '');
-                                                                        }}
-                                                                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                                                                            stockAdjustmentMode === 'add'
-                                                                                ? 'bg-background text-foreground shadow-sm font-semibold'
-                                                                                : 'text-muted-foreground hover:text-foreground'
-                                                                        }`}
-                                                                    >
-                                                                        + Add / Restock Stock
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setStockAdjustmentMode('set');
-                                                                        }}
-                                                                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                                                                            stockAdjustmentMode === 'set'
-                                                                                ? 'bg-background text-foreground shadow-sm font-semibold'
-                                                                                : 'text-muted-foreground hover:text-foreground'
-                                                                        }`}
-                                                                    >
-                                                                        = Set Exact Total
-                                                                    </button>
-                                                                </div>
-                                                            )}
                                                         </div>
                                                         
                                                         {/* Visual Math UI */}
                                                         {product && (
                                                             <div className="flex items-center justify-between px-4 py-3 bg-muted/60 border border-border/40 rounded-xl mb-4">
                                                                 <div className="text-center">
-                                                                    <p className="text-[11px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">Current</p>
+                                                                    <p className="text-[11px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">Current Stock</p>
                                                                     <p className="text-lg font-bold">{currentStock}</p>
                                                                 </div>
                                                                 <div className="text-lg font-light text-muted-foreground">+</div>
@@ -942,7 +912,7 @@ function EditProductContent() {
                                                         )}
 
                                                         <FormControl>
-                                                            {product && stockAdjustmentMode === 'add' ? (
+                                                            {product ? (
                                                                 <Input 
                                                                     type="number" 
                                                                     placeholder="e.g. 9 to add 9 more units" 
@@ -964,26 +934,16 @@ function EditProductContent() {
                                                                     disabled={!canManageProduct} 
                                                                     onChange={(e) => {
                                                                         const val = parseInt(e.target.value || '0', 10);
-                                                                        const safeVal = isNaN(val) ? 0 : val;
-                                                                        field.onChange(safeVal);
-                                                                        if (product) {
-                                                                            setQuantityToAddInput((safeVal - currentStock).toString());
-                                                                        }
+                                                                        field.onChange(isNaN(val) ? 0 : val);
                                                                     }}
                                                                 />
                                                             )}
                                                         </FormControl>
                                                         <FormDescription className="text-xs mt-1.5">
                                                             {product ? (
-                                                                stockAdjustmentMode === 'add' ? (
-                                                                    <span>
-                                                                        Enter quantity being added (e.g. typing <strong>9</strong> adds 9 to current <strong>{currentStock}</strong> = <strong>{newTotal}</strong> total). Use negative numbers to subtract stock.
-                                                                    </span>
-                                                                ) : (
-                                                                    <span>
-                                                                        Enter the new absolute total stock count (e.g. after a physical inventory count).
-                                                                    </span>
-                                                                )
+                                                                <span>
+                                                                    Enter quantity being added (e.g. typing <strong>9</strong> adds 9 to current <strong>{currentStock}</strong> = <strong>{newTotal}</strong> total). Use negative numbers to subtract stock.
+                                                                </span>
                                                             ) : (
                                                                 "Enter initial stock quantity."
                                                             )}
