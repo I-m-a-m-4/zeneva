@@ -229,7 +229,7 @@ export default function AuthenticatedLayout({
         sessionStorage.setItem('zeneva_seen_ceo_msg', 'true');
         setTimeout(() => {
           setShowCeoMessage(false);
-        }, 5000); // Hide after 5s
+        }, 45000); // Hide after 45s
       }, 3000); // Show 3s after load
       return () => clearTimeout(timer);
     }
@@ -855,7 +855,7 @@ export default function AuthenticatedLayout({
                 '/support'
               );
               setShowSupportPopup(true);
-              setTimeout(() => setShowSupportPopup(false), 6000); // 6 seconds auto-hide
+              setTimeout(() => setShowSupportPopup(false), 45000); // 45 seconds auto-hide
               localStorage.setItem('zeneva_last_viewed_support_user', Date.now().toString());
             }
           }
