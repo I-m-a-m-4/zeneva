@@ -15,7 +15,7 @@ import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, sign
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import { usePOS } from '@/context/pos-context';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader, ChevronLeft, ChevronRight, Building, UserCheck, Play, Pause, Sparkles, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Loader, ChevronLeft, ChevronRight, Building, UserCheck, Play, Pause, Sparkles, ArrowRight, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AppConfig } from '@/lib/config';
 import Image from 'next/image';
@@ -399,6 +399,10 @@ function SignupPageContent() {
               <p className="text-balance text-sm sm:text-base text-muted-foreground">
                 {t('auth.signupSubtitle')}
               </p>
+              <div className="inline-flex items-center justify-center gap-1.5 py-1 px-3.5 mx-auto mt-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold shadow-xs">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span>{t('auth.setupTimeBadge', { defaultValue: 'Takes 30 seconds to set up • Free forever plan' })}</span>
+              </div>
             </div>
 
             {isLoadingInvitation ? (

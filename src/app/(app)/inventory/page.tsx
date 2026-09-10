@@ -31,8 +31,10 @@ import {
   Coins,
   Truck,
   PackagePlus,
-  Sparkles
+  Sparkles,
+  FileText
 } from "lucide-react";
+import { ReorderInvoiceModal } from '@/components/inventory/reorder-invoice-modal';
 import {
   ResponsiveContainer,
   BarChart,
@@ -308,6 +310,7 @@ function InventoryPageContent() {
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
   const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
   const [showHealthModal, setShowHealthModal] = React.useState(false);
+  const [isReorderInvoiceModalOpen, setIsReorderInvoiceModalOpen] = React.useState(false);
   const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
 
   const toggleExpandParent = (parentId: string) => {
@@ -509,6 +512,9 @@ function InventoryPageContent() {
         totalCostValue: 0,
         potentialProfit: 0,
         marginPercent: 0,
+        sellThroughRate: 0,
+        deadStockCount: 0,
+        deadStockValue: 0,
         outOfStockCount: 0,
         belowReorderCount: 0,
         topSellers: [],
@@ -602,12 +608,30 @@ function InventoryPageContent() {
       .sort((a, b) => b.totalQuantity - a.totalQuantity)
       .slice(0, 7);
 
+    const periodDays = analyticsPeriod === '30d' ? 30 : analyticsPeriod === '90d' ? 90 : analyticsPeriod === '6m' ? 180 : analyticsPeriod === '1y' ? 365 : 90;
+
+    let totalSoldUnits = 0;
+    allSalesEntries.forEach(e => { totalSoldUnits += e.totalQuantity; });
+    const sellThroughRate = (totalUnits + totalSoldUnits) > 0 ? (totalSoldUnits / (totalUnits + totalSoldUnits)) * 100 : 0;
+
     const fastMoversLow = allSalesEntries
       .filter(entry => entry.totalQuantity >= 2 && entry.product.stock <= (entry.product.lowStockThreshold ?? 5))
-      .map(entry => entry.product);
+      .map(entry => {
+        const dailyRate = entry.totalQuantity / periodDays;
+        const runwayDays = dailyRate > 0 ? Math.max(1, Math.round((entry.product.stock || 0) / dailyRate)) : 14;
+        return {
+          product: entry.product,
+          runwayDays,
+          dailyRate: Number(dailyRate.toFixed(1))
+        };
+      })
+      .sort((a, b) => a.runwayDays - b.runwayDays);
 
-    const slowMovers = allSalesEntries
-      .filter(entry => entry.totalQuantity === 0 && (entry.product.stock || 0) > 0)
+    const allSlowEntries = allSalesEntries.filter(entry => entry.totalQuantity === 0 && (entry.product.stock || 0) > 0);
+    const deadStockCount = allSlowEntries.length;
+    const deadStockValue = allSlowEntries.reduce((sum, e) => sum + ((e.product.stock || 0) * (e.product.costPrice || e.product.price || 0)), 0);
+
+    const slowMovers = allSlowEntries
       .sort((a, b) => ((b.product.stock || 0) * (b.product.price || 0)) - ((a.product.stock || 0) * (a.product.price || 0)))
       .slice(0, 5)
       .map(entry => entry.product);
@@ -666,6 +690,9 @@ function InventoryPageContent() {
       totalCostValue,
       potentialProfit,
       marginPercent,
+      sellThroughRate,
+      deadStockCount,
+      deadStockValue,
       outOfStockCount,
       belowReorderCount,
       topSellers,
@@ -962,6 +989,17 @@ function InventoryPageContent() {
               </Button>
             )}
             {canManageStock && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 gap-1 border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 hover:text-orange-700 dark:hover:bg-orange-500/20 dark:hover:text-orange-300 hover:border-orange-500/60 font-semibold transition-colors"
+                onClick={() => setIsReorderInvoiceModalOpen(true)}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span className="sm:whitespace-nowrap">⚡ Auto Reorder PO</span>
+              </Button>
+            )}
+            {canManageStock && (
               <Button size="sm" asChild variant="outline" className="group h-9 gap-1">
                 <Link href="/expenses?tab=purchases">
                   <Truck className="h-3.5 w-3.5 text-primary group-hover:text-white" />
@@ -1083,6 +1121,12 @@ function InventoryPageContent() {
                 )}
 
                 {canManageStock && (
+                  <DropdownMenuItem onClick={() => setIsReorderInvoiceModalOpen(true)} className="text-orange-600 dark:text-orange-400 focus:text-orange-700 dark:focus:text-orange-300 focus:bg-orange-500/10">
+                    <FileText className="me-2 h-4 w-4" /> ⚡ Auto Reorder PO
+                  </DropdownMenuItem>
+                )}
+
+                {canManageStock && (
                   <DropdownMenuItem onClick={() => setIsCostPriceOpen(true)}>
                     <Coins className="me-2 h-4 w-4" /> Cost prices
                   </DropdownMenuItem>
@@ -1196,7 +1240,7 @@ function InventoryPageContent() {
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Profit Potential</p>
                 <p className="text-xl font-bold mt-1 text-teal-600 truncate">{currencySymbol}{analyticsData.potentialProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">~{analyticsData.marginPercent.toFixed(1)}% Gross Margin</p>
+                <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">~{analyticsData.marginPercent.toFixed(1)}% Margin • {analyticsData.sellThroughRate.toFixed(1)}% STR</p>
               </CardContent>
             </Card>
 
@@ -1341,15 +1385,21 @@ function InventoryPageContent() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {analyticsData.fastMoversLow.length > 0 ? (
-                  analyticsData.fastMoversLow.map(p => (
-                    <div key={p.id} className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
+                  analyticsData.fastMoversLow.map(item => (
+                    <div key={item.product.id} className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
                       <div>
-                        <p className="font-semibold">{p.name}</p>
-                        <p className="text-[11px] text-muted-foreground">Reorder Point: {p.lowStockThreshold ?? 5} units</p>
+                        <p className="font-semibold">{item.product.name}</p>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <span>Reorder: {item.product.lowStockThreshold ?? 5} units</span>
+                          <span>•</span>
+                          <span className={item.runwayDays <= 7 ? "text-amber-600 dark:text-amber-400 font-bold" : "text-muted-foreground"}>
+                            ⚡ ~{item.runwayDays}d runway
+                          </span>
+                        </p>
                       </div>
                       <div className="text-right">
                         <Badge variant="destructive" className="text-[10px]">
-                          {p.stock} remaining
+                          {item.product.stock} remaining
                         </Badge>
                       </div>
                     </div>
@@ -1366,7 +1416,9 @@ function InventoryPageContent() {
                 <CardTitle className="text-base font-semibold flex items-center gap-2 text-blue-600 dark:text-blue-400">
                   <span>💤</span> Slow-Moving Capital
                 </CardTitle>
-                <CardDescription>High value stock with 0 sales in period</CardDescription>
+                <CardDescription>
+                  {analyticsData.deadStockCount} items • {currencySymbol}{analyticsData.deadStockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} frozen capital
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {analyticsData.slowMovers.length > 0 ? (
@@ -2060,6 +2112,10 @@ function InventoryPageContent() {
           onClose={() => setPreviewImage(null)} 
           src={previewImage?.src || null} 
           alt={previewImage?.alt || ''} 
+      />
+      <ReorderInvoiceModal
+          isOpen={isReorderInvoiceModalOpen}
+          onOpenChange={setIsReorderInvoiceModalOpen}
       />
     </div>
 

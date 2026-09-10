@@ -206,8 +206,8 @@ export function useI18n(): I18nContextValue {
 
   return {
     locale: DEFAULT_LOCALE,
-    setLocale: () => {},
-    adoptLocale: () => {},
+    setLocale: () => { },
+    adoptLocale: () => { },
     t: (key: string, vars?: Vars) => translate(englishMessages, key, vars),
     dir: 'ltr',
     isReady: true,

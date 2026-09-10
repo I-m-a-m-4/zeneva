@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomerAnalyticsTab } from '@/components/customers/customer-analytics-tab';
 import { cn } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
 import CustomerHealthPanel, { type HealthFilter } from '@/components/customers/customer-health-panel';
@@ -160,7 +161,7 @@ export default function CustomersPage() {
   const [selectedCustomerIds, setSelectedCustomerIds] = React.useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [customerToEdit, setCustomerToEdit] = React.useState<Customer | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'all' | 'health'>('all');
+  const [activeTab, setActiveTab] = React.useState<'all' | 'health' | 'analytics'>('all');
   const [healthFilter, setHealthFilter] = React.useState<HealthFilter>('all');
   const [isFixingHealth, setIsFixingHealth] = React.useState(false);
 
@@ -653,8 +654,8 @@ export default function CustomersPage() {
         * here would compete with the tiles inside the tab that already carry it.
         */}
       <div className="w-full mb-4">
-        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'all' | 'health')} className="w-full md:max-w-md">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'all' | 'health' | 'analytics')} className="w-full md:max-w-lg">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="all">All customers</TabsTrigger>
             <TabsTrigger value="health" className="flex items-center gap-1.5">
               Health
@@ -662,9 +663,22 @@ export default function CustomersPage() {
                 <span className="flex h-2 w-2 rounded-full bg-red-500" />
               )}
             </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-1.5">
+              Analytics
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
+
+      {activeTab === 'analytics' && (
+        <CustomerAnalyticsTab
+          customers={displayCustomers || []}
+          receipts={receipts || []}
+          currencySymbol={currencySymbol}
+          segmentData={segmentData}
+          businessName={business?.name || 'Zeneva Store'}
+        />
+      )}
 
       {activeTab === 'health' && (
         <div className="mb-6">
@@ -693,6 +707,7 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {activeTab !== 'analytics' && (
       <Card className="w-full">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -1062,6 +1077,7 @@ export default function CustomersPage() {
           </CardFooter>
         )}
       </Card>
+      )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>

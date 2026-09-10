@@ -1,5 +1,5 @@
 
-export type IndustryType = 'boutique' | 'pharmacy' | 'grocery' | 'bakery' | 'restaurant' | 'default';
+export type IndustryType = 'boutique' | 'pharmacy' | 'grocery' | 'bakery' | 'restaurant' | 'electronics' | 'default';
 
 export interface IndustryConfig {
     label: string;
@@ -7,6 +7,7 @@ export interface IndustryConfig {
     defaultUnit: string;
     hasStock: boolean;
     hasExpiry: boolean;
+    hasSerialNumbers?: boolean;
     productFields: {
         label: string;
         key: string;
@@ -21,6 +22,7 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
         defaultUnit: 'Piece',
         hasStock: true,
         hasExpiry: false,
+        hasSerialNumbers: false,
         productFields: [
             { label: 'Material/Fabric', key: 'material', placeholder: 'e.g. Cotton, Silk' },
             { label: 'Size/Fit', key: 'variantValue', placeholder: 'e.g. XL, Slim Fit' }
@@ -32,6 +34,7 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
         defaultUnit: 'Pack',
         hasStock: true,
         hasExpiry: true,
+        hasSerialNumbers: false,
         productFields: [
             { label: 'Dosage', key: 'dosage', placeholder: 'e.g. 500mg' },
             { label: 'Manufacturer', key: 'manufacturer', placeholder: 'e.g. Pfizer' }
@@ -43,6 +46,7 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
         defaultUnit: 'pcs',
         hasStock: true,
         hasExpiry: true,
+        hasSerialNumbers: false,
         productFields: [
             { label: 'Weight/Volume', key: 'weightVolume', placeholder: 'e.g. 1kg, 750ml' },
             { label: 'Brand', key: 'brand', placeholder: 'e.g. Nestle' }
@@ -54,6 +58,7 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
         defaultUnit: 'pcs',
         hasStock: true,
         hasExpiry: true,
+        hasSerialNumbers: false,
         productFields: [
             { label: 'Flavor/Type', key: 'variantValue', placeholder: 'e.g. Chocolate, Vanilla' },
             { label: 'Packaging', key: 'packaging', placeholder: 'e.g. Box of 6' }
@@ -65,9 +70,22 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
         defaultUnit: 'Portion',
         hasStock: true,
         hasExpiry: false,
+        hasSerialNumbers: false,
         productFields: [
             { label: 'Spice Level', key: 'spiceLevel', placeholder: 'e.g. Hot, Mild' },
             { label: 'Add-ons', key: 'variantValue', placeholder: 'e.g. Extra Cheese' }
+        ]
+    },
+    electronics: {
+        label: 'Electronics & Appliances',
+        measurementLabels: ['IMEI / Serial No', 'Warranty Status', 'Device Condition'],
+        defaultUnit: 'Piece',
+        hasStock: true,
+        hasExpiry: false,
+        hasSerialNumbers: true,
+        productFields: [
+            { label: 'Model Number', key: 'variantValue', placeholder: 'e.g. iPhone 15 Pro, A2849' },
+            { label: 'Brand / Mfr', key: 'brand', placeholder: 'e.g. Apple, Samsung' }
         ]
     },
     default: {
@@ -76,6 +94,7 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
         defaultUnit: 'Unit',
         hasStock: true,
         hasExpiry: false,
+        hasSerialNumbers: false,
         productFields: [
             { label: 'Model/Variant', key: 'variantValue', placeholder: 'e.g. V2, Red' }
         ]
@@ -87,16 +106,19 @@ export function getIndustryConfig(industry?: string): IndustryConfig {
     
     const normalized = industry.toLowerCase();
     
-    if (normalized.includes('fashion') || normalized.includes('apparel') || normalized.includes('boutique')) {
+    if (normalized.includes('electronic') || normalized.includes('gadget') || normalized.includes('phone') || normalized.includes('computer') || normalized.includes('tech') || normalized.includes('appliance')) {
+        return INDUSTRY_CONFIGS.electronics;
+    }
+    if (normalized.includes('fashion') || normalized.includes('apparel') || normalized.includes('boutique') || normalized.includes('clothing')) {
         return INDUSTRY_CONFIGS.boutique;
     }
-    if (normalized.includes('health') || normalized.includes('beauty') || normalized.includes('pharmacy') || normalized.includes('medical')) {
+    if (normalized.includes('health') || normalized.includes('beauty') || normalized.includes('pharmacy') || normalized.includes('medical') || normalized.includes('drug')) {
         return INDUSTRY_CONFIGS.pharmacy;
     }
-    if (normalized.includes('food') || normalized.includes('beverage') || normalized.includes('restaurant') || normalized.includes('cafe')) {
+    if (normalized.includes('food') || normalized.includes('beverage') || normalized.includes('restaurant') || normalized.includes('cafe') || normalized.includes('bar')) {
         return INDUSTRY_CONFIGS.restaurant;
     }
-    if (normalized.includes('grocery') || normalized.includes('supermarket') || normalized.includes('bakery')) {
+    if (normalized.includes('grocery') || normalized.includes('supermarket') || normalized.includes('bakery') || normalized.includes('mart')) {
         return INDUSTRY_CONFIGS.grocery;
     }
     

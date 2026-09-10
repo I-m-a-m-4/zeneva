@@ -45,6 +45,12 @@ export interface Product {
         multiplier: number; // e.g., 24
         price?: number; // Optional override price for this UoM
     }[];
+
+    // --- Industry & Electronics Tracking ---
+    isSerializable?: boolean;
+    serialNumbers?: string[]; // Array of active serial numbers / IMEIs
+    supplierId?: string;
+    supplierName?: string;
 }
 export type InventoryItem = Product;
 export interface CartItem {
@@ -57,6 +63,7 @@ export interface CartItem {
     costPriceOverride?: number;
     originalCostPrice?: number;
     addedViaBarcode?: boolean;
+    selectedSerialNumber?: string;
 }
 
 export interface HeldSale {

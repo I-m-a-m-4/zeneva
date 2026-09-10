@@ -38,6 +38,7 @@ function ReviewPageContent() {
     const searchParams = useSearchParams();
     const isAutoPrompted = searchParams.get('auto') === 'true';
     const [backdate, setBackdate] = React.useState('');
+    const [backdateTime, setBackdateTime] = React.useState('');
     const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id;
     const receiptContentRef = React.useRef<HTMLDivElement>(null);
     const hasPrintedRef = React.useRef(false);
@@ -57,9 +58,23 @@ function ReviewPageContent() {
     // "already started" guard had latched, wedging the POS.
     const backdatedAt = React.useMemo(() => {
         if (!backdate) return null;
-        const parsed = new Date(backdate);
+        // date input gives "YYYY-MM-DD" — parse at local midnight so the
+        // day the admin chose is what lands on the receipt, not UTC midnight.
+        const [year, month, day] = backdate.split('-').map(Number);
+        if (!year || !month || !day) return null;
+        
+        let h = 0, m = 0;
+        if (backdateTime) {
+            const [hours, minutes] = backdateTime.split(':').map(Number);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                h = hours;
+                m = minutes;
+            }
+        }
+        
+        const parsed = new Date(year, month - 1, day, h, m, 0);
         return isNaN(parsed.getTime()) ? null : parsed;
-    }, [backdate]);
+    }, [backdate, backdateTime]);
 
     // Create a temporary receipt object for display before saving
     const displayReceipt = React.useMemo(() => ({
@@ -86,6 +101,9 @@ function ReviewPageContent() {
     const isAutoPromptedRef = React.useRef(false);
     const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
 
+    // Gate that must be true before checkout can proceed.
+    const canCompleteSale = !!business && !!user && cart.length > 0 && !!products && !!currentUserProfile;
+
     const handleCompleteSale = React.useCallback(() => {
         if (isCoreFeatureBlocked(business)) {
             setShowUpgradeOverlay(true);
@@ -99,7 +117,7 @@ function ReviewPageContent() {
 
         setIsCompleting(true);
         if (checkoutStartedRef.current) return;
-        
+
         if (!business || !user || cart.length === 0 || !products || !currentUserProfile) {
             toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
             setIsCompleting(false);
@@ -153,11 +171,11 @@ function ReviewPageContent() {
         const newReceiptId = uuidv4();
         let secureSubtotal = 0;
         let secureTotalCost = 0;
-        
+
         const itemsForReceipt = cart.map(cartItem => {
             const masterProduct = products.find(p => p.id === cartItem.product.id);
             const costPrice = cartItem.costPriceOverride ?? (masterProduct?.costPrice || 0);
-            
+
             // SECURITY: If not a manual override, use the price from the master product list
             let finalPrice = cartItem.product.price;
             if (!cartItem.isPriceOverride && masterProduct) {
@@ -237,12 +255,12 @@ function ReviewPageContent() {
             receiptNumber: displayReceipt.receiptNumber,
             items: itemsForReceipt,
             customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name, email: selectedCustomer.email } : null,
-            subtotal: secureSubtotal, 
-            tax: secureTax, 
-            discount, 
-            total: secureTotal, 
-            totalCost: secureTotalCost, 
-            profit, 
+            subtotal: secureSubtotal,
+            tax: secureTax,
+            discount,
+            total: secureTotal,
+            totalCost: secureTotalCost,
+            profit,
             paymentMethod,
             status,
             createdAt: backdatedAt || new Date(),
@@ -327,10 +345,10 @@ function ReviewPageContent() {
         cart.forEach(cartItem => {
             const masterProduct = products.find(p => p.id === cartItem.product.id);
             const isService = masterProduct?.categoryType === 'service';
-            
+
             const multiplier = cartItem.multiplier || 1;
             const quantitySold = cartItem.quantity * multiplier;
-            
+
             if (isService) {
                 addToQueue({
                     type: 'add-audit-log',
@@ -353,7 +371,7 @@ function ReviewPageContent() {
                 }, t('pos.queueLoggingService', { name: cartItem.product.name }));
                 return;
             }
-            
+
             addToQueue({
                 type: 'add-audit-log',
                 payload: {
@@ -424,7 +442,7 @@ function ReviewPageContent() {
                     resetPOS();
                 };
                 window.addEventListener('afterprint', handleAfterPrint);
-                
+
                 try {
                     if (typeof window !== 'undefined' && window.print) {
                         window.print();
@@ -435,15 +453,15 @@ function ReviewPageContent() {
                     console.warn("Printing failed or unsupported on this device:", printError);
                     handleAfterPrint();
                 }
-                
+
                 // Fallback for browsers (especially mobile and standalone PWAs) that don't reliably fire afterprint
                 const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
                 setTimeout(() => {
                     window.removeEventListener('afterprint', handleAfterPrint);
                     // Check if we haven't already navigated (resetPOS clears cart)
                     if (cart.length > 0) {
-                       router.push('/sales/pos/select-products');
-                       resetPOS();
+                        router.push('/sales/pos/select-products');
+                        resetPOS();
                     }
                 }, isMobile ? 1500 : 3000); // 1.5s on mobile, 3s on desktop fallback instead of 60s
             }, 500);
@@ -519,13 +537,25 @@ function ReviewPageContent() {
                                         {t('pos.backdateSaleHint')}
                                     </span>
                                 </Label>
-                                <Input
-                                    id="backdate"
-                                    type="datetime-local"
-                                    className="w-full mt-1"
-                                    value={backdate}
-                                    onChange={(e) => setBackdate(e.target.value)}
-                                />
+                                <div className="flex gap-2 mt-1">
+                                    <Input
+                                        id="backdate"
+                                        type="date"
+                                        className="w-full"
+                                        max={new Date().toISOString().split('T')[0]}
+                                        value={backdate}
+                                        onChange={(e) => setBackdate(e.target.value)}
+                                    />
+                                    <Input
+                                        id="backdateTime"
+                                        type="time"
+                                        className="w-32"
+                                        value={backdateTime}
+                                        onChange={(e) => setBackdateTime(e.target.value)}
+                                        disabled={!backdate}
+                                        title="Optional Time"
+                                    />
+                                </div>
                             </div>
                         </>
                     )}
@@ -580,7 +610,7 @@ function ReviewPageContent() {
                     </div>
                 </div>
             </div>
-            
+
             <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
         </div>
     )

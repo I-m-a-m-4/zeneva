@@ -207,7 +207,7 @@ interface POSContextType {
   isUserLoading: boolean;
   user: any;
   cart: CartItem[];
-  addToCart: (product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => void;
+  addToCart: (product: Product, unitName?: string, multiplier?: number, priceOverride?: number, selectedSerialNumber?: string) => void;
   removeFromCart: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
   updateCartItemPrice: (cartItemId: string, newPrice?: number, newCostPrice?: number) => void;
@@ -2449,6 +2449,54 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 hasSecondaryWrites = true;
               }
 
+              // Automatic Draft Purchase Order Generation for low stock items
+              const productsBelowThreshold = new Map<string, { product: Product, orderQty: number }>();
+
+              chunk.forEach(action => {
+                action.payload.productUpdates.forEach((u: any) => {
+                   const units = Number(u.quantitySold);
+                   const pId = u.id;
+                   const product = syncedProductsRef.current.find((p: Product) => p.id === pId); 
+                   if (product && typeof product.lowStockThreshold === 'number' && product.lowStockThreshold > 0 && typeof product.stock === 'number') {
+                       const currentStock = product.stock;
+                       const newStock = currentStock - units;
+                       if (newStock <= product.lowStockThreshold && currentStock > product.lowStockThreshold) {
+                           const suggestedQty = Math.max(1, (product.lowStockThreshold * 2) - newStock);
+                           productsBelowThreshold.set(product.id, { product, orderQty: suggestedQty });
+                       }
+                   }
+                });
+              });
+
+              if (productsBelowThreshold.size > 0) {
+                 const reorderItems = Array.from(productsBelowThreshold.values()).map(({ product, orderQty }) => {
+                    return {
+                        productId: product.id,
+                        name: product.name,
+                        sku: product.sku || 'N/A',
+                        currentStock: product.stock - (chunk.find(a => a.payload.productUpdates.find((u: any) => u.id === product.id))?.payload.productUpdates.find((u: any) => u.id === product.id)?.quantitySold || 0),
+                        reorderPoint: product.lowStockThreshold,
+                        costPrice: product.costPrice || product.price || 0,
+                        orderQty: orderQty
+                    };
+                 });
+                 const totalCost = reorderItems.reduce((sum, item) => sum + (item.costPrice * item.orderQty), 0);
+                 
+                 const poRef = doc(collection(firestore, 'businessInstances', businessId, 'purchaseOrders'));
+                 secondaryBatch.set(poRef, {
+                    supplierName: 'General Supplier',
+                    supplierPhone: '',
+                    supplierEmail: '',
+                    items: reorderItems,
+                    totalCost,
+                    status: 'draft',
+                    notes: 'Automatic draft PO for low stock items generated from POS sale.',
+                    createdBy: 'System (Auto)',
+                    createdAt: serverTimestamp()
+                 });
+                 hasSecondaryWrites = true;
+              }
+
               // Low-stock alerting used to happen here, with `doc(collection(...))` —
               // a fresh random id per sale, so the same product raised a brand-new
               // notification every time anyone sold one of it, and only ever to
@@ -3301,10 +3349,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return result;
   }, [businessId, firestore, syncedReceipts, receipts, user, queuedActions, isRealOnline, activeBranchId]);
 
-  const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number) => {
-    const cartItemId = unitName ? `${product.id}-${unitName}` : product.id;
+  const addToCart = useCallback((product: Product, unitName?: string, multiplier?: number, priceOverride?: number, selectedSerialNumber?: string) => {
+    const cartItemId = selectedSerialNumber ? `${product.id}-${selectedSerialNumber}` : (unitName ? `${product.id}-${unitName}` : product.id);
     const isService = product.categoryType === 'service';
-    const existingItem = cart.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
+    const existingItem = cart.find(item => (item.selectedSerialNumber ? `${item.product.id}-${item.selectedSerialNumber}` : (item.unit ? `${item.product.id}-${item.unit}` : item.product.id)) === cartItemId);
     const newQuantity = (existingItem?.quantity || 0) + 1;
     const totalQuantityInBaseUnit = newQuantity * (multiplier || 1);
 
@@ -3313,8 +3361,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
 
     setCart(prev => {
-      const exists = prev.find(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId);
-      if (exists) return prev.map(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
+      const exists = prev.find(item => (item.selectedSerialNumber ? `${item.product.id}-${item.selectedSerialNumber}` : (item.unit ? `${item.product.id}-${item.unit}` : item.product.id)) === cartItemId);
+      if (exists) return prev.map(item => (item.selectedSerialNumber ? `${item.product.id}-${item.selectedSerialNumber}` : (item.unit ? `${item.product.id}-${item.unit}` : item.product.id)) === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
       const finalProduct = priceOverride ? { ...product, price: priceOverride } : product;
       return [...prev, { 
         product: finalProduct, 
@@ -3322,7 +3370,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
         unit: unitName, 
         multiplier,
         isPriceOverride: !!priceOverride,
-        originalPrice: product.price
+        originalPrice: product.price,
+        selectedSerialNumber
       }];
     });
   }, [toast, cart]);

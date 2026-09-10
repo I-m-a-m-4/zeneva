@@ -55,7 +55,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     const { t } = useI18n();
     return (
         <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
-            <CardContent 
+            <CardContent
                 className="p-4 relative h-44 w-full bg-muted/20 flex items-center justify-center cursor-zoom-in"
                 onClick={() => product.imageUrl && onPreview(product.imageUrl, product.name)}
             >
@@ -148,8 +148,8 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
         const parsedCost = parseFloat(editCostPrice);
         if (!isNaN(parsedSale) && parsedSale >= 0) {
             updateCartItemPrice(
-                cartItemId, 
-                parsedSale, 
+                cartItemId,
+                parsedSale,
                 !isNaN(parsedCost) && parsedCost >= 0 ? parsedCost : undefined
             );
         }
@@ -173,39 +173,39 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[350px]">
                             <DialogHeader>
-                                <DialogTitle>{t('pos.editPriceTitle') || "Edit Item Price"}</DialogTitle>
+                                <DialogTitle>Edit Item Price</DialogTitle>
                             </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="salePrice">{t('pos.salePrice') || "Sale Price"}</Label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
-                                    <Input
-                                        id="salePrice"
-                                        type="number"
-                                        className="pl-8"
-                                        value={editSalePrice}
-                                        onChange={(e) => setEditSalePrice(e.target.value)}
-                                        min="0"
-                                    />
+                            <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="salePrice">Sale Price</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
+                                        <Input
+                                            id="salePrice"
+                                            type="number"
+                                            className="pl-8"
+                                            value={editSalePrice}
+                                            onChange={(e) => setEditSalePrice(e.target.value)}
+                                            min="0"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="costPrice">Cost Price</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
+                                        <Input
+                                            id="costPrice"
+                                            type="number"
+                                            className="pl-8"
+                                            value={editCostPrice}
+                                            onChange={(e) => setEditCostPrice(e.target.value)}
+                                            min="0"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground">Override the cost price for this specific transaction to calculate profit accurately.</p>
                                 </div>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="costPrice">{t('pos.costPriceOverride') || "Cost Price"}</Label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
-                                    <Input
-                                        id="costPrice"
-                                        type="number"
-                                        className="pl-8"
-                                        value={editCostPrice}
-                                        onChange={(e) => setEditCostPrice(e.target.value)}
-                                        min="0"
-                                    />
-                                </div>
-                                <p className="text-[10px] text-muted-foreground">Override the cost price for this specific transaction to calculate profit accurately.</p>
-                            </div>
-                        </div>
                             <DialogFooter>
                                 <Button onClick={handleSavePrices}>{t('common.save') || "Save"}</Button>
                             </DialogFooter>
@@ -236,12 +236,12 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
 
 const CartContents = () => {
     const {
-        cart, 
-        removeFromCart, 
+        cart,
+        removeFromCart,
         updateQuantity,
         updateCartItemPrice,
-        subtotal, 
-        currencySymbol, 
+        subtotal,
+        currencySymbol,
         clearCart,
         holdCurrentSale,
         heldSales,
@@ -298,7 +298,7 @@ const CartContents = () => {
                     {cart.map(item => {
                         const cartItemId = item.unit ? `${item.product.id}-${item.unit}` : item.product.id;
                         return (
-                            <CartItemRow 
+                            <CartItemRow
                                 key={cartItemId}
                                 item={item}
                                 cartItemId={cartItemId}
@@ -324,13 +324,13 @@ const CartContents = () => {
 
 
 export default function SelectProductsPage() {
-    const { 
-        cart, 
-        addToCart, 
-        subtotal, 
-        currencySymbol, 
-        products, 
-        isLoading: isPosLoading, 
+    const {
+        cart,
+        addToCart,
+        subtotal,
+        currencySymbol,
+        products,
+        isLoading: isPosLoading,
         business,
         searchProducts,
         searchProductsByField,
@@ -417,7 +417,7 @@ export default function SelectProductsPage() {
 
     const performManualSearch = () => {
         if (!searchTerm.trim()) return;
-        
+
         const exactMatch = products?.find(p =>
             p.sku?.toLowerCase() === searchTerm.toLowerCase() ||
             p.name.toLowerCase() === searchTerm.toLowerCase()
@@ -436,12 +436,12 @@ export default function SelectProductsPage() {
 
     const filteredProducts = React.useMemo(() => {
         let base = (products || []).filter(p => !p.parentId); // Hide child variants from main grid
-        
+
         // Apply instant local substring filter
         if (searchTerm.trim()) {
             const lower = searchTerm.toLowerCase();
-            base = base.filter(p => 
-                p.name.toLowerCase().includes(lower) || 
+            base = base.filter(p =>
+                p.name.toLowerCase().includes(lower) ||
                 p.sku?.toLowerCase().includes(lower) ||
                 p.category?.toLowerCase().includes(lower)
             );
@@ -468,7 +468,7 @@ export default function SelectProductsPage() {
 
     const handleScan = (sku: string) => {
         const product = products?.find(p => p.sku === sku);
-        
+
         if (product) {
             addToCart(product);
             toast({
@@ -511,8 +511,8 @@ export default function SelectProductsPage() {
                             />
 
                         </div>
-                        <Button 
-                            variant="secondary" 
+                        <Button
+                            variant="secondary"
                             size="icon"
                             className="h-11 w-11 shrink-0 border shadow-sm hover:shadow-md transition-all active:scale-95"
                             onClick={performManualSearch}
@@ -726,9 +726,9 @@ export default function SelectProductsPage() {
                     </DialogHeader>
                     <div className="grid gap-2 max-h-[60vh] overflow-y-auto">
                         {products?.filter(p => p.parentId === variantParent?.id).map(variant => (
-                            <Button 
-                                key={variant.id} 
-                                variant="outline" 
+                            <Button
+                                key={variant.id}
+                                variant="outline"
                                 className="justify-between h-auto py-3 hover:bg-muted hover:text-foreground"
                                 onClick={() => {
                                     addToCart(variant);
@@ -754,11 +754,11 @@ export default function SelectProductsPage() {
                     onScan={handleScan}
                 />
             )}
-            <ImageDialog 
-                isOpen={!!previewImage} 
-                onClose={() => setPreviewImage(null)} 
-                src={previewImage?.src || null} 
-                alt={previewImage?.alt || ''} 
+            <ImageDialog
+                isOpen={!!previewImage}
+                onClose={() => setPreviewImage(null)}
+                src={previewImage?.src || null}
+                alt={previewImage?.alt || ''}
             />
         </div>
 

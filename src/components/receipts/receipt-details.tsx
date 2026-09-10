@@ -144,7 +144,7 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                         </div>
                         <div className="flex justify-between mb-3">
                             <span className="text-gray-500">Date:</span>
-                            <span className="font-mono">{receipt.createdAt ? format(safeToDate(receipt.createdAt), 'dd/MM/yy HH:mm') : 'N/A'}</span>
+                            <span className="font-mono">{receipt.createdAt ? format(safeToDate(receipt.createdAt), 'dd/MM/yyyy HH:mm') : 'N/A'}</span>
                         </div>
 
                         {receipt.customer && (

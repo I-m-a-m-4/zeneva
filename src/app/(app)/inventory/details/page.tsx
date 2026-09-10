@@ -103,6 +103,7 @@ import { logAuditEvent } from '@/lib/audit';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
+import { getIndustryConfig } from '@/lib/industry';
 
 const makeProductSchema = (t: (key: string) => string) => z.object({
     name: z.string().min(3, t('inventory.valNameMin')),
@@ -116,9 +117,11 @@ const makeProductSchema = (t: (key: string) => string) => z.object({
     categoryType: z.enum(['product', 'service']).default('product'),
     lowStockThreshold: z.coerce.number().min(0).optional(),
 
-    // Advanced Features
+    // Advanced Features & Electronics Tracking
     type: z.enum(['single', 'variant', 'composite']).default('single'),
     baseUnit: z.string().optional(),
+    isSerializable: z.boolean().optional(),
+    serialNumbersInput: z.string().optional(),
     uomConversions: z.array(z.object({
         unitName: z.string().min(1, t('inventory.valUnitNameRequired')),
         multiplier: z.coerce.number().min(1, t('inventory.valMultiplierMin')),
@@ -390,12 +393,15 @@ function EditProductContent() {
     const categoryType = form.watch("categoryType");
 
 
+    const industryConfig = React.useMemo(() => getIndustryConfig(business?.settings?.industry), [business?.settings?.industry]);
+
     React.useEffect(() => {
         if (product) {
             form.reset({
                 ...product,
                 categoryType: product.categoryType || 'product',
-                type: product.type || 'single'
+                type: product.type || 'single',
+                serialNumbersInput: product.serialNumbers ? product.serialNumbers.join('\n') : ''
             });
             setQuantityToAddInput('');
             if (product.imageUrl) {
@@ -465,7 +471,18 @@ function EditProductContent() {
                 }
             }
 
-            const updatedValues = { ...values, imageUrl };
+            const rawSerials = values.serialNumbersInput
+                ? values.serialNumbersInput.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+                : [];
+            
+            const { serialNumbersInput: _, ...pureValues } = values;
+
+            const updatedValues = {
+                ...pureValues,
+                imageUrl,
+                isSerializable: rawSerials.length > 0 || !!values.isSerializable || !!industryConfig.hasSerialNumbers,
+                serialNumbers: rawSerials,
+            };
             const cleanData = Object.fromEntries(
                 Object.entries(updatedValues).filter(([_, v]) => v !== undefined)
             );
@@ -1025,6 +1042,47 @@ function EditProductContent() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {categoryType === 'product' && (industryConfig.hasSerialNumbers || form.watch('isSerializable') || product.isSerializable) && (
+                            <Card className="border-blue-500/20 bg-blue-50/5 dark:bg-blue-950/10">
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center justify-between">
+                                        <span className="flex items-center gap-2">
+                                            📱 Electronics IMEI & Serial Numbers
+                                        </span>
+                                        <Badge variant="secondary" className="text-xs">
+                                            {industryConfig.label}
+                                        </Badge>
+                                    </CardTitle>
+                                    <CardDescription className="text-xs">
+                                        Track unique serial numbers or IMEIs for electronics, appliances, and high-value devices.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="serialNumbersInput"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-semibold">IMEI / Serial Numbers (One per line or comma-separated)</FormLabel>
+                                                <FormControl>
+                                                    <Textarea
+                                                        placeholder="e.g. 354890123456789&#10;354890123456790"
+                                                        className="min-h-24 text-xs font-mono"
+                                                        {...field}
+                                                        disabled={!canManageProduct}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription className="text-[11px] text-muted-foreground">
+                                                    Cashiers scan or select from these exact IMEIs during POS checkout, which prints on warranty receipts.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </CardContent>
+                            </Card>
+                        )}
 
 
                     </div>

@@ -55,6 +55,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { useI18n } from '@/context/i18n-context';
+import { getIndustryConfig } from '@/lib/industry';
 
 import { Combobox } from '@/components/ui/combobox';
 import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
@@ -75,9 +76,11 @@ const makeProductSchema = (t: (key: string) => string) => z.object({
   expiryDate: z.date().optional(),
   categoryType: z.enum(['product', 'service']).default('product'),
 
-  // Advanced Features
+  // Advanced Features & Electronics Tracking
   type: z.enum(['single', 'variant', 'composite']).default('single'),
   baseUnit: z.string().optional(),
+  isSerializable: z.boolean().optional(),
+  serialNumbersInput: z.string().optional(),
   uomConversions: z.array(z.object({
     unitName: z.string().min(1, t('inventory.valUnitNameRequired')),
     multiplier: z.coerce.number().min(1, t('inventory.valMultiplierMin')),
@@ -98,6 +101,7 @@ export default function AddProductPage() {
   const { t } = useI18n();
   const productSchema = React.useMemo(() => makeProductSchema(t), [t]);
   const { business, products, currentUserProfile, isLoading, addToQueue, addProductWithImage } = usePOS();
+  const industryConfig = React.useMemo(() => getIndustryConfig(business?.settings?.industry), [business?.settings?.industry]);
   const firestore = useFirestore();
   const [isSaving, setIsSaving] = React.useState(false);
   const isSubmitting = React.useRef(false);
@@ -396,10 +400,19 @@ export default function AddProductPage() {
       // 1. Prepare data
       const newProductId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
 
+      const industryConfig = getIndustryConfig(business?.settings?.industry);
+      const rawSerials = values.serialNumbersInput
+        ? values.serialNumbersInput.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+        : [];
+      
+      const { serialNumbersInput: _, ...pureValues } = values;
+
       const dataToSave = {
-        ...values,
+        ...pureValues,
         id: newProductId,
         businessId: userProfile.businessId,
+        isSerializable: rawSerials.length > 0 || !!values.isSerializable || !!industryConfig.hasSerialNumbers,
+        serialNumbers: rawSerials,
         ...(customCreatedAt ? { createdAt: customCreatedAt } : {}),
       };
 
@@ -988,6 +1001,46 @@ export default function AddProductPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {categoryType === 'product' && (industryConfig.hasSerialNumbers || form.watch('isSerializable')) && (
+              <Card className="border-blue-500/20 bg-blue-50/5 dark:bg-blue-950/10">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      📱 Electronics IMEI & Serial Numbers
+                    </span>
+                    <Badge variant="secondary" className="text-xs">
+                      {industryConfig.label}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Track unique serial numbers or IMEIs for electronics, appliances, and high-value devices.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="serialNumbersInput"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold">IMEI / Serial Numbers (One per line or comma-separated)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="e.g. 354890123456789&#10;354890123456790"
+                            className="min-h-24 text-xs font-mono"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-[11px] text-muted-foreground">
+                          Cashiers will scan or select the exact IMEI at POS checkout, which is printed directly on the receipt.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             {categoryType === 'product' && (
               <Card>

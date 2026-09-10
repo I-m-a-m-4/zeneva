@@ -2252,6 +2252,7 @@ const en = {
     // --- Signup ---
     signupTitle: 'Create an account',
     signupSubtitle: 'Join growing retail brands on Zeneva.',
+    setupTimeBadge: 'Takes 30 seconds to set up • Free forever plan',
     haveAccountPrompt: 'Already have an account?',
     loginLink: 'Login',
     continueWithGoogle: 'Continue with Google',
@@ -2309,10 +2310,10 @@ export default en;
 
 type RecursivePartial<T> = {
   [P in keyof T]?: T[P] extends (infer U)[]
-    ? RecursivePartial<U>[]
-    : T[P] extends object | undefined
-    ? RecursivePartial<T[P]>
-    : T[P];
+  ? RecursivePartial<U>[]
+  : T[P] extends object | undefined
+  ? RecursivePartial<T[P]>
+  : T[P];
 };
 
 export type Messages = RecursivePartial<typeof en>;
