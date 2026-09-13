@@ -240,6 +240,9 @@ function SettingsPageContent() {
 
     // POS Settings
     const [allowPosPriceOverride, setAllowPosPriceOverride] = React.useState(false);
+    const [allowCashierExpenseLogging, setAllowCashierExpenseLogging] = React.useState(false);
+    const [allowManagerCostPriceView, setAllowManagerCostPriceView] = React.useState(false);
+    const [requireAdminApprovalForVoids, setRequireAdminApprovalForVoids] = React.useState(false);
 
     // Effect to populate form fields when business data loads
     React.useEffect(() => {
@@ -280,6 +283,9 @@ function SettingsPageContent() {
             setPreventSalesOutsideHours(business.settings?.operatingHours?.preventSalesOutsideHours || false);
 
             setAllowPosPriceOverride(business.settings?.allowPosPriceOverride || false);
+            setAllowCashierExpenseLogging(business.settings?.allowCashierExpenseLogging || false);
+            setAllowManagerCostPriceView(business.settings?.allowManagerCostPriceView || false);
+            setRequireAdminApprovalForVoids(business.settings?.requireAdminApprovalForVoids || false);
         }
     }, [business]);
 
@@ -1682,8 +1688,8 @@ function SettingsPageContent() {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-primary" />POS & Inventory</CardTitle>
-                            <CardDescription>Configure point of sale rules and checkout behavior.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Paintbrush className="h-5 w-5 text-primary" />Personalization</CardTitle>
+                            <CardDescription>Personalize point of sale rules and checkout behavior.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex items-center justify-between rounded-lg border p-4">
@@ -1693,12 +1699,39 @@ function SettingsPageContent() {
                                 </div>
                                 <Switch checked={allowPosPriceOverride} onCheckedChange={setAllowPosPriceOverride} />
                             </div>
+                            
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Allow Managers to View Cost Prices</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, Managers can see inventory cost prices and calculate profit. If disabled, they only see selling prices.</p>
+                                </div>
+                                <Switch checked={allowManagerCostPriceView} onCheckedChange={setAllowManagerCostPriceView} />
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Require Admin Approval for Voids & Returns</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, Cashiers and Managers cannot void sales or process returns without an Admin PIN.</p>
+                                </div>
+                                <Switch checked={requireAdminApprovalForVoids} onCheckedChange={setRequireAdminApprovalForVoids} />
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Allow Cashiers to Log Expenses</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, Cashiers can log small daily operational expenses. When disabled, only Managers and Admins can.</p>
+                                </div>
+                                <Switch checked={allowCashierExpenseLogging} onCheckedChange={setAllowCashierExpenseLogging} />
+                            </div>
                         </CardContent>
                         <CardFooter>
                             <Button
                                 type="button"
                                 onClick={() => handleSettingsSubmit('pos', {
-                                    'settings.allowPosPriceOverride': allowPosPriceOverride
+                                    'settings.allowPosPriceOverride': allowPosPriceOverride,
+                                    'settings.allowCashierExpenseLogging': allowCashierExpenseLogging,
+                                    'settings.allowManagerCostPriceView': allowManagerCostPriceView,
+                                    'settings.requireAdminApprovalForVoids': requireAdminApprovalForVoids
                                 })}
                                 disabled={isSaving["pos"]}
                             >

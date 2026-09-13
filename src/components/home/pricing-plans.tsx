@@ -96,6 +96,8 @@ export function PricingPlans() {
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> {t('pricing.proF9')}</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> {t('pricing.proF11')}</li>
                         <li className="flex items-center gap-3 font-semibold"><Check className="h-5 w-5 text-primary" /> {t('pricing.proF12')}</li>
+                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> {t('pricing.proF13')}</li>
+                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> {t('pricing.proF14')}</li>
                     </ul>
                     <div className="mt-auto pt-6">
                         <Button asChild size="lg" className="w-full">
@@ -130,6 +132,8 @@ export function PricingPlans() {
                         <li className="flex items-center gap-3 font-semibold"><Check className="h-5 w-5 text-primary" /> {t('pricing.bizF8')}</li>
                         <li className="flex items-center gap-3 font-semibold text-primary animate-pulse"><Check className="h-5 w-5 text-primary" /> {t('pricing.bizF9')}</li>
                         <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> {t('pricing.bizF10')}</li>
+                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> {t('pricing.bizF11')}</li>
+                        <li className="flex items-center gap-3"><Check className="h-5 w-5 text-primary" /> {t('pricing.bizF12')}</li>
                     </ul>
                     <div className="mt-auto pt-6">
                         <Button asChild size="lg" className="w-full">

@@ -62,7 +62,7 @@ function ReviewPageContent() {
         // day the admin chose is what lands on the receipt, not UTC midnight.
         const [year, month, day] = backdate.split('-').map(Number);
         if (!year || !month || !day) return null;
-        
+
         let h = 0, m = 0;
         if (backdateTime) {
             const [hours, minutes] = backdateTime.split(':').map(Number);
@@ -71,7 +71,7 @@ function ReviewPageContent() {
                 m = minutes;
             }
         }
-        
+
         const parsed = new Date(year, month - 1, day, h, m, 0);
         return isNaN(parsed.getTime()) ? null : parsed;
     }, [backdate, backdateTime]);
@@ -518,7 +518,7 @@ function ReviewPageContent() {
         <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
                 <h2 className="text-2xl font-bold mb-4 font-headline no-print">{t('pos.reviewYourSale')}</h2>
-                <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} amountReceived={amountReceived} />
+                <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} amountReceived={amountReceived} showAdminDetails={isAdmin} />
             </div>
             <div className="no-print">
                 <div className="p-4 rounded-lg bg-card border space-y-4">

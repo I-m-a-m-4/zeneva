@@ -66,6 +66,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format, subMonths, subDays, startOfMonth, parseISO } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { isCoreFeatureBlocked } from '@/lib/plan';
+import { apiBase } from '@/lib/platform';
 import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 import {
     Table,
@@ -93,6 +94,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { UnsplashImagePicker } from '@/components/inventory/unsplash-image-picker';
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import Image from "next/image";
@@ -459,7 +461,7 @@ function EditProductContent() {
                 const formData = new FormData();
                 formData.append('file', imageFile);
                 try {
-                    const response = await fetch(`/api/upload`, { method: 'POST', body: formData });
+                    const response = await fetch(`${apiBase()}/api/upload`, { method: 'POST', body: formData });
                     const result = await response.json();
                     if (response.ok && result.url) {
                         imageUrl = result.url;
@@ -1262,6 +1264,14 @@ function EditProductContent() {
                                             disabled={!canManageProduct}
                                         />
                                     </div>
+                                    <UnsplashImagePicker 
+                                        onImageSelect={(url, file) => {
+                                            setImagePreview(url);
+                                            setImageFile(file);
+                                        }}
+                                        initialSearchQuery={form.watch('name')}
+                                        disabled={!canManageProduct}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>

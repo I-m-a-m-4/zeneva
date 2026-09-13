@@ -193,7 +193,7 @@ function ReceiptContent() {
       )}
 
       <div ref={receiptContentRef} className="border rounded-lg bg-card overflow-hidden">
-        <ReceiptDetails receipt={receipt} business={business} currencySymbol={currencySymbol} isInvoice={isInvoice} />
+        <ReceiptDetails receipt={receipt} business={business} currencySymbol={currencySymbol} isInvoice={isInvoice} showAdminDetails={!!user && (user.role === 'admin' || user.role === 'manager')} />
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3 no-print">

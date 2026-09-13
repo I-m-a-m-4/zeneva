@@ -266,7 +266,10 @@ export default function MarketingFooter() {
           </div>
 
           <div className="mt-8 pt-6 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-white/10">
-            <p className="text-sm text-white/60">{t('footer.rights')}</p>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm text-white/60">{t('footer.rights')}</p>
+              <p className="text-sm text-white/40">Built by Bimex</p>
+            </div>
 
             {/* SEO-Optimized CAC Trust Badge */}
             <div 

@@ -115,8 +115,21 @@ export default function AddProductPage() {
   const [showUpgradeOverlay, setShowUpgradeOverlay] = React.useState(false);
 
   // Variant Builder State
-  const [variantAttributes, setVariantAttributes] = React.useState<{ name: string; values: string }[]>([{ name: 'Size', values: 'S, M, L' }]);
+  const [variantAttributes, setVariantAttributes] = React.useState<{ name: string; values: string }[]>([
+    industryConfig.variantPresets?.[0] || { name: 'Size', values: 'S, M, L' }
+  ]);
   const [variantMatrix, setVariantMatrix] = React.useState<{ combo: string; sku: string; price: number; stock: number; costPrice?: number; imageUrl?: string }[]>([]);
+
+  React.useEffect(() => {
+    if (industryConfig.variantPresets?.[0]) {
+      setVariantAttributes(prev => {
+        if (prev.length === 1 && prev[0].name === 'Size' && prev[0].values === 'S, M, L' && industryConfig.variantPresets![0].name !== 'Size') {
+          return [industryConfig.variantPresets![0]];
+        }
+        return prev;
+      });
+    }
+  }, [industryConfig]);
 
   React.useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__);
@@ -1098,6 +1111,39 @@ export default function AddProductPage() {
                           <Plus className="h-4 w-4 mr-1" /> Add Option
                         </Button>
                       </div>
+
+                      {/* Category-tailored preset buttons */}
+                      {industryConfig.variantPresets && industryConfig.variantPresets.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1 pb-1">
+                          <span className="text-[11px] text-muted-foreground font-medium">
+                            {industryConfig.label} Presets:
+                          </span>
+                          {industryConfig.variantPresets.map((preset, pIdx) => (
+                            <button
+                              key={pIdx}
+                              type="button"
+                              onClick={() => {
+                                setVariantAttributes(prev => {
+                                  const existingIdx = prev.findIndex(a => a.name.toLowerCase() === preset.name.toLowerCase());
+                                  if (existingIdx >= 0) {
+                                    const updated = [...prev];
+                                    updated[existingIdx] = { ...preset };
+                                    return updated;
+                                  }
+                                  if (prev.length === 1 && !prev[0].name.trim() && !prev[0].values.trim()) {
+                                    return [preset];
+                                  }
+                                  return [...prev, preset];
+                                });
+                              }}
+                              className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-secondary/80 hover:bg-primary hover:text-primary-foreground border border-border transition-all flex items-center gap-1 active:scale-95 cursor-pointer shadow-2xs"
+                            >
+                              <span>+ {preset.name}</span>
+                              <span className="text-[10px] opacity-75 font-normal">({preset.values})</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
                       {variantAttributes.map((attr, idx) => (
                         <div key={idx} className="flex gap-2 items-start">

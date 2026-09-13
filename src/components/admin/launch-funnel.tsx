@@ -43,12 +43,20 @@ import {
 } from '@/components/ui/table';
 import {
   AlertTriangle,
+  Calendar,
   DoorOpen,
   Loader2,
   RefreshCw,
   TrendingDown,
   UserPlus,
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useFirestore } from '@/firebase';
 import {
   furthestStage,
@@ -183,9 +191,12 @@ function Breakdown({
   );
 }
 
+type TimeRange = '24h' | '7d' | '14d' | '30d' | '90d' | 'all';
+
 export default function LaunchFunnel() {
   const firestore = useFirestore();
   const [docs, setDocs] = React.useState<LaunchDoc[] | null>(null);
+  const [timeRange, setTimeRange] = React.useState<TimeRange>('all');
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [truncated, setTruncated] = React.useState(false);
@@ -222,18 +233,40 @@ export default function LaunchFunnel() {
     void load();
   }, [load]);
 
+  const filteredDocs = React.useMemo(() => {
+    if (!docs) return null;
+    if (timeRange === 'all') return docs;
+
+    const now = Date.now();
+    const daysMap: Record<TimeRange, number> = {
+      '24h': 1,
+      '7d': 7,
+      '14d': 14,
+      '30d': 30,
+      '90d': 90,
+      'all': 0,
+    };
+    const days = daysMap[timeRange] || 0;
+    const cutoff = now - days * 24 * 60 * 60 * 1000;
+
+    return docs.filter((d) => {
+      const date = launchDate(d);
+      return date ? date.getTime() >= cutoff : false;
+    });
+  }, [docs, timeRange]);
+
   const summary = React.useMemo(
-    () => (docs ? summariseLaunches(docs) : null),
-    [docs],
+    () => (filteredDocs ? summariseLaunches(filteredDocs) : null),
+    [filteredDocs],
   );
 
   /** Never signed up, worst-off first — the list this panel exists to produce. */
   const lostInstalls = React.useMemo(() => {
-    if (!docs) return [];
-    return docs
+    if (!filteredDocs) return [];
+    return filteredDocs
       .filter((d) => !d.signedUp)
       .sort((a, b) => (launchDate(b)?.getTime() || 0) - (launchDate(a)?.getTime() || 0));
-  }, [docs]);
+  }, [filteredDocs]);
 
   return (
     <Card>
@@ -249,14 +282,30 @@ export default function LaunchFunnel() {
               Anonymous — a random per-install id, no email and no typed input.
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            <span className="ml-2">Refresh</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs bg-background">
+                <Calendar className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Timeframe" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="24h">Last 24 hours</SelectItem>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="14d">Last 14 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={isLoading} className="h-8 text-xs">
+              {isLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              <span className="ml-1.5 hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
       </CardHeader>
 
@@ -277,11 +326,26 @@ export default function LaunchFunnel() {
 
         {summary && summary.installs === 0 && !isLoading && (
           <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">No launches recorded yet.</p>
+            <p className="font-medium text-foreground">
+              {timeRange === 'all'
+                ? 'No launches recorded yet.'
+                : 'No launches recorded in this timeframe.'}
+            </p>
             <p className="mt-1 text-xs">
-              This only sees builds that shipped with launch telemetry. Store installs
-              from before it cannot be recovered — they were never recorded anywhere.
-              Numbers appear here once a new build reaches users.
+              {timeRange === 'all' ? (
+                'This only sees builds that shipped with launch telemetry. Store installs from before it cannot be recovered — they were never recorded anywhere. Numbers appear here once a new build reaches users.'
+              ) : (
+                <>
+                  No installs matched the selected period.{' '}
+                  <button
+                    type="button"
+                    onClick={() => setTimeRange('all')}
+                    className="text-primary underline font-medium hover:opacity-80"
+                  >
+                    Switch to All time ({docs?.length || 0} total)
+                  </button>
+                </>
+              )}
             </p>
           </div>
         )}
@@ -293,7 +357,13 @@ export default function LaunchFunnel() {
                 icon={DoorOpen}
                 label="Installs seen"
                 value={summary.installs}
-                hint={truncated ? `Newest ${MAX_DOCS} only` : 'All recorded launches'}
+                hint={
+                  timeRange !== 'all' && docs
+                    ? `${summary.installs} of ${docs.length} total recorded`
+                    : truncated
+                    ? `Newest ${MAX_DOCS} only`
+                    : 'All recorded launches'
+                }
               />
               <StatCard
                 icon={UserPlus}
@@ -439,7 +509,8 @@ export default function LaunchFunnel() {
               <p className="text-[11px] text-muted-foreground">
                 Installs from before launch telemetry shipped are not here and cannot be
                 — nothing recorded them.
-                {truncated && ` Showing the newest ${MAX_DOCS} installs only.`}
+                {truncated && timeRange === 'all' && ` Showing the newest ${MAX_DOCS} installs only.`}
+                {timeRange !== 'all' && docs && ` Showing ${summary.installs} install${summary.installs === 1 ? '' : 's'} in selected period (out of ${docs.length} total).`}
               </p>
             </div>
           </>

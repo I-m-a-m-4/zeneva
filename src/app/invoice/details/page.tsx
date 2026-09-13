@@ -137,7 +137,7 @@ function InvoiceContent() {
             )}
 
             <div ref={receiptContentRef} className="border rounded-lg bg-card overflow-hidden">
-                <ReceiptDetails receipt={invoice} business={business} currencySymbol={currencySymbol} isInvoice={true} />
+                <ReceiptDetails receipt={invoice} business={business} currencySymbol={currencySymbol} isInvoice={true} showAdminDetails={!!user && (user.role === 'admin' || user.role === 'manager')} />
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 no-print">

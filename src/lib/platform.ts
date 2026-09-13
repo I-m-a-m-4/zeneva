@@ -31,6 +31,11 @@ export function isNativeApp(): boolean {
  */
 export function apiBase(): string {
   if (!isNativeApp()) return '';
+  // When running locally in development (e.g. Tauri devUrl pointing to localhost),
+  // use the local dev server so newly added or modified local routes work immediately.
+  if (process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))) {
+    return '';
+  }
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://zeneva.space';
   return base.replace(/\/+$/, '');
 }

@@ -32,7 +32,8 @@ import {
   Truck,
   PackagePlus,
   Sparkles,
-  FileText
+  FileText,
+  ImageOff
 } from "lucide-react";
 import { ReorderInvoiceModal } from '@/components/inventory/reorder-invoice-modal';
 import {
@@ -98,6 +99,7 @@ import CostPriceDialog from '@/components/inventory/cost-price-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { Input } from '@/components/ui/input';
 import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { QuickRestockModal } from '@/components/inventory/quick-restock-modal';
@@ -105,10 +107,12 @@ import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { useBranch } from '@/context/branch-context';
 import { cn, safeToDate } from '@/lib/utils';
+import { apiBase } from '@/lib/platform';
 import { trackFeature } from '@/lib/product-telemetry';
 import Papa from 'papaparse';
 import { logAuditEvent } from '@/lib/audit';
 import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
+import { BulkImageEditor } from '@/components/inventory/bulk-image-editor';
 import BarcodeDialog from '@/components/inventory/barcode-dialog';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { QrCode } from 'lucide-react';
@@ -200,7 +204,7 @@ export default function InventoryPage() {
     );
 }
 
-function InventoryValuation({ products, currencySymbol }: { products: Product[], currencySymbol: string }) {
+function InventoryValuation({ products, currencySymbol, canViewCostPrice }: { products: Product[], currencySymbol: string, canViewCostPrice: boolean }) {
   const { t } = useI18n();
   const metrics = React.useMemo(() => {
     let atCost = 0, atRetail = 0, units = 0, missingCost = 0, skus = 0;
@@ -240,14 +244,18 @@ function InventoryValuation({ products, currencySymbol }: { products: Product[],
             <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Coins className="h-3 w-3" /> Retail Value</p>
             <p className="text-lg font-bold tracking-tight">{currencySymbol}{metrics.atRetail.toLocaleString()}</p>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Box className="h-3 w-3" /> Cost Value</p>
-            <p className="text-lg font-bold tracking-tight">{currencySymbol}{metrics.atCost.toLocaleString()}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3 w-3 rotate-180" /> Potential Profit</p>
-            <p className="text-lg font-bold tracking-tight text-green-600">{currencySymbol}{metrics.potentialProfit.toLocaleString()}</p>
-          </div>
+          {canViewCostPrice && (
+            <>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Box className="h-3 w-3" /> Cost Value</p>
+                <p className="text-lg font-bold tracking-tight">{currencySymbol}{metrics.atCost.toLocaleString()}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-3 w-3 rotate-180" /> Potential Profit</p>
+                <p className="text-lg font-bold tracking-tight text-green-600">{currencySymbol}{metrics.potentialProfit.toLocaleString()}</p>
+              </div>
+            </>
+          )}
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="h-3 w-3" /> Units on Hand</p>
             <p className="text-lg font-bold tracking-tight">{metrics.units.toLocaleString()}</p>
@@ -311,6 +319,7 @@ function InventoryPageContent() {
   const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
   const [showHealthModal, setShowHealthModal] = React.useState(false);
   const [isReorderInvoiceModalOpen, setIsReorderInvoiceModalOpen] = React.useState(false);
+  const [isBulkImageEditorOpen, setIsBulkImageEditorOpen] = React.useState(false);
   const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
 
   const toggleExpandParent = (parentId: string) => {
@@ -396,6 +405,9 @@ function InventoryPageContent() {
 
   const userRole = currentUserProfile?.role;
   const canManageStock = currentUserProfile?.permissions?.manage_inventory ?? (userRole === 'admin' || userRole === 'manager');
+  const canViewCostPrice = userRole === 'admin' || userRole === 'owner' || 
+    (userRole === 'manager' && business?.settings?.allowManagerCostPriceView !== false) ||
+    currentUserProfile?.permissions?.view_cost_price === true;
 
   // Get IDs of products queued for deletion
   const queuedDeletionIds = React.useMemo(() => {
@@ -795,6 +807,17 @@ function InventoryPageContent() {
     // that with a no.
     trackFeature('inventory_csv_import');
     setIsImportOpen(false);
+    
+    toast({
+      title: "Products imported successfully",
+      description: "Do your new products need images? You can add them all at once.",
+      duration: 12000,
+      action: (
+        <ToastAction altText="Bulk add images" onClick={() => setIsBulkImageEditorOpen(true)}>
+          Bulk add images
+        </ToastAction>
+      ),
+    });
   };
 
   const handleBulkEditSuccess = () => {
@@ -808,6 +831,36 @@ function InventoryPageContent() {
   // returned a canned string. Photographing stock is now a source inside
   // SmartImportDialog, which goes through duplicate matching and the review step
   // instead of writing straight to Firestore.
+
+  const handleBulkImageSave = async (updates: { productId: string; imageUrl: string; imageFile: File }[]) => {
+    for (const update of updates) {
+      // Upload image to Firebase via /api/upload
+      let finalImageUrl = update.imageUrl;
+      try {
+        const formData = new FormData();
+        formData.append('file', update.imageFile);
+        const uploadRes = await fetch(`${apiBase()}/api/upload`, { method: 'POST', body: formData });
+        const uploadData = await uploadRes.json();
+        if (uploadRes.ok && uploadData.url) {
+          finalImageUrl = uploadData.url;
+        }
+      } catch {
+        // Fall back to the proxied URL if upload fails
+      }
+
+      addToQueue({
+        type: 'update-product',
+        payload: {
+          productId: update.productId,
+          values: { imageUrl: finalImageUrl }
+        }
+      }, `Updating image for product ${update.productId}`);
+    }
+    toast({
+      title: `${updates.length} image${updates.length !== 1 ? 's' : ''} saved`,
+      description: 'Product images have been updated successfully.'
+    });
+  };
 
   const handleExport = async () => {
     if (!business?.id) return;
@@ -857,10 +910,6 @@ function InventoryPageContent() {
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== DEFAULT_SORT_BY ? 1 : 0);
   return (
     <div className="flex flex-col flex-1 w-full pb-16 md:pb-0">
-      
-      {canManageStock && products && (
-        <InventoryValuation products={products} currencySymbol={currencySymbol} />
-      )}
 
       <div className="flex items-center sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3.5 gap-4 z-10 border-b mb-4">
         <div className="flex flex-col flex-1">
@@ -989,31 +1038,70 @@ function InventoryPageContent() {
               </Button>
             )}
             {canManageStock && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-9 gap-1 border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 hover:text-orange-700 dark:hover:bg-orange-500/20 dark:hover:text-orange-300 hover:border-orange-500/60 font-semibold transition-colors"
-                onClick={() => setIsReorderInvoiceModalOpen(true)}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span className="sm:whitespace-nowrap">⚡ Auto Reorder PO</span>
-              </Button>
-            )}
-            {canManageStock && (
-              <Button size="sm" asChild variant="outline" className="group h-9 gap-1">
-                <Link href="/expenses?tab=purchases">
-                  <Truck className="h-3.5 w-3.5 text-primary group-hover:text-white" />
-                  <span className="sm:whitespace-nowrap">Purchases & Restock</span>
-                </Link>
-              </Button>
-            )}
-            {canManageStock && (
-              <Button size="sm" asChild variant="secondary" className="h-9 gap-1">
-                <Link href="/inventory/debts">
-                  <TrendingDown className="h-3.5 w-3.5" />
-                  <span className="sm:whitespace-nowrap">{t('inventory.manageDebts')}</span>
-                </Link>
-              </Button>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-9 gap-1.5 font-medium border-border/80 hover:bg-muted hover:text-foreground transition-colors">
+                    <Truck className="h-3.5 w-3.5 text-primary" />
+                    <span className="sm:whitespace-nowrap">Restock & Orders</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 p-1.5 shadow-md">
+                  <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                    Restock & Suppliers
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    onClick={() => setIsReorderInvoiceModalOpen(true)}
+                    className="flex items-start gap-2.5 p-2 cursor-pointer rounded-md focus:bg-orange-500/10 focus:text-orange-700 dark:focus:text-orange-300 group"
+                  >
+                    <div className="h-7 w-7 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-orange-500/20 transition-colors">
+                      <FileText className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-xs flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                        ⚡ Auto Reorder PO
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-normal">
+                        Generate purchase order for low stock
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild className="flex items-start gap-2.5 p-2 cursor-pointer rounded-md focus:bg-orange-500/10 focus:text-orange-700 dark:focus:text-orange-300 group">
+                    <Link href="/expenses?tab=purchases" className="flex items-start gap-2.5 w-full">
+                      <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                        <Truck className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-xs">
+                          Purchases & Restock
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Track incoming supplier shipments
+                        </span>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild className="flex items-start gap-2.5 p-2 cursor-pointer rounded-md focus:bg-orange-500/10 focus:text-orange-700 dark:focus:text-orange-300 group">
+                    <Link href="/inventory/debts" className="flex items-start gap-2.5 w-full">
+                      <div className="h-7 w-7 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <TrendingDown className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-xs">
+                          {t('inventory.manageDebts')}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Supplier debt ledger & balances
+                        </span>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {canManageStock && (
               <Button size="sm" asChild className="h-9 gap-1" id="tour-add-product">
@@ -1211,52 +1299,54 @@ function InventoryPageContent() {
           </div>
 
           {/* Top 6 KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card className="bg-card/50 backdrop-blur-sm border-border/60">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Products</p>
-                <p className="text-2xl font-bold mt-1">{analyticsData.totalItems}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{analyticsData.totalUnits.toLocaleString()} units in stock</p>
+              <CardContent className="p-5">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Unique SKUs</p>
+                <p className="text-4xl font-bold mt-2">{analyticsData.totalItems}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total product catalog</p>
               </CardContent>
             </Card>
 
             <Card className="bg-card/50 backdrop-blur-sm border-border/60">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Retail Valuation</p>
-                <p className="text-xl font-bold mt-1 text-emerald-600 truncate">{currencySymbol}{analyticsData.totalRetailValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Total retail value</p>
+              <CardContent className="p-5">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Units on Hand</p>
+                <p className="text-4xl font-bold mt-2">{analyticsData.totalUnits.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">Physical items in stock</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 backdrop-blur-sm border-border/60 border-amber-200 dark:border-amber-900/50">
+              <CardContent className="p-5">
+                <p className="text-xs text-amber-600 dark:text-amber-500 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5" /> Missing Cost Price
+                </p>
+                <p className="text-4xl font-bold mt-2 text-amber-500">{healthMetrics.missingCostPrice}</p>
+                <p className="text-xs text-muted-foreground mt-1">Items missing cost price</p>
               </CardContent>
             </Card>
 
             <Card className="bg-card/50 backdrop-blur-sm border-border/60">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Cost Valuation</p>
-                <p className="text-xl font-bold mt-1 text-blue-600 truncate">{currencySymbol}{analyticsData.totalCostValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Total capital invested</p>
+              <CardContent className="p-5">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Retail Value</p>
+                <p className="text-3xl font-bold mt-2 text-emerald-600 truncate">{currencySymbol}{analyticsData.totalRetailValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total retail value</p>
               </CardContent>
             </Card>
 
             <Card className="bg-card/50 backdrop-blur-sm border-border/60">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Profit Potential</p>
-                <p className="text-xl font-bold mt-1 text-teal-600 truncate">{currencySymbol}{analyticsData.potentialProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">~{analyticsData.marginPercent.toFixed(1)}% Margin • {analyticsData.sellThroughRate.toFixed(1)}% STR</p>
+              <CardContent className="p-5">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Cost Value</p>
+                <p className="text-3xl font-bold mt-2 text-blue-600 truncate">{currencySymbol}{analyticsData.totalCostValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total capital invested</p>
               </CardContent>
             </Card>
 
             <Card className="bg-card/50 backdrop-blur-sm border-border/60">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Reorder Alerts</p>
-                <p className="text-2xl font-bold mt-1 text-amber-500">{analyticsData.belowReorderCount}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Below reorder point</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/50 backdrop-blur-sm border-border/60">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Stockouts</p>
-                <p className="text-2xl font-bold mt-1 text-rose-500">{analyticsData.outOfStockCount}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Zero stock remaining</p>
+              <CardContent className="p-5">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Potential Profit</p>
+                <p className="text-3xl font-bold mt-2 text-teal-600 truncate">{currencySymbol}{analyticsData.potentialProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-xs text-emerald-600 font-semibold mt-1">~{analyticsData.marginPercent.toFixed(1)}% Margin</p>
               </CardContent>
             </Card>
           </div>
@@ -1653,7 +1743,7 @@ function InventoryPageContent() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 flex-wrap">
             <Button
               variant="outline"
               size="sm"
@@ -1664,6 +1754,15 @@ function InventoryPageContent() {
               className="text-xs flex-1 sm:flex-none"
             >
               Select All ({displayedProducts.length})
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsBulkImageEditorOpen(true)}
+              className="text-xs gap-1.5 flex-1 sm:flex-none border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-950/30"
+            >
+              <ImageOff className="h-3.5 w-3.5" />
+              Fetch Images
             </Button>
             <Button
               size="sm"
@@ -2116,6 +2215,14 @@ function InventoryPageContent() {
       <ReorderInvoiceModal
           isOpen={isReorderInvoiceModalOpen}
           onOpenChange={setIsReorderInvoiceModalOpen}
+      />
+      <BulkImageEditor
+        open={isBulkImageEditorOpen}
+        onOpenChange={setIsBulkImageEditorOpen}
+        products={(products || []).filter(p => !p.imageUrl)}
+        onSave={handleBulkImageSave}
+        freeTierLimit={10}
+        isPro={false}
       />
     </div>
 

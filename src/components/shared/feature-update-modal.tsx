@@ -21,19 +21,21 @@ export interface FeatureUpdate {
   actionHref?: string;
   releaseVersion?: string;
   isActive?: boolean;
+  imageUrl?: string;
 }
 
 const DEFAULT_LATEST_UPDATE: FeatureUpdate = {
-  id: 'release_v3_3_0_playstore',
-  title: 'Zeneva is Now Available on Google Play Store!',
-  badge: 'v3.3.0 Update',
+  id: 'release_bulk_image_fetch',
+  title: 'Bulk AI Image Fetch is Here!',
+  badge: 'New Feature',
   description:
-    'You can now download and install Zeneva directly from the Google Play Store on your Android phone or tablet! Manage inventory, process sales, and access Zen AI on the go.',
+    'Imported products via CSV with missing images? Zen AI can now automatically search and fetch images for multiple products at once! Head to your inventory, click "Fetch Images", and let AI do the heavy lifting.',
   videoUrl: '',
+  imageUrl: '/images/bulk-image-promo.png',
   changelogLink: '/notifications',
-  actionText: 'Get on Play Store',
-  actionHref: 'https://play.google.com/store/apps/details?id=com.zeneva.app',
-  releaseVersion: '3.3.0',
+  actionText: 'Try it now',
+  actionHref: '/inventory',
+  releaseVersion: '3.3.2',
   isActive: true,
 };
 
@@ -96,6 +98,7 @@ export function FeatureUpdateModal() {
             actionText: docData.actionText || 'Got it',
             actionHref: docData.actionHref || '',
             releaseVersion: docData.releaseVersion || '3.2.10',
+            imageUrl: docData.imageUrl || '',
             isActive: true,
           };
           setUpdate(activeUpdate);
@@ -200,6 +203,12 @@ export function FeatureUpdateModal() {
                   playsInline
                   className="w-full h-full object-cover"
                 />
+              ) : update.imageUrl ? (
+                <img
+                  src={update.imageUrl}
+                  alt={update.title}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 /* Rich Animated Showcase Canvas in Zeneva Signature Warm Orange */
                 <div className="relative w-full h-full flex flex-col justify-center items-center px-6 text-center overflow-hidden">
@@ -218,8 +227,8 @@ export function FeatureUpdateModal() {
                   {/* Faded Background Typography Watermark */}
                   <div className="absolute inset-0 flex flex-col justify-center items-center opacity-[0.05] pointer-events-none select-none font-black text-5xl sm:text-6xl tracking-tighter text-white leading-tight uppercase">
                     <span>Zeneva</span>
-                    <span>Google Play</span>
-                    <span>Android</span>
+                    <span>Zen AI</span>
+                    <span>Bulk Images</span>
                   </div>
 
                   {/* Hero Animated Content */}

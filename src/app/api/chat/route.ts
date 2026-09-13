@@ -629,7 +629,7 @@ export async function POST(req: Request) {
     // as Zen ignoring the question. 24 leaves room to finish and still bounds
     // a runaway loop.
     stopWhen: stepCountIs(24),
-    onFinish: async ({ toolCalls, usage }) => {
+    onFinish: async ({ text, toolCalls, usage, steps }) => {
       // `usage` is undefined on some provider errors; a missing token count should
       // leave the running total alone rather than add NaN to it.
       const inTok = (usage as any)?.inputTokens ?? (usage as any)?.promptTokens;
@@ -809,10 +809,14 @@ export async function POST(req: Request) {
             createdAt: m?.createdAt || new Date().toISOString(),
           }));
 
-          if (text || (toolCalls && toolCalls.length > 0)) {
+          const assistantText = (typeof text === 'string' && text)
+            ? text
+            : (Array.isArray(steps) ? steps.map((s: any) => s?.text).filter(Boolean).join('\n\n') : '');
+
+          if (assistantText || (toolCalls && toolCalls.length > 0)) {
             formattedMessages.push({
               role: 'assistant',
-              content: text || '',
+              content: assistantText || '',
               toolCalls: (toolCalls || []).map((t: any) => ({
                 toolName: t?.toolName,
                 args: t?.args,

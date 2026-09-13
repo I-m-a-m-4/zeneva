@@ -599,6 +599,9 @@ export interface BusinessInstance {
             preventSalesOutsideHours: boolean;
         };
         allowPosPriceOverride?: boolean;
+        allowCashierExpenseLogging?: boolean;
+        allowManagerCostPriceView?: boolean;
+        requireAdminApprovalForVoids?: boolean;
     };
 }
 

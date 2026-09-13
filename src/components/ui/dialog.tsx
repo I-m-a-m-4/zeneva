@@ -29,10 +29,16 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+interface DialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  hideScrollWrapper?: boolean;
+  contentClassName?: string;
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, hideScrollWrapper, contentClassName, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -43,10 +49,14 @@ const DialogContent = React.forwardRef<
       )}
       {...props}
     >
-      {/* Scrollable inner wrapper — padding lives here so scrollbar never eats it */}
-      <div className="relative flex-1 overflow-y-auto overflow-x-hidden p-6">
-        {children}
-      </div>
+      {hideScrollWrapper ? (
+        children
+      ) : (
+        /* Scrollable inner wrapper — padding lives here so scrollbar never eats it */
+        <div className={cn("relative flex-1 overflow-y-auto overflow-x-hidden p-6", contentClassName)}>
+          {children}
+        </div>
+      )}
       <DialogPrimitive.Close className="absolute right-4 top-4 z-10 rounded-md p-1 opacity-70 transition-all hover:opacity-100 hover:bg-muted hover:rotate-90 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
         <X className="h-6 w-6" />
         <span className="sr-only">Close</span>

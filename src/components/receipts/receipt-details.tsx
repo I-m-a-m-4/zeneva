@@ -12,6 +12,7 @@ interface ReceiptDetailsProps {
     currencySymbol?: string;
     isInvoice?: boolean;
     amountReceived?: number;
+    showAdminDetails?: boolean;
 }
 
 const Watermark = ({ businessName }: { businessName: string }) => (
@@ -21,7 +22,7 @@ const Watermark = ({ businessName }: { businessName: string }) => (
 );
 
 const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetailsProps>(
-    ({ receipt, business, currencySymbol = '₦', isInvoice = false, amountReceived }, ref) => {
+    ({ receipt, business, currencySymbol = '₦', isInvoice = false, amountReceived, showAdminDetails = false }, ref) => {
         const businessName = business?.name || 'Your Business';
         const businessAddress = business?.address || '';
 
@@ -72,9 +73,23 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                             <tbody className="divide-y">
                                 {receipt.items.map((item, index) => (
                                     <tr key={item.productId + index}>
-                                        <td className="py-3 font-medium">{item.name}</td>
+                                        <td className="py-3 font-medium">
+                                            {item.name}
+                                            {showAdminDetails && item.priceOverridden && (
+                                                <span className="ml-2 text-[9px] text-orange-500 font-normal bg-orange-50 dark:bg-orange-500/10 px-1 py-0.5 rounded no-print">
+                                                    Overridden
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="py-3 text-center">{item.quantity}</td>
-                                        <td className="py-3 text-right">{currencySymbol}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        <td className="py-3 text-right">
+                                            {showAdminDetails && item.priceOverridden && item.listPrice && item.listPrice !== item.price && (
+                                                <span className="text-muted-foreground line-through mr-1 text-[9px] no-print">
+                                                    {currencySymbol}{item.listPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </span>
+                                            )}
+                                            {currencySymbol}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </td>
                                         <td className="py-3 text-right">{currencySymbol}{(item.quantity * item.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                     </tr>
                                 ))}
@@ -164,9 +179,19 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                             {receipt.items.map((item, index) => (
                                 <div key={item.productId + index} className="flex justify-between items-start mb-1 text-[10px]">
                                     <div className="flex-1 pr-2">
-                                        <p className="font-medium leading-tight">{item.name}</p>
+                                        <p className="font-medium leading-tight">
+                                            {item.name}
+                                            {showAdminDetails && item.priceOverridden && (
+                                                <span className="ml-1 text-[8px] text-orange-500 font-normal no-print">
+                                                    (Overridden)
+                                                </span>
+                                            )}
+                                        </p>
                                         <p className="text-gray-500 text-[9px] mt-0.5">
-                                            {item.quantity} x {currencySymbol}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {item.quantity} x {showAdminDetails && item.priceOverridden && item.listPrice && item.listPrice !== item.price ? (
+                                                <span className="line-through mr-1 no-print">{currencySymbol}{item.listPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            ) : null}
+                                            {currencySymbol}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <p className="font-medium pt-0.5">{currencySymbol}{(item.quantity * item.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>

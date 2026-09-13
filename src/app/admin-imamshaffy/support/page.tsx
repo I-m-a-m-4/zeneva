@@ -645,7 +645,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
     return (
         // `relative` scopes the edit panel below, which is `absolute inset-0`:
         // without a positioned ancestor it escaped the pane entirely.
-        <div className="relative flex flex-col h-full bg-[#efeae2] dark:bg-slate-950 border rounded-xl overflow-hidden shadow-lg">
+        <div className="relative flex flex-col h-full min-h-0 bg-[#efeae2] dark:bg-slate-950 border rounded-xl overflow-hidden shadow-lg">
             {/* Hidden inputs for real file uploads */}
             <input 
                 type="file" 
@@ -744,7 +744,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
             </div>
 
             {/* Message viewport */}
-            <ScrollArea className="flex-1 p-3 md:p-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat bg-[size:360px]" ref={scrollAreaRef}>
+            <ScrollArea className="flex-1 min-h-0 p-3 md:p-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat bg-[size:360px]" ref={scrollAreaRef}>
                 <div className="space-y-3">
                     {isLoading ? (
                         <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary mt-10" />
@@ -972,7 +972,7 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                                 value={reply}
                                 onChange={(e) => setReply(e.target.value)}
                                 disabled={isSending}
-                                className="flex-1 min-w-0 min-h-[40px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-y rounded-lg text-sm"
+                                className="flex-1 min-w-0 min-h-[40px] max-h-[200px] bg-white dark:bg-slate-800 border-none ring-1 ring-border resize-y rounded-lg text-sm"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();

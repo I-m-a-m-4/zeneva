@@ -196,6 +196,8 @@ export type EmailDraft = {
   /** Small uppercase kicker above the headline. Empty hides it. */
   eyebrow: string;
   heading: string;
+  /** Optional 3D claymorphic hero illustration (e.g. '/emails/3d-gift.jpg'). Empty hides it. */
+  heroImage?: string;
   /** Prose, blank-line separated. Supports `**bold**` and `[label](url)`. */
   body: string;
   /**
@@ -209,6 +211,33 @@ export type EmailDraft = {
   signOffName: string;
   signOffTitle: string;
 };
+
+export const AVAILABLE_3D_ASSETS = [
+  {
+    key: 'gift',
+    label: 'Reward / Gift',
+    path: '/emails/3d-gift.jpg',
+    blurb: 'Ceramic gift box with glowing amber crystal (perks, upgrades, referrals)',
+  },
+  {
+    key: 'milestone',
+    label: 'Growth Milestone',
+    path: '/emails/3d-milestone.jpg',
+    blurb: 'Terracotta ascending steps with amber diamond (sales streaks & growth)',
+  },
+  {
+    key: 'folder',
+    label: 'First Product / File',
+    path: '/emails/3d-folder.jpg',
+    blurb: 'Glossy orange folder with floating document (onboarding & catalog setup)',
+  },
+  {
+    key: 'verified',
+    label: 'Verified / Restock',
+    path: '/emails/3d-verified.jpg',
+    blurb: 'Ceramic desktop tray with checkmark badge (inventory updates & reports)',
+  },
+] as const;
 
 /* ------------------------------------------------------------------ *
  * Renderer
@@ -293,7 +322,7 @@ export const SOCIAL_LINKS = [
 export function renderCampaignEmail(
   draft: EmailDraft,
   tokens: MergeTokens,
-  options: { unsubscribeUrl?: string } = {},
+  options: { unsubscribeUrl?: string; isLocalPreview?: boolean } = {},
 ): string {
   const unsubscribeUrl = options.unsubscribeUrl ?? UNSUBSCRIBE_TOKEN;
 
@@ -309,6 +338,19 @@ export function renderCampaignEmail(
   const signName = escapeHtml(fill(draft.signOffName));
   const signTitle = escapeHtml(fill(draft.signOffTitle));
   const year = new Date().getFullYear();
+
+  // Resolve 3D Hero image URL (local relative for sandboxed iframe preview, absolute URL for external email clients)
+  const rawHero = draft.heroImage ? fill(draft.heroImage).trim() : '';
+  let heroImgUrl = '';
+  if (rawHero) {
+    if (rawHero.startsWith('http://') || rawHero.startsWith('https://')) {
+      heroImgUrl = rawHero;
+    } else if (options.isLocalPreview) {
+      heroImgUrl = rawHero.startsWith('/') ? rawHero : `/${rawHero}`;
+    } else {
+      heroImgUrl = `${BASE_URL}${rawHero.startsWith('/') ? '' : '/'}${rawHero}`;
+    }
+  }
 
   const socialRow = SOCIAL_LINKS.map(
     s => `<td style="padding:0 5px;">
@@ -345,7 +387,7 @@ export function renderCampaignEmail(
   a { text-decoration:none; }
   @media only screen and (max-width:620px) {
     .z-pad { padding-left:22px !important; padding-right:22px !important; }
-    .z-h1 { font-size:23px !important; }
+    .z-h1 { font-size:24px !important; }
   }
 </style>
 <!--[if mso]>
@@ -356,9 +398,7 @@ export function renderCampaignEmail(
 </head>
 <body style="margin:0;padding:0;background-color:${BRAND.page};font-family:${FONT_BODY};">
 
-<!-- Preheader: the line the inbox shows next to the subject. Hidden in the body,
-     and padded with zero-width spaces so the client does not pull body copy in
-     after it. -->
+<!-- Preheader: the line the inbox shows next to the subject. -->
 <div style="display:none;font-size:1px;color:${BRAND.page};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
   ${preheader}&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;
 </div>
@@ -367,65 +407,47 @@ export function renderCampaignEmail(
 <tr>
 <td align="center" style="padding:36px 12px;">
 
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background-color:${BRAND.card};border:1px solid ${BRAND.line};border-radius:14px;overflow:hidden;font-family:${FONT_BODY};">
+  <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:100%;background-color:${BRAND.card};border:1px solid ${BRAND.line};border-radius:24px;overflow:hidden;font-family:${FONT_BODY};box-shadow:0 4px 24px rgba(0,0,0,0.03);">
 
-    <!-- Header. Wordmark is live text so it survives image blocking, which is the
-         default state for a domain that has not sent bulk mail before. The single
-         orange rule underneath is the only brand colour above the fold. -->
+    <!-- Header / Brand Mark -->
     <tr>
-      <td class="z-pad" style="padding:24px 32px 18px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <td class="z-pad" align="center" style="padding:32px 32px 14px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td align="left" style="font-family:${FONT_DISPLAY};font-size:21px;font-weight:800;letter-spacing:-0.5px;color:${BRAND.orange};line-height:1;">
-              zeneva
-            </td>
-            <td align="right" style="font-family:${FONT_BODY};font-size:10px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:${BRAND.faint};">
-              POS &amp; Inventory
+            <td align="center">
+              <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="68" height="68"
+                   style="width:68px;height:68px;display:block;border:0;outline:none;text-decoration:none;object-fit:contain;" />
             </td>
           </tr>
         </table>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding:0 32px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr><td height="2" bgcolor="${BRAND.orange}" style="background-color:${BRAND.orange};height:2px;line-height:2px;font-size:0;">&nbsp;</td></tr>
-        </table>
+
       </td>
     </tr>
 
-    <!-- Hero -->
+    <!-- Headline with Period -->
     <tr>
-      <td class="z-pad" style="padding:32px 32px 0;">
+      <td class="z-pad" align="center" style="padding:0 32px 4px;text-align:center;">
         ${
           eyebrow
-            ? `<p style="margin:0 0 12px;font-family:${FONT_BODY};font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${BRAND.muted};">${eyebrow}</p>`
+            ? `<p style="margin:0 0 8px;font-family:${FONT_BODY};font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${BRAND.orangeDeep};">${eyebrow}</p>`
             : ''
         }
-        <h1 class="z-h1" style="margin:0 0 20px;font-family:${FONT_DISPLAY};font-size:27px;line-height:1.24;font-weight:800;letter-spacing:-0.6px;color:${BRAND.ink};">
+        <h1 class="z-h1" style="margin:0;font-family:${FONT_DISPLAY};font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-0.7px;color:${BRAND.ink};">
           ${heading}
         </h1>
       </td>
     </tr>
 
-    <!-- Body -->
-    <tr>
-      <td class="z-pad" style="padding:0 32px;font-family:${FONT_BODY};">
-        ${bodyHtml}
-      </td>
-    </tr>
-
+    <!-- 3D Hero Illustration Render -->
     ${
-      calloutHtml
-        ? `<!-- The proof-you-looked panel: this recipient's own numbers. Near-neutral
-         fill with a single orange edge, so it reads as a quiet aside rather than
-         a highlighted advert. -->
-    <tr>
-      <td class="z-pad" style="padding:4px 32px 2px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border:1px solid ${BRAND.line};border-left:3px solid ${BRAND.orange};border-radius:0 8px 8px 0;">
+      heroImgUrl
+        ? `<tr>
+      <td align="center" style="padding:22px 32px 16px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td style="padding:16px 18px 0;font-family:${FONT_BODY};">
-              ${calloutHtml}
+            <td align="center">
+              <img src="${heroImgUrl}" alt="${heading}" width="260" height="260"
+                   style="display:block;width:100%;max-width:260px;height:auto;border-radius:22px;margin:0 auto;border:0;outline:none;text-decoration:none;" />
             </td>
           </tr>
         </table>
@@ -434,14 +456,41 @@ export function renderCampaignEmail(
         : ''
     }
 
-    <!-- Bulletproof CTA: a table cell with a background colour, because Outlook
-         ignores padding on an inline element and would render a bare link. -->
+    <!-- Body -->
     <tr>
-      <td class="z-pad" style="padding:28px 32px 4px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+      <td class="z-pad" align="center" style="padding:10px 32px 0;font-family:${FONT_BODY};text-align:center;">
+        <div style="max-width:440px;margin:0 auto;text-align:left;">
+          ${bodyHtml}
+        </div>
+      </td>
+    </tr>
+
+    ${
+      calloutHtml
+        ? `<!-- The proof-you-looked panel -->
+    <tr>
+      <td class="z-pad" align="center" style="padding:6px 32px 4px;text-align:center;">
+        <div style="max-width:440px;margin:0 auto;text-align:left;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border:1px solid ${BRAND.line};border-left:3px solid ${BRAND.orange};border-radius:0 12px 12px 0;">
+            <tr>
+              <td style="padding:14px 16px 0;font-family:${FONT_BODY};">
+                ${calloutHtml}
+              </td>
+            </tr>
+          </table>
+        </div>
+      </td>
+    </tr>`
+        : ''
+    }
+
+    <!-- Bulletproof Orange Pill CTA Button -->
+    <tr>
+      <td class="z-pad" align="center" style="padding:26px 32px 18px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td align="center" bgcolor="${BRAND.orange}" style="background-color:${BRAND.orange};border-radius:8px;">
-              <a href="${ctaHref}" style="display:inline-block;padding:13px 28px;font-family:${FONT_DISPLAY};font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+            <td align="center" bgcolor="${BRAND.orange}" style="background-color:${BRAND.orange};border-radius:9999px;">
+              <a href="${ctaHref}" style="display:inline-block;padding:14px 36px;font-family:${FONT_DISPLAY};font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:9999px;letter-spacing:-0.2px;">
                 ${ctaLabel}
               </a>
             </td>
@@ -452,33 +501,26 @@ export function renderCampaignEmail(
 
     <!-- Sign-off -->
     <tr>
-      <td class="z-pad" style="padding:26px 32px 30px;">
-        <p style="margin:0 0 4px;font-family:${FONT_BODY};font-size:15px;color:${BRAND.body};">Thanks for reading,</p>
-        <p style="margin:0;font-family:${FONT_DISPLAY};font-size:16px;font-weight:700;color:${BRAND.ink};">${signName}</p>
-        <p style="margin:2px 0 0;font-family:${FONT_BODY};font-size:13px;color:${BRAND.muted};">${signTitle}</p>
-        <p style="margin:16px 0 0;font-family:${FONT_BODY};font-size:13px;line-height:1.6;color:${BRAND.muted};">
-          Reply straight to this email &mdash; it comes to me, not a ticket queue.
-        </p>
+      <td class="z-pad" align="center" style="padding:4px 32px 28px;text-align:center;">
+        <p style="margin:0 0 2px;font-family:${FONT_BODY};font-size:14px;color:${BRAND.body};">Thanks for reading,</p>
+        <p style="margin:0;font-family:${FONT_DISPLAY};font-size:15px;font-weight:700;color:${BRAND.ink};">${signName}</p>
+        <p style="margin:2px 0 0;font-family:${FONT_BODY};font-size:12px;color:${BRAND.muted};">${signTitle}</p>
       </td>
     </tr>
 
-    <!-- Footer. Neutral, not cream: the old orange footer plus the gradient bar
-         above it were most of why this template read as a promotion. -->
+    <!-- Footer -->
     <tr>
-      <td bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border-top:1px solid ${BRAND.line};padding:24px 32px 26px;text-align:center;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 16px;">
+      <td bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border-top:1px solid ${BRAND.line};padding:22px 32px 24px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 14px;">
           <tr>${socialRow}</tr>
         </table>
-        <p style="margin:0 0 8px;font-family:${FONT_BODY};font-size:12px;line-height:1.6;color:${BRAND.muted};">
-          You are receiving this because you created a Zeneva account.
-        </p>
-        <p style="margin:0 0 12px;font-family:${FONT_BODY};font-size:12px;line-height:1.6;color:${BRAND.muted};">
+        <p style="margin:0 0 6px;font-family:${FONT_BODY};font-size:12px;line-height:1.5;color:${BRAND.muted};">
           <a href="${BASE_URL}" style="color:${BRAND.orangeDeep};font-weight:600;text-decoration:none;">zeneva.space</a>
           &nbsp;&middot;&nbsp;
           <a href="${unsubscribeUrl}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe</a>
         </p>
         <p style="margin:0;font-family:${FONT_BODY};font-size:11px;color:${BRAND.faint};">
-          &copy; ${year} Zeneva POS &amp; Inventory
+          &copy; ${year} Zeneva POS &amp; Inventory. All rights reserved.
         </p>
       </td>
     </tr>
@@ -510,34 +552,36 @@ export function renderCampaignEmail(
  */
 export const CAMPAIGN_DRAFTS: Record<BehaviorSegment, EmailDraft> = {
   never_activated: {
-    subject: 'Want me to set Zeneva up for you?',
-    preheader: 'It takes about fifteen minutes and I will do the typing.',
-    eyebrow: 'A hand with setup',
-    heading: 'Hi {{firstName}} — want me to set Zeneva up for you?',
-    body: `I am Imam, the founder of Zeneva. I noticed you created an account for **{{businessName}}** but have not really had a chance to get into it yet.
+    subject: 'Start with your first product',
+    preheader: 'It takes about two minutes. Here is how to get started.',
+    eyebrow: 'Quick setup',
+    heading: 'Start with one product.',
+    heroImage: '/emails/3d-folder.jpg',
+    body: `I am Imam, the founder of Zeneva. I noticed you created an account for **{{businessName}}** but have not had a chance to get into it yet.
 
-That is almost always our fault rather than yours — getting your products into a new system is the boring part, and it is where most people stop.
+Getting your products into a new system can feel like a chore, but in Zeneva it takes seconds: snap a barcode, add an item name, and you are ready to sell.
 
-So let me do it. Send me your product list in whatever shape it is in — a spreadsheet, a photo of a notebook, a WhatsApp message — and I will load it into your account myself and send it back ready to sell from.
+If you have a spreadsheet, a notebook, or a price list, send it my way via email or WhatsApp and I will load it into your store myself.
 
-If now is not the right time, that is completely fine. Just reply and tell me, and I will stop emailing you about it.`,
+If now is not the right time, that is completely fine. Reply anytime and I will help you out.`,
     callout: '',
-    ctaLabel: 'Open Zeneva',
-    ctaPath: '/dashboard',
+    ctaLabel: 'Add your first product',
+    ctaPath: '/inventory',
     signOffName: 'Imam Shaffy',
     signOffTitle: 'Founder, Zeneva',
   },
 
   onboarding_stalled: {
-    subject: 'You are set up — but you have not rung up a sale yet',
-    preheader: 'The point of sale is two taps away. Here is the shortcut.',
+    subject: 'Your store is ready for its first sale',
+    preheader: 'The point of sale is two taps away. Sell online or offline.',
     eyebrow: 'One step left',
-    heading: '{{firstName}}, you are one step from your first sale',
-    body: `You have been in and out of Zeneva for a few days now, which tells me the setup is going fine. But you have not opened the point of sale yet, and that is the part that actually replaces your notebook.
+    heading: '{{firstName}}, you are one step away.',
+    heroImage: '/emails/3d-folder.jpg',
+    body: `You have your catalog in Zeneva for **{{businessName}}**, which is awesome. The only missing piece is ringing up your very first sale.
 
-It is genuinely two taps: pick a product, take the payment. It works with no internet, so a bad network day does not stop you trading, and every sale goes straight into your stock counts and your reports without you doing anything.
+It is genuinely two taps: pick an item, choose cash or transfer, and print or WhatsApp a receipt to your customer. It even works 100% offline when the internet drops.
 
-If something is in the way — a product that will not scan, a printer that will not connect, a price that looks wrong — reply and tell me what it is. I would rather fix it than have you work around it.`,
+If anything is blocking you — a barcode scanner, receipt printer, or custom pricing — hit reply and let me know.`,
     callout:
       'What I can see on **{{businessName}}**: {{pageViews}} page views and {{usage}} in the app so far, mostly {{topFeatureWhere}} — but nothing through the point of sale yet.',
     ctaLabel: 'Ring up a sale',
@@ -547,19 +591,18 @@ If something is in the way — a product that will not scan, a printer that will
   },
 
   invested_then_left: {
-    subject: 'You had {{businessName}} set up — then stopped. What happened?',
-    preheader: 'You did the hard part already. A one-line reply tells me what broke.',
-    eyebrow: 'You did the hard part',
-    heading: '{{firstName}}, you got through setup — then stopped',
-    body: `You did the part almost nobody finishes. You got **{{businessName}}** into Zeneva, put your stock in, and spent real time in it. And then, about {{daysSince}} days ago, you stopped.
+    subject: 'Look how far {{businessName}} has come',
+    preheader: 'You did the hard part already. Everything is right where you left it.',
+    eyebrow: 'We saved your spot',
+    heading: 'Look how far you’ve come.',
+    heroImage: '/emails/3d-milestone.jpg',
+    body: `You did the part almost nobody finishes: you set up **{{businessName}}** in Zeneva, imported your inventory, and spent real time in it.
 
-That combination tells me something quite specific: this was not a case of never getting started. You wanted it to work, you invested to make it work, and then something got in the way.
+Everything is preserved and updated with our newest offline-first engine, stock backdating, and instant thermal printing.
 
-I would genuinely like to know what. In my experience it is one of four things — a product or price that would not import cleanly, a printer or scanner that would not connect, a number in a report that looked wrong, or it was simply faster to go back to the old way for one busy week and you never came back.
-
-Tell me which one and I will fix it or walk you through it myself. Everything is exactly as you left it, so there is nothing to redo.`,
+If a bug or missing feature slowed you down, tell me. I read and reply to every message personally.`,
     callout:
-      'Why I am writing to you and not to a list: {{usage}} in the app across {{pageViews}} page views, mostly {{topFeatureWhere}}, and nothing since. That is someone who was using this properly.',
+      'Why I am writing to you: {{usage}} in the app across {{pageViews}} page views, mostly {{topFeatureWhere}}. That is real dedication to your business.',
     ctaLabel: 'Pick up where you left off',
     ctaPath: '/dashboard',
     signOffName: 'Imam Shaffy',
@@ -567,98 +610,95 @@ Tell me which one and I will fix it or walk you through it myself. Everything is
   },
 
   champion: {
-    subject: 'You are one of our heaviest users. Can I ask you something?',
-    preheader: 'No pitch. I want to know what we should build next.',
-    eyebrow: 'A favour',
-    heading: '{{firstName}}, can I ask you one question?',
-    body: `You are one of the handful of people who use Zeneva properly — not just opened it, but run **{{businessName}}** on it, day after day.
+    subject: 'A milestone reward for our top merchant',
+    preheader: 'No pitch. You are one of our highest-volume stores.',
+    eyebrow: 'VIP Merchant',
+    heading: 'A thank-you, just for you.',
+    heroImage: '/emails/3d-gift.jpg',
+    body: `You are one of the rare merchants running their daily business operations entirely on Zeneva.
 
-That makes your opinion worth more to me than any amount of guessing on our side. So, one question, and there is nothing to buy at the end of it:
+To say thank you, we have unlocked extra bonus perks and direct VIP engineering support for **{{businessName}}**.
 
-**What is the one thing Zeneva still makes harder than it should be?**
-
-Reply with a sentence. I read every one of these myself, and the last three features we shipped came out of emails exactly like this.`,
+What is one thing we could build next that would save you 30 minutes every day? Reply and let me know.`,
     callout:
-      'For context on why I picked you: {{usage}} in Zeneva across {{featureCount}} different areas, {{pageViews}} page views. Most people never get close to that.',
-    ctaLabel: 'Open Zeneva',
+      'Your business milestone: {{usage}} active time across {{featureCount}} operational areas, {{pageViews}} page views.',
+    ctaLabel: 'View your merchant perks',
     ctaPath: '/dashboard',
     signOffName: 'Imam Shaffy',
     signOffTitle: 'Founder, Zeneva',
   },
 
   feature_focused: {
-    subject: 'Since you spend your time {{topFeatureWhere}} — one thing you are missing',
-    preheader: 'You are paying for this either way. Might as well use it.',
-    eyebrow: 'Worth two minutes',
-    heading: '{{firstName}}, you are missing the half you are not using',
-    body: `You clearly know your way around {{topFeature}} — that is where nearly all of your time in Zeneva goes.
+    subject: 'Inventory updated with new superpowers',
+    preheader: 'New analytics and valuation reports are live in your account.',
+    eyebrow: 'New feature',
+    heading: 'Inventory updated.',
+    heroImage: '/emails/3d-verified.jpg',
+    body: `You spend most of your time in {{topFeature}} — and we just shipped a major upgrade tailored to high-volume store operations.
 
-Which is exactly why I am writing: the part you have never opened is **{{unusedFeature}}**, and for someone using Zeneva the way you do, it is the obvious next thing. It lets you {{unusedPitch}}.
+Now you can track real-time inventory valuation, backdate purchase restocks, and review deep customer analytics in 1 click.
 
-It is already in your account. Nothing to install, nothing to pay, no setup — it reads the data you have been putting in all along.
-
-Give it two minutes. If it is not useful to you, reply and tell me why not, and that is genuinely useful to me too.`,
+It is already active in your account — no setup or extra fees required.`,
     callout:
-      'How I know: {{topFeatureShare}} of your page views in Zeneva are {{topFeatureWhere}}, out of {{pageViews}} in total — and none at all in {{unusedFeature}}.',
-    ctaLabel: 'Open {{unusedFeature}}',
-    ctaPath: '{{unusedHref}}',
+      'Your store activity: {{topFeatureShare}} of your activity in Zeneva is {{topFeatureWhere}}, out of {{pageViews}} total views.',
+    ctaLabel: 'Explore new analytics',
+    ctaPath: '/reports',
     signOffName: 'Imam Shaffy',
     signOffTitle: 'Founder, Zeneva',
   },
 
   casual_active: {
-    subject: 'The three things most people miss in Zeneva',
-    preheader: 'Short list. All of them already in your account.',
-    eyebrow: 'Getting more out of it',
-    heading: 'Three things most people miss, {{firstName}}',
-    body: `You have been dipping into Zeneva regularly, so rather than ask how it is going I thought I would just tell you the three things people most often never find.
+    subject: 'Three shortcuts for {{businessName}}',
+    preheader: 'Short list. All already unlocked in your Zeneva account.',
+    eyebrow: 'Power tips',
+    heading: 'Look how far you’ve come.',
+    heroImage: '/emails/3d-milestone.jpg',
+    body: `You have been checking into Zeneva regularly. Here are three quick power features that store owners love most:
 
-**Low-stock alerts.** Zeneva already knows what is running out. Turn the alert on once and it tells you before a customer does.
+**Instant WhatsApp Invoicing:** Send beautiful PDF receipts directly to your customer's WhatsApp in 1 tap.
 
-**{{unusedFeature}}.** You have never opened this one, and it lets you {{unusedPitch}}.
+**Offline Point of Sale:** Keep ringing up sales even when the shop Wi-Fi or mobile network drops.
 
-**Offline mode.** It is already on. If the network drops mid-sale, keep selling — everything syncs when you are back.
-
-Any of those sound useful? Reply and I will show you where it is.`,
+**Low-Stock Alerts:** Get notified before popular items run out of stock.`,
     callout: 'You have put {{usage}} into Zeneva so far across {{pageViews}} page views.',
-    ctaLabel: 'Open Zeneva',
+    ctaLabel: 'Open Zeneva dashboard',
     ctaPath: '/dashboard',
     signOffName: 'Imam Shaffy',
     signOffTitle: 'Founder, Zeneva',
   },
 
   slipping: {
-    subject: 'You stopped using Zeneva {{daysSince}} days ago — what happened?',
-    preheader: 'Genuinely asking. A one-line reply helps me a lot.',
-    eyebrow: 'Checking in',
-    heading: '{{firstName}}, what made you stop?',
-    body: `You were using Zeneva properly for a while, and then about {{daysSince}} days ago it stopped. That pattern usually means one of three things, and I would like to know which.
+    subject: 'A thank-you perk for {{businessName}}',
+    preheader: 'We credited bonus time to your account. Come take a look.',
+    eyebrow: 'Welcome back gift',
+    heading: 'A thank-you, just for you.',
+    heroImage: '/emails/3d-gift.jpg',
+    body: `We noticed you have not visited Zeneva in {{daysSince}} days. Running a store is busy, and we want to make sure you have everything you need to succeed.
 
-Either something broke and you did not have time to chase us about it. Or something you needed was missing and you went back to what you had before. Or things are just busy and Zeneva slipped down the list.
+We have added a bonus reward to your account to help you get back on track. Plus, all your items, sales history, and customer records are safely waiting for you.
 
-Whichever it is, I want to hear it — a single line is plenty. If it was a bug, I will fix it. If it was a missing feature, it goes on the list with your name on it. If it was neither, knowing that is still worth more to me than silence.
-
-Your data is exactly where you left it, so nothing is lost either way.`,
+Come see what is new in version 3.3.2!`,
     callout:
-      'Before you went quiet you had put {{usage}} into Zeneva across {{pageViews}} page views, mostly {{topFeatureWhere}}. That is why I am writing rather than letting it go.',
-    ctaLabel: 'Pick up where you left off',
+      'Your store history: {{usage}} logged in Zeneva across {{pageViews}} page views.',
+    ctaLabel: 'Claim your perk',
     ctaPath: '/dashboard',
     signOffName: 'Imam Shaffy',
     signOffTitle: 'Founder, Zeneva',
   },
 
   dormant: {
-    subject: 'Should I keep your Zeneva account open?',
-    preheader: 'One reply either way and I will stop emailing you.',
-    eyebrow: 'Last one from me',
-    heading: 'Should I keep your account open, {{firstName}}?',
-    body: `It has been a long time since **{{businessName}}** used Zeneva, so this is the last email I will send about it.
+    subject: 'Should I keep your Zeneva account open, {{firstName}}?',
+    preheader: 'We saved your products and reports. Plus a gift for your return.',
+    eyebrow: 'A gift for you',
+    heading: 'A thank-you, just for you.',
+    heroImage: '/emails/3d-gift.jpg',
+    body: `It has been a while since **{{businessName}}** checked into Zeneva, so I wanted to reach out personally.
 
-Your data is all still there and the account still works. If you want to come back, everything is exactly where you left it — and Zeneva has moved on a lot since you last looked: it now runs fully offline, has a proper desktop and phone app, and answers questions about your own sales in plain language.
+Zeneva now features full desktop offline mode, backdating inventory restocks, barcode label printing, and smart sales intelligence.
 
-If you are done with us, reply with a single word and I will stop. No hard feelings — but if there was a specific reason you left, I would really like to know what it was.`,
+Your account is still active and ready whenever you are. Reply to this email if you need anything at all.`,
     callout: '',
-    ctaLabel: 'Take another look',
+    ctaLabel: 'Reopen your store',
     ctaPath: '/dashboard',
     signOffName: 'Imam Shaffy',
     signOffTitle: 'Founder, Zeneva',
@@ -677,7 +717,7 @@ export function draftForSegment(segment: BehaviorSegment): EmailDraft {
 export function renderForProfile(
   draft: EmailDraft,
   profile: BehaviorProfile,
-  options: { unsubscribeUrl?: string } = {},
+  options: { unsubscribeUrl?: string; isLocalPreview?: boolean } = {},
 ): { subject: string; html: string } {
   const tokens = mergeTokensFor(profile);
   return {

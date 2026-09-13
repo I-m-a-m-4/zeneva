@@ -15,7 +15,7 @@ import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, sign
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import { usePOS } from '@/context/pos-context';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader, ChevronLeft, ChevronRight, Building, UserCheck, Play, Pause, Sparkles, ArrowRight, Clock } from 'lucide-react';
+import { Eye, EyeOff, Loader, ChevronLeft, ChevronRight, Building, UserCheck, Play, Pause, Sparkles, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AppConfig } from '@/lib/config';
 import Image from 'next/image';
@@ -296,6 +296,18 @@ function SignupPageContent() {
         await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
         await waitForUserProfile(firestore, user.uid);
         triggerRefresh();
+
+        // Send welcome email asynchronously
+        fetch('/api/emails/welcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            firstName: user.displayName?.split(' ')[0] || '',
+            businessName: invitationDetails?.businessName || ''
+          })
+        }).catch(err => console.error('Failed to send welcome email:', err));
+
         // Brief pause so the POS context has time to pick up the new auth state
         await new Promise(resolve => setTimeout(resolve, 1200));
         router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
@@ -361,6 +373,18 @@ function SignupPageContent() {
       await waitForUserProfile(firestore, userCredential.user.uid);
 
       triggerRefresh();
+
+      // Send welcome email asynchronously
+      fetch('/api/emails/welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userCredential.user.email,
+          firstName: '',
+          businessName: invitationDetails?.businessName || ''
+        })
+      }).catch(err => console.error('Failed to send welcome email:', err));
+
       await new Promise(resolve => setTimeout(resolve, 1500));
       router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
 
@@ -399,10 +423,6 @@ function SignupPageContent() {
               <p className="text-balance text-sm sm:text-base text-muted-foreground">
                 {t('auth.signupSubtitle')}
               </p>
-              <div className="inline-flex items-center justify-center gap-1.5 py-1 px-3.5 mx-auto mt-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold shadow-xs">
-                <Clock className="h-3.5 w-3.5 shrink-0" />
-                <span>{t('auth.setupTimeBadge', { defaultValue: 'Takes 30 seconds to set up • Free forever plan' })}</span>
-              </div>
             </div>
 
             {isLoadingInvitation ? (

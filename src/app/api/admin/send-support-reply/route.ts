@@ -115,10 +115,11 @@ export async function POST(req: Request) {
                 <tr>
                   <td style="padding: 40px 40px 32px 40px; background-color: #ffffff;">
                     
-                    <!-- BRAND LOGO -->
-                    <div style="margin-bottom: 28px;">
-                      <img src="https://iili.io/Cim1paf.png" alt="Zeneva" style="height: 36px; width: auto; display: block; border: 0; outline: none; text-decoration: none;" />
+                    <!-- BRAND LOGO (3D Shape Mark — circle + crescent, no wordmark) -->
+                    <div style="margin-bottom: 28px; text-align: center;">
+                      <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="72" height="72" style="width: 72px; height: 72px; object-fit: contain; display: inline-block; border: 0; outline: none; text-decoration: none;" />
                     </div>
+
 
                     <!-- SUBTITLE & TITLE -->
                     <div style="font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700; color: #ea580c; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px;">

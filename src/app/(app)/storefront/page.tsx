@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, Eye, Palette, Upload, Search, Package, Check, Twitter, Instagram, Facebook, Phone, Trash2, RefreshCcw, Banknote, CreditCard, ChevronRight, ChevronLeft, SlidersHorizontal, Share2, MapPin, Clock, Mail, ChevronDown } from 'lucide-react';
+import { Loader2, Copy, Eye, Palette, Upload, Search, Package, Check, Twitter, Instagram, Facebook, Phone, Trash2, RefreshCcw, Banknote, CreditCard, ChevronRight, ChevronLeft, SlidersHorizontal, Share2, MapPin, Clock, Mail, ChevronDown, Shirt, Sparkles } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePOS } from '@/context/pos-context';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,8 @@ import { AppConfig } from '@/lib/config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { apiBase } from '@/lib/platform';
+import { isFashionIndustry } from '@/lib/industry';
+import { Badge } from '@/components/ui/badge';
 
 const colorPresets = [
     { name: 'Orange (Default)', value: '22 90% 55%' },
@@ -135,28 +137,71 @@ function StorefrontPreview({ settings, bannerPreview, business }: { settings: an
                 </div>
             </div>
             <main className={cn("flex-1 p-4 pt-8", !hasProducts && "min-h-[400px]")}>
-                <h2 className="text-2xl font-bold mb-4">Our Products</h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold">Our Products</h2>
+                    {settings.layoutMode === 'lookbook' && (
+                        <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary border-primary/20 text-xs px-2.5 py-0.5">
+                            <Sparkles className="h-3 w-3" /> Lookbook Collection
+                        </Badge>
+                    )}
+                </div>
                 {hasProducts ? (
-                    <div className={cn("grid grid-cols-2 md:grid-cols-3 gap-4", gridClass)}>
-                        {previewProducts.map((p, i) => (
-                            <div key={`${p.id}-${i}`} className="border rounded-md overflow-hidden">
-                                <div className="w-full h-24 bg-muted relative">
-                                    {p.imageUrl && <Image src={p.imageUrl.includes(',') ? p.imageUrl.split(',')[0].trim() : p.imageUrl} alt={p.name} fill className="object-cover" />}
-                                </div>
-                                <div className="p-2">
-                                    <p className="text-xs font-medium truncate">{p.name}</p>
-                                    <div className="flex justify-between items-center mt-1">
-                                        <p className="text-xs text-primary font-semibold">₦{p.price}</p>
-                                        <Button size="sm" className="h-6 px-2 text-xs">Buy</Button>
+                    settings.layoutMode === 'lookbook' ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                            {previewProducts.map((p, i) => (
+                                <div key={`${p.id}-${i}`} className="group relative rounded-xl overflow-hidden border bg-card shadow-xs flex flex-col hover:shadow-md transition-all duration-300">
+                                    <div className="w-full aspect-[3/4] bg-muted/30 relative overflow-hidden flex items-center justify-center">
+                                        {p.imageUrl ? (
+                                            <Image 
+                                                src={p.imageUrl.includes(',') ? p.imageUrl.split(',')[0].trim() : p.imageUrl} 
+                                                alt={p.name} 
+                                                fill 
+                                                className="object-cover group-hover:scale-105 transition-transform duration-500" 
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/40 bg-muted/20">
+                                                <Shirt className="w-10 h-10 mb-1" />
+                                                <span className="text-[10px] font-medium uppercase tracking-wider">Lookbook Item</span>
+                                            </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                                            <span className="text-white text-xs font-medium">Quick View Look</span>
+                                        </div>
+                                    </div>
+                                    <div className="p-3.5 flex flex-col justify-between flex-1 bg-background/95">
+                                        <div>
+                                            <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
+                                            <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">{p.category || 'Fashion & Apparel'}</p>
+                                        </div>
+                                        <div className="flex justify-between items-center mt-3 pt-2 border-t border-border/40">
+                                            <span className="text-sm font-bold text-primary">₦{p.price.toLocaleString()}</span>
+                                            <Button size="sm" className="h-7 px-3 text-xs rounded-lg">Buy</Button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className={cn("grid grid-cols-2 md:grid-cols-3 gap-4", gridClass)}>
+                            {previewProducts.map((p, i) => (
+                                <div key={`${p.id}-${i}`} className="border rounded-md overflow-hidden">
+                                    <div className="w-full h-24 bg-muted relative">
+                                        {p.imageUrl && <Image src={p.imageUrl.includes(',') ? p.imageUrl.split(',')[0].trim() : p.imageUrl} alt={p.name} fill className="object-cover" />}
+                                    </div>
+                                    <div className="p-2">
+                                        <p className="text-xs font-medium truncate">{p.name}</p>
+                                        <div className="flex justify-between items-center mt-1">
+                                            <p className="text-xs text-primary font-semibold">₦{p.price}</p>
+                                            <Button size="sm" className="h-6 px-2 text-xs">Buy</Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
                 ) : (
                     <div className="h-full flex items-center justify-center text-muted-foreground">No products to display.</div>
                 )}
-
             </main>
 
 
@@ -175,6 +220,8 @@ function StorefrontCustomizationPage() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
+    const isFashion = isFashionIndustry(business?.settings?.industry || (business as any)?.category);
+
     const [storeSettings, setStoreSettings] = React.useState({
         enabled: false,
         headline: '',
@@ -182,6 +229,7 @@ function StorefrontCustomizationPage() {
         description: '',
         bannerImageUrl: '',
         desktopColumns: 4,
+        layoutMode: 'standard',
         footerText: '',
         socialTwitter: '',
         socialInstagram: '',
@@ -530,7 +578,7 @@ function StorefrontCustomizationPage() {
                 const formData = new FormData();
                 formData.append('file', imageFile);
                 try {
-                    const response = await fetch(`/api/upload`, { method: 'POST', body: formData });
+                    const response = await fetch(`${apiBase()}/api/upload`, { method: 'POST', body: formData });
                     const result = await response.json();
                     if (!response.ok || !result.url) {
                         throw new Error(result.error || 'Image upload failed.');
@@ -657,6 +705,48 @@ function StorefrontCustomizationPage() {
                                                         <div className="h-full w-full rounded" style={{ backgroundColor: `hsl(${preset.value})` }}></div>
                                                     </button>
                                                 ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label htmlFor="layoutMode">Storefront Layout Style</Label>
+                                                {isFashion && (
+                                                    <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border border-primary/20">
+                                                        ✨ Recommended for Fashion
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSettingsChange('layoutMode', 'standard')}
+                                                    className={cn(
+                                                        "p-3 rounded-lg border text-start transition-all",
+                                                        (storeSettings as any).layoutMode !== 'lookbook'
+                                                            ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                                            : "border-border hover:bg-muted/50"
+                                                    )}
+                                                >
+                                                    <p className="text-xs font-semibold text-foreground">Standard Grid</p>
+                                                    <p className="text-[11px] text-muted-foreground mt-0.5">Classic e-commerce product grid</p>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSettingsChange('layoutMode', 'lookbook')}
+                                                    className={cn(
+                                                        "p-3 rounded-lg border text-start transition-all",
+                                                        (storeSettings as any).layoutMode === 'lookbook'
+                                                            ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                                            : "border-border hover:bg-muted/50"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-xs font-semibold text-foreground flex items-center gap-1">
+                                                            <Shirt className="h-3.5 w-3.5 text-primary" /> Visual Lookbook
+                                                        </p>
+                                                    </div>
+                                                    <p className="text-[11px] text-muted-foreground mt-0.5">High-impact 3:4 portrait apparel cards</p>
+                                                </button>
                                             </div>
                                         </div>
                                         <div>

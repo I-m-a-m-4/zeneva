@@ -32,7 +32,7 @@ import {
   orderBy,
   query,
 } from 'firebase/firestore';
-import { AlertTriangle, BanIcon, Mail, RefreshCw, Send, Users } from 'lucide-react';
+import { AlertTriangle, BanIcon, Mail, RefreshCw, Send, Sparkles, Users } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
@@ -371,8 +371,8 @@ function EmailMarketingConsole() {
             Audience
           </TabsTrigger>
           <TabsTrigger value="compose" className="shrink-0 gap-1.5">
-            <Send className="h-3.5 w-3.5" />
-            Compose
+            <Sparkles className="h-3.5 w-3.5" />
+            Templates &amp; Compose
             {selectedIds.size > 0 && (
               <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
                 {selectedIds.size}

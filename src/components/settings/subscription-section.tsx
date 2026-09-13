@@ -20,56 +20,57 @@ import { track } from '@vercel/analytics';
 import { AI_MONTHLY_LIMITS, effectivePlan, isPaidPlan, isPaidPlanExpired } from '@/lib/plan';
 import { apiBase } from '@/lib/platform';
 import { usePOS } from '@/context/pos-context';
+import { useI18n } from '@/context/i18n-context';
 
 const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
 
-/**
- * What each paid plan advertises here must match the marketing pages
- * (`src/components/home/pricing-plans.tsx` and `src/app/pricing/pricing-content.tsx`).
- * A shop reads the homepage before it reaches this screen, so a feature listed
- * there and missing here reads as a downgrade at the moment of payment.
- *
- * Zen AI allowances are pulled from `AI_MONTHLY_LIMITS` rather than typed out, so
- * changing a limit in one place cannot leave this list quietly overselling. They
- * are **credits**, not messages: a turn costs one credit or twenty depending on the
- * work it does, so wording this as "messages" oversells the allowance to exactly
- * the heavy user who is about to pay for it.
- */
-const plans = [
+type PlanDef = {
+    name: string;
+    price: number;
+    priceUSD: number;
+    features: string[];
+    planId: string;
+};
+
+const getPlans = (t: (key: string) => string): PlanDef[] => [
     {
-        name: 'Pro',
+        name: t('pricing.proName'),
         price: 10000,
         priceUSD: 10,
         features: [
-            'Up to 1,500 products & 5 staff accounts',
-            'Advanced Point of Sale (POS) with barcode scanning',
-            'Invoicing & Debt Management',
-            `Zen AI — ${AI_MONTHLY_LIMITS.pro.toLocaleString()} credits/month`,
-            'Smart Bulk Inventory Import',
-            'Shareable Receipt Links (WhatsApp/SMS)',
-            'Backorders & Backdating',
-            'Advanced Reports & Analytics',
-            'AI Product Data Troubleshooter',
-            'Granular Staff Permissions (RBAC)',
-            'Secure Audit Log',
+            `${t('pricing.proF1')} & ${t('pricing.proF2')}`,
+            t('pricing.proF3'),
+            t('pricing.proF4'),
+            t('pricing.proF5'),
+            t('pricing.proF6'),
+            t('pricing.proF7'),
+            t('pricing.proF8'),
+            t('pricing.proF9'),
+            t('pricing.proF10'),
+            t('pricing.proF12'),
+            t('pricing.proF11'),
+            t('pricing.proF13'),
+            t('pricing.proF14'),
         ],
         planId: 'pro',
     },
     {
-        name: 'Business',
+        name: t('pricing.bizName'),
         price: 30000,
         priceUSD: 30,
         features: [
-            'Everything in Pro',
-            'Unlimited products & staff accounts',
-            'Multi-Branch Management',
-            'Integrated Zeneva Terminal (Anti-Theft)',
-            `Zen AI — ${AI_MONTHLY_LIMITS.business.toLocaleString()} credits/month`,
-            'AI Business Performance Dashboard',
-            'Advanced Customer Intelligence (CRM+)',
-            'Inventory Velocity Reports (ABC Analysis)',
-            'Automated Email Receipts',
-            'Priority Phone & Email Support'
+            t('pricing.bizF1'),
+            t('pricing.bizF2'),
+            t('pricing.bizF8'),
+            t('pricing.bizF9'),
+            t('pricing.bizF3'),
+            t('pricing.bizF4'),
+            t('pricing.bizF5'),
+            t('pricing.bizF6'),
+            t('pricing.bizF7'),
+            t('pricing.bizF10'),
+            t('pricing.bizF11'),
+            t('pricing.bizF12'),
         ],
         planId: 'business',
     }
@@ -94,7 +95,7 @@ const PaystackSubscriptionButton = ({
     setProcessingPlan,
     currency
 }: { 
-    plan: typeof plans[0], 
+    plan: PlanDef, 
     cycle: typeof billingCycles[0],
     finalAmount: number,
     userProfile: UserProfile, 
@@ -293,7 +294,7 @@ const DodoSubscriptionButton = ({
     isProcessing, 
     setProcessingPlan
 }: { 
-    plan: typeof plans[0], 
+    plan: PlanDef, 
     cycle: typeof billingCycles[0],
     finalAmount: number,
     userProfile: UserProfile, 
@@ -429,6 +430,8 @@ const DodoSubscriptionButton = ({
 
 // Main component that uses the button
 export default function SubscriptionSection({ userProfile, businessInstance }: { userProfile: UserProfile; businessInstance: BusinessInstance; }) {
+    const { t } = useI18n();
+    const plans = getPlans(t);
     const [processingPlan, setProcessingPlan] = useState<string | null>(null);
     const [globalCycleId, setGlobalCycleId] = useState('12m');
     const [activeSelection, setActiveSelection] = useState<{ planId: string, cycleId: string }>({ planId: 'pro', cycleId: '12m' });

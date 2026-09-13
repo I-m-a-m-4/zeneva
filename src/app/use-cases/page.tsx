@@ -107,9 +107,9 @@ const USE_CASES: UseCase[] = [
     icon: Shirt,
     pain: 'One style becomes twenty rows once you account for size and colour, and last season quietly eats your cash.',
     solves: [
+      { label: 'Fast size-switching at checkout', detail: 'Cashiers tap garments to switch sizes (XS–XXL) with instant in-stock chips and zero checkout friction.' },
+      { label: 'Highly visual lookbooks', detail: 'Showcase apparel in editorial lookbook layouts with high-res model photography and 1-tap WhatsApp ordering.' },
       { label: 'Real variant products', detail: 'A parent style holds its variants, each with its own SKU, price and stock count, grouped under one name in the catalogue.' },
-      { label: 'Trapped-cash analysis', detail: 'Ask Zen AI what is not moving and it reports the money sitting in slow stock, per product.' },
-      { label: 'Category splits', detail: 'Reports break takings down by category so you can see which rail actually pays.' },
     ],
     offline: 'Sales, variant lookup and stock edits all work with no connection.',
     keywords: ['fashion', 'boutique', 'clothing', 'apparel', 'shoes', 'thrift', 'tailor'],

@@ -42,7 +42,10 @@ import {
     BookOpen,
     Sparkles,
     Smartphone,
-    Search
+    Search,
+    Tag,
+    Wallet,
+    PieChart
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -230,6 +233,9 @@ export default function Home() {
 
                             {/* Left Column: Copy & Form */}
                             <div className="max-w-xl z-10 mx-auto lg:mx-0 text-center lg:text-start">
+                                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/25 text-xs font-semibold text-primary mb-5 shadow-2xs hover:bg-primary/15 transition-all">
+                                    <span>✨ NEW: Instant Web Image Search — Add product photos in 1 click</span>
+                                </div>
                                 <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900"><T k="landing.heroEyebrow" /></p>
                                 <h1 className="leading-[0.95] lg:text-6xl xl:text-7xl text-4xl md:text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
                                     <T k="landing.heroLine1" /><br />
@@ -491,6 +497,39 @@ export default function Home() {
                                         iconColor: "text-amber-600",
                                         hoverBg: "bg-[#FFFBEB]", // Light Amber
                                         badgeKey: "landing.badgeHighlyShared"
+                                    },
+                                    {
+                                        icon: Tag,
+                                        titleKey: "landing.f16t",
+                                        descKey: "landing.f16d",
+                                        bgColor: "bg-lime-100",
+                                        iconColor: "text-lime-600",
+                                        hoverBg: "bg-[#F7FEE7]" // Light Lime
+                                    },
+                                    {
+                                        icon: Wallet,
+                                        titleKey: "landing.f17t",
+                                        descKey: "landing.f17d",
+                                        bgColor: "bg-emerald-100",
+                                        iconColor: "text-emerald-600",
+                                        hoverBg: "bg-[#ECFDF5]" // Light Emerald
+                                    },
+                                    {
+                                        icon: PieChart,
+                                        titleKey: "landing.f18t",
+                                        descKey: "landing.f18d",
+                                        bgColor: "bg-violet-100",
+                                        iconColor: "text-violet-600",
+                                        hoverBg: "bg-[#F5F3FF]" // Light Violet
+                                    },
+                                    {
+                                        icon: Search,
+                                        titleKey: "landing.f19t",
+                                        descKey: "landing.f19d",
+                                        bgColor: "bg-amber-100",
+                                        iconColor: "text-amber-600",
+                                        hoverBg: "bg-[#FFFBEB]", // Light Amber
+                                        badgeKey: "landing.badgeNew"
                                     }
                                 ].map((feature, index) => (
                                     <div key={index} className="group relative p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg overflow-hidden transition-all duration-300 isolate cursor-pointer shadow-sm">

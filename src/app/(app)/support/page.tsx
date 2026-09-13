@@ -364,13 +364,35 @@ type Message = {
 
 function ZenAIChatBot({ userProfile }: { userProfile?: UserProfile }) {
     const firestore = useFirestore();
-    const [messages, setMessages] = React.useState<Message[]>([
-        { sender: 'ai', text: "Hi! I'm Zen AI. Ask me anything about Zeneva, or ask me to add a product to your inventory!" }
-    ]);
+    const [messages, setMessages] = React.useState<Message[]>([]);
     const [input, setInput] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(false);
     const { toast } = useToast();
     const { t } = useI18n();
+
+    React.useEffect(() => {
+        let greeting = "Hi! I'm Zen AI. Ask me anything about Zeneva, or ask me to add a product to your inventory!";
+        try {
+            const historyStr = sessionStorage.getItem('zeneva_recent_pages');
+            if (historyStr) {
+                const history: string[] = JSON.parse(historyStr);
+                const lastVisited = history.reverse().find(p => p !== '/support'); // Find the most recent non-support page
+                
+                if (lastVisited?.startsWith('/inventory')) {
+                    greeting = "Hi there! Do you need help managing your products, or are you looking for advanced features like bulk editing and variations? I can guide you!";
+                } else if (lastVisited?.startsWith('/sales/pos')) {
+                    greeting = "Welcome! Are you looking for help setting up your POS, connecting a printer, or applying discounts? Just ask!";
+                } else if (lastVisited?.startsWith('/settings')) {
+                    greeting = "Hello! Need help configuring your store or setting up staff permissions? Let me know what you're looking for.";
+                } else if (lastVisited?.startsWith('/reports') || lastVisited?.startsWith('/dashboard')) {
+                    greeting = "Hi! Do you need help understanding a specific report or finding the right analytics for your business?";
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to read page history", e);
+        }
+        setMessages([{ sender: 'ai', text: greeting }]);
+    }, []);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();

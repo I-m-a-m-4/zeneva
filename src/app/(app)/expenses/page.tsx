@@ -198,6 +198,8 @@ function ExpensesAndPurchasesContent() {
   const initialTabParam = searchParams.get('tab');
 
   const { business, currentUserProfile, products } = usePOS();
+  
+  const canViewPurchasesAndSuppliers = currentUserProfile?.role !== 'vendor_operator';
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -1029,19 +1031,23 @@ function ExpensesAndPurchasesContent() {
 
       {/* ======================== UNIFIED TABS ======================== */}
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-        <TabsList className="grid w-full sm:w-[580px] grid-cols-3">
+        <TabsList className={`grid w-full ${canViewPurchasesAndSuppliers ? 'sm:w-[580px] grid-cols-3' : 'sm:w-[200px] grid-cols-1'}`}>
           <TabsTrigger value="expenses" className="flex items-center gap-2">
             <Wallet className="h-4 w-4" />
             Operating Expenses ({expenses.length})
           </TabsTrigger>
-          <TabsTrigger value="purchases" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Stock Purchases ({purchases.length})
-          </TabsTrigger>
-          <TabsTrigger value="suppliers" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Suppliers ({suppliers.length})
-          </TabsTrigger>
+          {canViewPurchasesAndSuppliers && (
+            <>
+              <TabsTrigger value="purchases" className="flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                Stock Purchases ({purchases.length})
+              </TabsTrigger>
+              <TabsTrigger value="suppliers" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Suppliers ({suppliers.length})
+              </TabsTrigger>
+            </>
+          )}
         </TabsList>
 
         {/* ============================================================= */}

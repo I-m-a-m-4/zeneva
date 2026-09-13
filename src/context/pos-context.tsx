@@ -39,7 +39,7 @@ import {   syncProductsToOffline,
   getCachedAuditLogs,
   offlineDbUsable
 } from '@/lib/sqlite-sync';
-import { isNativeApp, isMobileApp } from '@/lib/platform';
+import { isNativeApp, isMobileApp, apiBase } from '@/lib/platform';
 import { reportAnomaly } from '@/lib/error-logger';
 import {
   classifyProductSyncFailure,
@@ -2927,7 +2927,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const formData = new FormData();
       formData.append('file', imageFile);
       try {
-        const response = await fetch(`/api/upload`, { method: 'POST', body: formData });
+        const response = await fetch(`${apiBase()}/api/upload`, { method: 'POST', body: formData });
         const result = await response.json();
         if (response.ok && result.url) {
           imageUrl = result.url;

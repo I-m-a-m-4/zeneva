@@ -49,6 +49,7 @@ import {
   type BehaviorSegment,
 } from '@/lib/behavior-segments';
 import {
+  AVAILABLE_3D_ASSETS,
   CAMPAIGN_FROM,
   CAMPAIGN_REPLY_TO,
   mergeTokensFor,
@@ -57,6 +58,29 @@ import {
   type EmailDraft,
 } from '@/lib/email-templates';
 import { TONE_CLASSES } from './segment-styles';
+
+/** Sample merchant for instant template previewing without selecting recipients. */
+export const SAMPLE_MERCHANT_PROFILE: BehaviorProfile = {
+  userId: 'sample_ada',
+  businessId: 'sample_biz',
+  name: 'Ada Lovelace',
+  firstName: 'Ada',
+  businessName: "Ada's Retail Store",
+  email: 'ada@example.com',
+  phone: '+2348012345678',
+  segment: 'feature_focused',
+  contactable: true,
+  optedOut: false,
+  usageSeconds: 5400,
+  pageViews: 142,
+  topFeature: 'selling',
+  topFeatureShare: 0.76,
+  unusedHighValue: ['ai', 'reports'],
+  daysSinceSeen: 2,
+  lastPage: '/sales/pos',
+  familiesTouched: 4,
+  plan: 'pro',
+};
 
 /**
  * Gap between sends. Resend's default limit is ~2 requests/second; 600 ms keeps a
@@ -121,16 +145,18 @@ export default function CampaignComposer({
   const [progress, setProgress] = React.useState<{ done: number; total: number } | null>(null);
   const abortRef = React.useRef(false);
 
+  const isPreviewMode = recipients.length === 0;
+
   // Excluded here rather than mid-loop, so the count the operator confirms is the
   // count that actually gets mailed.
   const mailable = React.useMemo(() => recipients.filter(r => r.contactable), [recipients]);
   const excluded = recipients.length - mailable.length;
 
-  const previewProfile = mailable[previewIndex] ?? mailable[0] ?? null;
+  const previewProfile = mailable[previewIndex] ?? mailable[0] ?? SAMPLE_MERCHANT_PROFILE;
 
   React.useEffect(() => {
     // Keep the preview pointer inside the list when the selection shrinks.
-    if (previewIndex >= mailable.length) setPreviewIndex(0);
+    if (previewIndex >= mailable.length && mailable.length > 0) setPreviewIndex(0);
   }, [mailable.length, previewIndex]);
 
   /**
@@ -150,14 +176,14 @@ export default function CampaignComposer({
     if (!previewProfile) return null;
     // A dead href in the preview: the real one needs the tracking id, which only
     // exists once `sendEmail` has minted it.
-    return renderForProfile(draft, previewProfile, { unsubscribeUrl: '#' });
+    return renderForProfile(draft, previewProfile, { unsubscribeUrl: '#', isLocalPreview: true });
   }, [draft, previewProfile]);
 
   /** Tokens the operator has typed that nothing will fill. */
   const strayTokens = React.useMemo(() => {
     if (!previewProfile) return [];
     const tokens = mergeTokensFor(previewProfile);
-    const fields = [draft.subject, draft.heading, draft.eyebrow, draft.body, draft.callout, draft.ctaLabel, draft.ctaPath];
+    const fields = [draft.subject, draft.heading, draft.eyebrow, draft.body, draft.callout, draft.ctaLabel, draft.ctaPath, draft.heroImage || ''];
     return [...new Set(fields.flatMap(f => unknownTokensIn(f, tokens)))];
   }, [draft, previewProfile]);
 
@@ -242,56 +268,119 @@ export default function CampaignComposer({
     }
   }
 
-  if (recipients.length === 0) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-          <Users className="h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-medium">Nobody selected yet</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
-            Go to the Audience tab, pick a behaviour segment, and tick the people you
-            want to write to. The template and the numbers in it follow from what
-            they actually do in the app.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      {/* ---------------- Left: the draft ---------------- */}
-      <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Template
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Each one is written for a behaviour, not a plan. Picking one replaces
-              the draft below.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {BEHAVIOR_SEGMENT_ORDER.map(segment => (
+    <div className="flex flex-col gap-4">
+      {isPreviewMode && (
+        <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-950 dark:text-amber-200">
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-lg bg-amber-500/20 p-1.5 text-amber-700 dark:text-amber-300">
+              <Eye className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Template Showcase &amp; Preview Mode</p>
+              <p className="text-muted-foreground text-xs">
+                You can browse, customize, and preview all 3D templates with sample merchant data (<span className="font-medium text-foreground">Ada Lovelace · Ada&apos;s Retail Store</span>).
+                When ready to send to real customers, select them in the <strong>Audience</strong> tab.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        {/* ---------------- Left: the draft ---------------- */}
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Template
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Each one is written for a behaviour, not a plan. Picking one replaces
+                the draft below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {BEHAVIOR_SEGMENT_ORDER.map(segment => (
+                <button
+                  key={segment}
+                  type="button"
+                  onClick={() => onPickTemplate(segment)}
+                  title={BEHAVIOR_SEGMENT_META[segment].blurb}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
+                    templateSegment === segment
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : cn(TONE_CLASSES[BEHAVIOR_SEGMENT_META[segment].tone], 'hover:opacity-80'),
+                  )}
+                >
+                  {BEHAVIOR_SEGMENT_META[segment].label}
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* 3D Hero Visual Selector */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="text-base">🍊</span>
+                3D Hero Visual
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Select a signature 3D claymorphic asset for the email hero.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {AVAILABLE_3D_ASSETS.map(asset => {
+                const isSelected = draft.heroImage === asset.path;
+                return (
+                  <button
+                    key={asset.key}
+                    type="button"
+                    onClick={() => {
+                      const next: EmailDraft = { ...draft, heroImage: asset.path };
+                      onDraftChange(next);
+                    }}
+                    title={asset.blurb}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all text-xs',
+                      isSelected
+                        ? 'border-primary bg-primary/10 font-semibold text-primary ring-2 ring-primary/30'
+                        : 'border-border bg-card hover:bg-muted/50 text-muted-foreground',
+                    )}
+                  >
+                    <img
+                      src={asset.path}
+                      alt={asset.label}
+                      className="h-9 w-9 rounded-lg object-cover border border-border shadow-sm"
+                    />
+                    <div className="min-w-0 pr-1">
+                      <p className="truncate font-medium text-foreground text-xs">{asset.label}</p>
+                      <p className="truncate text-[10px] text-muted-foreground max-w-[120px]">{asset.blurb.split('(')[0]}</p>
+                    </div>
+                  </button>
+                );
+              })}
               <button
-                key={segment}
                 type="button"
-                onClick={() => onPickTemplate(segment)}
-                title={BEHAVIOR_SEGMENT_META[segment].blurb}
+                onClick={() => {
+                  const next: EmailDraft = { ...draft, heroImage: '' };
+                  onDraftChange(next);
+                }}
                 className={cn(
-                  'rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors',
-                  templateSegment === segment
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : cn(TONE_CLASSES[BEHAVIOR_SEGMENT_META[segment].tone], 'hover:opacity-80'),
+                  'flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs transition-all',
+                  !draft.heroImage
+                    ? 'border-primary bg-primary/10 font-semibold text-primary ring-2 ring-primary/30'
+                    : 'border-border bg-card hover:bg-muted/50 text-muted-foreground',
                 )}
               >
-                {BEHAVIOR_SEGMENT_META[segment].label}
+                <BanIcon className="h-4 w-4" />
+                <span>No image</span>
               </button>
-            ))}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
         <Card>
           <CardHeader className="pb-3">
@@ -510,6 +599,14 @@ export default function CampaignComposer({
                   Stop
                 </Button>
               </div>
+            ) : isPreviewMode ? (
+              <Button
+                disabled
+                className="gap-2 opacity-70"
+              >
+                <Users className="h-4 w-4" />
+                Select merchants in Audience tab to send
+              </Button>
             ) : (
               <Button
                 onClick={handleSend}
@@ -528,5 +625,6 @@ export default function CampaignComposer({
         </Card>
       </div>
     </div>
+  </div>
   );
 }

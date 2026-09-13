@@ -58,6 +58,7 @@ import BusinessHealthIndicator from '@/components/dashboard/business-health-indi
 import QueueStatus from '@/components/layout/queue-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CachedImage } from '@/components/shared/cached-image';
+import PageTracker from '@/components/support/page-tracker';
 import { useNativeNotifications } from '@/hooks/use-native-notifications';
 import { useFCM } from '@/hooks/use-fcm';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -1263,6 +1264,11 @@ export default function AuthenticatedLayout({
         if (isForeign) return false;
       }
 
+      // 5. RBAC settings
+      if (item.href === '/expenses' && userRole === 'vendor_operator') {
+          if (businessInstance?.settings?.allowCashierExpenseLogging !== true) return false;
+      }
+
       return true;
     });
   };
@@ -1325,7 +1331,8 @@ export default function AuthenticatedLayout({
       (protectedRoute.startsWith('/inventory') && permissions.manage_inventory === false) ||
       (protectedRoute === '/customers' && permissions.view_customers === false) ||
       (protectedRoute === '/audit-log' && permissions.view_audit_logs === false) ||
-      (protectedRoute === '/online-orders' && permissions.manage_online_orders === false);
+      (protectedRoute === '/online-orders' && permissions.manage_online_orders === false) ||
+      (protectedRoute === '/expenses' && userRole === 'vendor_operator' && businessInstance?.settings?.allowCashierExpenseLogging !== true);
 
     const isExplicitlyAllowed = 
       (protectedRoute === '/reports' && permissions.view_reports === true) ||
@@ -1402,6 +1409,7 @@ export default function AuthenticatedLayout({
           <div
             className="relative flex h-full w-full overflow-hidden high-fidelity-shell"
           >
+            <PageTracker />
             <Confetti trigger={isConfettiActive} onComplete={handleConfettiComplete} />
             <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print overflow-hidden">
               <SidebarHeader className="p-2 flex items-center gap-2 justify-center">

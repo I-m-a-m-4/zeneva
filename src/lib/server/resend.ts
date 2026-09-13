@@ -86,8 +86,8 @@ function wrapInTemplate(body: string): string {
   const year = new Date().getFullYear();
   return `
     <div style="font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-      <div style="background-color: #fcfcfc; padding: 25px; border-bottom: 1px solid #f5f5f5;">
-        <div style="font-size: 20px; font-weight: 800; color: #f97316; letter-spacing: -0.5px;">Zeneva</div>
+      <div style="background-color: #fcfcfc; padding: 25px; border-bottom: 1px solid #f5f5f5; text-align: center;">
+        <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="60" height="60" style="width: 60px; height: 60px; object-fit: contain; display: inline-block; border: 0;" />
       </div>
 
       <div style="padding: 40px 30px; color: #1f2937; line-height: 1.7; font-size: 15px;">

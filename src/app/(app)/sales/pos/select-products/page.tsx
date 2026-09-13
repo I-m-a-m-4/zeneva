@@ -4,11 +4,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock } from "lucide-react";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock, Shirt, Smartphone, Pill, Coffee } from "lucide-react";
 import { CachedImage } from "@/components/shared/cached-image";
 import Link from "next/link";
-import *as React from "react";
+import * as React from "react";
 import type { Product } from '@/types';
+import { isFashionIndustry, getIndustryConfig, type IndustryConfig } from "@/lib/industry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ import { CatalogUnavailable } from "@/components/shared/catalog-unavailable";
 import HeldSalesDrawer from "@/components/pos/held-sales-drawer";
 import { useI18n } from "@/context/i18n-context";
 import { Label } from "@/components/ui/label";
+import { useUser } from "@/firebase";
 
 
 function ProductCardSkeleton() {
@@ -45,14 +47,29 @@ function ProductCardSkeleton() {
     );
 }
 
-const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addToCart, onPreview }: {
+function renderCategoryIcon(icon?: string, size = 16) {
+    switch (icon) {
+        case 'shirt': return <Shirt size={size} />;
+        case 'smartphone': return <Smartphone size={size} />;
+        case 'pill': return <Pill size={size} />;
+        case 'coffee': return <Coffee size={size} />;
+        default: return <Package size={size} />;
+    }
+}
+
+const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addToCart, onPreview, variants, isFashion, industryConfig }: {
     product: Product,
     currencySymbol: string,
     handleAddToCart: (product: Product) => void,
     addToCart: any,
-    onPreview: (src: string, alt: string) => void
+    onPreview: (src: string, alt: string) => void,
+    variants?: Product[],
+    isFashion?: boolean,
+    industryConfig?: IndustryConfig
 }) => {
     const { t } = useI18n();
+    const hasVariants = variants && variants.length > 0;
+
     return (
         <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
             <CardContent
@@ -70,12 +87,12 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
 
                 ) : (
                     <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground/40">
-                        <Package size={40} />
+                        {renderCategoryIcon(industryConfig?.fastSwitcherIcon, 38)}
                     </div>
                 )}
             </CardContent>
             <CardHeader className="px-4 py-1 flex-grow">
-                <CardTitle className="text-sm font-medium leading-tight line-clamp-3 min-h-[3.25rem] text-foreground flex items-center gap-1.5 flex-wrap">
+                <CardTitle className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.5rem] text-foreground flex items-center gap-1.5 flex-wrap">
                     <Link
                         href={`/inventory/details?id=${product.id}`}
                         className="hover:text-primary hover:underline transition-colors"
@@ -86,10 +103,51 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                     {(product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services') ? (
                         <Badge variant="outline" className="text-[10px] h-4 bg-blue-500/10 text-blue-500 border-blue-500/20 px-1 py-0">{t('pos.serviceBadge')}</Badge>
                     ) : (
-                        (product.stock || 0) <= 0 && <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0 bg-red-500/10 text-red-500 border-red-500/20">{t('pos.outOfStock')}</Badge>
+                        (product.stock || 0) <= 0 && !hasVariants && <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0 bg-red-500/10 text-red-500 border-red-500/20">{t('pos.outOfStock')}</Badge>
                     )}
                 </CardTitle>
             </CardHeader>
+
+            {/* Fast Size-Switching Chips on Card */}
+            {hasVariants && (
+                <div className="px-4 pb-2 pt-0 flex flex-wrap gap-1 items-center">
+                    {variants.slice(0, 4).map(v => {
+                        const inStock = (v.stock ?? 0) > 0;
+                        return (
+                            <button
+                                key={v.id}
+                                type="button"
+                                disabled={!inStock}
+                                className={cn(
+                                    "text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all select-none active:scale-95",
+                                    inStock 
+                                        ? "bg-secondary/60 hover:bg-primary hover:text-primary-foreground border-border/80 text-foreground cursor-pointer shadow-2xs" 
+                                        : "opacity-40 line-through bg-muted/20 border-border/40 cursor-not-allowed text-muted-foreground"
+                                )}
+                                title={`${v.variantValue || v.name} (${v.stock} in stock)`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    addToCart(v);
+                                }}
+                            >
+                                {v.variantValue || v.name.replace(`${product.name} - `, '')}
+                            </button>
+                        );
+                    })}
+                    {variants.length > 4 && (
+                        <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:text-primary px-1 font-semibold hover:underline"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(product);
+                            }}
+                        >
+                            +{variants.length - 4} more
+                        </button>
+                    )}
+                </div>
+            )}
 
             <CardFooter className="px-4 pb-4 pt-0 flex justify-between items-end mt-auto">
                 <div className="flex flex-col">
@@ -97,7 +155,17 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                     {product.baseUnit && <span className="text-[10px] text-muted-foreground">{t('pos.perUnit', { unit: product.baseUnit })}</span>}
                 </div>
 
-                {product.uomConversions && product.uomConversions.length > 0 ? (
+                {hasVariants ? (
+                    <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-10 px-3 rounded-lg border-primary/30 text-primary hover:bg-primary/10 flex items-center gap-1.5 text-xs font-semibold shadow-2xs" 
+                        onClick={() => handleAddToCart(product)}
+                    >
+                        {renderCategoryIcon(industryConfig?.fastSwitcherIcon, 14)}
+                        <span>{industryConfig?.cardActionLabel || 'Options'} ({variants.length})</span>
+                    </Button>
+                ) : product.uomConversions && product.uomConversions.length > 0 ? (
                     <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                             <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center">
@@ -250,6 +318,10 @@ const CartContents = () => {
         business
     } = usePOS();
     const { t } = useI18n();
+    const { currentUserProfile } = useUser();
+
+    const canOverridePrice = currentUserProfile?.role === 'admin' || 
+        (currentUserProfile?.role === 'manager' && business?.settings?.allowPosPriceOverride !== false);
 
     // Suppress SSR/client hydration mismatch: cart is read from localStorage which
     // doesn't exist on the server. Render a neutral placeholder until mounted.
@@ -307,7 +379,7 @@ const CartContents = () => {
                                 removeFromCart={removeFromCart}
                                 updateCartItemPrice={updateCartItemPrice}
                                 t={t}
-                                allowPosPriceOverride={business?.settings?.allowPosPriceOverride ?? false}
+                                allowPosPriceOverride={canOverridePrice}
                             />
                         );
                     })}
@@ -456,15 +528,36 @@ export default function SelectProductsPage() {
 
 
 
+    const industryConfig = React.useMemo(() => {
+        return getIndustryConfig(business?.settings?.industry || (business as any)?.category);
+    }, [business]);
+
+    const isFashion = React.useMemo(() => {
+        return isFashionIndustry(business?.settings?.industry || (business as any)?.category);
+    }, [business]);
+
+    const productVariants = React.useMemo(() => {
+        const map = new Map<string, Product[]>();
+        (products || []).forEach(p => {
+            if (p.parentId) {
+                const list = map.get(p.parentId) || [];
+                list.push(p);
+                map.set(p.parentId, list);
+            }
+        });
+        return map;
+    }, [products]);
+
     const [variantParent, setVariantParent] = React.useState<Product | null>(null);
 
     const handleAddToCart = React.useCallback((product: Product) => {
-        if (product.type === 'variant') {
+        const childVariants = products?.filter(p => p.parentId === product.id) || [];
+        if (product.type === 'variant' || childVariants.length > 0) {
             setVariantParent(product);
         } else {
             addToCart(product);
         }
-    }, [addToCart]);
+    }, [addToCart, products]);
 
     const handleScan = (sku: string) => {
         const product = products?.find(p => p.sku === sku);
@@ -595,6 +688,9 @@ export default function SelectProductsPage() {
                                                 handleAddToCart={() => handleAddToCart(product)}
                                                 addToCart={addToCart}
                                                 onPreview={(src, alt) => setPreviewImage({ src, alt })}
+                                                variants={productVariants.get(product.id) || []}
+                                                isFashion={isFashion}
+                                                industryConfig={industryConfig}
                                             />
                                         ))}
                                     </div>
@@ -720,29 +816,81 @@ export default function SelectProductsPage() {
             </div>
 
             <Dialog open={!!variantParent} onOpenChange={(open) => !open && setVariantParent(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Select Variant for {variantParent?.name}</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-2 max-h-[60vh] overflow-y-auto">
-                        {products?.filter(p => p.parentId === variantParent?.id).map(variant => (
-                            <Button
-                                key={variant.id}
-                                variant="outline"
-                                className="justify-between h-auto py-3 hover:bg-muted hover:text-foreground"
-                                onClick={() => {
-                                    addToCart(variant);
-                                    setVariantParent(null);
-                                    toast({ title: t('pos.addedToCart'), description: variant.name });
-                                }}
-                            >
-                                <div className="flex flex-col items-start">
-                                    <span className="font-medium">{variant.variantValue}</span>
-                                    <span className="text-xs text-muted-foreground">{variant.stock} in stock</span>
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+                    <DialogHeader className="p-4 pb-3 border-b bg-muted/20">
+                        <div className="flex items-center gap-3">
+                            <div className="h-14 w-14 rounded-xl bg-muted border overflow-hidden relative shrink-0 flex items-center justify-center shadow-xs">
+                                {variantParent?.imageUrl ? (
+                                    <CachedImage
+                                        src={variantParent.imageUrl}
+                                        alt={variantParent.name}
+                                        className="w-full h-full object-contain"
+                                    />
+                                ) : (
+                                    <span className="text-muted-foreground/60">
+                                        {renderCategoryIcon(industryConfig?.fastSwitcherIcon, 28)}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="min-w-0 flex-1 pr-6">
+                                <div className="flex items-center gap-2">
+                                    <DialogTitle className="text-base font-bold truncate">
+                                        {variantParent?.name}
+                                    </DialogTitle>
+                                    <Badge variant="secondary" className="text-[10px] font-bold h-4 shrink-0 bg-primary/10 text-primary border border-primary/20">
+                                        {industryConfig?.fastSwitcherBadge || '⚡ Fast Switcher'}
+                                    </Badge>
                                 </div>
-                                <span className="font-bold">{currencySymbol}{variant.price.toLocaleString()}</span>
-                            </Button>
-                        ))}
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Base: <span className="font-semibold text-foreground">{currencySymbol}{variantParent?.price?.toLocaleString()}</span> • Tap any {industryConfig?.fastSwitcherIcon === 'shirt' ? 'size' : industryConfig?.fastSwitcherIcon === 'smartphone' ? 'spec' : industryConfig?.fastSwitcherIcon === 'pill' ? 'dosage' : 'option'} to add to cart
+                                </p>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="p-4 max-h-[60vh] overflow-y-auto">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                            {products?.filter(p => p.parentId === variantParent?.id).map(variant => {
+                                const inStock = (variant.stock ?? 0) > 0;
+                                return (
+                                    <button
+                                        key={variant.id}
+                                        type="button"
+                                        disabled={!inStock}
+                                        onClick={() => {
+                                            addToCart(variant);
+                                            setVariantParent(null);
+                                            toast({ 
+                                                title: t('pos.addedToCart'), 
+                                                description: `${variant.name} (${variant.variantValue || 'Selected size'})` 
+                                            });
+                                        }}
+                                        className={cn(
+                                            "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all text-center relative group select-none",
+                                            inStock 
+                                                ? "border-border/80 hover:border-primary hover:bg-primary/5 active:scale-95 cursor-pointer bg-card shadow-2xs" 
+                                                : "border-border/30 bg-muted/20 opacity-50 cursor-not-allowed"
+                                        )}
+                                    >
+                                        <span className="text-base font-bold text-foreground group-hover:text-primary tracking-tight">
+                                            {variant.variantValue || variant.name.replace(`${variantParent?.name} - `, '')}
+                                        </span>
+                                        <span className="text-xs font-semibold text-muted-foreground mt-0.5">
+                                            {currencySymbol}{variant.price.toLocaleString()}
+                                        </span>
+                                        <div className="mt-1.5 flex items-center gap-1.5">
+                                            <span className={cn(
+                                                "h-1.5 w-1.5 rounded-full",
+                                                inStock ? (variant.stock > 5 ? "bg-emerald-500" : "bg-amber-500") : "bg-rose-500"
+                                            )} />
+                                            <span className="text-[10px] text-muted-foreground font-medium">
+                                                {inStock ? `${variant.stock} in stock` : 'Sold out'}
+                                            </span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
