@@ -119,6 +119,12 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                 );
                 const cameraId = backCamera ? backCamera.id : devices[0].id;
 
+                // Check if element is still mounted after async camera permission/listing delays
+                if (!document.getElementById("barcode-reader")) {
+                    console.log("Scanner unmounted during init");
+                    return;
+                }
+
                 await scannerInstance.start(
                     cameraId,
                     {

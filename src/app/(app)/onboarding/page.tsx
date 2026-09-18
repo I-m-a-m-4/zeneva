@@ -45,6 +45,7 @@ const LOCALE_CODES = LOCALES.map(l => l.code) as [LocaleCode, ...LocaleCode[]];
 const onboardingSchemaBase = z.object({
   organizationName: z.string(),
   industry: z.string(),
+  customIndustry: z.string().optional(),
   address: z.string().optional(),
   state: z.string(),
   country: z.string(),
@@ -559,17 +560,17 @@ const OnboardingStepper = ({ currentStep, steps }: { currentStep: number, steps:
     <ol role="list" className="flex items-center justify-between w-full relative">
       {/* Background connecting line */}
       <div className="absolute top-5 left-4 right-4 h-0.5 bg-muted z-0" />
-      
+
       {/* Active progress line */}
-      <div 
-        className="absolute top-5 left-4 h-0.5 bg-primary transition-all duration-500 ease-in-out z-0" 
+      <div
+        className="absolute top-5 left-4 h-0.5 bg-primary transition-all duration-500 ease-in-out z-0"
         style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 96}%` }}
       />
 
       {steps.map((step, stepIdx) => {
         const isCompleted = stepIdx < currentStep - 1;
         const isActive = stepIdx === currentStep - 1;
-        
+
         return (
           <li key={step.name} className="relative flex flex-col items-center flex-1 z-10">
             {isCompleted ? (
@@ -585,7 +586,7 @@ const OnboardingStepper = ({ currentStep, steps }: { currentStep: number, steps:
                 <step.icon className="h-5 w-5 text-muted-foreground" />
               </div>
             )}
-            
+
             <span className={cn(
               "mt-3 text-xs font-semibold whitespace-nowrap transition-colors duration-300",
               isActive ? "text-primary font-bold" : "text-muted-foreground"
@@ -624,16 +625,25 @@ export default function OnboardingPage() {
     return z.object({
       organizationName: z.string().min(3, t.orgNameMin),
       industry: z.string().min(1, t.industryMin),
+      customIndustry: z.string().optional(),
       address: z.string().optional(),
       state: z.string().min(2, t.stateMin),
       country: z.string().min(2, t.countryMin),
       currency: z.string().min(1, t.currencyMin),
       language: z.enum(LOCALE_CODES),
+    }).superRefine((data, ctx) => {
+      if (data.industry === 'Other' && (!data.customIndustry || data.customIndustry.trim() === '')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please specify your industry.",
+          path: ["customIndustry"],
+        });
+      }
     });
   }, [t]);
 
   const steps = React.useMemo(() => [
-    { name: t.stepProfile, icon: Building, fields: ['organizationName', 'industry', 'language'] },
+    { name: t.stepProfile, icon: Building, fields: ['organizationName', 'industry', 'customIndustry', 'language'] },
     { name: t.stepLocation, icon: MapPin, fields: ['address', 'state', 'country'] },
     { name: t.stepCurrency, icon: Landmark, fields: ['currency'] },
   ], [t]);
@@ -653,7 +663,7 @@ export default function OnboardingPage() {
         setDoc(doc(firestore, 'users', authUser.uid), {
           onboardingStep: step,
           onboardingLastActive: serverTimestamp()
-        }, { merge: true }).catch(() => {});
+        }, { merge: true }).catch(() => { });
       });
     }
   }, [step, firestore, mounted]);
@@ -734,18 +744,22 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
     try {
       const batch = writeBatch(firestore);
-      
+
       let localTimezone = 'Africa/Lagos';
       try {
         localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Lagos';
-      } catch {}
-      
+      } catch { }
+
       // 1. Update Business Instance
       const businessDocRef = doc(firestore, 'businessInstances', bId);
+      const finalIndustry = data.industry === 'Other' && data.customIndustry 
+        ? data.customIndustry 
+        : data.industry;
+
       batch.update(businessDocRef, {
         name: data.organizationName,
         address: data.address,
-        'settings.industry': data.industry,
+        'settings.industry': finalIndustry,
         'settings.state': data.state,
         'settings.country': data.country,
         'settings.currency': data.currency,
@@ -773,12 +787,12 @@ export default function OnboardingPage() {
       // 3. Create Welcome Notification
       const notifRef = doc(collection(firestore, `users/${authUser.uid}/notifications`));
       batch.set(notifRef, {
-          title: "Welcome to Zeneva",
-          body: `Hi ${currentUserProfile?.name || 'there'}, your organization setup for ${data.organizationName} is complete. Explore your dashboard to get started!`,
-          createdAt: serverTimestamp(),
-          read: false,
-          type: 'system',
-          clickable: false
+        title: "Welcome to Zeneva",
+        body: `Hi ${currentUserProfile?.name || 'there'}, your organization setup for ${data.organizationName} is complete. Explore your dashboard to get started!`,
+        createdAt: serverTimestamp(),
+        read: false,
+        type: 'system',
+        clickable: false
       });
 
       await batch.commit();
@@ -849,7 +863,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="fixed inset-0 z-50 w-full flex flex-col items-center justify-center min-h-screen py-8 px-4 lg:px-8 bg-background/40 overflow-y-auto backdrop-blur-sm">
-      
+
       <div className="w-full max-w-4xl space-y-5 sm:space-y-6 bg-gradient-to-b from-orange-500/10 via-card/95 to-card/95 dark:via-card/80 dark:to-card/80 backdrop-blur-xl border border-dashed border-orange-500/40 p-6 sm:p-8 rounded-xl my-auto shadow-none">
         <div className="text-center mb-6 relative z-10">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
@@ -894,6 +908,17 @@ export default function OnboardingPage() {
                           </FormControl>
                           <FormMessage className="text-[11px]" /></FormItem>
                       )} />
+                      {form.watch("industry") === "Other" && (
+                        <FormField control={form.control} name="customIndustry" render={({ field }) => (
+                          <FormItem className="space-y-2">
+                            <FormLabel className="text-xs sm:text-sm font-semibold">Please specify <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. Photography" className="h-10 sm:h-12 text-sm shadow-none" {...field} value={field.value || ''} />
+                            </FormControl>
+                            <FormMessage className="text-[11px]" />
+                          </FormItem>
+                        )} />
+                      )}
                       <FormField control={form.control} name="language" render={({ field }) => (
                         <FormItem className="space-y-2">
                           <FormLabel className="text-xs sm:text-sm font-semibold">{t.language}</FormLabel>

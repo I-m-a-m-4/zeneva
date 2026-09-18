@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireSuperAdmin, corsHeaders } from '../_guard';
-import { getFirebaseAdminApp } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+import { adminFirestore } from '@/firebase/admin';
 
 export async function POST(req: Request) {
     const auth = await requireSuperAdmin(req);
@@ -15,8 +16,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing businessId' }, { status: 400, headers: corsHeaders });
         }
 
-        const admin = await getFirebaseAdminApp();
-        const db = admin.firestore();
+        const db = adminFirestore;
+        if (!db) {
+            return NextResponse.json({ error: 'Firestore admin not initialized' }, { status: 500, headers: corsHeaders });
+        }
 
         const transactions: any[] = [];
         let receiptsCount = 0;

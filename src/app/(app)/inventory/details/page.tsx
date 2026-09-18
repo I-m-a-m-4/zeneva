@@ -283,9 +283,22 @@ function EditProductContent() {
         
         const mapped = sorted.map((tx: any) => {
             let balanceAfter = currentBalance;
+            let anomalies: string[] = [];
+
             if (tx.closingStock !== undefined) {
+                if (currentBalance !== tx.closingStock && tx.id !== sorted[0]?.id) {
+                    anomalies.push('Balance discrepancy detected against logged closing stock.');
+                }
                 balanceAfter = tx.closingStock;
                 currentBalance = tx.closingStock; // Sync up if it was explicitly logged
+            }
+
+            if (balanceAfter < 0) {
+                anomalies.push('Stock was oversold (balance dropped below zero).');
+            }
+
+            if ((tx.type === 'in' || tx.type === 'out') && !tx.referenceId && !tx.notes?.includes('Initial')) {
+                anomalies.push('Missing transaction reference ID.');
             }
 
             // Calculate what the stock was before this transaction to pass to the next older one
@@ -298,7 +311,8 @@ function EditProductContent() {
 
             return {
                 ...tx,
-                computedBalance: balanceAfter
+                computedBalance: balanceAfter,
+                anomalies
             };
         });
 
@@ -320,7 +334,7 @@ function EditProductContent() {
     }, [combinedLogs, logFilter]);
 
     const salesData = React.useMemo(() => {
-        const salesLogs = combinedLogs.filter((log: any) => log.action === 'product.sale');
+        const salesLogs = combinedLogs.filter((log: any) => log.type === 'out');
         const dataMap: Record<string, number> = {};
 
         if (salesPeriod === '30d') {
@@ -329,11 +343,12 @@ function EditProductContent() {
                 dataMap[format(d, 'dd MMM')] = 0;
             }
             salesLogs.forEach((log: any) => {
-                if (!log.createdAt) return;
-                const d = log.createdAt.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
+                const dateVal = log.date || log.createdAt;
+                if (!dateVal) return;
+                const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
                 const key = format(d, 'dd MMM');
                 if (dataMap[key] !== undefined) {
-                    const soldQty = log.details?.adjustment ? Math.abs(log.details.adjustment) : 0;
+                    const soldQty = log.quantity ? Math.abs(log.quantity) : 0;
                     dataMap[key] += soldQty;
                 }
             });
@@ -343,11 +358,12 @@ function EditProductContent() {
                 dataMap[format(d, 'dd MMM')] = 0;
             }
             salesLogs.forEach((log: any) => {
-                if (!log.createdAt) return;
-                const d = log.createdAt.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
+                const dateVal = log.date || log.createdAt;
+                if (!dateVal) return;
+                const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
                 const key = format(d, 'dd MMM');
                 if (dataMap[key] !== undefined) {
-                    const soldQty = log.details?.adjustment ? Math.abs(log.details.adjustment) : 0;
+                    const soldQty = log.quantity ? Math.abs(log.quantity) : 0;
                     dataMap[key] += soldQty;
                 }
             });
@@ -358,11 +374,12 @@ function EditProductContent() {
                 dataMap[format(d, 'MMM yy')] = 0;
             }
             salesLogs.forEach((log: any) => {
-                if (!log.createdAt) return;
-                const d = log.createdAt.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
+                const dateVal = log.date || log.createdAt;
+                if (!dateVal) return;
+                const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
                 const key = format(d, 'MMM yy');
                 if (dataMap[key] !== undefined) {
-                    const soldQty = log.details?.adjustment ? Math.abs(log.details.adjustment) : 0;
+                    const soldQty = log.quantity ? Math.abs(log.quantity) : 0;
                     dataMap[key] += soldQty;
                 }
             });
@@ -1497,8 +1514,28 @@ function EditProductContent() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="font-medium text-sm">
-                                                            {tx.computedBalance !== undefined ? tx.computedBalance : '-'}
+                                                        <div className="font-medium text-sm flex flex-col gap-1">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className={tx.computedBalance < 0 ? "text-red-500 font-bold" : ""}>
+                                                                    {tx.computedBalance !== undefined ? tx.computedBalance : '-'}
+                                                                </span>
+                                                                {tx.anomalies && tx.anomalies.length > 0 && (
+                                                                    <TooltipProvider>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <AlertCircle className="h-3.5 w-3.5 text-amber-500 cursor-help" />
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="bg-amber-50 border-amber-200 text-amber-900 shadow-sm max-w-[200px]">
+                                                                                <ul className="list-disc pl-3 text-xs space-y-0.5">
+                                                                                    {tx.anomalies.map((a: string, i: number) => (
+                                                                                        <li key={i}>{a}</li>
+                                                                                    ))}
+                                                                                </ul>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    </TooltipProvider>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>

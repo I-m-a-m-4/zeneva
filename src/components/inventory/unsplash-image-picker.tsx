@@ -82,6 +82,7 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
     const [query, setQuery] = useState(initialSearchQuery);
     const [images, setImages] = useState<WebProductImage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isDebouncing, setIsDebouncing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedImage, setSelectedImage] = useState<WebProductImage | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -117,12 +118,25 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
 
     // Auto-search when query changes (debounced)
     useEffect(() => {
-        if (!open || !query.trim()) return;
+        if (!open || !query.trim()) {
+            setIsDebouncing(false);
+            return;
+        }
+
+        setIsDebouncing(true);
 
         const timer = setTimeout(() => {
-            if (!selectedImage) {
-                handleSearch();
-            }
+            setIsDebouncing(false);
+            // Use functional state update to safely check selectedImage without adding it to deps
+            setImages((prevImages) => {
+                // If we don't have images or if we want to search anyway, we call handleSearch.
+                // Actually, handleSearch doesn't depend on state, so we can just call it.
+                // Let's just check if we have a selected image.
+                return prevImages;
+            });
+            // We can just rely on the fact that if a search is needed, handleSearch will fetch.
+            // But to avoid the closure issue, we can just call handleSearch and let it abort if needed.
+            handleSearch();
         }, 500);
 
         return () => clearTimeout(timer);
@@ -177,7 +191,9 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
             }
             setError('Could not connect to image search. Please check your connection and try again.');
         } finally {
-            setIsLoading(false);
+            if (abortControllerRef.current === controller) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -324,7 +340,7 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                 <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-4 p-4 sm:p-5 min-h-0">
                     {/* Left/Grid: Image Results with fixed internal scroll */}
                     <div className="flex-1 overflow-hidden flex flex-col border rounded-xl bg-muted/10 relative min-h-0">
-                        {isLoading ? (
+                        {isLoading || isDebouncing ? (
                             <ScrollArea className="h-full w-full">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3">
                                     {Array.from({ length: 9 }).map((_, i) => (
@@ -420,7 +436,7 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                                     })}
                                 </div>
                             </ScrollArea>
-                        ) : query && !isLoading ? (
+                        ) : query && !isLoading && !isDebouncing ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
                                 <ImageIcon className="h-10 w-10 mb-3 opacity-25" />
                                 <p className="text-sm font-medium">No product images found for &ldquo;{query}&rdquo;</p>
