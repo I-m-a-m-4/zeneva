@@ -31,6 +31,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -55,7 +56,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import type { Product, UserProfile, AuditLog } from '@/types';
+import type { Product, UserProfile, AuditLog, InventoryTransaction } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { usePOS } from '@/context/pos-context';
@@ -106,6 +107,7 @@ import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { getIndustryConfig } from '@/lib/industry';
+import { ProductStockHistoryChart } from '@/components/inventory/product-stock-history-chart';
 
 const makeProductSchema = (t: (key: string) => string) => z.object({
     name: z.string().min(3, t('inventory.valNameMin')),
@@ -230,19 +232,17 @@ function EditProductContent() {
         }
     };
 
-    // Fetch Stock Logs
+    // Fetch Inventory Transactions
     React.useEffect(() => {
         if (!business?.id || !firestore || !product?.id) {
             if (!isProductLoading) setIsLogsLoading(false);
             return;
         }
 
-        const stockQuery = query(
-            collection(firestore, 'businessInstances', business.id, 'auditLogs'),
-            where('entityId', '==', product.id),
-            where('action', 'in', ['product.stock_adjustment', 'product.create', 'product.update', 'product.bulk_update', 'product.sale']),
-            orderBy('createdAt', 'desc'),
-            limit(50)
+        const txQuery = query(
+            collection(firestore, 'inventory_transactions'),
+            where('businessId', '==', business.id),
+            where('productId', '==', product.id)
         );
 
         // Fallback timer for offline/slow connection to prevent infinite spinner
@@ -250,21 +250,13 @@ function EditProductContent() {
             setIsLogsLoading(false);
         }, 4000);
 
-
-        const unsubscribe = onSnapshot(stockQuery, (snap) => {
-            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
-            // Filter to ensure we only show logs that actually affected stock or are explicit adjustments
-            const filtered = logs.filter(log => {
-                if (log.action === 'product.stock_adjustment' || log.action === 'product.create' || log.action === 'product.sale') return true;
-                if (log.action === 'product.update' || log.action === 'product.bulk_update') {
-                    // Show if it explicitly mentions stock or adjustment
-                    return log.details?.adjustment !== undefined || 
-                           log.details?.newStock !== undefined || 
-                           log.details?.stock !== undefined;
-                }
-                return false;
-            });
-            setStockLogs(filtered);
+        const unsubscribe = onSnapshot(txQuery, (snap) => {
+            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryTransaction));
+            setStockLogs(logs as any);
+            setIsLogsLoading(false);
+            clearTimeout(timeoutId);
+        }, (err) => {
+            console.error('Failed to listen to transactions:', err);
             setIsLogsLoading(false);
             clearTimeout(timeoutId);
         });
@@ -276,22 +268,42 @@ function EditProductContent() {
     }, [business?.id, firestore, product?.id, isProductLoading]);
     
     const combinedLogs = React.useMemo(() => {
-        const pendingLogs = (queuedActions || [])
-            .filter(a => a.type === 'add-audit-log' && a.payload.entityId === product?.id)
-            .map(a => ({
-                id: a.id,
-                ...a.payload,
-                isPending: true,
-                createdAt: { toDate: () => new Date(a.timestamp) }
-            }));
-
-        const all = [...pendingLogs, ...stockLogs];
-        return all.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date();
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date();
+        // We'll skip pending actions for inventory transactions to keep it simple,
+        // or just rely on local state if needed. Let's just return stockLogs for now,
+        // since inventory_transactions are server-authoritative.
+        const all = [...stockLogs];
+        const sorted = all.sort((a, b) => {
+            const dateA = a.date?.toDate ? a.date.toDate() : new Date();
+            const dateB = b.date?.toDate ? b.date.toDate() : new Date();
             return dateB.getTime() - dateA.getTime();
         });
-    }, [queuedActions, stockLogs, product?.id]);
+
+        // Compute running balance backwards
+        let currentBalance = product?.stock || 0;
+        
+        const mapped = sorted.map((tx: any) => {
+            let balanceAfter = currentBalance;
+            if (tx.closingStock !== undefined) {
+                balanceAfter = tx.closingStock;
+                currentBalance = tx.closingStock; // Sync up if it was explicitly logged
+            }
+
+            // Calculate what the stock was before this transaction to pass to the next older one
+            let changeAmount = 0;
+            if (tx.type === 'in' || tx.type === 'return') changeAmount = tx.quantity;
+            else if (tx.type === 'out') changeAmount = -Math.abs(tx.quantity);
+            else if (tx.type === 'adjustment') changeAmount = tx.quantity; // Adjustments already carry their sign or represent total change
+            
+            currentBalance -= changeAmount;
+
+            return {
+                ...tx,
+                computedBalance: balanceAfter
+            };
+        });
+
+        return mapped.slice(0, 100);
+    }, [stockLogs, product?.stock]);
 
     const [logFilter, setLogFilter] = React.useState('all');
     const [salesPeriod, setSalesPeriod] = React.useState<'30d' | '90d' | '6m' | '1y' | 'all'>('6m');
@@ -299,9 +311,10 @@ function EditProductContent() {
     const filteredLogs = React.useMemo(() => {
         if (logFilter === 'all') return combinedLogs;
         return combinedLogs.filter((log: any) => {
-            if (logFilter === 'sale') return log.action === 'product.sale';
-            if (logFilter === 'stock_adjustment') return log.action === 'product.stock_adjustment';
-            if (logFilter === 'update') return log.action === 'product.create' || log.action === 'product.update' || log.action === 'product.bulk_update';
+            if (logFilter === 'in') return log.type === 'in';
+            if (logFilter === 'out') return log.type === 'out';
+            if (logFilter === 'return') return log.type === 'return';
+            if (logFilter === 'adjustment') return log.type === 'adjustment';
             return true;
         });
     }, [combinedLogs, logFilter]);
@@ -500,6 +513,8 @@ function EditProductContent() {
 
             // 3. Log stock adjustment if changed via queue for offline support
             if (values.stock !== product.stock) {
+                const adjustment = values.stock - (product.stock || 0);
+                
                 addToQueue({
                     type: 'add-audit-log',
                     payload: {
@@ -515,11 +530,25 @@ function EditProductContent() {
                             entityName: product.name,
                             oldStock: product.stock, 
                             newStock: values.stock, 
-                            adjustment: values.stock - (product.stock || 0),
+                            adjustment,
                             reason: 'Full Edit Page'
                         }
                     }
                 }, `Logging stock adjustment for ${product.name}`);
+
+                addToQueue({
+                    type: 'add-inventory-transaction',
+                    payload: {
+                        businessId: business.id,
+                        productId: product.id,
+                        productName: product.name,
+                        type: 'adjustment',
+                        quantity: Math.abs(adjustment),
+                        closingStock: values.stock,
+                        notes: `Manual adjustment from ${product.stock} to ${values.stock}`,
+                        createdBy: currentUserProfile.name
+                    }
+                }, `Logging inventory transaction for ${product.name}`);
             }
 
             // 4. Log price and cost movements as a before/after pair.
@@ -662,7 +691,14 @@ function EditProductContent() {
                         )}
                     </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-[1fr_250px] lg:grid-cols-3 lg:gap-8">
+                <Tabs defaultValue="details" className="w-full">
+                    <TabsList className="mb-4 grid w-full max-w-[400px] grid-cols-2">
+                        <TabsTrigger value="details">Product Details</TabsTrigger>
+                        <TabsTrigger value="history">Stock & Sales History</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="details">
+                        <div className="grid gap-4 md:grid-cols-[1fr_250px] lg:grid-cols-3 lg:gap-8">
                     <div className="grid auto-rows-max items-start gap-4 lg:col-span-2 lg:gap-8">
                         <Card>
                             <CardHeader>
@@ -1300,7 +1336,9 @@ function EditProductContent() {
 
                     </div>
                 </div>
+                </TabsContent>
 
+                <TabsContent value="history">
                 {(categoryType === 'product' || categoryType === 'service') && (
                     <Card className="border-primary/10 shadow-sm overflow-hidden mt-4">
                         <CardHeader className="bg-primary/5 pb-4">
@@ -1363,6 +1401,12 @@ function EditProductContent() {
                     </Card>
                 )}
 
+                {product?.id && (categoryType === 'product' || categoryType === 'service') && (
+                    <div className="mt-4">
+                        <ProductStockHistoryChart productId={product.id} />
+                    </div>
+                )}
+
                 {(categoryType === 'product' || categoryType === 'service') && (
                     <Card className="border-primary/10 shadow-sm overflow-hidden mt-4">
                         <CardHeader className="bg-primary/5 pb-4">
@@ -1382,16 +1426,17 @@ function EditProductContent() {
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" size="sm" className="w-[150px] h-8 text-[11px] justify-between bg-background font-normal">
                                             <span>
-                                                {logFilter === 'all' ? t('inventory.logFilterAll') : logFilter === 'sale' ? t('inventory.logFilterSales') : logFilter === 'stock_adjustment' ? t('inventory.logFilterAdjustments') : t('inventory.logFilterUpdates')}
+                                                {logFilter === 'all' ? 'All Transactions' : logFilter === 'in' ? 'Stock In (Restocks)' : logFilter === 'out' ? 'Stock Out (Sales)' : logFilter === 'return' ? 'Returns (Voided)' : 'Adjustments'}
                                             </span>
                                             <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-1" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-[150px]">
-                                        <DropdownMenuItem onClick={() => setLogFilter('all')}>{t('inventory.logFilterAll')}</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setLogFilter('sale')}>{t('inventory.logFilterSales')}</DropdownMenuItem>
-                                        {categoryType === 'product' && <DropdownMenuItem onClick={() => setLogFilter('stock_adjustment')}>{t('inventory.logFilterAdjustments')}</DropdownMenuItem>}
-                                        <DropdownMenuItem onClick={() => setLogFilter('update')}>{t('inventory.logFilterUpdates')}</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLogFilter('all')}>All Transactions</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLogFilter('in')}>Stock In (Restocks)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLogFilter('out')}>Stock Out (Sales)</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLogFilter('return')}>Returns (Voided)</DropdownMenuItem>
+                                        {categoryType === 'product' && <DropdownMenuItem onClick={() => setLogFilter('adjustment')}>{t('inventory.logFilterAdjustments')}</DropdownMenuItem>}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
@@ -1402,6 +1447,7 @@ function EditProductContent() {
                                     <TableRow>
                                         <TableHead className="text-[10px] uppercase font-bold py-2 px-4">{t('inventory.colAction')}</TableHead>
                                         <TableHead className="text-[10px] uppercase font-bold py-2">{t('inventory.colChange')}</TableHead>
+                                        <TableHead className="text-[10px] uppercase font-bold py-2">Balance</TableHead>
                                         <TableHead className="text-[10px] uppercase font-bold py-2">{t('inventory.colUser')}</TableHead>
                                         <TableHead className="text-[10px] uppercase font-bold py-2 text-right px-4">{t('common.date')}</TableHead>
                                     </TableRow>
@@ -1409,88 +1455,59 @@ function EditProductContent() {
                                 <TableBody>
                                     {isLogsLoading ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="h-24 text-center">
+                                            <TableCell colSpan={5} className="h-24 text-center">
                                                 <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />
                                             </TableCell>
                                         </TableRow>
                                     ) : filteredLogs.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground">
+                                            <TableCell colSpan={5} className="h-24 text-center text-xs text-muted-foreground">
                                                 {t('inventory.noLogsFound')}
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        filteredLogs.map((log: any) => {
-                                            const adjustment = log.details?.adjustment !== undefined 
-                                                ? log.details.adjustment 
-                                                : (log.action === 'product.create' ? log.details?.stock : (log.details?.newStock !== undefined && log.details?.oldStock !== undefined ? log.details.newStock - log.details.oldStock : undefined));
-                                            const isAddition = adjustment !== undefined && adjustment > 0;
+                                        filteredLogs.map((tx: any) => {
+                                            const isAddition = tx.type === 'in' || tx.type === 'return' || (tx.type === 'adjustment' && tx.quantity > 0);
                                             
                                             return (
-                                                <TableRow key={log.id} className="hover:bg-muted/20">
+                                                <TableRow key={tx.id} className="hover:bg-muted/20">
                                                     <TableCell className="px-4">
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs font-medium capitalize">
-                                                                    {log.action.split('.').pop()?.replace('_', ' ')}
+                                                                    {tx.type === 'in' ? 'Stock In' : tx.type === 'out' ? 'Stock Out' : tx.type === 'return' ? 'Return' : 'Adjustment'}
                                                                 </span>
-                                                                {log.isPending && (
-                                                                    <Badge variant="outline" className="text-[8px] h-3.5 bg-yellow-500/10 text-yellow-600 border-yellow-500/20 px-1 animate-pulse">
-                                                                        {t('inventory.syncingBadge')}
-                                                                    </Badge>
-                                                                )}
                                                             </div>
-                                                            {log.details?.reason && (() => {
-                                                                const match = log.details.reason.match(/(rec-[a-f0-9]+)/i);
-                                                                if (match) {
-                                                                    const receiptNumber = match[1];
-                                                                    const parts = log.details.reason.split(receiptNumber);
-                                                                    const receiptId = log.details?.receiptId;
-                                                                    const href = receiptId 
-                                                                        ? `/receipts/details?id=${receiptId}`
-                                                                        : `/receipts?search=${receiptNumber}`;
-                                                                    return (
-                                                                        <span className="text-[10px] text-muted-foreground">
-                                                                            {parts[0]}
-                                                                            <Link 
-                                                                                href={href} 
-                                                                                className="text-primary hover:underline font-mono font-medium"
-                                                                            >
-                                                                                {receiptNumber}
-                                                                            </Link>
-                                                                            {parts[1]}
-                                                                        </span>
-                                                                    );
-                                                                }
-                                                                return <span className="text-[10px] text-muted-foreground">{log.details.reason}</span>;
-                                                            })()}
+                                                            {tx.notes && (
+                                                                <span className="text-[10px] text-muted-foreground">{tx.notes}</span>
+                                                            )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {adjustment !== undefined ? (
-                                                            <div className={cn(
-                                                                "flex items-center gap-1 font-bold text-sm",
-                                                                isAddition ? "text-green-600" : "text-red-600"
-                                                            )}>
-                                                                {isAddition ? (
-                                                                    <ArrowDownLeft className="h-4 w-4" />
-                                                                ) : (
-                                                                    <ArrowUpRight className="h-4 w-4" />
-                                                                )}
-                                                                <span>{Math.abs(adjustment)}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">{t('inventory.updatedLabel')}</span>
-                                                        )}
+                                                        <div className={cn(
+                                                            "flex items-center gap-1 font-bold text-sm",
+                                                            isAddition ? "text-green-600" : "text-red-600"
+                                                        )}>
+                                                            {isAddition ? (
+                                                                <ArrowDownLeft className="h-4 w-4" />
+                                                            ) : (
+                                                                <ArrowUpRight className="h-4 w-4" />
+                                                            )}
+                                                            <span>{Math.abs(tx.quantity)}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium text-sm">
+                                                            {tx.computedBalance !== undefined ? tx.computedBalance : '-'}
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs">{log.userName}</span>
-                                                            <span className="text-[9px] text-muted-foreground uppercase">{log.userRole?.replace('_', ' ')}</span>
+                                                            <span className="text-xs">{tx.createdBy || 'System'}</span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right text-[10px] text-muted-foreground px-4">
-                                                        {log.createdAt ? formatDistanceToNow(log.createdAt.toDate(), { addSuffix: true }) : t('inventory.justNow')}
+                                                        {tx.date ? formatDistanceToNow(tx.date.toDate(), { addSuffix: true }) : t('inventory.justNow')}
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -1501,6 +1518,8 @@ function EditProductContent() {
                         </CardContent>
                     </Card>
                 )}
+                </TabsContent>
+                </Tabs>
                 <div className="flex flex-wrap items-center justify-center gap-2 w-full px-4 md:hidden">
                     <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
                         {t('common.discard')}

@@ -223,34 +223,74 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
   }, []);
 
   // Speech Recognition Setup
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = 'en-US';
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
 
-      rec.onstart = () => setIsListening(true);
-      rec.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
-          setLocalInput((prev) => (prev.trim() + ' ' + transcript.trim()).trim());
-        }
-      };
-      rec.onerror = () => setIsListening(false);
-      rec.onend = () => setIsListening(false);
-      recognitionRef.current = rec;
-    }
+  useEffect(() => {
+    // Cleanup on unmount
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    };
   }, []);
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
+  const toggleListening = async () => {
     if (isListening) {
-      recognitionRef.current.stop();
-    } else {
-      try { recognitionRef.current.start(); } catch {}
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        setIsTranscribing(true);
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'audio.webm');
+
+        try {
+          const res = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!res.ok) throw new Error('Transcription failed');
+          const data = await res.json();
+          if (data.text) {
+            setLocalInput((prev) => (prev.trim() + ' ' + data.text.trim()).trim());
+          }
+        } catch (error) {
+          console.error('Transcription error:', error);
+          toast({ title: 'Transcription failed', description: 'Could not process audio.', variant: 'destructive' });
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      toast({ title: 'Microphone access denied', description: 'Please allow microphone access to use voice dictation.', variant: 'destructive' });
     }
   };
 
@@ -773,8 +813,8 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                       className="w-full bg-transparent outline-none text-foreground placeholder:text-muted-foreground/80 text-base sm:text-lg"
                       value={localInput}
                       onChange={(e) => setLocalInput(e.target.value)}
-                      placeholder="Assign a task, analyze inventory, or type a prompt..."
-                      disabled={isLoading}
+                      placeholder={isTranscribing ? "Transcribing audio..." : isListening ? "Listening to your voice..." : "Assign a task, analyze inventory, or type a prompt..."}
+                      disabled={isLoading || isTranscribing}
                     />
 
                     {/* Inner Action Bar */}
@@ -1041,8 +1081,8 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                     className="flex-1 bg-transparent py-2.5 px-2 outline-none text-foreground placeholder:text-muted-foreground text-sm sm:text-base"
                     value={localInput}
                     onChange={(e) => setLocalInput(e.target.value)}
-                    placeholder="Ask Zen AI anything about your store..."
-                    disabled={isLoading}
+                    placeholder={isTranscribing ? "Transcribing audio..." : isListening ? "Listening to your voice..." : "Ask Zen AI anything about your store..."}
+                    disabled={isLoading || isTranscribing}
                   />
                   {isLoading ? (
                     <button

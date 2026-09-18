@@ -24,7 +24,9 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Product } from '@/types';
@@ -85,6 +87,7 @@ export function BulkImageEditor({
   const [saveProgress, setSaveProgress] = useState(0);
   const [isFetching, setIsFetching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Reset state when dialog opens/closes
   React.useEffect(() => {
@@ -227,9 +230,14 @@ export function BulkImageEditor({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!isFetching && !isSaving) onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-[900px] w-[95vw] flex flex-col max-h-[90vh] p-4 sm:p-6 gap-4">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+      <DialogContent hideScrollWrapper className={cn(
+        "flex flex-col gap-4 transition-all duration-200",
+        isExpanded 
+          ? "max-w-[100vw] w-screen h-screen max-h-screen m-0 p-4 sm:p-6 rounded-none" 
+          : "sm:max-w-[1000px] w-[95vw] max-h-[90vh] p-4 sm:p-6"
+      )}>
+        <DialogHeader className="flex flex-row items-start justify-between pr-6">
+          <DialogTitle className="flex items-center gap-2 text-lg font-bold mt-0">
             <Sparkles className="h-5 w-5 text-primary" />
             Bulk Image Fetch
             {isLimited && (
@@ -239,6 +247,14 @@ export function BulkImageEditor({
               </Badge>
             )}
           </DialogTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 absolute right-12 top-4 opacity-70 hover:opacity-100 hidden sm:flex"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
           <DialogDescription>
             {phase === 'fetch' && !isFetching &&
               `Automatically find images for ${cappedProducts.length} product${cappedProducts.length !== 1 ? 's' : ''} without images. Review and approve before saving.`}
@@ -299,7 +315,7 @@ export function BulkImageEditor({
 
         {/* Phase: Fetch — in progress */}
         {phase === 'fetch' && isFetching && (
-          <div className="flex-1 min-h-0 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+          <div className={cn("flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar", !isExpanded && "max-h-[50vh]")}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-1">
               {candidates.map((c) => (
                 <div key={c.product.id} className={cn(
@@ -337,7 +353,7 @@ export function BulkImageEditor({
 
         {/* Phase: Review */}
         {(phase === 'review' || phase === 'saving' || phase === 'done') && (
-          <div className="flex-1 min-h-0 max-h-[54vh] overflow-y-auto pr-2 custom-scrollbar">
+          <div className={cn("flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar", !isExpanded && "max-h-[54vh]")}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-1">
               {candidates.map((c, idx) => {
                 const selectedImg = c.images[c.selectedIdx];

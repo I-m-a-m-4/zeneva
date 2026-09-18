@@ -1478,8 +1478,8 @@ const en = {
     deltaFlat: 'flat',
     deltaVsPrevious: '{pct}% vs previous',
 
-    tabAnalytics: 'Analytics Dashboard',
-    tabProfitLoss: 'Profit & Loss',
+    tabAnalytics: 'Analytics',
+    tabProfitLoss: 'Net Profit & Expenses',
     tabDailySales: 'Daily Sales Items',
     tabBusinessRating: 'Business Rating',
 

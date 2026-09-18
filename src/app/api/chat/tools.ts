@@ -10,6 +10,7 @@ import { computeBusinessRating, RATING_WINDOW_DAYS } from '@/lib/business-rating
 import { buildProductIndex } from '@/lib/import/match';
 import { resolveOne } from '@/lib/import/cost-prices';
 import { describeBulkOp, previewBulkOp } from '@/lib/import/bulk-ops';
+import { performImageSearch } from '../images/search/route';
 
 /**
  * Zen AI's toolkit.
@@ -268,10 +269,22 @@ function similarity(query: string, target: string): number {
   if (t.startsWith(q)) return 0.95;
   if (t.includes(q)) return 0.85;
 
-  const qWords = q.split(/\s+/).filter(Boolean);
-  const tWords = t.split(/\s+/).filter(Boolean);
-  const shared = qWords.filter((w) => tWords.some((tw) => tw.startsWith(w) || w.startsWith(tw)));
-  if (shared.length) return 0.5 + 0.3 * (shared.length / Math.max(qWords.length, 1));
+  const stopWords = new Set(['the', 'and', 'for', 'with', 'into', 'of', 'in', 'on', 'at', 'to', 'a', 'an', 'is', 'are', 'services', 'kit']);
+  const filterWord = (w: string) => w.length > 2 && !stopWords.has(w);
+  const qWords = q.split(/\s+/).filter(filterWord);
+  const tWords = t.split(/\s+/).filter(filterWord);
+
+  let qLen = 0;
+  qWords.forEach((w) => { qLen += w.length; });
+
+  const shared = qWords.filter((w) => tWords.some((tw) => {
+    if (w === tw) return true;
+    if (w.length > 2 && tw.length > 2 && (tw.startsWith(w) || w.startsWith(tw))) return true;
+    return false;
+  }));
+
+  let sharedLen = 0;
+  shared.forEach((w) => { sharedLen += w.length; });
 
   const bigrams = (s: string) => {
     const out = new Set<string>();
@@ -280,10 +293,15 @@ function similarity(query: string, target: string): number {
   };
   const a = bigrams(q);
   const b = bigrams(t);
-  if (!a.size || !b.size) return 0;
   let overlap = 0;
-  a.forEach((g) => { if (b.has(g)) overlap++; });
-  return (2 * overlap) / (a.size + b.size);
+  if (a.size && b.size) {
+    a.forEach((g) => { if (b.has(g)) overlap++; });
+  }
+  const bigramScore = (a.size && b.size) ? (2 * overlap) / (a.size + b.size) : 0;
+
+  const wordScore = shared.length ? 0.5 + 0.3 * (sharedLen / Math.max(qLen, 1)) + (bigramScore * 0.1) : 0;
+
+  return Math.max(wordScore, bigramScore);
 }
 
 /** Trim a product doc to what the UI card and the model actually need. */
@@ -735,6 +753,17 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
       },
     }),
 
+    searchWebForImages: tool({
+      description: 'Search the web for images of a product or brand by name. Use this when the user asks you to find an image, look up a picture, or search the web for what a product looks like. Do NOT call findSimilarProducts when using this tool. If the user only asks for an image, just use this tool.',
+      inputSchema: z.object({ query: z.string().describe('The product name or search term.') }),
+      execute: async ({ query }) => {
+        try {
+          const results = await performImageSearch(query, 6);
+          return { type: 'IMAGE_GRID', query, images: results };
+        } catch (e: any) { return fail('Failed to search web for images', e); }
+      },
+    }),
+
     getProductDetails: tool({
       description: 'Full detail for one product by its document ID, including sales velocity and days of stock cover.',
       inputSchema: z.object({ productId: z.string().describe('Firestore document ID of the product.') }),
@@ -764,6 +793,59 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
             },
           };
         } catch (e: any) { return fail('Failed to load product', e); }
+      },
+    }),
+
+    getProductStockHistory: tool({
+      description: 'Retrieve the stock and sales history (inventory transactions) for a specific product, including sales, restocks, returns, and manual adjustments.',
+      inputSchema: z.object({ productId: z.string().describe('Firestore document ID of the product.') }),
+      execute: async ({ productId }) => {
+        try {
+          const doc = await db.collection('products').doc(productId).get();
+          if (!doc.exists) return { error: 'Product not found.' };
+          const data: any = { id: doc.id, ...doc.data() };
+          if (data.businessId !== businessId) return { error: 'Product not found.' };
+
+          const snap = await db
+            .collection('inventory_transactions')
+            .where('businessId', '==', businessId)
+            .where('productId', '==', productId)
+            .get();
+
+          let transactions = snap.docs.map((d) => {
+            const tx = d.data();
+            return {
+              id: d.id,
+              type: tx.type, // 'in', 'out', 'return', 'adjustment'
+              quantity: tx.quantity,
+              notes: tx.notes || '',
+              createdBy: tx.createdBy || 'System',
+              dateStr: tx.date ? new Date(toMillis(tx.date)).toISOString() : null,
+              dateMs: tx.date ? toMillis(tx.date) : 0,
+              closingStock: tx.closingStock
+            };
+          });
+
+          // Sort in memory to avoid composite index requirements
+          transactions.sort((a, b) => b.dateMs - a.dateMs);
+          
+          // Limit to most recent 100
+          transactions = transactions.slice(0, 100);
+
+          return {
+            type: 'TABLE',
+            title: `Stock History for ${data.name}`,
+            note: `Showing the last ${transactions.length} inventory transactions for ${data.name}.`,
+            columns: [
+              { key: 'dateStr', title: 'Date', type: 'date' },
+              { key: 'type', title: 'Type', type: 'text' },
+              { key: 'quantity', title: 'Quantity', type: 'number' },
+              { key: 'notes', title: 'Notes', type: 'text' },
+              { key: 'createdBy', title: 'User', type: 'text' }
+            ],
+            rows: transactions
+          };
+        } catch (e: any) { return fail('Failed to load product stock history', e); }
       },
     }),
 
@@ -2480,12 +2562,6 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
             const isService = product.categoryType === 'service' || product.type === 'service';
             const onHand = Number(product.stock) || 0;
-            if (!isService && running > onHand) {
-              return {
-                error: `Not enough stock for ${product.name}: ${onHand} on hand but ${running} requested. ` +
-                  'Tell the owner and ask whether to reduce the quantity or record a delivery first.',
-              };
-            }
 
             subtotal += price * line.quantity;
             lines.push({

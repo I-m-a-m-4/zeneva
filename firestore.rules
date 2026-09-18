@@ -449,6 +449,25 @@ service cloud.firestore {
                       isSubscriptionActive(resource.data.get('businessId', null)))));
     }
 
+    match /inventory_transactions/{transactionId} {
+      allow get: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || isRequestingUserMemberOf(resource.data.get('businessId', null))));
+      allow list: if isSuperAdmin() || (isUserAuthenticated() && (resource.data.businessId == getCurrentUserBusinessId() || resource.data.createdBy == request.auth.uid));
+
+      allow create: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
+                      isRequestingUserStaff() &&
+                      isRequestingUserMemberOf(request.resource.data.get('businessId', null)) &&
+                      isSubscriptionActive(request.resource.data.get('businessId', null)));
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
+                      isRequestingUserStaff() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
+                      isSubscriptionActive(resource.data.get('businessId', null)) &&
+                      fieldsUnchanged(['businessId'].toSet()));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || (
+                      isRequestingUserManager() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
+                      isSubscriptionActive(resource.data.get('businessId', null)))));
+    }
+
     match /receipts/{receiptId} {
         // A customer opens a receipt link by unguessable id; keep get public.
         allow get: if true;

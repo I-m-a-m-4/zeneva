@@ -304,7 +304,7 @@ export interface OnlineOrder {
 
 export interface QueuedAction {
     id: string;
-    type: 'complete-sale' | 'update-product' | 'add-customer' | 'update-customer' | 'delete-customer' | 'bulk-update-products' | 'add-product' | 'delete-product' | 'update-settings' | 'add-audit-log' | 'delete-receipt';
+    type: 'complete-sale' | 'update-product' | 'add-customer' | 'update-customer' | 'delete-customer' | 'bulk-update-products' | 'add-product' | 'delete-product' | 'update-settings' | 'add-audit-log' | 'delete-receipt' | 'add-inventory-transaction';
     description: string;
     payload: any;
     timestamp: number;
@@ -952,4 +952,18 @@ export interface PromoToastConfig {
     cooldownHours: number; // e.g. 24
     autoShowDelaySec: number; // e.g. 3
     updatedAt?: any;
+}
+
+export interface InventoryTransaction {
+    id?: string;
+    businessId: string;
+    productId: string;
+    productName: string;
+    type: 'in' | 'out' | 'adjustment' | 'return';
+    quantity: number; // Positive number representing the change amount
+    closingStock?: number; // The product's total stock immediately after this transaction
+    date: any; // Firestore Timestamp
+    notes?: string;
+    referenceId?: string; // e.g., Receipt ID or PO ID
+    createdBy?: string;
 }

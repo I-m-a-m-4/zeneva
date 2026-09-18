@@ -2356,6 +2356,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 createdAt: dateVal 
               });
 
+              // Log Stock Movements
+              action.payload.receiptData.items?.forEach((item: any) => {
+                if (!item.productId) return;
+                const txRef = doc(collection(firestore, 'inventory_transactions'));
+                batch.set(txRef, {
+                  businessId,
+                  productId: item.productId,
+                  productName: item.name || 'Unknown',
+                  type: 'out',
+                  quantity: item.quantity || 0,
+                  date: dateVal,
+                  notes: action.payload.receiptData.receiptNumber ? `Sale (Receipt #${action.payload.receiptData.receiptNumber})` : 'Sale',
+                  referenceId: action.payload.receiptData.id,
+                  createdBy: action.payload.receiptData.createdBy || ''
+                });
+              });
+
               // Cascade product stock movements. Units are *summed*, because two
               // sales of the same product in one chunk must both come off the shelf
               // — a map of absolute figures collapsed them to the last one.
@@ -2753,8 +2770,42 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 batch.set(doc(auditLogRef), { ...action.payload, createdAt: serverTimestamp() });
                 break;
               }
+              case 'add-inventory-transaction': {
+                const invTransRef = collection(firestore, 'inventory_transactions');
+                batch.set(doc(invTransRef), { ...action.payload, date: serverTimestamp() });
+                break;
+              }
               case 'delete-receipt': {
                 batch.delete(doc(firestore, 'receipts', action.payload.receiptId));
+                
+                // Restock items and log inventory transactions
+                if (action.payload.receipt) {
+                  action.payload.receipt.items?.forEach((item: any) => {
+                    if (!item.productId) return;
+                    
+                    // Restock item
+                    if (item.quantity > 0) {
+                      batch.update(doc(firestore, 'products', item.productId), { 
+                        stock: increment(item.quantity), 
+                        updatedAt: serverTimestamp() 
+                      });
+                    }
+
+                    // Log Stock Movement
+                    const txRef = doc(collection(firestore, 'inventory_transactions'));
+                    batch.set(txRef, {
+                      businessId,
+                      productId: item.productId,
+                      productName: item.name || 'Unknown',
+                      type: 'return',
+                      quantity: item.quantity || 0,
+                      date: serverTimestamp(),
+                      notes: action.payload.receipt.receiptNumber ? `Voided Sale (Receipt #${action.payload.receipt.receiptNumber})` : 'Voided Sale',
+                      referenceId: action.payload.receiptId,
+                      createdBy: currentUserProfile?.name || 'Unknown'
+                    });
+                  });
+                }
                 break;
               }
             }
@@ -4072,6 +4123,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [heldSales]);
 
   const voidReceipt = useCallback(async (receiptId: string) => {
+    const receiptToVoid = receipts?.find(r => r.id === receiptId);
+    
     // 1. Optimistic local state updates
     setSyncedReceipts(prev => prev.filter(r => r.id !== receiptId));
     // Desktop has no receipts blob in localStorage - step 2 below is its removal
@@ -4096,7 +4149,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     // 3. Dispatch global delete command to Firestore sync engine
     addToQueue({
       type: 'delete-receipt',
-      payload: { receiptId }
+      payload: { receiptId, receipt: receiptToVoid }
     }, `Voided receipt ${receiptId}`);
 
     toast({

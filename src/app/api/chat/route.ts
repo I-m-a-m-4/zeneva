@@ -835,7 +835,7 @@ export async function POST(req: Request) {
             plan: plan || 'starter',
             title,
             lastPrompt: promptText,
-            messages: formattedMessages,
+            messages: JSON.parse(JSON.stringify(formattedMessages)),
             turnsCount: formattedMessages.length,
             tokensIn: inTok || 0,
             tokensOut: outTok || 0,

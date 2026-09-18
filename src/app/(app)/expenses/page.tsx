@@ -98,6 +98,9 @@ import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { safeToDate, cn } from '@/lib/utils';
 import { logAuditEvent } from '@/lib/audit';
 import { downloadCsv } from '@/lib/csv';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
 import type { Expense, ExpenseCategory, ExpensePaymentMethod } from '@/types';
 import {
   collection,
@@ -227,7 +230,7 @@ function ExpensesAndPurchasesContent() {
   const [expenseSearch, setExpenseSearch] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState<string>('all');
   const [selectedMethod, setSelectedMethod] = React.useState<string>('all');
-  const [timeRange, setTimeRange] = React.useState<'today' | 'week' | 'month' | 'all'>('month');
+  const [timeRange, setTimeRange] = React.useState<'today' | 'week' | 'month' | 'year' | 'all'>('month');
   const [drawerOnly, setDrawerOnly] = React.useState(false);
 
   // Expense Dialogs
@@ -425,6 +428,9 @@ function ExpensesAndPurchasesContent() {
         } else if (timeRange === 'month') {
           const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
           if (expDate < thirtyDaysAgo) return false;
+        } else if (timeRange === 'year') {
+          const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          if (expDate < oneYearAgo) return false;
         }
       }
 
@@ -439,6 +445,82 @@ function ExpensesAndPurchasesContent() {
       return true;
     });
   }, [expenses, selectedCategory, selectedMethod, timeRange, drawerOnly, expenseSearch]);
+
+  const handleExportExpenseReport = async () => {
+    toast({
+      title: 'Generating PDF',
+      description: 'Your expense report is being generated...',
+    });
+
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(18);
+    doc.text(business?.name || "Zeneva POS", 14, 18);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Expense Report", 14, 25);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`Generated: ${format(new Date(), 'EEEE, MMMM d, yyyy')}`, 14, 31);
+    
+    if (timeRange !== 'all') {
+      doc.text(`Time Period: ${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}`, 14, 36);
+    }
+
+    const tableColumn = ["Date", "Title", "Category", "Payment Method", "Recipient", "Amount"];
+    
+    const tableRows = filteredExpenses.map(exp => {
+      const dateObj = safeToDate(exp.date);
+      const formattedDate = dateObj ? format(dateObj, 'MMM d, yyyy') : 'N/A';
+      
+      const catInfo = EXPENSE_CATEGORIES.find(c => c.id === exp.category);
+      const catName = catInfo?.label.split('(')[0].trim() || exp.category;
+      
+      const methodStr = exp.paymentMethod.replace('_', ' ');
+      const methodCap = methodStr.charAt(0).toUpperCase() + methodStr.slice(1);
+      
+      return [
+        formattedDate,
+        exp.title,
+        catName,
+        `${methodCap}${exp.deductFromCashDrawer ? ' (Drawer)' : ''}`,
+        exp.recipient || '-',
+        `${currencySymbol}${exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+      ];
+    });
+
+    const totalFiltered = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    tableRows.push([
+      "Total", 
+      "", 
+      "", 
+      "", 
+      "", 
+      `${currencySymbol}${totalFiltered.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 42,
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      didParseCell: function(data) {
+        if (data.row.index === tableRows.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [240, 240, 240];
+        }
+      }
+    });
+
+    doc.save(`zeneva-expenses-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
 
   // -------------------------------------------------------------
   // FILTERED PURCHASES
@@ -717,6 +799,20 @@ function ExpensesAndPurchasesContent() {
               updatePayload.costPrice = item.unitCost;
             }
             batch.update(productRef, updatePayload);
+            
+            // Log Inventory Transaction
+            const txRef = doc(collection(firestore, 'inventory_transactions'));
+            batch.set(txRef, {
+              businessId: business.id,
+              productId: item.productId,
+              productName: item.productName || 'Unknown',
+              type: 'in',
+              quantity: item.quantityOrdered,
+              date: serverTimestamp(),
+              notes: purchase.poNumber ? `Restock (PO #${purchase.poNumber})` : 'Restock',
+              referenceId: purchase.id,
+              createdBy: currentUserProfile?.name || 'System'
+            });
           }
         }
       }
@@ -1094,6 +1190,7 @@ function ExpensesAndPurchasesContent() {
                     <SelectItem value="today">Today</SelectItem>
                     <SelectItem value="week">Last 7 Days</SelectItem>
                     <SelectItem value="month">Last 30 Days</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
                     <SelectItem value="all">All Time</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1107,6 +1204,12 @@ function ExpensesAndPurchasesContent() {
                     checked={drawerOnly}
                     onCheckedChange={setDrawerOnly}
                   />
+                </div>
+                <div className="flex items-center sm:col-span-2 md:col-span-4 justify-end">
+                  <Button variant="outline" className="w-full sm:w-auto" onClick={handleExportExpenseReport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export PDF
+                  </Button>
                 </div>
               </div>
             </CardContent>

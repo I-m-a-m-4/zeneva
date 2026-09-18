@@ -126,11 +126,13 @@ const USE_CASES: UseCase[] = [
     capabilities: [
       { label: 'Product photos', detail: 'Ask to see an item and Zen AI draws its picture, with the price, stock and margin beside it.' },
       { label: 'Similar-name picker', detail: 'Type a name that matches several products and you get a row of cards to tap rather than a wrong guess. The cards look the same as they do on the POS screen.' },
+      { label: 'Web image search', detail: 'Ask to find a picture of a product on the web, and Zen AI will search the internet to show you a grid of results, exactly like the inventory page.' },
       { label: 'Full product record', detail: 'SKU, category, cost, margin, stock, units sold in the last 30 days, days of cover and expiry — one card, no page-hopping.' },
       { label: 'Never guesses between two', detail: 'If a name is ambiguous, Zen AI will not act on it. It asks you to pick first, so no change is ever applied to the wrong item.' },
     ],
     examples: [
       'Show me a picture of the Seiko watch',
+      'Search the web for an image of ALTRUIST SUNSCREEN SPF 30',
       'What does my best-selling product look like?',
       'Find products similar to "coke"',
     ],

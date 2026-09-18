@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
 import { useBranch } from '@/context/branch-context';
-import type { Receipt, Customer } from '@/types';
+import type { Receipt, Customer, Expense } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Sparkles, AlertCircle, ArrowUp, ArrowDown, Minus } from 'lucide-react';
@@ -13,6 +13,10 @@ import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { subDays, isSameDay } from 'date-fns';
 import TopCustomersList from '@/components/reports/top-customers-list';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+
+// Shared Components
 import { safeToDate, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +55,7 @@ import {
 import { downloadCsv } from '@/lib/csv';
 import { trackFeature } from '@/lib/product-telemetry';
 import { useI18n } from '@/context/i18n-context';
+import { collection, query, where, limit, getDocs, Timestamp } from 'firebase/firestore';
 
 /**
  * A KPI figure with, where we have one, its comparison against the equivalent
@@ -135,12 +140,14 @@ function ReportStatCard({ title, value, icon: Icon, description, delta }: { titl
 
 
 export default function ReportsDashboard() {
-    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange, users } = usePOS();
+    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange, users, firestore } = usePOS();
     const { activeBranchId } = useBranch();
     const { t } = useI18n();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const [reportBatchReceipts, setReportBatchReceipts] = React.useState<Receipt[]>([]);
+    const [reportBatchExpenses, setReportBatchExpenses] = React.useState<Expense[]>([]);
+    const [previousExpenses, setPreviousExpenses] = React.useState<Expense[]>([]);
     const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
     const [date, setDate] = React.useState<DateRange | undefined>({
@@ -248,7 +255,9 @@ export default function ReportsDashboard() {
         })).size || 1;
 
         const totalCost = targetReceipts.reduce((sum, r) => sum + (r.totalCost ?? r.items?.reduce((sumCost, item) => sumCost + ((item.costPrice || 0) * (item.quantity || 0)), 0) ?? 0), 0);
-        const totalProfit = targetReceipts.reduce((sum, r) => sum + (r.profit ?? (r.total - (r.totalCost ?? 0))), 0);
+        const grossProfit = targetReceipts.reduce((sum, r) => sum + (r.profit ?? (r.total - (r.totalCost ?? 0))), 0);
+        const totalExpenses = reportBatchExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        const totalProfit = grossProfit - totalExpenses;
 
         return {
             totalRevenue,
@@ -327,6 +336,8 @@ export default function ReportsDashboard() {
         if (dateFromTime && dateToTime) {
             // Clear stale data immediately so old branch data doesn't flash while loading
             setReportBatchReceipts([]);
+            setReportBatchExpenses([]);
+            setPreviousExpenses([]);
             const fetchBatch = async () => {
                 setIsFetchingBatch(true);
                 const timeout = setTimeout(() => {
@@ -340,8 +351,40 @@ export default function ReportsDashboard() {
                 }, 4000);
 
                 try {
-                    const res = await fetchReceiptsInRange(new Date(dateFromTime), new Date(dateToTime));
+                    const fromDate = new Date(dateFromTime);
+                    const toDate = new Date(dateToTime);
+                    const res = await fetchReceiptsInRange(fromDate, toDate);
                     setReportBatchReceipts(res);
+                    
+                    const prev = previousWindow(fromDate, toDate);
+                    
+                    if (business?.id && firestore) {
+                        const q = query(
+                            collection(firestore, 'expenses'),
+                            where('businessId', '==', business.id),
+                            where('date', '>=', Timestamp.fromDate(fromDate)),
+                            where('date', '<=', Timestamp.fromDate(toDate)),
+                            limit(5000)
+                        );
+                        const snap = await getDocs(q);
+                        const exps = snap.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
+                        setReportBatchExpenses(exps);
+                    }
+                    
+                    if (prev) {
+                        const pExQuery = query(
+                            collection(firestore, 'expenses'),
+                            where('businessId', '==', business.id),
+                            where('date', '>=', Timestamp.fromDate(prev.from)),
+                            where('date', '<=', Timestamp.fromDate(prev.to)),
+                            limit(2000)
+                        );
+                        const pExDocs = await getDocs(pExQuery);
+                        const pExps = pExDocs.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+                        setPreviousExpenses(pExps);
+                    } else {
+                        setPreviousExpenses([]);
+                    }
                 } finally {
                     clearTimeout(timeout);
                     setIsFetchingBatch(false);
@@ -491,8 +534,8 @@ export default function ReportsDashboard() {
      */
     const comparison = React.useMemo(() => {
         if (!previousReceipts) return null;
-        const current = summarisePeriod(deepReceipts, products || []);
-        const prior = summarisePeriod(previousReceipts, products || []);
+        const current = summarisePeriod(deepReceipts, products || [], reportBatchExpenses);
+        const prior = summarisePeriod(previousReceipts, products || [], previousExpenses);
         return {
             revenue: periodDelta(current.revenue, prior.revenue),
             sales: periodDelta(current.sales, prior.sales),
@@ -504,6 +547,8 @@ export default function ReportsDashboard() {
                 current.profit !== null && prior.profit !== null
                     ? periodDelta(current.profit, prior.profit)
                     : null,
+            expenses: periodDelta(current.totalExpenses, prior.totalExpenses),
+            netProfit: periodDelta(current.netProfit, prior.netProfit),
         };
     }, [previousReceipts, deepReceipts, products]);
 
@@ -675,13 +720,46 @@ export default function ReportsDashboard() {
                                     icon={FileText}
                                     description={t('reports.kpiNetCostHint')}
                                 />
-                                <ReportStatCard
-                                    title={t('reports.kpiNetProfit')}
-                                    value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                    icon={Coins}
-                                    description={t('reports.kpiNetProfitHint')}
-                                    delta={comparison?.profit}
-                                />
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <div className="cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all rounded-xl outline-none">
+                                            <ReportStatCard
+                                                title={t('reports.kpiNetProfit')}
+                                                value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                                icon={Coins}
+                                                description={`${t('reports.kpiNetProfitHint')} (Click for analysis)`}
+                                                delta={comparison?.profit}
+                                            />
+                                        </div>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[425px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Net Profit Analysis</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-muted-foreground">Gross Revenue</span>
+                                                <span className="font-medium">{currencySymbol}{(finalReportData?.totalRevenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-muted-foreground">Cost of Goods Sold (COGS)</span>
+                                                <span className="font-medium text-rose-500">-{currencySymbol}{(finalReportData?.totalCost ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center font-semibold pt-2 border-t">
+                                                <span>Gross Profit</span>
+                                                <span>{currencySymbol}{((finalReportData?.totalRevenue ?? 0) - (finalReportData?.totalCost ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm pt-2">
+                                                <span className="text-muted-foreground">Operating Expenses</span>
+                                                <span className="font-medium text-rose-500">-{currencySymbol}{((finalReportData?.totalRevenue ?? 0) - (finalReportData?.totalCost ?? 0) - (finalReportData?.totalProfit ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center font-bold text-base pt-2 border-t">
+                                                <span>Net Operating Profit</span>
+                                                <span className="text-emerald-600 dark:text-emerald-400">{currencySymbol}{(finalReportData?.totalProfit ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
                                 <ReportStatCard
                                     title={t('reports.kpiProductRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
@@ -861,6 +939,7 @@ export default function ReportsDashboard() {
                                 <ProfitLossStatement 
                                     receipts={deepReceipts} 
                                     products={products || []} 
+                                    expenses={reportBatchExpenses}
                                     currencySymbol={currencySymbol} 
                                 />
                             </FeatureGate>

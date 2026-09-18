@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-interface ImageResult {
+export interface ImageResult {
   id: string;
   title: string;
   urls: {
@@ -238,12 +238,20 @@ export async function GET(request: Request) {
   }
 
   const cleanQuery = query.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  const results = await performImageSearch(cleanQuery, limit);
+
+  // Always return 200 with results array, even if empty, to avoid frontend 500 crash
+  return NextResponse.json({ results });
+}
+
+export async function performImageSearch(cleanQuery: string, limit: number): Promise<ImageResult[]> {
   const cacheKey = `${cleanQuery.toLowerCase()}:${limit}`;
 
   // Check in-memory cache
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json({ results: cached.results });
+    return cached.results;
   }
 
   const queryCandidates = generateQueryFallbacks(cleanQuery);
@@ -278,6 +286,5 @@ export async function GET(request: Request) {
     cache.set(cacheKey, { timestamp: Date.now(), results });
   }
 
-  // Always return 200 with results array, even if empty, to avoid frontend 500 crash
-  return NextResponse.json({ results });
+  return results;
 }

@@ -33,7 +33,9 @@ import {
   PackagePlus,
   Sparkles,
   FileText,
-  ImageOff
+  ImageOff,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { ReorderInvoiceModal } from '@/components/inventory/reorder-invoice-modal';
 import {
@@ -109,6 +111,7 @@ import { useBranch } from '@/context/branch-context';
 import { cn, safeToDate } from '@/lib/utils';
 import { apiBase } from '@/lib/platform';
 import { trackFeature } from '@/lib/product-telemetry';
+import GlobalStockHistory from '@/components/inventory/global-stock-history';
 import Papa from 'papaparse';
 import { logAuditEvent } from '@/lib/audit';
 import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
@@ -271,6 +274,10 @@ function InventoryValuation({ products, currencySymbol, canViewCostPrice }: { pr
 }
 
 function InventoryPageContent() {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -299,6 +306,7 @@ function InventoryPageContent() {
     retryProductSync
   } = usePOS();
 
+  const [viewLayout, setViewLayout] = React.useState<'list' | 'grid'>('list');
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [isCostPriceOpen, setIsCostPriceOpen] = React.useState(false);
   const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
@@ -320,6 +328,7 @@ function InventoryPageContent() {
   const [showHealthModal, setShowHealthModal] = React.useState(false);
   const [isReorderInvoiceModalOpen, setIsReorderInvoiceModalOpen] = React.useState(false);
   const [isBulkImageEditorOpen, setIsBulkImageEditorOpen] = React.useState(false);
+  const [bulkImageEditorMode, setBulkImageEditorMode] = React.useState<'missing' | 'selected' | 'all'>('missing');
   const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
 
   const toggleExpandParent = (parentId: string) => {
@@ -813,7 +822,7 @@ function InventoryPageContent() {
       description: "Do your new products need images? You can add them all at once.",
       duration: 12000,
       action: (
-        <ToastAction altText="Bulk add images" onClick={() => setIsBulkImageEditorOpen(true)}>
+        <ToastAction altText="Bulk add images" onClick={() => { setBulkImageEditorMode('missing'); setIsBulkImageEditorOpen(true); }}>
           Bulk add images
         </ToastAction>
       ),
@@ -908,6 +917,11 @@ function InventoryPageContent() {
   };
 
   const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== DEFAULT_SORT_BY ? 1 : 0);
+
+  if (!mounted) {
+    return <InventoryBodySkeleton />;
+  }
+
   return (
     <div className="flex flex-col flex-1 w-full pb-16 md:pb-0">
 
@@ -950,6 +964,12 @@ function InventoryPageContent() {
                      {t('inventory.bulkEditCount', { count: selectedProductIds.length })}
                    </span>
                  </Button>
+                 <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => { setBulkImageEditorMode('selected'); setIsBulkImageEditorOpen(true); }}>
+                   <ImageOff className="h-3.5 w-3.5" />
+                   <span className="sm:whitespace-nowrap">
+                     Fetch Images
+                   </span>
+                 </Button>
                  <Button variant="default" size="sm" className="h-9 gap-1 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground hover:bg-primary/90" onClick={() => { setBulkEditInitialMode('ai'); setBulkEditInitialInstruction(''); setIsBulkEditDialogOpen(true); }}>
                    <Sparkles className="h-3.5 w-3.5" />
                    <span className="sm:whitespace-nowrap">
@@ -964,6 +984,25 @@ function InventoryPageContent() {
                  </Button>
                </>
              )}
+
+            <div className="flex items-center rounded-md border p-0.5 bg-muted/20 mr-1">
+              <Button
+                variant={viewLayout === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => setViewLayout('list')}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewLayout === 'grid' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => setViewLayout('grid')}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
 
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
@@ -1127,6 +1166,9 @@ function InventoryPageContent() {
                   <DropdownMenuItem onClick={() => setIsBulkEditDialogOpen(true)}>
                     <Edit className="me-2 h-4 w-4" /> {t('inventory.bulkEdit')}
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { setBulkImageEditorMode('selected'); setIsBulkImageEditorOpen(true); }}>
+                    <ImageOff className="me-2 h-4 w-4" /> Fetch Images
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                     <Trash2 className="me-2 h-4 w-4" /> {t('inventory.deleteSelected')}
                   </DropdownMenuItem>
@@ -1251,8 +1293,8 @@ function InventoryPageContent() {
       </div>
 
       <div className="w-full mb-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:max-w-lg">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:max-w-2xl">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">{t('inventory.tabAllProducts')}</TabsTrigger>
             <TabsTrigger value="health" className="flex items-center gap-1.5">
               {t('inventory.tabHealth')}
@@ -1261,9 +1303,18 @@ function InventoryPageContent() {
             <TabsTrigger value="analytics" className="flex items-center gap-1.5">
               Analytics
             </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-1.5">
+              Stock History
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
+
+      {activeTab === 'history' && (
+        <div className="space-y-6 mb-6">
+          <GlobalStockHistory />
+        </div>
+      )}
 
       {activeTab === 'analytics' && (
         <div className="space-y-6 mb-6">
@@ -1567,6 +1618,8 @@ function InventoryPageContent() {
         </div>
       )}
 
+
+
       {activeTab === 'health' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
           {/* Left Column: Metric Cards */}
@@ -1755,15 +1808,29 @@ function InventoryPageContent() {
             >
               Select All ({displayedProducts.length})
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsBulkImageEditorOpen(true)}
-              className="text-xs gap-1.5 flex-1 sm:flex-none border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-950/30"
-            >
-              <ImageOff className="h-3.5 w-3.5" />
-              Fetch Images
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs gap-1.5 flex-1 sm:flex-none border-blue-500/50 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-950/30"
+                >
+                  <ImageOff className="h-3.5 w-3.5" />
+                  Fetch Images
+                  <ChevronDown className="h-3 w-3 ml-0.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Fetch scope</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setBulkImageEditorMode('missing'); setIsBulkImageEditorOpen(true); }}>
+                  Missing images only
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setBulkImageEditorMode('all'); setIsBulkImageEditorOpen(true); }}>
+                  All products (override existing)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               size="sm"
               onClick={() => {
@@ -1855,7 +1922,8 @@ function InventoryPageContent() {
             </Table>
           ) : (
             displayedProducts && displayedProducts.length > 0 ? (
-              <Table>
+              viewLayout === 'list' ? (
+                <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-12">
@@ -2076,6 +2144,174 @@ function InventoryPageContent() {
                 })}
                 </TableBody>
               </Table>
+              ) : (
+                <div className="flex flex-col min-h-0 h-full">
+                  <div className="px-5 py-3 border-b flex items-center gap-3 bg-muted/10 sticky top-0 z-10">
+                    <Checkbox
+                      checked={displayedProducts.length > 0 && selectedProductIds.length === displayedProducts.length}
+                      onCheckedChange={handleSelectAll}
+                      id="select-all-grid"
+                    />
+                    <label htmlFor="select-all-grid" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer text-muted-foreground select-none">
+                      Select All ({displayedProducts.length})
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-4">
+                    {displayedProducts.map((product) => {
+                    const variantInfo = getVariantInfo(product);
+                    const isExpanded = expandedParentIds.includes(product.id);
+                    const effectiveImageUrl = product.imageUrl || (product.parentId ? products?.find(p => p.id === product.parentId)?.imageUrl : undefined);
+                    const isOptimistic = (product as any).isOptimistic;
+                    
+                    return (
+                      <React.Fragment key={product.id}>
+                        <div className={cn("relative group rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col overflow-hidden transition-all hover:shadow-md", isOptimistic && "opacity-70", selectedProductIds.includes(product.id) && "ring-2 ring-primary border-primary")}>
+                           <div className="absolute top-2 left-2 z-10">
+                             <Checkbox
+                               checked={selectedProductIds.includes(product.id)}
+                               onCheckedChange={() => handleRowSelect(product.id)}
+                               disabled={isOptimistic}
+                               className="bg-background/80 backdrop-blur"
+                             />
+                           </div>
+                           <div className="absolute top-2 right-2 z-10">
+                             <DropdownMenu modal={false}
+                               open={openMenuId === product.id} 
+                               onOpenChange={(open) => setOpenMenuId(open ? product.id : null)}
+                             >
+                               <DropdownMenuTrigger asChild>
+                                 <Button size="icon" variant="secondary" className="h-7 w-7 bg-background/80 backdrop-blur shadow-sm hover:bg-background/90 opacity-0 group-hover:opacity-100 transition-opacity">
+                                   <MoreHorizontal className="h-4 w-4" />
+                                 </Button>
+                               </DropdownMenuTrigger>
+                               <DropdownMenuContent align="end">
+                                 {canManageStock && (
+                                   <>
+                                     <DropdownMenuItem onSelect={() => router.push(`/inventory/details?id=${product.id}`)}>
+                                       <Edit className="me-2 h-4 w-4" /> {t('inventory.fullEdit')}
+                                     </DropdownMenuItem>
+                                     <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>
+                                       <Edit className="me-2 h-4 w-4" /> {t('inventory.quickEdit')}
+                                     </DropdownMenuItem>
+                                     <DropdownMenuItem onSelect={() => setQuickRestockProduct(product)}>
+                                       <PackagePlus className="me-2 h-4 w-4" /> Quick Restock
+                                     </DropdownMenuItem>
+                                   </>
+                                 )}
+                                 <DropdownMenuItem onSelect={() => setBarcodeProduct(product)} disabled={!product.sku}>
+                                   <BarcodeIcon className="me-2 h-4 w-4" /> {t('inventory.printBarcode')}
+                                 </DropdownMenuItem>
+                               </DropdownMenuContent>
+                             </DropdownMenu>
+                           </div>
+                           <div 
+                             className="aspect-square w-full bg-muted cursor-pointer relative"
+                             onClick={() => {
+                               if (isOptimistic) return;
+                               if (variantInfo.isVariantParent) { toggleExpandParent(product.id); return; }
+                               router.push(`/inventory/details?id=${product.id}`);
+                             }}
+                           >
+                              {effectiveImageUrl ? (
+                                <CachedImage src={effectiveImageUrl} alt={product.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Package className="h-8 w-8" /></div>
+                              )}
+                              {isOptimistic && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                </div>
+                              )}
+                           </div>
+                           <div className="p-3 flex flex-col flex-1 cursor-pointer" onClick={() => !isOptimistic && router.push(`/inventory/details?id=${product.id}`)}>
+                             <div className="flex justify-between items-start mb-1 gap-2">
+                               <div className="line-clamp-2 text-sm font-semibold leading-tight">{product.name}</div>
+                               {variantInfo.isVariantParent && (
+                                 <Button
+                                   type="button"
+                                   variant="ghost"
+                                   size="icon"
+                                   className="h-6 w-6 p-0 hover:bg-muted shrink-0"
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     toggleExpandParent(product.id);
+                                   }}
+                                 >
+                                   {isExpanded ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                 </Button>
+                               )}
+                             </div>
+                             <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2 flex-wrap">
+                               <span className="font-mono bg-muted px-1 rounded">{product.sku || 'NO-SKU'}</span>
+                               {variantInfo.isVariantParent && (
+                                 <Badge variant="secondary" className="text-[10px] h-4 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleExpandParent(product.id); }}>
+                                   {variantInfo.variants.length} options
+                                 </Badge>
+                               )}
+                             </div>
+                             
+                             <div className="mt-auto pt-2 border-t flex items-end justify-between">
+                               <div>
+                                 <div className="text-[10px] text-muted-foreground mb-0.5">{t('common.price')}</div>
+                                 <div className="font-semibold">{variantInfo.isVariantParent ? variantInfo.priceDisplay : `${currencySymbol}${product.price?.toLocaleString() || 0}`}</div>
+                               </div>
+                               {canManageStock && (
+                                 <div className="text-right">
+                                   <div className="text-[10px] text-muted-foreground mb-0.5">{t('inventory.colStock')}</div>
+                                   {product.categoryType === 'service' || product.category?.toLowerCase() === 'service' || product.category?.toLowerCase() === 'services' ? (
+                                      <span className="text-muted-foreground/40 italic text-xs">{t('inventory.notAvailable')}</span>
+                                   ) : (
+                                      <Badge variant={variantInfo.totalStock <= 0 ? 'destructive' : variantInfo.totalStock <= (product.lowStockThreshold || 5) ? 'secondary' : 'outline'} className="text-[10px]">
+                                        {variantInfo.totalStock} {product.baseUnit || ''}
+                                      </Badge>
+                                   )}
+                                 </div>
+                               )}
+                             </div>
+                           </div>
+                        </div>
+                        {/* Variant children if expanded */}
+                        {variantInfo.isVariantParent && isExpanded && variantInfo.variants.map((child: any) => {
+                          const childImg = child.imageUrl || effectiveImageUrl;
+                          return (
+                            <div key={child.id} className="relative group rounded-xl border border-muted bg-muted/30 text-card-foreground flex flex-col overflow-hidden opacity-90 scale-[0.96]">
+                              <div className="absolute top-2 left-2 z-10">
+                               <Checkbox
+                                 checked={selectedProductIds.includes(child.id)}
+                                 onCheckedChange={() => handleRowSelect(child.id)}
+                                 className="bg-background/80 backdrop-blur"
+                               />
+                             </div>
+                             <div className="absolute top-2 right-2 z-10">
+                               <Button size="icon" variant="secondary" className="h-7 w-7 bg-background/80 backdrop-blur shadow-sm hover:bg-background/90 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => router.push(`/inventory/details?id=${child.id}`)}>
+                                 <Edit className="h-3.5 w-3.5" />
+                               </Button>
+                             </div>
+                             <div 
+                               className="aspect-square w-full bg-muted/50 cursor-pointer"
+                               onClick={() => router.push(`/inventory/details?id=${child.id}`)}
+                             >
+                               {childImg ? <CachedImage src={childImg} alt={child.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Package className="h-6 w-6" /></div>}
+                             </div>
+                             <div className="p-3 flex flex-col flex-1 cursor-pointer" onClick={() => router.push(`/inventory/details?id=${child.id}`)}>
+                               <div className="line-clamp-2 text-xs font-semibold mb-1">{child.name}</div>
+                               <div className="font-mono text-[10px] text-muted-foreground mt-1 bg-muted/50 px-1 rounded w-fit">{child.sku || 'NO-SKU'}</div>
+                               <div className="mt-auto pt-2 flex items-end justify-between">
+                                 <div className="font-semibold text-xs">{currencySymbol}{child.price?.toLocaleString() || 0}</div>
+                                 {canManageStock && (
+                                   <Badge variant="outline" className="text-[9px]">{child.stock || 0} {child.baseUnit || ''}</Badge>
+                                 )}
+                               </div>
+                             </div>
+                            </div>
+                          )
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                 </div>
+                </div>
+              )
             ) : isCatalogUnavailable ? (
               /*
                * A load that failed is not a shop with no stock.
@@ -2219,10 +2455,16 @@ function InventoryPageContent() {
       <BulkImageEditor
         open={isBulkImageEditorOpen}
         onOpenChange={setIsBulkImageEditorOpen}
-        products={(products || []).filter(p => !p.imageUrl)}
+        products={
+          bulkImageEditorMode === 'selected'
+            ? displayedProducts.filter(p => selectedProductIds.includes(p.id))
+            : bulkImageEditorMode === 'all'
+              ? (products || [])
+              : (products || []).filter(p => !p.imageUrl)
+        }
         onSave={handleBulkImageSave}
         freeTierLimit={10}
-        isPro={false}
+        isPro={business?.plan === 'pro' || business?.plan === 'business' || business?.accessLevel === 'lifetime'}
       />
     </div>
 

@@ -45,8 +45,8 @@
  */
 
 import { safeToDate } from '@/lib/utils';
-import { isService as isServiceRow } from '@/lib/product-kind';
-import type { Product, Receipt, UserProfile } from '@/types';
+import type { Product, Receipt, UserProfile, Expense } from '@/types';
+import { isService } from '@/lib/product-kind';
 
 /* ------------------------------------------------------------------ *
  * Shared helpers
@@ -189,7 +189,7 @@ export function aggregateItems(
         product = byName.get(String(line.name ?? '').trim().toLowerCase());
       }
 
-      const service = isServiceRow(product ?? { category: null, categoryType: null, type: null });
+      const service = isService((product ?? { category: null, categoryType: null, type: null }) as any);
       if (kind === 'product' && service) continue;
       if (kind === 'service' && !service) continue;
 
@@ -654,12 +654,15 @@ export type PeriodSummary = {
   /** Distinct identified buyers. Anonymous sales are not counted. */
   buyers: number;
   receiptCount: number;
+  totalExpenses: number;
+  netProfit: number;
 };
 
 /** Roll a set of receipts into the figures the KPI row compares. */
 export function summarisePeriod(
   receipts: Receipt[] | null | undefined,
   products: Product[] | null | undefined,
+  expenses?: Expense[] | null
 ): PeriodSummary {
   const list = receipts || [];
   const byId = indexProducts(products);
@@ -687,8 +690,20 @@ export function summarisePeriod(
     }
   }
 
+  let totalExpenses = 0;
+  for (const exp of expenses || []) {
+    if (exp?.status !== 'pending') { // Only count actual spent money (paid)
+      totalExpenses += num(exp?.amount);
+    }
+  }
+
   const sales = list.length;
   const profit = anyCost ? costedRevenue - costSum : null;
+
+  // Net Profit is total revenue - total expenses 
+  // (ignoring COGS profit here as net profit is usually Revenue - Expenses in basic cash flow unless specified otherwise, but standard net profit is gross profit - operating expenses. If we have profit, use profit - expenses, else revenue - expenses. Let's provide Revenue - Expenses as cashflow net profit, or Gross Profit - Expenses if costs are fully tracked).
+  // The user asked "deduct my expenses from the revenue I generate". So netProfit = revenue - totalExpenses.
+  const netProfit = revenue - totalExpenses;
 
   return {
     revenue,
@@ -699,6 +714,8 @@ export function summarisePeriod(
     marginPct: profit !== null && costedRevenue > 0 ? (profit / costedRevenue) * 100 : null,
     buyers: buyers.size,
     receiptCount: sales,
+    totalExpenses,
+    netProfit
   };
 }
 

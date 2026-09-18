@@ -356,12 +356,6 @@ export function buildSaleFromProposal(
     const isService = product.categoryType === 'service' || product.type === 'service';
     if (!isService) {
       const already = stockByProduct.get(product.id) ?? (product.stock ?? 0);
-      if (already - qty < 0) {
-        return fail(
-          `Not enough stock for ${product.name} — ${already} on hand, ${qty} requested. ` +
-          'Record the delivery first, or reduce the quantity.',
-        );
-      }
       stockByProduct.set(product.id, already - qty);
       soldByProduct.set(product.id, (soldByProduct.get(product.id) ?? 0) + qty);
     }

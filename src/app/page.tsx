@@ -233,9 +233,7 @@ export default function Home() {
 
                             {/* Left Column: Copy & Form */}
                             <div className="max-w-xl z-10 mx-auto lg:mx-0 text-center lg:text-start">
-                                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/25 text-xs font-semibold text-primary mb-5 shadow-2xs hover:bg-primary/15 transition-all">
-                                    <span>✨ NEW: Instant Web Image Search — Add product photos in 1 click</span>
-                                </div>
+
                                 <p className="uppercase text-xs font-semibold tracking-tight font-dm-sans mb-6 text-slate-900"><T k="landing.heroEyebrow" /></p>
                                 <h1 className="leading-[0.95] lg:text-6xl xl:text-7xl text-4xl md:text-5xl font-medium text-foreground tracking-tighter font-display mb-8">
                                     <T k="landing.heroLine1" /><br />

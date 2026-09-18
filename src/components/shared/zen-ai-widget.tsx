@@ -184,7 +184,11 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
           toast({ title: 'Sale not recorded', description: built.reason, variant: 'destructive' });
           return;
         }
-        addToQueue({ type: 'complete-sale', payload: built.payload }, `Zen AI: recording sale ${built.receiptNumber}`);
+        const payload = built.payload;
+        if (payload.receiptData && payload.receiptData.createdAt instanceof Date) {
+          payload.receiptData = { ...payload.receiptData, createdAt: payload.receiptData.createdAt.toISOString() };
+        }
+        addToQueue({ type: 'complete-sale', payload }, `Zen AI: recording sale ${built.receiptNumber}`);
       } else if (action.action === 'COST_PRICES' || action.action === 'COST_ESTIMATE') {
         const writes = check.writes ?? [];
         if (writes.length === 0) {
@@ -259,48 +263,142 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
   }, [sendMessage, isCreditsExhausted, plan, monthlyLimit]);
 
   // Speech Recognition Setup
+  const [isTranscribing, setIsTranscribing] = React.useState(false);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const audioChunksRef = React.useRef<BlobPart[]>([]);
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const silenceStartRef = React.useRef<number | null>(null);
+  const vadLoopRef = React.useRef<number | null>(null);
+
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = 'en-US';
-
-      rec.onstart = () => setIsListening(true);
-      rec.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
-          setInput(prev => (prev.trim() + ' ' + transcript.trim()).trim());
-        }
-      };
-      rec.onerror = () => setIsListening(false);
-      rec.onend = () => setIsListening(false);
-
-      recognitionRef.current = rec;
-    }
+    // Cleanup on unmount
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (vadLoopRef.current) cancelAnimationFrame(vadLoopRef.current);
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+    };
   }, []);
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
+  const toggleListening = async () => {
     if (isListening) {
-      recognitionRef.current.stop();
-    } else {
-      try { recognitionRef.current.start(); } catch {}
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (vadLoopRef.current) cancelAnimationFrame(vadLoopRef.current);
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      // VAD setup
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+      microphone.connect(analyser);
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      const SILENCE_THRESHOLD = 15;
+      const SILENCE_DURATION_MS = 1500;
+      silenceStartRef.current = null;
+
+      const checkSilence = () => {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+
+        if (average < SILENCE_THRESHOLD) {
+          if (silenceStartRef.current === null) {
+            silenceStartRef.current = Date.now();
+          } else if (Date.now() - silenceStartRef.current > SILENCE_DURATION_MS) {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+              mediaRecorderRef.current.stop();
+              setIsListening(false);
+            }
+            return;
+          }
+        } else {
+          silenceStartRef.current = null;
+        }
+        vadLoopRef.current = requestAnimationFrame(checkSilence);
+      };
+      
+      checkSilence();
+
+      mediaRecorder.onstop = async () => {
+        setIsTranscribing(true);
+        if (vadLoopRef.current) cancelAnimationFrame(vadLoopRef.current);
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+          audioContextRef.current.close();
+        }
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'audio.webm');
+
+        try {
+          const res = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!res.ok) throw new Error('Transcription failed');
+          const data = await res.json();
+          if (data.text) {
+            setInput(prev => (prev.trim() + ' ' + data.text.trim()).trim());
+          }
+        } catch (error) {
+          console.error('Transcription error:', error);
+          toast({ title: 'Transcription failed', description: 'Could not process audio.', variant: 'destructive' });
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      toast({ title: 'Microphone access denied', description: 'Please allow microphone access to use voice dictation.', variant: 'destructive' });
     }
   };
 
   React.useEffect(() => {
     if (isOpen && dictationTrigger > 0) {
       const timer = setTimeout(() => {
-        if (recognitionRef.current && !isListening) {
-          try { recognitionRef.current.start(); } catch {}
+        if (!isListening && !isTranscribing) {
+          toggleListening();
         }
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [dictationTrigger, isOpen, isListening]);
+  }, [dictationTrigger, isOpen, isListening, isTranscribing]);
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {
@@ -637,8 +735,8 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
                       type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      placeholder={isListening ? "Listening to your voice..." : "Ask Zen AI anything..."}
-                      disabled={isLoading}
+                      placeholder={isTranscribing ? "Transcribing audio..." : isListening ? "Listening to your voice..." : "Ask Zen AI anything..."}
+                      disabled={isLoading || isTranscribing}
                       className="w-full bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground/75 focus:ring-0 focus:outline-none py-1 pl-1"
                     />
                   </div>

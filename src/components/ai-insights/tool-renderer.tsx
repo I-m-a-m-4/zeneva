@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Package, DollarSign, Users, Sparkles, CheckCircle2, XCircle,
   AlertTriangle, TrendingUp, ArrowRight, ReceiptText, LayoutGrid, Table2,
-  Coins, Calculator,
+  Coins, Calculator, Download, Plus,
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -18,6 +18,10 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import type { ChartConfig } from '@/components/ui/chart';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { apiBase } from '@/lib/platform';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogClose, DialogTitle } from '@/components/ui/dialog';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 /**
  * Generative UI for Zen AI tool results.
@@ -385,6 +389,107 @@ function ProductPicker({ result, onPick }: { result: any; onPick?: (p: any) => v
         ))}
       </div>
       <p className="text-[11px] text-muted-foreground mt-2.5">Tap a product to continue.</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+function ImageGrid({ result, onPick }: { result: any, onPick?: (val: any) => void }) {
+  const [selectedImage, setSelectedImage] = React.useState<any>(null);
+
+  const images = result.images || [];
+  if (images.length === 0) {
+    return (
+      <div className="flex items-start gap-2 text-xs text-muted-foreground border border-dashed border-border rounded-lg px-3 py-3">
+        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-px" />
+        <span>No images found for <strong className="text-foreground">"{result.query}"</strong>.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full rounded-xl border border-border/60 bg-muted/20 p-3">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <Sparkles className="w-3.5 h-3.5 text-primary" />
+        <span className="text-xs font-semibold text-foreground">
+          Images for "{result.query}"
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {images.map((img: any) => {
+          const proxyUrl = `${apiBase()}/api/images/proxy?url=${encodeURIComponent(img.urls.regular)}&fallback=${encodeURIComponent(img.urls.small)}`;
+          return (
+            <div 
+               key={img.id} 
+               className="relative aspect-square overflow-hidden rounded-lg border border-border/50 group bg-muted cursor-pointer"
+               onClick={() => setSelectedImage(img)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={proxyUrl}
+                alt={img.alt_description || 'Product image'}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                loading="lazy"
+              />
+              <div className="absolute inset-x-0 bottom-0 p-1.5 bg-gradient-to-t from-black/60 to-transparent">
+                 <p className="text-[9px] text-white/90 truncate">{img.user?.name || 'Web'}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
+        <DialogContent className="max-w-2xl bg-black border-border/20 p-0 overflow-hidden outline-none">
+          <DialogTitle className="sr-only">Expanded Web Image</DialogTitle>
+          {selectedImage && (
+            <div className="relative w-full h-[60vh] sm:h-[80vh] flex flex-col bg-black">
+              <div className="absolute top-2 right-2 z-10">
+                 <DialogClose asChild>
+                   <button className="w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 backdrop-blur-sm transition-colors border border-white/10">
+                     <XCircle className="w-5 h-5" />
+                   </button>
+                 </DialogClose>
+              </div>
+              <div className="flex-1 min-h-0 relative flex items-center justify-center p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${apiBase()}/api/images/proxy?url=${encodeURIComponent(selectedImage.urls.full)}&fallback=${encodeURIComponent(selectedImage.urls.regular)}`}
+                  alt={selectedImage.alt_description || 'Expanded image'}
+                  className="max-w-full max-h-full object-contain rounded"
+                />
+              </div>
+              <div className="p-4 bg-background/95 backdrop-blur-md border-t border-border/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                 <div className="min-w-0">
+                   <p className="text-sm font-medium text-foreground truncate">{selectedImage.user?.name || 'Web Image'}</p>
+                   <p className="text-xs text-muted-foreground truncate max-w-sm" title={selectedImage.alt_description}>{selectedImage.alt_description}</p>
+                 </div>
+                 <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none text-xs" onClick={() => {
+                        const url = `${apiBase()}/api/images/proxy?url=${encodeURIComponent(selectedImage.urls.full)}&download=true`;
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `image-${selectedImage.id}.jpg`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }}>
+                      <Download className="w-3.5 h-3.5 mr-1.5" /> Download
+                    </Button>
+                    {onPick && (
+                      <Button size="sm" className="flex-1 sm:flex-none text-xs" onClick={() => {
+                          setSelectedImage(null);
+                          onPick(`Assign this image to a product: ${selectedImage.urls.regular}`);
+                      }}>
+                        <Plus className="w-3.5 h-3.5 mr-1.5" /> Assign to Product
+                      </Button>
+                    )}
+                 </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1280,6 +1385,8 @@ export function ToolResult({ output, onApprove, onReject, onPick }: {
       return <ProductResultSwitch result={output} onPick={onPick} />;
     case 'PRODUCT_PICKER':
       return <ProductPicker result={output} onPick={onPick} />;
+    case 'IMAGE_GRID':
+      return <ImageGrid result={output} onPick={onPick} />;
     case 'CUSTOMER_LIST':
       return <CustomerList result={output} />;
     case 'METRICS':
