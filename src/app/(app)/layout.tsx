@@ -403,6 +403,24 @@ export default function AuthenticatedLayout({
     setIsMounted(true);
   }, []);
 
+  React.useEffect(() => {
+    const handlePageAction = (e: any) => {
+      const { action, payload } = e.detail || {};
+      if (!action) return;
+
+      if (action === 'open_point_of_sale') {
+        router.push('/sales/pos');
+      } else if (action === 'open_settings_tab') {
+        const tab = payload || 'profile';
+        router.push(`/settings?tab=${tab}`);
+      } else if (action === 'contact_support') {
+        router.push('/settings?tab=support');
+      }
+    };
+    window.addEventListener('zen-page-action', handlePageAction);
+    return () => window.removeEventListener('zen-page-action', handlePageAction);
+  }, [router]);
+
   // --- Helpers & Hooks (Above early returns to avoid Rule of Hooks violations) ---
   
   const handleLogout = () => {
@@ -511,7 +529,16 @@ export default function AuthenticatedLayout({
     if (isLoadingUserNotifications || isLoadingAdminNotifications) return [];
     const combined = [
       ...(userNotifications || []).map(n => ({ ...n, isGlobal: false })),
-      ...visibleAnnouncements.map(n => ({ ...n, read: true, isGlobal: true }))
+      ...visibleAnnouncements.map(n => ({ ...n, read: true, isGlobal: true })),
+      {
+        id: 'zen-ai-announcement',
+        title: 'Meet Zen AI, your new co-pilot! 🚀',
+        body: 'Press the "Control" key anywhere to summon Zen AI. It can instantly fetch missing product images from the web, filter your reports, record walk-in sales, and more!',
+        createdAt: new Date(),
+        isGlobal: true,
+        read: false,
+        sentBy: 'System'
+      }
     ];
     combined.sort((a, b) => {
       const dateA = safeToDate(a.createdAt);
@@ -1431,8 +1458,8 @@ export default function AuthenticatedLayout({
                 </Link>
                 <BranchSwitcher />
               </SidebarHeader>
-              <SidebarContent className="flex-1 p-2">
-                <div className="flex-1 overflow-y-auto scrollbar-none hover:scrollbar-thin scrollbar-thumb-muted-foreground/20">
+              <SidebarContent className="flex-1 p-2 min-h-0">
+                <div className="flex-1 h-full overflow-y-auto scrollbar-none hover:scrollbar-thin scrollbar-thumb-muted-foreground/20">
                   <SidebarMenu>
                     {!isMounted || isUserLoading ? (
                       // Show skeletons for the top 5 nav items while loading or before mounting

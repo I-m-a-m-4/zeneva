@@ -21,17 +21,17 @@ import { Input } from '@/components/ui/input';
 import { Search, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ProductStockHistoryChart } from './product-stock-history-chart';
+import { TransactionDetailsModal } from './transaction-details-modal';
 
 export default function GlobalStockHistory() {
-    const { business, firestore, products } = usePOS();
+    const { business, firestore, products, users } = usePOS();
     const { t } = useI18n();
     const [transactions, setTransactions] = React.useState<InventoryTransaction[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [logFilter, setLogFilter] = React.useState<'all' | 'in' | 'out' | 'return' | 'adjustment'>('all');
     const [dateFilter, setDateFilter] = React.useState<'30d' | '90d' | '6m' | '1y' | 'all'>('all');
     const [searchQuery, setSearchQuery] = React.useState('');
-    const [selectedProductForChart, setSelectedProductForChart] = React.useState<string | null>(null);
+    const [selectedTransaction, setSelectedTransaction] = React.useState<any | null>(null);
 
     const handleExportAudit = () => {
         const headers = ['Date', 'Product', 'Type', 'Quantity', 'Notes', 'Created By'];
@@ -153,9 +153,6 @@ export default function GlobalStockHistory() {
         });
     }, [transactions, products]);
 
-    const totalIn = processedTransactions.filter(t => t.type === 'in' || t.quantity > 0).length;
-    const totalOut = processedTransactions.filter(t => t.type === 'out' || t.type === 'return' || t.quantity < 0).length;
-
     const filteredTransactions = processedTransactions.filter(log => {
         if (searchQuery && !log.productName?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         
@@ -175,6 +172,20 @@ export default function GlobalStockHistory() {
         if (logFilter === 'adjustment') return log.type === 'adjustment' || (log.type !== 'in' && log.type !== 'out' && log.type !== 'return');
         return log.type === logFilter;
     });
+
+    let totalUnitsIn = 0;
+    let totalUnitsOut = 0;
+    
+    filteredTransactions.forEach(t => {
+        const qty = Math.abs(t.quantity || 0);
+        if (t.type === 'in' || t.quantity > 0 || (t.type === 'adjustment' && t.quantity > 0)) {
+            totalUnitsIn += qty;
+        } else if (t.type === 'out' || t.type === 'return' || t.quantity < 0 || (t.type === 'adjustment' && t.quantity < 0)) {
+            totalUnitsOut += qty;
+        }
+    });
+
+    const netMovement = totalUnitsIn - totalUnitsOut;
 
     if (isLoading) {
         return (
@@ -210,32 +221,34 @@ export default function GlobalStockHistory() {
             </div>
 
             <div className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
-                        <CardTitle className="text-sm font-medium">Total Entries</CardTitle>
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{transactions.length}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
-                        <CardTitle className="text-sm font-medium">Stock Added (In)</CardTitle>
-                        <ArrowUp className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalIn}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
-                        <CardTitle className="text-sm font-medium">Stock Removed (Out)</CardTitle>
+                        <CardTitle className="text-sm font-medium">Total Units Sold (Out)</CardTitle>
                         <ArrowDown className="h-4 w-4 text-rose-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{totalOut}</div>
+                        <div className="text-2xl font-bold">{totalUnitsOut.toLocaleString()}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
+                        <CardTitle className="text-sm font-medium">Total Units Restocked (In)</CardTitle>
+                        <ArrowUp className="h-4 w-4 text-emerald-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{totalUnitsIn.toLocaleString()}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="py-4 flex flex-row items-center justify-between space-y-0">
+                        <CardTitle className="text-sm font-medium">Net Stock Movement</CardTitle>
+                        <ArrowRightLeft className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className={`text-2xl font-bold ${netMovement > 0 ? 'text-emerald-600' : netMovement < 0 ? 'text-rose-600' : ''}`}>
+                            {netMovement > 0 ? '+' : ''}{netMovement.toLocaleString()}
+                        </div>
                     </CardContent>
                 </Card>
             </div>
@@ -324,7 +337,7 @@ export default function GlobalStockHistory() {
                                         <TableRow 
                                             key={tx.id || Math.random().toString()}
                                             className="cursor-pointer hover:bg-muted/50"
-                                            onClick={() => setSelectedProductForChart(tx.productId)}
+                                            onClick={() => setSelectedTransaction(tx)}
                                         >
                                             <TableCell className="font-medium whitespace-nowrap">
                                                 {tx.date?.seconds 
@@ -378,18 +391,12 @@ export default function GlobalStockHistory() {
                 </CardContent>
             </Card>
             
-            <Dialog open={!!selectedProductForChart} onOpenChange={(open) => !open && setSelectedProductForChart(null)}>
-                <DialogContent className="max-w-4xl w-[90vw]">
-                    <DialogHeader>
-                        <DialogTitle>Stock History Chart</DialogTitle>
-                    </DialogHeader>
-                    <div className="mt-4">
-                        {selectedProductForChart && (
-                            <ProductStockHistoryChart productId={selectedProductForChart} />
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <TransactionDetailsModal 
+                transaction={selectedTransaction} 
+                users={users || []}
+                open={!!selectedTransaction} 
+                onOpenChange={(open) => !open && setSelectedTransaction(null)} 
+            />
         </div>
         </div>
     );

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
 import { X, Sparkles, Loader2, User, Mic, ArrowUp, Maximize2, Minimize2, Trash2, Square, ExternalLink, Zap } from 'lucide-react';
@@ -90,15 +90,17 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
   const [isListening, setIsListening] = React.useState(false);
   const recognitionRef = React.useRef<any>(null);
 
+  const pathname = usePathname();
+
   const transport = React.useMemo(() => new DefaultChatTransport({
     api: apiBase() + '/api/chat',
     prepareSendMessagesRequest: async ({ messages, body }) => {
       const token = await getAuth().currentUser?.getIdToken();
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
-      return { body: { ...body, messages }, headers };
+      return { body: { ...body, messages, pathname }, headers };
     },
-  }), []);
+  }), [pathname]);
 
   const { messages, sendMessage, setMessages, status, stop } = useChat({
     id: sessionId,
@@ -368,7 +370,10 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
             body: formData,
           });
 
-          if (!res.ok) throw new Error('Transcription failed');
+          if (!res.ok) {
+            toast({ title: 'Transcription failed', description: 'Could not process audio.', variant: 'destructive' });
+            return;
+          }
           const data = await res.json();
           if (data.text) {
             setInput(prev => (prev.trim() + ' ' + data.text.trim()).trim());
@@ -400,12 +405,11 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
     }
   }, [dictationTrigger, isOpen, isListening, isTranscribing]);
 
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
-      }
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading, creditsExhausted]);
 
@@ -701,8 +705,41 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
                             </div>
                           </div>
                         )}
+                        <div ref={messagesEndRef} />
                       </div>
                     </ScrollArea>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Empty State Suggestion Pills */}
+              <AnimatePresence>
+                {messages.length === 0 && !isListening && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="flex flex-wrap gap-2 w-full justify-center px-4 mb-2"
+                  >
+                    {(pathname.includes('/inventory') 
+                      ? ["Show me items that are running low on stock", "Help me search the inventory for a product", "Open the form to add a new product"]
+                      : pathname.includes('/reports')
+                      ? ["Export this report's data as a PDF document", "Filter this sales report to show only this month", "Analyze why revenue might be down"]
+                      : ["Take me directly to the Point of Sale register", "Explain how to use the features on this page", "Help me record a new business expense"]
+                    ).map((suggestion, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                           if (isCreditsExhausted) return;
+                           sendMessage({ text: suggestion });
+                           setLastUserPrompt(suggestion);
+                        }}
+                        className="bg-background/80 hover:bg-background border border-border/80 shadow-sm rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-all duration-200"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
                   </motion.div>
                 )}
               </AnimatePresence>

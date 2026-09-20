@@ -2836,6 +2836,51 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
         } catch (e: any) { return fail('Failed to forecast stockouts', e); }
       },
     }),
+    setPageTimeRange: tool({
+      description: 'Change the date range filter on the current page to the specified number of days (e.g. 7 for last 7 days, 30 for last 30 days). Use this when the user asks you to filter the current view or change the date range on screen.',
+      parameters: z.object({
+        days: z.number().describe('Number of days to filter by (1 for today, 7 for last 7 days, 30 for this month)'),
+      }),
+      execute: async ({ days }) => {
+        return {
+          type: 'SET_TIME_RANGE',
+          days,
+          message: `I've prepared a filter for the last ${days} days.`
+        };
+      },
+    }),
+    executePageAction: tool({
+      description: `Trigger a generic UI action on the current page to act as the user's co-pilot. Supported actions include:
+- 'open_create_product': Open the "Add Product" modal
+- 'open_create_expense': Open the "Record Expense" modal
+- 'open_point_of_sale': Navigate directly to the active POS register
+- 'open_settings_tab': Navigate to Settings (pass tab name like 'staff' or 'receipt' in payload)
+- 'search_inventory': Apply a search string to the inventory (pass search string in payload)
+- 'filter_low_stock': Filter inventory view to low stock items
+- 'search_customer': Look up a specific customer (pass name in payload)
+- 'filter_receipts_by_status': Filter sales history (pass status in payload)
+- 'export_current_view': Trigger CSV/PDF export for the current table
+- 'switch_report_tab': Switch between Analytics/Profit&Loss (pass tab name in payload)
+- 'contact_support': Open the live chat/support modal
+- 'show_tutorial': Trigger a guided tour for the current page`,
+      parameters: z.object({
+        action: z.enum([
+          'open_create_product', 'open_create_expense', 'open_point_of_sale', 'open_settings_tab',
+          'search_inventory', 'filter_low_stock', 'search_customer', 'filter_receipts_by_status',
+          'export_current_view', 'switch_report_tab', 'contact_support', 'show_tutorial'
+        ]).describe('The exact action identifier to trigger.'),
+        payload: z.string().optional().describe('Optional payload for the action, such as a search query.'),
+        message: z.string().describe('A friendly message to show the user confirming the action.'),
+      }),
+      execute: async ({ action, payload, message }) => {
+        return {
+          type: 'PAGE_ACTION',
+          action,
+          payload,
+          message,
+        };
+      },
+    }),
     reportUnanswered: tool({
       description:
         'Call this when you genuinely do not have the answer to the user\'s question, either because it is outside your business data or you lack the tools for it. It logs the unanswered query so the admin can review it later.',

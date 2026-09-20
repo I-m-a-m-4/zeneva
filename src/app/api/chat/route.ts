@@ -210,6 +210,15 @@ answer out of \`getSalesMetrics\` plus three other calls.
 
 RATING_SECTION_TOKEN
 
+## Capabilities — when asked what you can do
+When the user asks what you can do, what your features are, or what the coolest things you can do are, ALWAYS highlight these active features:
+1. **Control the app:** "I can navigate you around the app, open forms, filter reports, or export data for you — just ask."
+2. **Fetch product images from the web:** "I can automatically fetch the perfect images from the web for products that are missing photos, especially after a bulk CSV import."
+3. **Record sales & cost prices:** "I can help you record walk-in sales or update cost prices in bulk via chat."
+4. **Detect Theft & Loss:** "I can run an automated fraud and shrinkage sweep to spot unauthorized discounts or voids."
+5. **Forecast Revenue & Stock:** "I can project future earnings and tell you exactly when fast-moving items will run out."
+Keep it brief and bulleted.
+
 ## Getting them to a page
 When the owner wants to *be somewhere* — "open my reports", "where do I change
 that", "take me to inventory" — call \`linkToPage\` with the path and a short label.
@@ -379,8 +388,15 @@ can be turned on in Settings → General, then stop. One sentence, no pitch, and
 second mention later in the conversation.`;
 
 export async function POST(req: Request) {
-  const json = await req.json();
-  const { messages, id: clientSessionId } = json as { messages: UIMessage[]; id?: string; data?: any };
+  let json;
+  try {
+    json = await req.json();
+  } catch (err) {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const { messages, id: clientSessionId, pathname } = json as { messages: UIMessage[]; id?: string; pathname?: string; data?: any };
 
   // ── SECURITY LAYER 1: Verified identity ──
   //
@@ -592,8 +608,8 @@ export async function POST(req: Request) {
 
   const businessData = reserved.business;
   const plan = reserved.quote.plan;
-  // Tool results carry the currency so cards render the right symbol.
   const currency = businessData?.settings?.currency || 'NGN';
+  const activePageContext = pathname ? `\n\n## PAGE CONTEXT\nThe user is currently on the following page: ${pathname}. \nIf they ask "how do I do this" or "what is on this page", explain the purpose of this page. If they want to filter the current page or do an action, use tools if available.` : '';
 
   // The business rating is opt-in, and Zen is one of its surfaces. Strictly
   // `=== true`: `undefined` means the owner has never been asked, which is not
@@ -620,7 +636,7 @@ export async function POST(req: Request) {
     system: `${SYSTEM_PROMPT.replace(
       RATING_SECTION_TOKEN,
       ratingEnabled ? RATING_SECTION_ON : RATING_SECTION_OFF,
-    )}\n\n## Active Session Context\n- businessId: ${businessId}\n- userId: ${userId}`,
+    )}\n\n## Active Session Context\n- businessId: ${businessId}\n- userId: ${userId}${pathname ? `\n- Current Page: ${pathname}\n- Page Help: If the user asks for help about "this page", they mean the current page.` : ''}`,
     messages: modelMessages,
     // Every tool call costs a step, and a real question ("how did last month
     // compare, and what should I reorder?") legitimately spends several before

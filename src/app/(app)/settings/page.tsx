@@ -1,6 +1,6 @@
 'use client';
-
 import * as React from 'react';
+import DevelopersTab from '@/components/settings/developers-tab';
 import Image from 'next/image';
 import Link from 'next/link';
 import PageTitle from '@/components/shared/page-title';
@@ -898,6 +898,7 @@ function SettingsPageContent() {
                     <TabsTrigger value="storefront" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabStorefront')}</TabsTrigger>
                     <TabsTrigger value="financials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabFinancialsBilling')}</TabsTrigger>
                     <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabSystemSecurity')}</TabsTrigger>
+                    <TabsTrigger value="developers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">Developers</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="general" className="space-y-6 mt-0">
@@ -1831,6 +1832,10 @@ function SettingsPageContent() {
                         </Card>
                     )}
 
+                </TabsContent>
+
+                <TabsContent value="developers" className="space-y-6 mt-0">
+                    <DevelopersTab business={business} />
                 </TabsContent>
             </Tabs>
         </div>

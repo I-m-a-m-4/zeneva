@@ -8,7 +8,7 @@ import {
   ArrowUp, Loader2, Clock, TrendingUp, DollarSign, Users, ReceiptText,
   SquarePen, BookOpen, Trash2, Send, Gauge, X, Zap, Search,
   PanelLeft, PanelLeftClose, XCircle, Mic, SlidersHorizontal,
-  Laptop, ArrowUpRight, RotateCw, Sparkles, Layers, Box, FileText, ChevronRight, ChevronLeft
+  Laptop, ArrowUpRight, RotateCw, Sparkles, Layers, Box, FileText, ChevronRight, ChevronLeft, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppConfig } from '@/lib/config';
@@ -83,19 +83,19 @@ const UPGRADE_HREF = '/billing';
 const SUGGESTION_POOLS = [
   [
     {
-      title: "Audit dead stock & margin leaks",
-      desc: "Spot quiet loss-making items and outdated cost prices across your store.",
-      prompt: "Which products are quietly losing me money or have zero sales this month?"
+      title: "Fetch product images",
+      desc: "Automatically find and assign pictures for your inventory items.",
+      prompt: "Fetch images for all my products that don't have one"
     },
     {
-      title: "Forecast cashflow & reorders",
-      desc: "Predict next month's sales trend and get recommended inventory restocks.",
-      prompt: "What will my sales look like next month, and what should I reorder now?"
+      title: "Break down sales & profit",
+      desc: "See a detailed cost, revenue, and profit breakdown for recent transactions.",
+      prompt: "Can I see the breakdown of how the total net cost of yesterday's sales was gotten?"
     },
     {
-      title: "Record a sale via prompt",
-      desc: "Instant proposal card to log sold units and auto-issue POS receipts.",
-      prompt: "Record a sale: 2 units of Zeneva, paid cash"
+      title: "Bulk restock & price updates",
+      desc: "Quickly add stock or update cost prices just by typing them.",
+      prompt: "Restock: Pepsi 50cl +20 units, Coke set stock to 50"
     }
   ],
   [
@@ -203,7 +203,17 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
   // Manus UI States
   const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    const hasVisited = localStorage.getItem('zen_ai_suggestions_seen');
+    if (!hasVisited) {
+      setShowSuggestions(true);
+      localStorage.setItem('zen_ai_suggestions_seen', 'true');
+    } else {
+      setShowSuggestions(Math.random() > 0.9);
+    }
+  }, []);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isListening, setIsListening] = useState(false);
   const [lastUserPrompt, setLastUserPrompt] = useState('');
@@ -869,33 +879,47 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                   </form>
 
                   {/* Suggested for you — desktop only */}
-                  {showSuggestions && (
-                    <div className="border-t border-border/60 bg-muted/20 p-4 sm:p-5 flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground">Suggested for you</span>
-                        <div className="flex items-center gap-1">
-                          <button type="button" onClick={() => setSuggestionIndex((prev) => (prev + 1) % SUGGESTION_POOLS.length)} className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors">
-                            <RotateCw className="h-3 w-3" />
-                          </button>
-                          <button type="button" onClick={() => setShowSuggestions(false)} className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors">
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2.5">
-                        {SUGGESTION_POOLS[suggestionIndex].map((item, idx) => (
-                          <button key={idx} type="button" onClick={() => submitPrompt(item.prompt)}
-                            className="text-left p-3 rounded-2xl bg-card border border-border/80 hover:border-orange-500/40 hover:shadow-xs transition-all flex flex-col justify-between group h-24">
-                            <div className="flex items-start justify-between gap-1 w-full">
-                              <span className="text-xs font-semibold text-foreground line-clamp-1 group-hover:text-orange-600 transition-colors">{item.title}</span>
-                              <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-orange-500 transition-colors shrink-0" />
+                  <div className="border-t border-border/60 bg-muted/20 flex flex-col transition-all">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowSuggestions(prev => !prev)}
+                      className="flex items-center justify-between w-full p-4 sm:px-5 sm:py-3 hover:bg-muted/30 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-muted-foreground">Suggested for you</span>
+                      <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showSuggestions && "rotate-180")} />
+                    </button>
+
+                    <AnimatePresence>
+                      {showSuggestions && (
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 flex flex-col gap-3">
+                            <div className="flex justify-end -mt-8 relative z-10 mr-8">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setSuggestionIndex((prev) => (prev + 1) % SUGGESTION_POOLS.length); }} className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-background/80 flex items-center justify-center transition-colors">
+                                <RotateCw className="h-3 w-3" />
+                              </button>
                             </div>
-                            <span className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{item.desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                            <div className="grid grid-cols-3 gap-2.5">
+                              {SUGGESTION_POOLS[suggestionIndex].map((item, idx) => (
+                                <button key={idx} type="button" onClick={() => submitPrompt(item.prompt)}
+                                  className="text-left p-3 rounded-2xl bg-card border border-border/80 hover:border-orange-500/40 hover:shadow-xs transition-all flex flex-col justify-between group h-24">
+                                  <div className="flex items-start justify-between gap-1 w-full">
+                                    <span className="text-xs font-semibold text-foreground line-clamp-1 group-hover:text-orange-600 transition-colors">{item.title}</span>
+                                    <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-orange-500 transition-colors shrink-0" />
+                                  </div>
+                                  <span className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{item.desc}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {/* ── DESKTOP ONLY: quick chips ── */}

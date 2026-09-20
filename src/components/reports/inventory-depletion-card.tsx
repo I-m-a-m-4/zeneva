@@ -2,8 +2,10 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Package, AlertTriangle, ArrowRight, LayoutGrid, List } from 'lucide-react';
 import type { Receipt, Product } from '@/types';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import { safeToDate } from '@/lib/utils';
 import { isService } from '@/lib/product-kind';
 import { subDays } from 'date-fns';
@@ -21,8 +23,11 @@ export default function InventoryDepletionCard({ receipts, products }: Inventory
     // docs/notifications.md — and the alert it promised was the `new Notification`
     // call removed below. The Tauri permission is requested once at sign-in by
     // NativeNotificationListener, so there was nothing for anyone to enable here.
+    // NativeNotificationListener, so there was nothing for anyone to enable here.
 
     const { t } = useI18n();
+    const [isExpanded, setIsExpanded] = React.useState(false);
+    const [viewMode, setViewMode] = React.useState<'list'|'grid'>('list');
 
     const depletionAlerts = React.useMemo(() => {
         if (!receipts || !products) return [];
@@ -86,45 +91,78 @@ export default function InventoryDepletionCard({ receipts, products }: Inventory
             }
         });
 
-        return alerts.sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 5); // Show top 5 most urgent
+        return alerts.sort((a, b) => a.daysRemaining - b.daysRemaining);
     }, [receipts, products]);
 
     if (depletionAlerts.length === 0) {
         return null; // Don't show if there's nothing to warn about
     }
 
+    const displayAlerts = isExpanded ? depletionAlerts : depletionAlerts.slice(0, 5);
+    const hasMore = depletionAlerts.length > 5;
+
     return (
         <Card className="border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-950/10">
-            <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
-                    <AlertTriangle className="h-5 w-5" /> {t('reports.depTitle')}
-                </CardTitle>
-                <CardDescription className="mt-1">
-                    {t('reports.depSubtitle')}
-                </CardDescription>
+            <CardHeader className="pb-3 flex flex-row items-start justify-between">
+                <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                        <AlertTriangle className="h-5 w-5" /> {t('reports.depTitle')}
+                    </CardTitle>
+                    <CardDescription>
+                        {t('reports.depSubtitle')}
+                    </CardDescription>
+                </div>
+                <div className="flex bg-muted rounded-md p-0.5 mt-0">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={`h-7 w-7 ${viewMode === 'list' ? 'bg-background shadow-sm' : ''}`} 
+                        onClick={() => setViewMode('list')}
+                    >
+                        <List className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className={`h-7 w-7 ${viewMode === 'grid' ? 'bg-background shadow-sm' : ''}`} 
+                        onClick={() => setViewMode('grid')}
+                    >
+                        <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
-                <div className="space-y-4">
-                    {depletionAlerts.map((alert, i) => (
-                        <div key={alert.product.id || i} className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-full ${alert.daysRemaining <= 3 ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-                                    <Package className="h-4 w-4" />
+                <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4' : 'space-y-4'}>
+                    {displayAlerts.map((alert, i) => (
+                        <Link key={alert.product.id || i} href={`/inventory/details?id=${alert.product.id}`} className="block transition-transform hover:scale-[1.01] active:scale-[0.98]">
+                            <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border shadow-sm h-full">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`p-2 rounded-full flex-shrink-0 ${alert.daysRemaining <= 3 ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                                        <Package className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-sm truncate">{alert.product.name}</p>
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                            {t('reports.depStock')} {alert.currentStock} <ArrowRight className="h-3 w-3 mx-1 flex-shrink-0" /> {t('reports.depSelling')}{alert.velocity}{t('reports.depPerDay')}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-semibold text-sm">{alert.product.name}</p>
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                        {t('reports.depStock')} {alert.currentStock} <ArrowRight className="h-3 w-3 mx-1" /> {t('reports.depSelling')}{alert.velocity}{t('reports.depPerDay')}
-                                    </p>
-                                </div>
+                                <Badge variant={alert.daysRemaining <= 3 ? "destructive" : "secondary"} className={`ml-2 flex-shrink-0 ${alert.daysRemaining > 3 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" : ""}`}>
+                                    {alert.daysRemaining === 0
+                                        ? t('inventory.statusOutOfStock')
+                                        : t('reports.depRunsOut', { count: alert.daysRemaining })}
+                                </Badge>
                             </div>
-                            <Badge variant={alert.daysRemaining <= 3 ? "destructive" : "secondary"} className={alert.daysRemaining > 3 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" : ""}>
-                                {alert.daysRemaining === 0
-                                    ? t('inventory.statusOutOfStock')
-                                    : t('reports.depRunsOut', { count: alert.daysRemaining })}
-                            </Badge>
-                        </div>
+                        </Link>
                     ))}
+                    {hasMore && (
+                        <button
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className={`w-full text-center text-sm text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 font-medium py-2 mt-2 transition-colors ${viewMode === 'grid' ? 'col-span-full' : ''}`}
+                        >
+                            {isExpanded ? 'Show less' : `View all ${depletionAlerts.length} warnings`}
+                        </button>
+                    )}
                 </div>
             </CardContent>
         </Card>

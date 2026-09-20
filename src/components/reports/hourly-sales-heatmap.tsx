@@ -178,7 +178,7 @@ export default function HourlySalesHeatmap({ receipts }: HourlySalesHeatmapProps
                                         {hourlyData.map((entry, index) => (
                                             <Cell 
                                                 key={`cell-${index}`} 
-                                                fill={entry.count === peakHour?.count && entry.count > 0 ? 'var(--primary)' : 'rgba(var(--primary-rgb, 249, 115, 22), 0.3)'} 
+                                                fill={entry.count === peakHour?.count && entry.count > 0 ? '#f97316' : 'rgba(249, 115, 22, 0.3)'}
                                             />
                                         ))}
                                     </Bar>

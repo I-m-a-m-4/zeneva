@@ -418,22 +418,38 @@ export default function FollowUpCenter({
     {
       name: 'Download App',
       subject: 'Download the official Zeneva Desktop & Mobile App',
-      body: (name: string) => `Hi ${name || 'there'},<br><br>To get the best experience out of Zeneva, we highly recommend downloading our official app for PC, Mac, and mobile devices.<br><br>The native Zeneva app runs much faster, operates fully offline, and connects seamlessly to barcode scanners and receipt printers.<br><br>You can download the app for all your devices here: <a href="https://zeneva.space/download" target="_blank" style="color: #ea580c; font-weight: bold; text-decoration: underline;">https://zeneva.space/download</a><br><br>If you need help setting up the application on your computer or phone, please reply to this email and we'll walk you through it.<br><br>Best,<br>Zeneva Team`
+      body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>To get the best experience out of Zeneva, we highly recommend downloading our official app for PC, Mac, and mobile devices.<br><br>The native Zeneva app runs much faster, operates fully offline, and connects seamlessly to barcode scanners and receipt printers.<br><br>You can download the app for all your devices here: <a href="https://zeneva.space/download" target="_blank" style="color: #ea580c; font-weight: bold; text-decoration: underline;">https://zeneva.space/download</a><br><br>If you need help setting up the application on your computer or phone, please reply to this email and we'll walk you through it.<br><br>Best,<br>Zeneva Team`
     },
     {
       name: 'Usage Follow-up',
       subject: 'Are you still using Zeneva?',
-      body: (name: string) => `Hi ${name || 'there'},<br><br>I noticed you haven't logged into Zeneva in a while. I'm reaching out to see if you are still using our software for your business, or if you ran into any issues that stopped you from moving forward.<br><br>We're constantly improving Zeneva based on feedback. If it wasn't a good fit, or if there's a feature you felt was missing, I'd love to hear your thoughts so we can make it better.<br><br>If you need help getting back on track, just reply to this email and I'll personally assist you.<br><br>Best,<br>Zeneva Team`
+      body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>I noticed you haven't logged into Zeneva in a while. I'm reaching out to see if you are still using our software for your business, or if you ran into any issues that stopped you from moving forward.<br><br>We're constantly improving Zeneva based on feedback. If it wasn't a good fit, or if there's a feature you felt was missing, I'd love to hear your thoughts so we can make it better.<br><br>If you need help getting back on track, just reply to this email and I'll personally assist you.<br><br>Best,<br>Zeneva Team`
+    },
+    {
+      name: 'Win-Back: 2 Months Free',
+      subject: '2 Months of Zeneva Business Plan on us!',
+      body: (name: string, recipient: any) => {
+        let timeText = 'a while';
+        if (recipient.daysSinceActive) {
+            timeText = `${recipient.daysSinceActive} days`;
+        } else if (recipient.lastSeen) {
+            const date = typeof recipient.lastSeen?.toDate === 'function' ? recipient.lastSeen.toDate() : new Date(recipient.lastSeen);
+            const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+            if (!isNaN(days) && days > 0) timeText = `${days} days`;
+        }
+        
+        return `Hi ${name || 'there'},<br><br>I noticed you haven't been back to Zeneva in ${timeText}, and I wanted to personally reach out.<br><br>We are constantly improving our platform and we really value the feedback of businesses like yours. To encourage you to give Zeneva another try, I've just granted your account <strong>2 full months of our premium Business Plan completely free</strong>.<br><br>There's no catch, and you don't need to put in a credit card. Just log in, explore the new features, and if you have any feedback or hit any snags, reply directly to this email.<br><br>After the 2 months, if you love it, you can choose to continue. I hope to see you back!<br><br>Best,<br>Zeneva Team`;
+      }
     },
     {
       name: 'Onboarding Help',
       subject: 'Need help adding your inventory to Zeneva?',
-      body: (name: string) => `Hi ${name || 'there'},<br><br>I see you created an account with Zeneva but haven't added your products yet. I know setting up a new system can take some time, so I wanted to offer my help.<br><br>Do you need any assistance uploading your product list or setting up your initial inventory? I can walk you through the process or even help you import your existing data.<br><br>Just reply to this email and let me know how I can be of assistance.<br><br>Best,<br>Zeneva Team`
+      body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>I see you created an account with Zeneva but haven't added your products yet. I know setting up a new system can take some time, so I wanted to offer my help.<br><br>Do you need any assistance uploading your product list or setting up your initial inventory? I can walk you through the process or even help you import your existing data.<br><br>Just reply to this email and let me know how I can be of assistance.<br><br>Best,<br>Zeneva Team`
     },
     {
       name: 'Feedback Request',
       subject: 'How is Zeneva working out for your business?',
-      body: (name: string) => `Hi ${name || 'there'},<br><br>You've been using Zeneva for a while now, and I wanted to check in and see how everything is going.<br><br>Is the system doing everything you need it to do? We are currently planning our next set of features, and feedback from active business owners like you is incredibly valuable to us.<br><br>If there's anything you'd like to see improved, or a new feature that would make your life easier, please reply and let me know. I read every single response.<br><br>Best,<br>Zeneva Team`
+      body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>You've been using Zeneva for a while now, and I wanted to check in and see how everything is going.<br><br>Is the system doing everything you need it to do? We are currently planning our next set of features, and feedback from active business owners like you is incredibly valuable to us.<br><br>If there's anything you'd like to see improved, or a new feature that would make your life easier, please reply and let me know. I read every single response.<br><br>Best,<br>Zeneva Team`
     }
   ];
 
@@ -443,7 +459,7 @@ export default function FollowUpCenter({
     // Templates build raw HTML around the recipient's name, and that name comes
     // from a self-registered `users` document. Escaping here covers both send
     // paths, since the single-recipient branch posts `emailBody` verbatim.
-    setEmailBody(template.body(escapeHtml(selectedRecipient.name || '')));
+    setEmailBody(template.body(escapeHtml(selectedRecipient.name || ''), selectedRecipient));
   };
 
   return (
@@ -648,6 +664,7 @@ export default function FollowUpCenter({
                           name: lead.contactName || lead.businessName,
                           email: lead.email,
                           businessId: lead.businessId,
+                          daysSinceActive: lead.daysSinceActive,
                         });
                         setIsModalOpen(true);
                       }}

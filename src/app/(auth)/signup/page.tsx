@@ -266,20 +266,24 @@ function SignupPageContent() {
 
         if (
           popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
-          (popupError?.code === 'auth/popup-blocked' && !isDesktop)
+          (popupError?.code === 'auth/popup-blocked' && !isDesktop) ||
+          popupError?.code === 'auth/internal-error'
         ) {
-          // Browser blocked the popup — fall back to redirect silently.
+          // Browser blocked the popup or Tauri environment failed — fall back to redirect silently.
           // Recorded before the call, which navigates the whole shell away.
           void trackLaunchStage(
             'signup_failed',
             `popup-fallback:${popupError?.code ?? 'unknown'}`,
           );
+          
+          if (popupError?.code === 'auth/internal-error') {
+            toast({
+              title: "Redirecting...",
+              description: t('auth.googleTemporaryIssue'),
+            });
+          }
           await signInWithRedirect(auth, provider);
           return;
-        } else if (popupError?.code === 'auth/internal-error') {
-          // Firebase internal errors are usually transient. Wait briefly and retry once.
-          await new Promise(resolve => setTimeout(resolve, 1200));
-          result = await signInWithPopup(auth, provider);
         } else {
           throw popupError;
         }

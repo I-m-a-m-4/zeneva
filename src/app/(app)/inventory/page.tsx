@@ -38,6 +38,7 @@ import {
   List
 } from "lucide-react";
 import { ReorderInvoiceModal } from '@/components/inventory/reorder-invoice-modal';
+import InventoryDepletionCard from '@/components/reports/inventory-depletion-card';
 import {
   ResponsiveContainer,
   BarChart,
@@ -409,6 +410,26 @@ function InventoryPageContent() {
       setSortBy(s as any);
     }
   }, [searchParams]);
+
+  // AI Co-Pilot Page Action Listener
+  React.useEffect(() => {
+    const handlePageAction = (e: any) => {
+      const { action, payload } = e.detail || {};
+      if (!action) return;
+
+      if (action === 'search_inventory') {
+        if (payload) {
+          setSearchTerm(payload);
+        }
+      } else if (action === 'filter_low_stock') {
+        setStockFilter('low-stock');
+      } else if (action === 'open_create_product') {
+        setIsImportOpen(true);
+      }
+    };
+    window.addEventListener('zen-page-action', handlePageAction);
+    return () => window.removeEventListener('zen-page-action', handlePageAction);
+  }, []);
 
   // Subscription logic removed here as it is now handled by the root layout's subscription guard overlay.
 
@@ -1614,6 +1635,11 @@ function InventoryPageContent() {
                 )}
               </CardContent>
             </Card>
+          </div>
+
+          {/* Depletion Forecast Section */}
+          <div className="mt-6">
+            <InventoryDepletionCard receipts={receipts || []} products={products || []} />
           </div>
         </div>
       )}

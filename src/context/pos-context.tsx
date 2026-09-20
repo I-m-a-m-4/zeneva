@@ -2266,6 +2266,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setIsQueueProcessing(true);
     
     try {
+      const dispatchWebhooksForProducts = async (productIds: Set<string>) => {
+        try {
+          if (productIds.size === 0) return;
+          const token = await getAuth().currentUser?.getIdToken();
+          if (!token) return;
+          const updatedProducts = syncedProductsRef.current.filter((p: Product) => productIds.has(p.id));
+          if (updatedProducts.length > 0) {
+            fetch('/api/webhooks/dispatch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ businessId, event: 'inventory.updated', payload: { products: updatedProducts } })
+            }).catch(console.error);
+          }
+        } catch (err) { console.error('Webhook dispatch failed', err); }
+      };
+
       // PERFORMANCE & COST OPTIMIZATION:
       // Efficiently gather sequential 'complete-sale' triggers into unified Firestore batches.
       // This guarantees transactional consistency while collapsing high-traffic writes.
@@ -2447,6 +2463,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
             // Ship the final, lightweight consolidated payload!
             await batch.commit();
+
+            // Dispatch webhooks for updated products
+            const chunkProductIds = new Set<string>();
+            chunk.forEach(a => a.payload.productUpdates?.forEach((u: any) => chunkProductIds.add(u.id)));
+            if (chunkProductIds.size > 0) dispatchWebhooksForProducts(chunkProductIds);
 
             // ----------------------------------------------------------------
             // Secondary Non-Critical Operations (Stats & Notifications)
@@ -2813,6 +2834,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
             await batch.commit();
             successfullyCommitIds.push(action.id);
             await applyLocal?.();
+
+            // Webhook dispatches
+            if (action.type === 'update-product') dispatchWebhooksForProducts(new Set([action.payload.productId]));
+            if (action.type === 'bulk-update-products') dispatchWebhooksForProducts(new Set(action.payload.productIds));
+            if (action.type === 'delete-receipt' && action.payload.receipt?.items) {
+               const rIds = new Set<string>();
+               action.payload.receipt.items.forEach((i: any) => i.productId && rIds.add(i.productId));
+               dispatchWebhooksForProducts(rIds);
+            }
 
           } catch (singularErr: any) {
             console.error(`❌ Standalone sync step failed [${action.type}]:`, singularErr);

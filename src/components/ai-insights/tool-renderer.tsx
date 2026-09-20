@@ -1346,6 +1346,50 @@ export function ProposalCard({ result, onApprove, onReject }: {
   );
 }
 
+function SetTimeRangeCard({ result }: { result: any }) {
+  React.useEffect(() => {
+    // Dispatch the custom event immediately so the page updates
+    window.dispatchEvent(new CustomEvent('zen-set-date-range', { detail: { days: result.days } }));
+  }, [result.days]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col gap-2 rounded-xl bg-card border-[0.5px] border-border/40 p-4 w-full"
+    >
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-primary/10 rounded-full text-primary">
+          <Sparkles className="w-4 h-4" />
+        </div>
+        <p className="text-xs font-medium text-foreground">{result.message}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+function PageActionCard({ result }: { result: any }) {
+  React.useEffect(() => {
+    // Dispatch the custom event immediately so the page updates
+    window.dispatchEvent(new CustomEvent('zen-page-action', { detail: { action: result.action, payload: result.payload } }));
+  }, [result.action, result.payload]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col gap-2 rounded-xl bg-card border-[0.5px] border-border/40 p-4 w-full"
+    >
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-primary/10 rounded-full text-primary">
+          <Sparkles className="w-4 h-4" />
+        </div>
+        <p className="text-xs font-medium text-foreground">{result.message}</p>
+      </div>
+    </motion.div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export function ToolResult({ output, onApprove, onReject, onPick }: {
   output: any;
@@ -1409,6 +1453,10 @@ export function ToolResult({ output, onApprove, onReject, onPick }: {
           )}
         </div>
       );
+    case 'SET_TIME_RANGE':
+      return <SetTimeRangeCard result={output} />;
+    case 'PAGE_ACTION':
+      return <PageActionCard result={output} />;
     default:
       // Untagged results are summarised by the model in prose.
       return null;

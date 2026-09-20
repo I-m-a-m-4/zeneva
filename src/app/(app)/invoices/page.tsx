@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Eye, Inbox, FileText, Download, Share2, Search } from "lucide-react";
+import { Eye, Inbox, FileText, Download, Share2, Search, MoreHorizontal } from "lucide-react";
 import type { Receipt } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS } from '@/context/pos-context';
@@ -26,6 +26,8 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import RefreshButton from "@/components/shared/refresh-button";
 import Link from "next/link";
+import { useRouter } from 'next/navigation';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +56,7 @@ export default function InvoicesPage() {
     const [updatingId, setUpdatingId] = React.useState<string | null>(null);
     const firestore = useFirestore();
     const { toast } = useToast();
+    const router = useRouter();
 
     const handleMarkPaid = async (id: string) => {
         if (!firestore) return;
@@ -179,25 +182,45 @@ export default function InvoicesPage() {
                                         <TableCell>{format(safeToDate(invoice.createdAt), 'PP')}</TableCell>
                                         <TableCell>{getStatusBadge(invoice)}</TableCell>
                                         <TableCell className="text-right font-semibold">{currencySymbol}{invoice.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                {invoice.status !== 'paid' && (
-                                                    <Button
-                                                        size="sm"
-                                                        className="h-8 bg-emerald-600 hover:bg-emerald-700"
-                                                        onClick={() => handleMarkPaid(invoice.id)}
-                                                        disabled={updatingId === invoice.id}
-                                                    >
-                                                        {updatingId === invoice.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="mr-2 h-3.5 w-3.5" />}
-                                                        {t('invoices.markPaid')}
+                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                            <DropdownMenu modal={false}>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                        <span className="sr-only">{t('common.actions')}</span>
                                                     </Button>
-                                                )}
-                                                <Button asChild size="sm" variant="outline" className="h-8">
-                                                    <Link href={`/invoice/details?id=${invoice.id}`}>
-                                                        <Eye className="mr-2 h-3.5 w-3.5" /> {t('receipts.view')}
-                                                    </Link>
-                                                </Button>
-                                            </div>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>{t('common.actions')}</DropdownMenuLabel>
+                                                    <DropdownMenuItem className="cursor-pointer" onSelect={() => router.push(`/invoice/details?id=${invoice.id}`)}>
+                                                        <Eye className="me-2 h-4 w-4" /> {t('receipts.view')}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="cursor-pointer" onSelect={() => {
+                                                        const shareData = {
+                                                            title: 'Invoice ' + (invoice.receiptNumber || invoice.id),
+                                                            text: 'Invoice from ' + business?.name,
+                                                            url: 'https://zeneva.space' + `/invoice/details?id=${invoice.id}`
+                                                        };
+                                                        if (navigator.share) {
+                                                            navigator.share(shareData).catch(console.error);
+                                                        } else {
+                                                            navigator.clipboard.writeText(shareData.url);
+                                                            toast({ title: 'Link copied', description: 'Invoice link copied to clipboard' });
+                                                        }
+                                                    }}>
+                                                        <Share2 className="me-2 h-4 w-4" /> {t('common.share') || 'Share'}
+                                                    </DropdownMenuItem>
+                                                    {invoice.status !== 'paid' && (
+                                                        <>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); handleMarkPaid(invoice.id); }} disabled={updatingId === invoice.id}>
+                                                                {updatingId === invoice.id ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <CheckCircle className="me-2 h-4 w-4 text-emerald-600" />} 
+                                                                {t('invoices.markPaid')}
+                                                            </DropdownMenuItem>
+                                                        </>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))}

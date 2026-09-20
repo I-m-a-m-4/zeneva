@@ -11,7 +11,11 @@ import TopItemsPanel from './top-items-panel';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import { safeToDate } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Search, Printer } from 'lucide-react';
+import { downloadCsv } from '@/lib/csv';
 import { usePOS } from '@/context/pos-context';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/context/i18n-context';
@@ -106,6 +110,168 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
 
     const { business } = usePOS();
     const { toast } = useToast();
+
+    const [searchTerm, setSearchTerm] = React.useState('');
+
+    const profitStatementItems = React.useMemo(() => {
+        if (!receipts || !products) return [];
+
+        const items: any[] = [];
+        receipts.forEach(r => {
+            const dateStr = r.createdAt ? format(safeToDate(r.createdAt), 'dd MMM yyyy, hh:mm a') : 'Unknown';
+            r.items?.forEach(i => {
+                const product = products.find(p => p.id === i.productId);
+                const name = i.name || product?.name || 'Unknown Item';
+                const qty = Number(i.quantity) || 0;
+                const sellingPrice = Number(i.price) || 0;
+                const unitCost = Number(i.costPrice) || Number(product?.costPrice) || 0; 
+                const profit = (sellingPrice - unitCost) * qty;
+
+                items.push({
+                    id: Math.random().toString(), // good enough for key here
+                    receiptRef: r.receiptNumber || r.id,
+                    date: dateStr,
+                    name,
+                    qty,
+                    unitCost,
+                    sellingPrice,
+                    profit,
+                    isOverride: i.isPriceOverride || false,
+                });
+            });
+        });
+        return items;
+    }, [receipts, products]);
+
+    const filteredItems = React.useMemo(() => {
+        if (!searchTerm) return profitStatementItems;
+        const lower = searchTerm.toLowerCase();
+        return profitStatementItems.filter(item => item.name.toLowerCase().includes(lower) || item.receiptRef?.toLowerCase().includes(lower));
+    }, [profitStatementItems, searchTerm]);
+
+    const totalFilteredQty = filteredItems.reduce((acc, curr) => acc + curr.qty, 0);
+    const totalFilteredCost = filteredItems.reduce((acc, curr) => acc + (curr.unitCost * curr.qty), 0);
+    const totalFilteredRevenue = filteredItems.reduce((acc, curr) => acc + (curr.sellingPrice * curr.qty), 0);
+    const totalFilteredProfit = filteredItems.reduce((acc, curr) => acc + curr.profit, 0);
+
+    const handleExportBreakdownPDF = async () => {
+        toast({
+            title: t('reports.generatingPdf'),
+            description: t('reports.generatingPdfBody'),
+        });
+
+        const doc = new jsPDF();
+        
+        let hasDMSans = false;
+        try {
+            const fontUrl = 'https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-400-normal.ttf';
+            const fontResponse = await fetch(fontUrl);
+            if (fontResponse.ok) {
+                const buffer = await fontResponse.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64 = window.btoa(binary);
+                doc.addFileToVFS('DMSans.ttf', base64);
+                doc.addFont('DMSans.ttf', 'DMSans', 'normal');
+                doc.setFont('DMSans');
+                hasDMSans = true;
+            }
+        } catch (e) {
+            console.warn('Could not load font.', e);
+        }
+
+        const formatCurrencyForPDF = (amount: number) => {
+            const prefix = hasDMSans && currencySymbol === '₦' ? '₦' : currencySymbol === '₦' ? 'NGN ' : currencySymbol;
+            return `${prefix}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        };
+
+        doc.setTextColor(242, 242, 242);
+        doc.setFontSize(80);
+        doc.text("ZENEVA", 105, 150, { align: "center", angle: 45 });
+        
+        doc.setTextColor(20, 20, 20);
+        doc.setFontSize(18);
+        doc.text(business?.name || "Zeneva POS", 14, 18);
+        
+        doc.setFontSize(12);
+        doc.setTextColor(60, 60, 60);
+        doc.text("Sales Statement Breakdown", 14, 25);
+        
+        doc.setFontSize(9);
+        doc.setTextColor(110, 110, 110);
+        doc.text(`Generated: ${format(new Date(), 'EEEE, MMMM d, yyyy, hh:mm a')}`, 14, 31);
+        
+        const hasOverride = business?.settings?.allowPosPriceOverride;
+        const tableColumn = ["Date", "Receipt", "Product", "Qty", "Unit Cost", "Sell Price", ...(hasOverride ? ["Override"] : []), "Profit"];
+        
+        const tableRows = filteredItems.map(item => [
+            item.date,
+            item.receiptRef,
+            item.name,
+            item.qty.toString(),
+            formatCurrencyForPDF(item.unitCost),
+            formatCurrencyForPDF(item.sellingPrice),
+            ...(hasOverride ? [item.isOverride ? "Yes" : "-"] : []),
+            formatCurrencyForPDF(item.profit)
+        ]);
+
+        tableRows.push([
+            "Totals",
+            "",
+            "",
+            totalFilteredQty.toString(),
+            formatCurrencyForPDF(totalFilteredCost),
+            formatCurrencyForPDF(totalFilteredRevenue),
+            ...(hasOverride ? [""] : []),
+            formatCurrencyForPDF(totalFilteredProfit)
+        ]);
+        
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 38,
+            theme: 'grid',
+            styles: { 
+                fontSize: 8, 
+                cellPadding: 3.5,
+                font: hasDMSans ? 'DMSans' : 'helvetica'
+            },
+            headStyles: { 
+                fillColor: [249, 115, 22], 
+                textColor: [255, 255, 255], 
+                fontStyle: 'bold' 
+            },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            didParseCell: function(data) {
+                if (data.row.index === tableRows.length - 1) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.fillColor = [240, 240, 240];
+                    if (data.column.index === tableColumn.length - 1) {
+                        data.cell.styles.textColor = [5, 150, 105];
+                    }
+                }
+            },
+            willDrawPage: function (data) {
+                if (data.pageNumber > 1) {
+                    doc.setTextColor(242, 242, 242);
+                    doc.setFontSize(80);
+                    doc.text("ZENEVA", 105, 150, { align: "center", angle: 45 });
+                }
+            },
+            didDrawPage: function (data) {
+                doc.setFontSize(8);
+                doc.setTextColor(130, 130, 130);
+                if (hasDMSans) doc.setFont('DMSans');
+                doc.text(`Page ${data.pageNumber}`, 14, doc.internal.pageSize.height - 10);
+                doc.textWithLink("Generated via zeneva.space", doc.internal.pageSize.width - 55, doc.internal.pageSize.height - 10, { url: "https://zeneva.space" });
+            }
+        });
+
+        doc.save(`zeneva-sales-breakdown-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    };
 
     const handleExportPDF = async () => {
         toast({
@@ -305,6 +471,108 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     />
                 </div>
             </div>
+
+            {/* Sales Statement Breakdown */}
+            <Card className="border border-border/50">
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-primary" /> Sales Statement Breakdown
+                        </CardTitle>
+                        <CardDescription>
+                            Detailed breakdown of every item sold and its profit margin.
+                        </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-64">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search product or receipt..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9 h-9 w-full"
+                            />
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => {
+                            const csvData = filteredItems.map(item => ({
+                                Date: item.date,
+                                Receipt: item.receiptRef,
+                                Product: item.name,
+                                Qty: item.qty,
+                                'Unit Cost': item.unitCost,
+                                'Selling Price': item.sellingPrice,
+                                'Total Profit': item.profit
+                            }));
+                            downloadCsv(csvData, 'profit_statement.csv');
+                        }}>
+                            <Download className="mr-2 h-3.5 w-3.5" /> Export CSV
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleExportBreakdownPDF}>
+                            <Printer className="mr-2 h-3.5 w-3.5" /> Export PDF
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/50 hover:bg-transparent">
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Product</TableHead>
+                                    <TableHead className="text-right">Qty</TableHead>
+                                    <TableHead className="text-right">Unit Cost</TableHead>
+                                    <TableHead className="text-right">Sell Price</TableHead>
+                                    {business?.settings?.allowPosPriceOverride && <TableHead className="text-center">Override</TableHead>}
+                                    <TableHead className="text-right font-bold text-indigo-600 dark:text-indigo-400">Profit</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredItems.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                            No sales data matches your search.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    <>
+                                        {filteredItems.map((item) => (
+                                            <TableRow key={item.id} className="hover:bg-muted/30">
+                                                <TableCell className="whitespace-nowrap">{item.date}</TableCell>
+                                                <TableCell className="font-medium">{item.name}</TableCell>
+                                                <TableCell className="text-right">{item.qty}</TableCell>
+                                                <TableCell className="text-right">{currencySymbol}{item.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                                <TableCell className="text-right">{currencySymbol}{item.sellingPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                                {business?.settings?.allowPosPriceOverride && (
+                                                    <TableCell className="text-center">
+                                                        {item.isOverride ? (
+                                                            <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">Yes</Badge>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                )}
+                                                <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">
+                                                    {currencySymbol}{item.profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        <TableRow className="bg-muted/10 font-bold border-t-2">
+                                            <TableCell colSpan={2} className="text-right">Totals</TableCell>
+                                            <TableCell className="text-right">{totalFilteredQty}</TableCell>
+                                            <TableCell className="text-right text-muted-foreground">{currencySymbol}{totalFilteredCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                            <TableCell className="text-right text-muted-foreground">{currencySymbol}{totalFilteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                            {business?.settings?.allowPosPriceOverride && <TableCell></TableCell>}
+                                            <TableCell className="text-right text-emerald-700 dark:text-emerald-400 font-black">
+                                                {currencySymbol}{totalFilteredProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </TableCell>
+                                        </TableRow>
+                                    </>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Formal Income Statement Table */}
             <Card className="border border-border/50">

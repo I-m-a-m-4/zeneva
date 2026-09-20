@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Eye, Inbox, MoreHorizontal, Trash2, Loader2, Search } from "lucide-react";
+import { Eye, Inbox, MoreHorizontal, Trash2, Loader2, Search, Share2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useFirestore } from '@/firebase';
 import { doc, runTransaction } from 'firebase/firestore';
@@ -524,6 +524,21 @@ function ReceiptsContent() {
                             <DropdownMenuLabel>{t('common.actions')}</DropdownMenuLabel>
                             <DropdownMenuItem className="cursor-pointer" onSelect={() => router.push(`/receipts/details?id=${receipt.id}`)}>
                               <Eye className="me-2 h-4 w-4" /> {t('receipts.view')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onSelect={() => {
+                              const shareData = {
+                                title: 'Receipt ' + (receipt.receiptNumber || receipt.id),
+                                text: 'Receipt from ' + business?.name,
+                                url: 'https://zeneva.space' + `/receipts/details?id=${receipt.id}`
+                              };
+                              if (navigator.share) {
+                                navigator.share(shareData).catch(console.error);
+                              } else {
+                                navigator.clipboard.writeText(shareData.url);
+                                toast({ title: 'Link copied', description: 'Receipt link copied to clipboard' });
+                              }
+                            }}>
+                              <Share2 className="me-2 h-4 w-4" /> Share receipt
                             </DropdownMenuItem>
                             {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
                               <>

@@ -365,6 +365,39 @@ const CAPABILITIES: {
       'Which products run out first, and roughly how many days you have',
     ],
   },
+  {
+    icon: Store,
+    accent: 'var(--zia-aqua)',
+    title: 'Your Personal Co-Pilot',
+    blurb: 'Control the Zeneva app directly from the chat without digging through menus.',
+    points: [
+      'Navigate the app and open forms (like Add Product or Record Expense)',
+      'Filter reports and search inventory instantly',
+      'Export current tables and data to CSV with a simple request',
+    ],
+  },
+  {
+    icon: Sparkles,
+    accent: 'var(--zia-magenta)',
+    title: 'Find Missing Product Images',
+    blurb: 'Zen AI keeps your catalog visual by searching the web for missing photos.',
+    points: [
+      'Automatically finds product images online',
+      'Saves you time manually hunting for pictures of new inventory',
+      'Helps staff identify products faster with visual cues',
+    ],
+  },
+  {
+    icon: ShieldCheck,
+    accent: 'var(--zia-cyan)',
+    title: 'Detect Theft & Margin Leaks',
+    blurb: 'Run automated sweeps to spot irregularities and protect your bottom line.',
+    points: [
+      'Spot unauthorized discounts and suspicious voided sales',
+      'Identify products selling at or below cost price',
+      'Catch missing cost prices that artificially inflate profit figures',
+    ],
+  },
 ];
 
 /** Rotating in the hero, so the input never looks like it wants a command. */

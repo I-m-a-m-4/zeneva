@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/firebase";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, getAdditionalUserInfo, signOut } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader, ChevronLeft } from "lucide-react";
 import { AppConfig } from "@/lib/config";
@@ -71,6 +71,20 @@ export default function LoginPage() {
     getRedirectResult(auth)
       .then(async (result) => {
         if (!result || !isMounted) return;
+        
+        const addlInfo = getAdditionalUserInfo(result);
+        if (addlInfo?.isNewUser) {
+           await result.user.delete().catch(() => {});
+           await signOut(auth).catch(() => {});
+           toast({
+              variant: "destructive",
+              title: "Account not found",
+              description: "It looks like you don't have an account. Please sign up first."
+           });
+           setIsGoogleLoading(false);
+           return;
+        }
+        
         // User is successfully signed in. AuthLayout handles the redirection to POS page.
       })
       .catch((error: any) => {
@@ -110,31 +124,43 @@ export default function LoginPage() {
 
 
       try {
-        await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        const addlInfo = getAdditionalUserInfo(result);
+        if (addlInfo?.isNewUser) {
+           await result.user.delete().catch(() => {});
+           await signOut(auth).catch(() => {});
+           toast({
+              variant: "destructive",
+              title: "Account not found",
+              description: "It looks like you don't have an account. Please sign up first."
+           });
+           setIsGoogleLoading(false);
+           return;
+        }
         // AuthLayout handles the redirection once auth state changes
         void trackLaunchStage('login_succeeded', 'google-popup');
       } catch (popupError: any) {
         const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
         
-        if (popupError?.code === 'auth/internal-error') {
-            // Firebase internal errors are usually transient. Wait briefly and retry once.
-            await new Promise(resolve => setTimeout(resolve, 1200));
-            await signInWithPopup(auth, provider);
-            void trackLaunchStage('login_succeeded', 'google-popup');
-            return;
-        }
-
         if (
           popupError?.code === 'auth/operation-not-supported-in-this-environment' ||
           (popupError?.code === 'auth/popup-blocked' && !isDesktop) || 
-          (!isDesktop && popupError?.code === 'auth/network-request-failed')
+          (!isDesktop && popupError?.code === 'auth/network-request-failed') ||
+          popupError?.code === 'auth/internal-error'
         ) {
-          // The webview cannot host a popup, or mobile browser blocked it.
+          // The webview cannot host a popup, or mobile browser blocked it, or Tauri internal error.
           // This branch navigates the whole shell away.
           void trackLaunchStage(
             'login_failed',
             `popup-fallback:${popupError?.code ?? 'unknown'}`,
           );
+          
+          if (popupError?.code === 'auth/internal-error') {
+            toast({
+              title: "Redirecting...",
+              description: t('auth.googleTemporaryIssue'),
+            });
+          }
           await signInWithRedirect(auth, provider);
         } else {
           throw popupError;

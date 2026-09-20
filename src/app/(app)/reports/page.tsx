@@ -11,7 +11,7 @@ import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopItemsPanel from '@/components/reports/top-items-panel';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { subDays, isSameDay } from 'date-fns';
+import { subDays, isSameDay, format } from 'date-fns';
 import TopCustomersList from '@/components/reports/top-customers-list';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -27,6 +27,7 @@ import OverviewChart from '@/components/dashboard/overview-chart';
 import CustomerAnalytics from '@/components/reports/customer-analytics';
 import DailySalesItemsTable from '@/components/reports/daily-sales-items-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Printer, Image as ImageIcon, BarChart2, CheckCircle } from 'lucide-react';
 
@@ -38,7 +39,7 @@ import HourlySalesHeatmap from '@/components/reports/hourly-sales-heatmap';
 import BasketAnalysis from '@/components/reports/basket-analysis';
 import ProfitLossStatement from '@/components/reports/profit-loss-statement';
 import RevenueForecastCard from '@/components/reports/revenue-forecast-card';
-import InventoryDepletionCard from '@/components/reports/inventory-depletion-card';
+import DailyCustomerRetentionChart from '@/components/reports/daily-customer-retention-chart';
 import BusinessRatingPanel from '@/components/reports/business-rating-panel';
 import StaffPerformance from '@/components/reports/staff-performance';
 import CategoryPerformance from '@/components/reports/category-performance';
@@ -101,9 +102,9 @@ function DeltaChip({ delta }: { delta: KpiDelta | null | undefined }) {
     );
 }
 
-function ReportStatCard({ title, value, icon: Icon, description, delta }: { title: string, value: string | number, icon: React.ElementType, description?: string, delta?: KpiDelta | null }) {
-    return (
-        <Card>
+function ReportStatCard({ title, value, icon: Icon, description, delta, onClick }: { title: string, value: string | number, icon: React.ElementType, description?: string, delta?: KpiDelta | null, onClick?: () => void }) {
+    const cardContent = (
+        <Card className={cn(onClick && "cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
                 <Icon className="h-4 w-4 text-muted-foreground" />
@@ -115,6 +116,27 @@ function ReportStatCard({ title, value, icon: Icon, description, delta }: { titl
             </CardContent>
         </Card>
     );
+
+    if (onClick) {
+        return (
+            <div 
+                className="rounded-xl outline-none h-full"
+                onClick={onClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onClick();
+                    }
+                }}
+            >
+                {cardContent}
+            </div>
+        );
+    }
+    
+    return cardContent;
 }
 
 /*
@@ -138,6 +160,267 @@ function ReportStatCard({ title, value, icon: Icon, description, delta }: { titl
  */
 
 
+
+function getKpiInsight(id: string, data: any, comparison: any, currencySymbol: string) {
+    const pctDelta = comparison?.[id]?.deltaPct;
+    const up = pctDelta !== undefined && pctDelta > 0;
+    const down = pctDelta !== undefined && pctDelta < 0;
+
+    switch (id) {
+        case 'revenue':
+            return {
+                insight: `Revenue shows your top-line business growth. ${up ? 'Your revenue is growing compared to the previous period.' : down ? 'Revenue has declined. Consider running promotions or checking inventory availability.' : ''}`,
+                recommendation: 'Track which days bring in the most revenue and schedule your best staff during those peak times.'
+            };
+        case 'product-revenue':
+            return {
+                insight: `Physical goods account for ${data?.totalRevenue ? ((data.totalProductRevenue / data.totalRevenue) * 100).toFixed(1) : 0}% of your total revenue.`,
+                recommendation: 'Use ABC analysis to identify your top-selling products and ensure they never run out of stock.'
+            };
+        case 'service-revenue':
+            return {
+                insight: `Services typically yield higher margins than physical goods. They currently make up ${data?.totalRevenue ? ((data.totalServiceRevenue / data.totalRevenue) * 100).toFixed(1) : 0}% of your revenue.`,
+                recommendation: 'Consider bundling high-margin services with popular products to increase overall profitability.'
+            };
+        case 'sales':
+            return {
+                insight: `You processed ${data?.totalSales} total transactions in this period. ${up ? 'Transaction volume is up!' : ''}`,
+                recommendation: 'If transaction volume is high but average order value is low, train staff to suggest add-on items at checkout.'
+            };
+        case 'unique-products':
+            return {
+                insight: `You sold ${data?.uniqueProductsSold} different products out of your catalog of ${data?.catalogSize} items.`,
+                recommendation: `${data?.catalogSize > 0 && (data?.uniqueProductsSold / data?.catalogSize) < 0.2 ? 'A small fraction of your catalog is driving sales. Consider discounting or clearing out dead stock.' : 'A healthy mix of products are moving.'}`
+            };
+        case 'units-sold':
+            return {
+                insight: `A total of ${data?.totalItemsSold} items moved through your business. This averages to ${(data?.totalItemsSold / (data?.totalSales || 1)).toFixed(1)} items per transaction.`,
+                recommendation: 'Encourage bundle deals (e.g., "Buy 2 get 1 half price") to increase the number of items per sale.'
+            };
+        case 'daily-velocity':
+            return {
+                insight: `You are averaging ${data?.dailyAverageSales?.toFixed(1)} sales transactions per day.`,
+                recommendation: 'Identify your slowest days of the week and run "flash sales" exclusively on those days to smooth out velocity.'
+            };
+        case 'daily-revenue':
+            return {
+                insight: `Your business brings in an average of ${currencySymbol}${data?.dailyAverageRevenue?.toLocaleString(undefined, { maximumFractionDigits: 0 })} every day.`,
+                recommendation: 'Use this daily average to set realistic daily sales targets and motivate your team.'
+            };
+        case 'catalog-size':
+            return {
+                insight: `You have ${data?.catalogSize} unique products tracked in your system.`,
+                recommendation: 'Large catalogs tie up capital. Review the "Dead Stock Analysis" to find items that haven\'t sold in 60+ days.'
+            };
+        case 'avg-order':
+            return {
+                insight: `Customers spend an average of ${currencySymbol}${data?.averageOrderValue?.toLocaleString(undefined, { maximumFractionDigits: 0 })} per visit.`,
+                recommendation: 'Increasing average order value is the most cost-effective way to grow. Position impulse-buy items near the checkout.'
+            };
+        case 'customers':
+            return {
+                insight: `You saw ${data?.buyersInRange} unique purchasing customers out of a total database of ${data?.totalCustomers}.`,
+                recommendation: 'It costs 5x more to acquire a new customer than retain an existing one. Consider reaching out to customers who haven\'t bought recently.'
+            };
+        default:
+            return {
+                insight: 'Tracking this metric over time will give you a clearer picture of your business health.',
+                recommendation: 'Compare this metric across different seasons to identify cyclical trends.'
+            };
+    }
+}
+
+function DataInsightModalContent({
+    insightModal,
+    reportBatchReceipts,
+    customers,
+    products,
+    finalReportData,
+    comparison,
+    currencySymbol
+}: {
+    insightModal: any,
+    reportBatchReceipts: Receipt[],
+    customers: Customer[],
+    products: Product[],
+    finalReportData: any,
+    comparison: any,
+    currencySymbol: string
+}) {
+    const [page, setPage] = React.useState(0);
+    const rowsPerPage = 5;
+    
+    React.useEffect(() => {
+        setPage(0);
+    }, [insightModal?.id]);
+
+    const activeInsight = insightModal ? getKpiInsight(insightModal.id, finalReportData, comparison, currencySymbol || '$') : null;
+
+    let tableContent = null;
+    let totalItems = 0;
+
+    if (insightModal?.id === 'sales') {
+        const sorted = [...reportBatchReceipts].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
+        totalItems = sorted.length;
+        const pageData = sorted.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableContent = (
+            <div className="flex flex-col h-full">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Receipt</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {pageData.map(r => (
+                            <TableRow key={r.id}>
+                                <TableCell className="font-medium text-xs">{r.receiptNumber || r.id.substring(0,8)}</TableCell>
+                                <TableCell className="text-xs">{format(safeToDate(r.createdAt), 'MMM d, h:mm a')}</TableCell>
+                                <TableCell className="text-right text-xs font-medium">{currencySymbol}{r.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+        );
+    } else if (insightModal?.id === 'unique-products') {
+        const itemMap = new Map<string, {name: string, qty: number, total: number}>();
+        reportBatchReceipts.forEach(r => {
+            (r.items || []).forEach(item => {
+                const existing = itemMap.get(item.productId) || { name: item.name, qty: 0, total: 0 };
+                existing.qty += item.quantity;
+                existing.total += (item.price * item.quantity);
+                itemMap.set(item.productId, existing);
+            });
+        });
+        const itemsList = Array.from(itemMap.values()).sort((a, b) => b.total - a.total);
+        totalItems = itemsList.length;
+        const pageData = itemsList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableContent = (
+            <div className="flex flex-col h-full">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Qty Sold</TableHead>
+                            <TableHead className="text-right">Revenue</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {pageData.map((item, idx) => (
+                            <TableRow key={idx}>
+                                <TableCell className="font-medium text-xs truncate max-w-[120px]" title={item.name}>{item.name}</TableCell>
+                                <TableCell className="text-xs">{item.qty}</TableCell>
+                                <TableCell className="text-right text-xs font-medium">{currencySymbol}{item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+        );
+    } else if (insightModal?.id === 'customers') {
+        const customerMap = new Map<string, {name: string, phone: string, spent: number}>();
+        reportBatchReceipts.forEach(r => {
+            if (r.customerId && r.customerId !== 'walk-in') {
+                const existing = customerMap.get(r.customerId) || { name: r.customerName || 'Unknown', phone: r.customerPhone || '', spent: 0 };
+                existing.spent += r.total;
+                customerMap.set(r.customerId, existing);
+            }
+        });
+        const custList = Array.from(customerMap.values()).sort((a, b) => b.spent - a.spent);
+        totalItems = custList.length;
+        const pageData = custList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableContent = (
+            <div className="flex flex-col h-full">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Phone</TableHead>
+                            <TableHead className="text-right">Spent</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {pageData.map((c, idx) => (
+                            <TableRow key={idx}>
+                                <TableCell className="font-medium text-xs truncate max-w-[120px]">{c.name}</TableCell>
+                                <TableCell className="text-xs">{c.phone || '-'}</TableCell>
+                                <TableCell className="text-right text-xs font-medium">{currencySymbol}{c.spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+        );
+    }
+
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    const hasData = ['sales', 'unique-products', 'customers'].includes(insightModal?.id || '');
+
+    return (
+        <div className={cn("py-4", hasData ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "space-y-4")}>
+            <div className="space-y-4 flex flex-col">
+                <div className="text-3xl font-bold text-primary">{insightModal?.value}</div>
+                <p className="text-muted-foreground text-sm">{insightModal?.description}</p>
+                {activeInsight && (
+                    <div className="bg-muted p-4 rounded-lg flex flex-col gap-3 mt-auto">
+                        <div className="flex items-start gap-3">
+                            <Bot className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                            <p className="text-sm">{activeInsight.insight}</p>
+                        </div>
+                        <div className="flex items-start gap-3 border-t border-border pt-3">
+                            <Sparkles className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm font-medium">{activeInsight.recommendation}</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {hasData && (
+                <div className="flex flex-col border rounded-lg bg-card overflow-hidden">
+                    <div className="p-3 bg-muted/50 border-b text-sm font-medium">
+                        Raw Data {totalItems > 0 ? `(${totalItems})` : ''}
+                    </div>
+                    <div className="flex-1 overflow-auto min-h-[220px]">
+                        {totalItems > 0 ? tableContent : (
+                            <div className="h-full flex items-center justify-center text-sm text-muted-foreground p-4">
+                                No raw data found for this period.
+                            </div>
+                        )}
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="p-2 border-t flex items-center justify-between bg-muted/20">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-7 text-xs" 
+                                onClick={() => setPage(Math.max(0, page - 1))}
+                                disabled={page === 0}
+                            >
+                                Previous
+                            </Button>
+                            <span className="text-xs text-muted-foreground">Page {page + 1} of {totalPages}</span>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-7 text-xs" 
+                                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                                disabled={page === totalPages - 1}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export default function ReportsDashboard() {
     const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange, users, firestore } = usePOS();
@@ -169,6 +452,27 @@ export default function ReportsDashboard() {
             });
         }
     }, [businessCreatedAtTime]);
+
+    React.useEffect(() => {
+        const handleSetDateRange = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            const days = customEvent.detail?.days;
+            if (typeof days === 'number') {
+                const now = new Date();
+                const from = new Date(now.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+                from.setHours(0, 0, 0, 0);
+                setDate({ from, to: now });
+                toast({
+                    title: "Date Range Updated",
+                    description: `Filtered to the last ${days} days by Zen AI.`,
+                });
+            }
+        };
+        window.addEventListener('zen-set-date-range', handleSetDateRange);
+        return () => window.removeEventListener('zen-set-date-range', handleSetDateRange);
+    }, [toast]);
+
+
 
     const hasLifetimeAccess = business?.accessLevel === 'lifetime';
 
@@ -298,14 +602,14 @@ export default function ReportsDashboard() {
             totalProductRevenue,
             totalServiceRevenue,
             uniqueProductsSold: uniqueProductIds.size,
-            catalogSize: activeBranchId && activeBranchId !== 'all' ? products.length : Math.max(stats?.totalProducts || 0, products.length),
-            dailyAverageSales: totalSales / activeDays,
-            dailyAverageRevenue: totalRevenue / activeDays,
+            catalogSize: products.length,
+            dailyAverageSales: activeDays > 0 ? totalSales / activeDays : 0,
+            dailyAverageRevenue: activeDays > 0 ? totalRevenue / activeDays : 0,
             totalProfit,
             totalCost
-        }
+        };
+    }, [reportBatchReceipts, receipts, products, customers, reportBatchExpenses, activeBranchId, stats?.totalCustomers]);
 
-    }, [reportBatchReceipts, receipts, products, customers, stats, activeBranchId]);
 
     // Surgical Analytics
     const { fetchMonthlyAnalytics } = usePOS();
@@ -318,6 +622,36 @@ export default function ReportsDashboard() {
      */
     const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number }[] | null>(null);
     const [activeTab, setActiveTab] = React.useState<string>('analytics');
+
+    // AI Co-Pilot Page Action Listener
+    React.useEffect(() => {
+        const handlePageAction = (e: any) => {
+            const { action, payload } = e.detail || {};
+            if (!action) return;
+
+            if (action === 'export_current_view') {
+                if (activeTab === 'analytics') {
+                    // Try to trigger the analytics CSV export if available
+                    const btn = document.querySelector('[data-export-analytics-csv]') as HTMLButtonElement;
+                    if (btn) btn.click();
+                    else downloadCsv(reportBatchReceipts, products, customers);
+                } else {
+                    // Raw receipts data export (Daily Sales style)
+                    downloadCsv(reportBatchReceipts, products, customers);
+                }
+            } else if (action === 'switch_report_tab') {
+                setActiveTab(payload || 'profit-loss');
+            }
+        };
+        window.addEventListener('zen-page-action', handlePageAction);
+        return () => window.removeEventListener('zen-page-action', handlePageAction);
+    }, [activeTab, reportBatchReceipts, products, customers]);
+    const [insightModal, setInsightModal] = React.useState<{
+        id: string;
+        title: string;
+        value: string | number;
+        description?: string;
+    } | null>(null);
 
     React.useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -679,7 +1013,7 @@ export default function ReportsDashboard() {
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={handleExportAnalyticsCsv}>
+                                <DropdownMenuItem data-export-analytics-csv onClick={handleExportAnalyticsCsv}>
                                     <FileText className="h-4 w-4 mr-2" />
                                     {t('reports.exportCsv')}
                                 </DropdownMenuItem>
@@ -706,71 +1040,80 @@ export default function ReportsDashboard() {
                 ) : (
                     <>
                         <TabsContent value="analytics" className="space-y-6 mt-0">
-                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+                            <Dialog open={!!insightModal} onOpenChange={(open) => !open && setInsightModal(null)}>
+                                <DialogContent className={['sales', 'unique-products', 'customers'].includes(insightModal?.id || '') ? "max-w-4xl" : ""}>
+                                    <DialogHeader>
+                                        <DialogTitle>{insightModal?.title} Insights</DialogTitle>
+                                    </DialogHeader>
+                                    <DataInsightModalContent 
+                                        insightModal={insightModal} 
+                                        reportBatchReceipts={reportBatchReceipts}
+                                        customers={customers}
+                                        products={products}
+                                        finalReportData={finalReportData}
+                                        comparison={comparison}
+                                        currencySymbol={currencySymbol || '$'}
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                 <ReportStatCard
                                     title={t('reports.kpiRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
                                     description={t('reports.kpiRevenueHint')}
                                     delta={comparison?.revenue}
+                                    onClick={() => setInsightModal({
+                                        id: 'revenue',
+                                        title: t('reports.kpiRevenue'),
+                                        value: `${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        description: t('reports.kpiRevenueHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiNetCost')}
                                     value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={FileText}
                                     description={t('reports.kpiNetCostHint')}
+                                    onClick={() => {
+                                        setActiveTab('profit-loss');
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
                                 />
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <div className="cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all rounded-xl outline-none">
-                                            <ReportStatCard
-                                                title={t('reports.kpiNetProfit')}
-                                                value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
-                                                icon={Coins}
-                                                description={`${t('reports.kpiNetProfitHint')} (Click for analysis)`}
-                                                delta={comparison?.profit}
-                                            />
-                                        </div>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-[425px]">
-                                        <DialogHeader>
-                                            <DialogTitle>Net Profit Analysis</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-muted-foreground">Gross Revenue</span>
-                                                <span className="font-medium">{currencySymbol}{(finalReportData?.totalRevenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-muted-foreground">Cost of Goods Sold (COGS)</span>
-                                                <span className="font-medium text-rose-500">-{currencySymbol}{(finalReportData?.totalCost ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center font-semibold pt-2 border-t">
-                                                <span>Gross Profit</span>
-                                                <span>{currencySymbol}{((finalReportData?.totalRevenue ?? 0) - (finalReportData?.totalCost ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm pt-2">
-                                                <span className="text-muted-foreground">Operating Expenses</span>
-                                                <span className="font-medium text-rose-500">-{currencySymbol}{((finalReportData?.totalRevenue ?? 0) - (finalReportData?.totalCost ?? 0) - (finalReportData?.totalProfit ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center font-bold text-base pt-2 border-t">
-                                                <span>Net Operating Profit</span>
-                                                <span className="text-emerald-600 dark:text-emerald-400">{currencySymbol}{(finalReportData?.totalProfit ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                        </div>
-                                    </DialogContent>
-                                </Dialog>
+                                <ReportStatCard
+                                    title={t('reports.kpiNetProfit')}
+                                    value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    icon={Coins}
+                                    description={`${t('reports.kpiNetProfitHint')} (Click for analysis)`}
+                                    delta={comparison?.profit}
+                                    onClick={() => {
+                                        setActiveTab('profit-loss');
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                />
                                 <ReportStatCard
                                     title={t('reports.kpiProductRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={Package}
                                     description={t('reports.kpiProductRevenueHint')}
+                                    onClick={() => setInsightModal({
+                                        id: 'product-revenue',
+                                        title: t('reports.kpiProductRevenue'),
+                                        value: `${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        description: t('reports.kpiProductRevenueHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiServiceRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={TrendingUp}
                                     description={t('reports.kpiServiceRevenueHint')}
+                                    onClick={() => setInsightModal({
+                                        id: 'service-revenue',
+                                        title: t('reports.kpiServiceRevenue'),
+                                        value: `${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        description: t('reports.kpiServiceRevenueHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiSales')}
@@ -778,12 +1121,24 @@ export default function ReportsDashboard() {
                                     icon={ShoppingCart}
                                     description={t('reports.kpiSalesHint')}
                                     delta={comparison?.sales}
+                                    onClick={() => setInsightModal({
+                                        id: 'sales',
+                                        title: t('reports.kpiSales'),
+                                        value: finalReportData?.totalSales.toLocaleString() || '0',
+                                        description: t('reports.kpiSalesHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiUniqueProducts')}
                                     value={finalReportData?.uniqueProductsSold?.toLocaleString() || '0'}
                                     icon={Package}
                                     description={t('reports.kpiUniqueProductsHint')}
+                                    onClick={() => setInsightModal({
+                                        id: 'unique-products',
+                                        title: t('reports.kpiUniqueProducts'),
+                                        value: finalReportData?.uniqueProductsSold?.toLocaleString() || '0',
+                                        description: t('reports.kpiUniqueProductsHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiUnitsSold')}
@@ -791,24 +1146,48 @@ export default function ReportsDashboard() {
                                     icon={Layers}
                                     description={t('reports.kpiUnitsSoldHint')}
                                     delta={comparison?.units}
+                                    onClick={() => setInsightModal({
+                                        id: 'units-sold',
+                                        title: t('reports.kpiUnitsSold'),
+                                        value: finalReportData?.totalItemsSold.toLocaleString() || '0',
+                                        description: t('reports.kpiUnitsSoldHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiDailyVelocity')}
                                     value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
                                     icon={TrendingUp}
                                     description={t('reports.kpiDailyVelocityHint')}
+                                    onClick={() => setInsightModal({
+                                        id: 'daily-velocity',
+                                        title: t('reports.kpiDailyVelocity'),
+                                        value: finalReportData?.dailyAverageSales?.toFixed(1) || '0',
+                                        description: t('reports.kpiDailyVelocityHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiDailyRevenue')}
                                     value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
                                     description={t('reports.kpiDailyRevenueHint')}
+                                    onClick={() => setInsightModal({
+                                        id: 'daily-revenue',
+                                        title: t('reports.kpiDailyRevenue'),
+                                        value: `${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        description: t('reports.kpiDailyRevenueHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiCatalogSize')}
                                     value={finalReportData?.catalogSize?.toLocaleString() || '0'}
                                     icon={Package}
                                     description={t('reports.kpiCatalogSizeHint')}
+                                    onClick={() => setInsightModal({
+                                        id: 'catalog-size',
+                                        title: t('reports.kpiCatalogSize'),
+                                        value: finalReportData?.catalogSize?.toLocaleString() || '0',
+                                        description: t('reports.kpiCatalogSizeHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiAvgOrder')}
@@ -816,11 +1195,23 @@ export default function ReportsDashboard() {
                                     icon={FileText}
                                     description={t('reports.kpiAvgOrderHint')}
                                     delta={comparison?.avgBasket}
+                                    onClick={() => setInsightModal({
+                                        id: 'avg-order',
+                                        title: t('reports.kpiAvgOrder'),
+                                        value: `${currencySymbol}${finalReportData?.averageOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        description: t('reports.kpiAvgOrderHint')
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiCustomers')}
                                     value={finalReportData?.totalCustomers.toLocaleString() || '0'}
                                     icon={Users}
+                                    onClick={() => setInsightModal({
+                                        id: 'customers',
+                                        title: t('reports.kpiCustomers'),
+                                        value: finalReportData?.totalCustomers.toLocaleString() || '0',
+                                        description: finalReportData ? t('reports.kpiCustomersBought', { count: finalReportData.buyersInRange, formatted: finalReportData.buyersInRange.toLocaleString() }) : t('reports.kpiCustomersHint')
+                                    })}
                                     description={
                                         finalReportData
                                             ? t('reports.kpiCustomersBought', {
@@ -841,7 +1232,7 @@ export default function ReportsDashboard() {
                             >
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                                     <RevenueForecastCard receipts={deepReceipts} currencySymbol={currencySymbol} />
-                                    <InventoryDepletionCard receipts={deepReceipts} products={products || []} />
+                                    <DailyCustomerRetentionChart receipts={deepReceipts} customers={customers || []} />
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
