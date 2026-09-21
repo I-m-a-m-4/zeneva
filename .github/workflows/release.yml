@@ -173,15 +173,14 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Android SDK setup
-        id: setup-android
-        uses: android-actions/setup-android@v3
+      - name: Accept Android licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Setup NDK
         run: |
           # Install pinned NDK version known to work with Rust cross-compilation (26.1.10909125 is the stable LTS for Tauri)
           NDK_VERSION="26.1.10909125"
-          yes | sdkmanager --install "ndk;${NDK_VERSION}" > /dev/null 2>&1 || true
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;${NDK_VERSION}" > /dev/null 2>&1 || true
 
           NDK_PATH="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
           if [ ! -d "$NDK_PATH" ]; then
