@@ -115,10 +115,17 @@ export async function POST(req: Request) {
                 <tr>
                   <td style="padding: 40px 40px 32px 40px; background-color: #ffffff;">
                     
-                    <!-- BRAND LOGO (3D Shape Mark — circle + crescent, no wordmark) -->
-                    <div style="margin-bottom: 28px; text-align: center;">
-                      <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="72" height="72" style="width: 72px; height: 72px; object-fit: contain; display: inline-block; border: 0; outline: none; text-decoration: none;" />
-                    </div>
+                    <!-- BRAND LOGO WITH WORDMARK -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 28px;">
+                      <tr>
+                        <td align="center" valign="middle" style="padding-right:10px;">
+                          <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="44" height="44" style="width: 44px; height: 44px; object-fit: contain; display: block; border: 0; outline: none; text-decoration: none;" />
+                        </td>
+                        <td align="left" valign="middle">
+                          <span style="font-family: 'DM Sans', sans-serif; font-size: 32px; font-weight: 800; letter-spacing: -0.8px; color: #ea580c; line-height: 1;">zeneva</span>
+                        </td>
+                      </tr>
+                    </table>
 
 
                     <!-- SUBTITLE & TITLE -->

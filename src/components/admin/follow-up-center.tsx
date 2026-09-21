@@ -989,7 +989,7 @@ export default function FollowUpCenter({
 
       {/* Compose Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[800px]">
+        <DialogContent className="max-w-5xl w-[92vw] max-h-[92vh] flex flex-col overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Send Strategic Follow-Up</DialogTitle>
             <DialogDescription>
@@ -1016,7 +1016,7 @@ export default function FollowUpCenter({
               <div className="space-y-2">
                 <Label>Message Body (HTML Supported)</Label>
                 <Textarea 
-                  className="h-[300px] font-mono text-xs" 
+                  className="h-[460px] md:h-[500px] font-mono text-xs" 
                   value={emailBody} 
                   onChange={e => setEmailBody(e.target.value)} 
                   placeholder="Hi {{name}}..."
@@ -1025,7 +1025,7 @@ export default function FollowUpCenter({
               </div>
               <div className="space-y-2">
                 <Label>Preview</Label>
-                <div className="h-[300px] border rounded-md overflow-hidden bg-white shadow-sm">
+                <div className="h-[460px] md:h-[500px] border rounded-md overflow-hidden bg-white shadow-sm">
                   <iframe
                     sandbox=""
                     referrerPolicy="no-referrer"
@@ -1073,7 +1073,7 @@ export default function FollowUpCenter({
       </Dialog>
       {/* View Email Modal */}
       <Dialog open={!!viewLog} onOpenChange={(open) => !open && setViewLog(null)}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />

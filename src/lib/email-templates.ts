@@ -423,18 +423,20 @@ export function renderCampaignEmail(
 
   <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:100%;background-color:${BRAND.card};border:1px solid ${BRAND.line};border-radius:24px;overflow:hidden;font-family:${FONT_BODY};box-shadow:0 4px 24px rgba(0,0,0,0.03);">
 
-    <!-- Header / Brand Mark -->
+    <!-- Header / Brand Logo with Wordmark -->
     <tr>
       <td class="z-pad" align="center" style="padding:32px 32px 14px;text-align:center;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td align="center">
-              <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="68" height="68"
-                   style="width:68px;height:68px;display:block;border:0;outline:none;text-decoration:none;object-fit:contain;" />
+            <td align="center" valign="middle" style="padding-right:10px;">
+              <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="44" height="44"
+                   style="width:44px;height:44px;display:block;border:0;outline:none;text-decoration:none;object-fit:contain;" />
+            </td>
+            <td align="left" valign="middle">
+              <span style="font-family:${FONT_DISPLAY};font-size:32px;font-weight:800;letter-spacing:-0.8px;color:${BRAND.orangeDeep};line-height:1;display:inline-block;">zeneva</span>
             </td>
           </tr>
         </table>
-
       </td>
     </tr>
 
@@ -771,13 +773,16 @@ export function wrapTransactionalEmail(body: string): string {
 <tr>
 <td align="center" style="padding:36px 12px;">
   <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:100%;background-color:${BRAND.card};border:1px solid ${BRAND.line};border-radius:24px;overflow:hidden;font-family:${FONT_BODY};box-shadow:0 4px 24px rgba(0,0,0,0.03);">
-    <!-- Header / Brand Mark -->
+    <!-- Header / Brand Logo with Wordmark -->
     <tr>
       <td align="center" style="padding:32px 32px 14px;text-align:center;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td align="center">
-              <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="68" height="68" style="width:68px;height:68px;display:block;border:0;outline:none;text-decoration:none;object-fit:contain;" />
+            <td align="center" valign="middle" style="padding-right:10px;">
+              <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="44" height="44" style="width:44px;height:44px;display:block;border:0;outline:none;text-decoration:none;object-fit:contain;" />
+            </td>
+            <td align="left" valign="middle">
+              <span style="font-family:${FONT_DISPLAY};font-size:32px;font-weight:800;letter-spacing:-0.8px;color:${BRAND.orangeDeep};line-height:1;display:inline-block;">zeneva</span>
             </td>
           </tr>
         </table>
