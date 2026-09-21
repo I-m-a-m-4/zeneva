@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Mail, RefreshCw, Eye, AlertCircle, CheckCircle2, Send, Search, Filter, Clock, TrendingUp, Bot } from 'lucide-react';
+import { Mail, RefreshCw, Eye, AlertCircle, CheckCircle2, Send, Search, Filter, Clock, TrendingUp, Bot, Zap, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
