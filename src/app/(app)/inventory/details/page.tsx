@@ -232,7 +232,7 @@ function EditProductContent() {
         }
     };
 
-    // Fetch Inventory Transactions
+    // Fetch Inventory Transactions & Legacy Audit Logs
     React.useEffect(() => {
         if (!business?.id || !firestore || !product?.id) {
             if (!isProductLoading) setIsLogsLoading(false);
@@ -244,25 +244,95 @@ function EditProductContent() {
             where('businessId', '==', business.id),
             where('productId', '==', product.id)
         );
+        
+        const legacyQuery = query(
+            collection(firestore, 'businessInstances', business.id, 'auditLogs'),
+            where('entityId', '==', product.id),
+            where('action', 'in', ['product.stock_adjustment', 'product.create', 'product.update', 'product.bulk_update', 'product.sale']),
+            orderBy('createdAt', 'desc'),
+            limit(50)
+        );
 
-        // Fallback timer for offline/slow connection to prevent infinite spinner
-        const timeoutId = setTimeout(() => {
+        let txLogs: any[] = [];
+        let legacyLogs: any[] = [];
+        let hasTxLoaded = false;
+        let hasLegacyLoaded = false;
+        let isDone = false;
+        
+        const updateLogs = () => {
+            if (!hasTxLoaded || !hasLegacyLoaded || isDone) return;
+            isDone = true; // prevent double set if both resolve instantly
+            
+            // Map legacy logs to the new format
+            const mappedLegacy = legacyLogs.filter((log: any) => {
+                if (log.action === 'product.stock_adjustment' || log.action === 'product.create' || log.action === 'product.sale') return true;
+                if (log.action === 'product.update' || log.action === 'product.bulk_update') {
+                    return log.details?.adjustment !== undefined || log.details?.newStock !== undefined || log.details?.stock !== undefined;
+                }
+                return false;
+            }).map((log: any) => {
+                const details = log.details || {};
+                let rawAdj = details.adjustment !== undefined 
+                    ? details.adjustment 
+                    : (log.action === 'product.create' ? details.stock : (details.newStock !== undefined && details.oldStock !== undefined ? details.newStock - details.oldStock : 0));
+                
+                let type = 'adjustment';
+                if (log.action === 'product.sale') type = 'out';
+                else type = rawAdj >= 0 ? 'in' : 'out';
+                
+                return {
+                    id: log.id,
+                    businessId: business.id,
+                    productId: product.id,
+                    type,
+                    quantity: Math.abs(rawAdj || 0),
+                    date: log.createdAt,
+                    notes: details.reason || log.action,
+                    createdBy: log.userName || 'System',
+                    referenceId: log.id,
+                    _isLegacy: true
+                };
+            }).filter((l: any) => l.quantity > 0 || l.type === 'adjustment'); // keep 0 adjustments just in case
+            
+            const txRefs = new Set(txLogs.map(t => t.referenceId).filter(Boolean));
+            const filteredLegacy = mappedLegacy.filter((l: any) => !txRefs.has(l.id));
+            
+            setStockLogs([...txLogs, ...filteredLegacy] as any);
             setIsLogsLoading(false);
-        }, 4000);
+        };
 
-        const unsubscribe = onSnapshot(txQuery, (snap) => {
-            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryTransaction));
-            setStockLogs(logs as any);
-            setIsLogsLoading(false);
-            clearTimeout(timeoutId);
+        const unsubTx = onSnapshot(txQuery, (snap) => {
+            txLogs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            hasTxLoaded = true;
+            isDone = false; // allow re-trigger on new tx
+            updateLogs();
         }, (err) => {
             console.error('Failed to listen to transactions:', err);
-            setIsLogsLoading(false);
-            clearTimeout(timeoutId);
+            hasTxLoaded = true;
+            updateLogs();
+        });
+        
+        const unsubLegacy = onSnapshot(legacyQuery, (snap) => {
+            legacyLogs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            hasLegacyLoaded = true;
+            isDone = false;
+            updateLogs();
+        }, (err) => {
+            console.error('Failed to listen to legacy logs:', err);
+            hasLegacyLoaded = true;
+            updateLogs();
         });
 
+        const timeoutId = setTimeout(() => {
+            setIsLogsLoading(false);
+            hasTxLoaded = true;
+            hasLegacyLoaded = true;
+            updateLogs();
+        }, 4000);
+
         return () => {
-            unsubscribe();
+            unsubTx();
+            unsubLegacy();
             clearTimeout(timeoutId);
         };
     }, [business?.id, firestore, product?.id, isProductLoading]);
