@@ -36,7 +36,7 @@ const navLinks = [
   { href: '/admin-imamshaffy/users', label: 'Users', icon: Users, primary: true },
   { href: '/admin-imamshaffy/investors', label: 'Cap Table', icon: PieChart },
   { href: '/admin-imamshaffy/achievements', label: 'Achievements', icon: Crown },
-  { href: '/admin-imamshaffy/outreach', label: 'Strategic Outreach', icon: Mail },
+  { href: '/admin-imamshaffy/outreach', label: 'Outreach', icon: Mail, primary: true },
   { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
   { href: '/admin-imamshaffy/marketing', label: 'Studio', icon: Clapperboard },
   { href: '/admin-imamshaffy/promos', label: 'Promo Popups', icon: Sparkles },

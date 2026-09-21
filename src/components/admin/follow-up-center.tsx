@@ -266,6 +266,8 @@ export default function FollowUpCenter({
   }, [logs, atRiskBusinesses, ownerFor]);
 
   const [isSending, setIsSending] = React.useState(false);
+  const [isGrantingPlan, setIsGrantingPlan] = React.useState(false);
+  const [selectedThreadEmail, setSelectedThreadEmail] = React.useState<string | null>(null);
   const [bulkProgress, setBulkProgress] = React.useState<{ done: number; total: number } | null>(null);
   const abortBulkRef = React.useRef(false);
   const { toast } = useToast();
@@ -283,6 +285,49 @@ export default function FollowUpCenter({
       setEmailBody(winBack.body(escapeHtml(selectedRecipient.name || ''), selectedRecipient));
     }
   }, [isModalOpen, selectedRecipient]);
+
+  // Quick 1-click function to grant 2 months free Business Plan extension
+  const handleGrantTwoMonths = async (targetBusinessId?: string, recipientEmail?: string, recipientName?: string) => {
+    const bizId = targetBusinessId || selectedRecipient?.businessId;
+    if (!bizId) {
+      toast({ variant: 'destructive', title: 'Missing Info', description: 'Business ID is required to extend trial.' });
+      return;
+    }
+    const name = recipientName || selectedRecipient?.name || 'Merchant';
+    
+    setIsGrantingPlan(true);
+    try {
+      const { firestore } = await import('@/firebase');
+      const { doc, updateDoc, collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+      
+      const expiryDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60 days / 2 months
+      const busRef = doc(firestore, 'businessInstances', bizId);
+      await updateDoc(busRef, {
+        plan: 'business',
+        trialExpiresAt: expiryDate,
+        updatedAt: serverTimestamp()
+      });
+
+      const historyRef = collection(firestore, 'businessInstances', bizId, 'subscription_history');
+      await addDoc(historyRef, {
+        action: `Admin Grant: 2 Months Business Plan extended to ${format(expiryDate, 'PPP')}`,
+        amount: 0,
+        currency: 'NGN',
+        timestamp: serverTimestamp()
+      });
+
+      toast({
+        variant: 'success',
+        title: '⚡ 2 Months Free Granted!',
+        description: `Upgraded ${name} to Business Plan until ${format(expiryDate, 'MMMM d, yyyy')}.`
+      });
+    } catch (err: any) {
+      console.error('Grant Failed:', err);
+      toast({ variant: 'destructive', title: 'Grant Failed', description: err.message || 'Failed to extend trial.' });
+    } finally {
+      setIsGrantingPlan(false);
+    }
+  };
 
   const fetchLogs = async () => {
     if (onRefresh) {
@@ -685,25 +730,37 @@ export default function FollowUpCenter({
                         </div>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={!lead.contactable}
-                      title={lead.contactable ? undefined : 'No email address on this account'}
-                      className="h-8 shrink-0 text-xs"
-                      onClick={() => {
-                        setSelectedRecipient({
-                          id: lead.businessId,
-                          name: lead.contactName || lead.businessName,
-                          email: lead.email,
-                          businessId: lead.businessId,
-                          daysSinceActive: lead.daysSinceActive,
-                        });
-                        setIsModalOpen(true);
-                      }}
-                    >
-                      <Mail className="mr-2 h-3 w-3" /> Reach out
-                    </Button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isGrantingPlan || !lead.businessId}
+                        className="h-8 text-xs font-bold border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                        title="Grant 2 Months Free Business Plan extension"
+                        onClick={() => handleGrantTwoMonths(lead.businessId, lead.email, lead.contactName || lead.businessName)}
+                      >
+                        <Zap className="mr-1 h-3 w-3 text-amber-500" /> 2Mo Free
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!lead.contactable}
+                        title={lead.contactable ? undefined : 'No email address on this account'}
+                        className="h-8 shrink-0 text-xs font-medium"
+                        onClick={() => {
+                          setSelectedRecipient({
+                            id: lead.businessId,
+                            name: lead.contactName || lead.businessName,
+                            email: lead.email,
+                            businessId: lead.businessId,
+                            daysSinceActive: lead.daysSinceActive,
+                          });
+                          setIsModalOpen(true);
+                        }}
+                      >
+                        <Mail className="mr-1.5 h-3 w-3" /> Reach out
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -995,9 +1052,20 @@ export default function FollowUpCenter({
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-orange-500/10" onClick={() => setViewLog(log)}>
-                          <Search className="h-4 w-4 text-orange-400" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-[11px] font-bold text-orange-600 hover:bg-orange-500/10"
+                            title="View email conversation thread history for this merchant"
+                            onClick={() => setSelectedThreadEmail(log.sentTo)}
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 mr-1 text-orange-500" /> Thread
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-orange-500/10" title="View Audit Details" onClick={() => setViewLog(log)}>
+                            <Search className="h-4 w-4 text-orange-400" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ));
@@ -1082,15 +1150,148 @@ export default function FollowUpCenter({
                 </Button>
               </div>
             ) : (
-              <div className="flex w-full justify-end gap-2">
-                <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSending}>Cancel</Button>
-                <Button onClick={handleSendEmail} disabled={isSending} className="bg-orange-600 hover:bg-orange-700 text-white">
-                  {isSending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                  Dispatch Strike
-                </Button>
+              <div className="flex w-full justify-between items-center gap-2">
+                {selectedRecipient?.businessId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isGrantingPlan}
+                    className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10 text-xs font-bold"
+                    onClick={() => handleGrantTwoMonths(selectedRecipient.businessId, selectedRecipient.email, selectedRecipient.name)}
+                  >
+                    <Zap className="h-3.5 w-3.5 mr-1 text-amber-500 animate-pulse" />
+                    Grant 2Mo Free Plan
+                  </Button>
+                )}
+                <div className="flex gap-2 ml-auto">
+                  <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSending}>Cancel</Button>
+                  <Button onClick={handleSendEmail} disabled={isSending} className="bg-orange-600 hover:bg-orange-700 text-white">
+                    {isSending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                    Dispatch Strike
+                  </Button>
+                </div>
               </div>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Merchant Email Conversation Thread Modal (Support-Style Chat) */}
+      <Dialog open={!!selectedThreadEmail} onOpenChange={(open) => !open && setSelectedThreadEmail(null)}>
+        <DialogContent className="max-w-4xl w-[92vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          {(() => {
+            if (!selectedThreadEmail) return null;
+            const threadLogs = logs
+              .filter(l => l.sentTo?.toLowerCase() === selectedThreadEmail.toLowerCase())
+              .sort((a, b) => (a.sentAt?.seconds || 0) - (b.sentAt?.seconds || 0));
+            const firstLog = threadLogs[0] || {};
+            const recipientName = firstLog.recipientName || selectedThreadEmail;
+            const targetBizId = firstLog.businessId;
+
+            return (
+              <div className="flex flex-col h-[80vh]">
+                {/* Thread Header */}
+                <div className="bg-slate-900 text-white p-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-orange-600 flex items-center justify-center font-bold text-white text-base shadow-sm">
+                      {recipientName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base flex items-center gap-2 text-white">
+                        {recipientName}
+                        <Badge variant="outline" className="text-[10px] border-orange-500/40 text-orange-400 bg-orange-500/10">
+                          {threadLogs.length} Messages
+                        </Badge>
+                      </h3>
+                      <p className="text-xs text-slate-400">{selectedThreadEmail}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {targetBizId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isGrantingPlan}
+                        className="bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 text-xs font-bold"
+                        onClick={() => handleGrantTwoMonths(targetBizId, selectedThreadEmail, recipientName)}
+                      >
+                        <Zap className="h-3.5 w-3.5 mr-1 text-amber-400" />
+                        Grant 2Mo Free Plan
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold"
+                      onClick={() => {
+                        setSelectedRecipient({
+                          name: recipientName,
+                          email: selectedThreadEmail,
+                          businessId: targetBizId,
+                        });
+                        setSelectedThreadEmail(null);
+                        setIsModalOpen(true);
+                      }}
+                    >
+                      <Mail className="h-3.5 w-3.5 mr-1" />
+                      New Email
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Messages Thread Feed */}
+                <ScrollArea className="flex-1 p-6 bg-slate-50/70">
+                  <div className="space-y-4">
+                    {threadLogs.map((msg, idx) => (
+                      <div key={msg.id || idx} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-orange-500" />
+                            <span className="font-bold text-sm text-slate-900">{msg.subject}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              {msg.sentAt?.seconds ? format(new Date(msg.sentAt.seconds * 1000), 'MMM d, yyyy h:mm a') : 'N/A'}
+                            </span>
+                            {msg.status === 'opened' || (msg.openCount > 0 && msg.status === 'sent') ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] font-black uppercase">
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> Opened ({msg.openCount || 1}x)
+                              </Badge>
+                            ) : msg.status === 'failed' ? (
+                              <Badge variant="destructive" className="text-[10px] font-black uppercase">Failed</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 text-[10px] font-black uppercase">
+                                Dispatched
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Render Body Preview */}
+                        <div 
+                          className="text-xs text-slate-700 leading-relaxed max-h-[350px] overflow-y-auto font-sans p-3 bg-slate-50/80 rounded-lg border border-slate-100"
+                          dangerouslySetInnerHTML={{ __html: msg.html || msg.body || '<p class="italic text-muted-foreground">Message content logged</p>' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+
+                {/* Quick Footer Action */}
+                <div className="p-4 bg-white border-t flex items-center justify-between shrink-0">
+                  <span className="text-xs text-slate-500">
+                    Total outreach history for {recipientName}: <strong className="text-slate-900">{threadLogs.length} dispatches</strong>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedThreadEmail(null)}
+                  >
+                    Close Thread
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
       {/* View Email Modal */}
