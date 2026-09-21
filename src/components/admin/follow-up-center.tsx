@@ -275,6 +275,15 @@ export default function FollowUpCenter({
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [viewLog, setViewLog] = React.useState<FollowUpLog | null>(null);
 
+  // Automatically populate modal with default 'Win-Back: 2 Months Free' template on open
+  React.useEffect(() => {
+    if (isModalOpen && selectedRecipient) {
+      const winBack = templates.find(t => t.name === 'Win-Back: 2 Months Free') || templates[0];
+      setSubject(winBack.subject);
+      setEmailBody(winBack.body(escapeHtml(selectedRecipient.name || ''), selectedRecipient));
+    }
+  }, [isModalOpen, selectedRecipient]);
+
   const fetchLogs = async () => {
     if (onRefresh) {
         onRefresh();
@@ -442,10 +451,10 @@ export default function FollowUpCenter({
         const isMobileRecipient = recipient?.platformTag === 'Mobile App' || recipient?.channel === 'play' || recipient?.deviceType === 'Mobile App';
         const storeName = isMobileRecipient ? 'Google Play Store' : 'Microsoft Store';
         const storeInstructions = isMobileRecipient 
-          ? 'open Google Play on your phone and update your app to the latest version'
-          : 'open the Microsoft Store on your PC and click <strong>Get updates / Update</strong>';
+          ? 'open Google Play on your phone and update your app to the latest version for the best experience'
+          : 'open the Microsoft Store on your PC and click <strong>Get updates / Update</strong> to update your app to the latest version for the best experience';
         
-        return `Hi ${name || 'there'},<br><br>This is Bello, Founder & CEO of Zeneva.<br><br>I noticed you haven't been back to Zeneva in ${timeText}, and I wanted to personally reach out.<br><br>We are constantly improving our platform and we really value the feedback of businesses like yours. To encourage you to give Zeneva another try, I've just granted your account <strong>2 full months of our premium Business Plan completely free</strong>.<br><br>There's no catch, and you don't need to put in a credit card. Just log in, explore the new features, and if you have any feedback or hit any snags, reply directly to this email.<br><br><strong>Important:</strong> We just pushed a major new update to the <strong>${storeName}</strong> with performance upgrades and new features! Please make sure to ${storeInstructions} for the best experience.<br><br>After the 2 months, if you love it, you can choose to continue. I hope to see you back!<br><br>Best,<br>Bello Imam<br>Founder & CEO, Zeneva`;
+        return `Hi ${name || 'there'},<br><br>This is Bello, Founder & CEO of Zeneva.<br><br>I noticed you haven't been back to Zeneva in ${timeText}, and I wanted to personally reach out.<br><br>We are constantly improving our platform and we really value the feedback of businesses like yours. To encourage you to give Zeneva another try, I've just granted your account <strong>2 full months of our premium Business Plan completely free</strong>.<br><br>There's no catch, and you don't need to put in a credit card. Just log in, explore the new features, and if you have any feedback or hit any snags, reply directly to this email.<br><br><strong>Important:</strong> We just pushed a major new update to the <strong>${storeName}</strong> with performance upgrades and new features! Please make sure to ${storeInstructions}.<br><br>After the 2 months, if you love it, you can choose to continue. I hope to see you back!<br><br>Best,<br>Bello Imam<br>Founder & CEO, Zeneva`;
       }
     },
     {
