@@ -293,23 +293,44 @@ const GOOGLE_FONTS_HREF =
   + '&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700'
   + '&display=swap';
 
-/** Where the generated raster assets live. See scripts/generate-email-assets.mjs. */
-const ASSETS = `${BASE_URL}/email`;
+/** Where raster hero assets live (public/emails/). Social icons use text links instead of PNGs. */
+const ASSETS = `${BASE_URL}/emails`;
 
 /**
  * Footer social row.
  *
  * Handles copied from the live marketing footer (`marketing-footer.tsx`) so the
- * two cannot drift. Rendered as **PNG images**, not inline SVG: Gmail strips SVG
- * entirely, so an `<svg>` icon set would simply be missing for most of the list.
+ * two cannot drift. Rendered as **styled text links** — Gmail strips both inline
+ * SVG and blocks external image requests from unknown senders, so text links are
+ * the only approach that survives all major clients without image-hosting
+ * infrastructure.
  */
 export const SOCIAL_LINKS = [
   { key: 'instagram', label: 'Instagram', href: 'https://www.instagram.com/zeneva_pos/' },
-  { key: 'x', label: 'X', href: 'https://x.com/zeneva_retail' },
+  { key: 'x', label: 'X (Twitter)', href: 'https://x.com/zeneva_retail' },
   { key: 'tiktok', label: 'TikTok', href: 'https://www.tiktok.com/@zeneva_retail' },
   { key: 'youtube', label: 'YouTube', href: 'https://www.youtube.com/@ZenevaPos' },
   { key: 'whatsapp', label: 'WhatsApp', href: 'https://wa.me/2349064233805' },
 ];
+
+/**
+ * Build the social‑links footer row as plain anchor text.
+ *
+ * This replaces the previous PNG-image approach. The asset directory
+ * (`public/email/social-*.png`) was never committed, so every outgoing mail
+ * had a row of broken-image icons. Text links render identically in Gmail,
+ * Outlook, Apple Mail, and any other client regardless of image-blocking.
+ */
+function buildSocialRow(links: typeof SOCIAL_LINKS): string {
+  return links
+    .map(
+      s =>
+        `<td style="padding:0 8px;">
+          <a href="${s.href}" style="color:#94a3b8;text-decoration:none;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:12px;font-weight:600;letter-spacing:0.02em;">${s.label}</a>
+        </td>`,
+    )
+    .join('');
+}
 
 /**
  * Render a draft to a complete, standalone HTML document.
@@ -352,14 +373,7 @@ export function renderCampaignEmail(
     }
   }
 
-  const socialRow = SOCIAL_LINKS.map(
-    s => `<td style="padding:0 5px;">
-                <a href="${s.href}" style="text-decoration:none;">
-                  <img src="${ASSETS}/social-${s.key}.png" width="30" height="30" alt="${s.label}"
-                       style="display:block;border:0;outline:none;text-decoration:none;border-radius:15px;" />
-                </a>
-              </td>`,
-  ).join('');
+  const socialRow = buildSocialRow(SOCIAL_LINKS);
 
   return `<!doctype html>
 <html lang="en" style="margin:0;padding:0;">
@@ -728,13 +742,7 @@ export function renderForProfile(
 
 export function wrapTransactionalEmail(body: string): string {
   const year = new Date().getFullYear();
-  const socialRow = SOCIAL_LINKS.map(
-    s => `<td style="padding:0 5px;">
-            <a href="${s.href}" style="text-decoration:none;">
-              <img src="${ASSETS}/social-${s.key}.png" width="30" height="30" alt="${s.label}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:15px;" />
-            </a>
-          </td>`
-  ).join('');
+  const socialRow = buildSocialRow(SOCIAL_LINKS);
 
   return `<!doctype html>
 <html lang="en" style="margin:0;padding:0;">
