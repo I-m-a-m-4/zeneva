@@ -465,8 +465,11 @@ export default function DashboardPage() {
 
   const { currentUserProfile } = usePOS();
 
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
+
   const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
-  const isRestricted = !hasReportPermission;
+  const isRestricted = mounted ? !hasReportPermission : false;
 
   if (isLoading || !finalDashboardData) {
     return <DashboardSkeleton restricted={isRestricted} />;

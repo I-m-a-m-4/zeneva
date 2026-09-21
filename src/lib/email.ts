@@ -12,26 +12,23 @@ export interface ContactEmailParams {
 }
 
 export const sendInvitationEmail = async (params: ContactEmailParams) => {
-    const serviceId = process.env.NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID;
-    const templateId = process.env.NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID;
-    const publicKey = process.env.NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY;
-
-    if (!serviceId || !templateId || !publicKey) {
-        const missing = [
-            !serviceId && 'NEXT_PUBLIC_EMAILJS_INVITE_SERVICE_ID',
-            !templateId && 'NEXT_PUBLIC_EMAILJS_INVITE_TEMPLATE_ID',
-            !publicKey && 'NEXT_PUBLIC_EMAILJS_INVITE_PUBLIC_KEY'
-        ].filter(Boolean).join(', ');
-        const errorMessage = `EmailJS invitation service is not fully configured. Missing keys: ${missing}. Please check your .env file and restart the server.`;
-        console.error(errorMessage);
-        throw new Error(errorMessage);
-    }
-
     try {
-        const response = await emailjs.send(serviceId, templateId, params as any, publicKey);
-        return response;
-    } catch (error) {
-        console.error('[EmailJS] Failed to send invitation email:', error);
+        const response = await fetch('/api/emails/invite', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error: any) {
+        console.error('[Email API] Failed to send invitation email:', error.message || error);
         throw error;
     }
 };

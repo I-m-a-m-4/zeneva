@@ -327,6 +327,11 @@ service cloud.firestore {
                                get(/databases/$(database)/documents/businessInstances/$(businessId)).data.ownerId == request.auth.uid
                              ));
       }
+
+      match /webhooks/{webhookId} {
+        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+        allow create, update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId));
+      }
     }
 
     match /users/{userId} {

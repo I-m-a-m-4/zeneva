@@ -94,8 +94,9 @@ export default function DevelopersTab({ business }: DevelopersTabProps) {
                 </CardHeader>
                 <CardContent>
                     <FeatureGate 
-                        plan="pro" 
-                        business={business} 
+                        requiredPlan="pro" 
+                        currentPlan={business?.plan || 'starter'} 
+                        hasLifetimeAccess={business?.accessLevel === 'lifetime'}
                         featureName="Developer Tools" 
                         description="Upgrade to the Pro plan to access webhooks, connect to WooCommerce or Wix, and sync your inventory live."
                     />
@@ -129,7 +130,7 @@ export default function DevelopersTab({ business }: DevelopersTabProps) {
                                         <div key={wh.id} className="flex items-center justify-between p-3 border rounded-md">
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-sm">{wh.url}</span>
-                                                <span className="text-xs text-muted-foreground">Subscribed to: {wh.events.join(', ')}</span>
+                                                <span className="text-xs text-muted-foreground">Subscribed to: {wh.events?.join(', ') || 'inventory.updated'}</span>
                                             </div>
                                             <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteWebhook(wh.id)}>
                                                 <Trash2 className="h-4 w-4" />

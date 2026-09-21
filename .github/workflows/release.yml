@@ -176,6 +176,8 @@ jobs:
       - name: Android SDK setup
         id: setup-android
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11479570
 
       - name: Setup NDK
         run: |

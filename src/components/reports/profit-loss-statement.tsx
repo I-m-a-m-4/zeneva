@@ -112,6 +112,8 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
     const { toast } = useToast();
 
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [page, setPage] = React.useState(1);
+    const pageSize = 50;
 
     const profitStatementItems = React.useMemo(() => {
         if (!receipts || !products) return [];
@@ -149,6 +151,13 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
         return profitStatementItems.filter(item => item.name.toLowerCase().includes(lower) || item.receiptRef?.toLowerCase().includes(lower));
     }, [profitStatementItems, searchTerm]);
 
+    React.useEffect(() => {
+        setPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.ceil(filteredItems.length / pageSize);
+    const paginatedItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+
     const totalFilteredQty = filteredItems.reduce((acc, curr) => acc + curr.qty, 0);
     const totalFilteredCost = filteredItems.reduce((acc, curr) => acc + (curr.unitCost * curr.qty), 0);
     const totalFilteredRevenue = filteredItems.reduce((acc, curr) => acc + (curr.sellingPrice * curr.qty), 0);
@@ -162,9 +171,9 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
 
         const doc = new jsPDF();
         
-        let hasDMSans = false;
+        let hasCustomFont = false;
         try {
-            const fontUrl = 'https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-400-normal.ttf';
+            const fontUrl = 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf';
             const fontResponse = await fetch(fontUrl);
             if (fontResponse.ok) {
                 const buffer = await fontResponse.arrayBuffer();
@@ -174,17 +183,17 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     binary += String.fromCharCode(bytes[i]);
                 }
                 const base64 = window.btoa(binary);
-                doc.addFileToVFS('DMSans.ttf', base64);
-                doc.addFont('DMSans.ttf', 'DMSans', 'normal');
-                doc.setFont('DMSans');
-                hasDMSans = true;
+                doc.addFileToVFS('Roboto.ttf', base64);
+                doc.addFont('Roboto.ttf', 'Roboto', 'normal');
+                doc.setFont('Roboto');
+                hasCustomFont = true;
             }
         } catch (e) {
             console.warn('Could not load font.', e);
         }
 
         const formatCurrencyForPDF = (amount: number) => {
-            const prefix = hasDMSans && currencySymbol === '₦' ? '₦' : currencySymbol === '₦' ? 'NGN ' : currencySymbol;
+            const prefix = hasCustomFont ? currencySymbol : (currencySymbol === '₦' ? 'NGN ' : currencySymbol);
             return `${prefix}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         };
 
@@ -219,9 +228,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
         ]);
 
         tableRows.push([
-            "Totals",
-            "",
-            "",
+            { content: "Totals", colSpan: 3, styles: { halign: 'right' } } as any,
             totalFilteredQty.toString(),
             formatCurrencyForPDF(totalFilteredCost),
             formatCurrencyForPDF(totalFilteredRevenue),
@@ -237,7 +244,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             styles: { 
                 fontSize: 8, 
                 cellPadding: 3.5,
-                font: hasDMSans ? 'DMSans' : 'helvetica'
+                font: hasCustomFont ? 'Roboto' : 'helvetica'
             },
             headStyles: { 
                 fillColor: [249, 115, 22], 
@@ -264,7 +271,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             didDrawPage: function (data) {
                 doc.setFontSize(8);
                 doc.setTextColor(130, 130, 130);
-                if (hasDMSans) doc.setFont('DMSans');
+                if (hasCustomFont) doc.setFont('Roboto');
                 doc.text(`Page ${data.pageNumber}`, 14, doc.internal.pageSize.height - 10);
                 doc.textWithLink("Generated via zeneva.space", doc.internal.pageSize.width - 55, doc.internal.pageSize.height - 10, { url: "https://zeneva.space" });
             }
@@ -281,9 +288,9 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
 
         const doc = new jsPDF();
         
-        let hasDMSans = false;
+        let hasCustomFont = false;
         try {
-            const fontUrl = 'https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-400-normal.ttf';
+            const fontUrl = 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf';
             const fontResponse = await fetch(fontUrl);
             if (fontResponse.ok) {
                 const buffer = await fontResponse.arrayBuffer();
@@ -293,17 +300,17 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     binary += String.fromCharCode(bytes[i]);
                 }
                 const base64 = window.btoa(binary);
-                doc.addFileToVFS('DMSans.ttf', base64);
-                doc.addFont('DMSans.ttf', 'DMSans', 'normal');
-                doc.setFont('DMSans');
-                hasDMSans = true;
+                doc.addFileToVFS('Roboto.ttf', base64);
+                doc.addFont('Roboto.ttf', 'Roboto', 'normal');
+                doc.setFont('Roboto');
+                hasCustomFont = true;
             }
         } catch (e) {
             console.warn('Could not load font.', e);
         }
 
         const formatCurrencyForPDF = (amount: number) => {
-            const prefix = hasDMSans && currencySymbol === '₦' ? '₦' : currencySymbol;
+            const prefix = hasCustomFont ? currencySymbol : (currencySymbol === '₦' ? 'NGN ' : currencySymbol);
             return `${prefix}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         };
 
@@ -527,7 +534,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredItems.length === 0 ? (
+                                {paginatedItems.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                             No sales data matches your search.
@@ -535,7 +542,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                     </TableRow>
                                 ) : (
                                     <>
-                                        {filteredItems.map((item) => (
+                                        {paginatedItems.map((item) => (
                                             <TableRow key={item.id} className="hover:bg-muted/30">
                                                 <TableCell className="whitespace-nowrap">{item.date}</TableCell>
                                                 <TableCell className="font-medium">{item.name}</TableCell>
@@ -571,6 +578,30 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             </TableBody>
                         </Table>
                     </div>
+                    
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={page === 1} 
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                            >
+                                Previous
+                            </Button>
+                            <span className="text-sm text-muted-foreground">
+                                Page {page} of {totalPages}
+                            </span>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={page >= totalPages} 
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

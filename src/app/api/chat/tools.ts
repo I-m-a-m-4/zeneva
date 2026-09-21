@@ -1489,7 +1489,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
       description:
         "Offer a tap-through link to a page in the Zeneva app. Use when the user asks to open, go to, or see a page — e.g. 'open inventory', 'show me the reports', 'take me to the POS'. Returns a LINK card. Covers sub-pages too: adding a product, branches, debts, the POS steps.",
       inputSchema: z.object({
-        href: z.string().describe('Absolute app path, starting with a forward slash.'),
+        href: z.string().describe('Absolute app path, starting with a forward slash. (e.g. /inventory, /reports, /sales/pos/select-products for the POS)'),
         label: z.string().describe('What the link says, e.g. "Open Inventory".'),
         detail: z.string().optional().describe('One short line on what is on that page.'),
       }),
@@ -1500,7 +1500,14 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
         }
 
         // Strip query/hash before matching so `/inventory?x=1` still resolves.
-        const path = href.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+        let path = href.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+
+        // Fix common AI hallucinated routes
+        if (path === '/pos' || path === '/sales' || path === '/sales/pos') {
+            path = '/sales/pos/select-products';
+        } else if (path === '/products') {
+            path = '/inventory';
+        }
 
         if (!APP_ROUTES.has(path)) {
           /*

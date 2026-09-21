@@ -405,6 +405,22 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
     }
   }, [dictationTrigger, isOpen, isListening, isTranscribing]);
 
+  React.useEffect(() => {
+    if (!isOpen && isListening) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        // Clear onstop so we don't transcribe and waste tokens when discarded
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        mediaRecorderRef.current.stop();
+      }
+      if (vadLoopRef.current) cancelAnimationFrame(vadLoopRef.current);
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+      setIsListening(false);
+    }
+  }, [isOpen, isListening]);
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {

@@ -9,6 +9,8 @@ import type { Customer, Receipt } from '@/types';
 import { safeToDate } from '@/lib/utils';
 import { useI18n } from '@/context/i18n-context';
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 interface DailyCustomerRetentionChartProps {
     receipts: Receipt[];
     customers: Customer[];
@@ -16,9 +18,19 @@ interface DailyCustomerRetentionChartProps {
 
 export default function DailyCustomerRetentionChart({ receipts, customers }: DailyCustomerRetentionChartProps) {
     const { t } = useI18n();
+    const [timeRange, setTimeRange] = React.useState('30d');
 
     const chartData = React.useMemo(() => {
         if (!receipts || receipts.length === 0) return [];
+
+        // Apply time range filter
+        let filteredReceipts = receipts;
+        const now = new Date();
+        if (timeRange !== 'all') {
+            const daysToSubtract = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+            const thresholdDate = new Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000);
+            filteredReceipts = receipts.filter(r => safeToDate(r.createdAt) >= thresholdDate);
+        }
 
         // Map customer ID to their creation date (first seen)
         const customerCreationMap = new Map<string, Date>();
@@ -31,7 +43,7 @@ export default function DailyCustomerRetentionChart({ receipts, customers }: Dai
         // Group by day (YYYY-MM-DD)
         const dailyData = new Map<string, { newCustomers: Set<string>, returningCustomers: Set<string>, walkIns: number }>();
 
-        receipts.forEach(receipt => {
+        filteredReceipts.forEach(receipt => {
             const date = safeToDate(receipt.createdAt);
             const dateStr = date.toISOString().split('T')[0];
 
@@ -80,7 +92,7 @@ export default function DailyCustomerRetentionChart({ receipts, customers }: Dai
                 WalkIn: stats.walkIns
             };
         });
-    }, [receipts, customers]);
+    }, [receipts, customers, timeRange]);
 
     const chartConfig = {
         New: {
@@ -99,14 +111,27 @@ export default function DailyCustomerRetentionChart({ receipts, customers }: Dai
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    Daily Customer Retention
-                </CardTitle>
-                <CardDescription>New vs Returning customers making purchases each day</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <div className="space-y-1">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                        <Users className="h-5 w-5 text-primary" />
+                        Daily Customer Retention
+                    </CardTitle>
+                    <CardDescription>New vs Returning customers making purchases each day</CardDescription>
+                </div>
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                    <SelectTrigger className="w-[120px] h-8 text-xs">
+                        <SelectValue placeholder="Select Range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="7d">Last 7 Days</SelectItem>
+                        <SelectItem value="30d">Last 30 Days</SelectItem>
+                        <SelectItem value="90d">Last 90 Days</SelectItem>
+                        <SelectItem value="all">All Time</SelectItem>
+                    </SelectContent>
+                </Select>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
                 {chartData.length > 0 ? (
                     <div className="h-[300px] w-full">
                         <ChartContainer config={chartConfig} className="h-full w-full">
