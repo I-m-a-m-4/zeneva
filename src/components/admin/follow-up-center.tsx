@@ -431,15 +431,21 @@ export default function FollowUpCenter({
       subject: '2 Months of Zeneva Business Plan on us!',
       body: (name: string, recipient: any) => {
         let timeText = 'a while';
-        if (recipient.daysSinceActive) {
+        if (recipient?.daysSinceActive) {
             timeText = `${recipient.daysSinceActive} days`;
-        } else if (recipient.lastSeen) {
+        } else if (recipient?.lastSeen) {
             const date = typeof recipient.lastSeen?.toDate === 'function' ? recipient.lastSeen.toDate() : new Date(recipient.lastSeen);
             const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
             if (!isNaN(days) && days > 0) timeText = `${days} days`;
         }
         
-        return `Hi ${name || 'there'},<br><br>This is Bello, Founder & CEO of Zeneva.<br><br>I noticed you haven't been back to Zeneva in ${timeText}, and I wanted to personally reach out.<br><br>We are constantly improving our platform and we really value the feedback of businesses like yours. To encourage you to give Zeneva another try, I've just granted your account <strong>2 full months of our premium Business Plan completely free</strong>.<br><br>There's no catch, and you don't need to put in a credit card. Just log in, explore the new features, and if you have any feedback or hit any snags, reply directly to this email.<br><br><strong>Important:</strong> We just pushed a major new update with performance upgrades and new features! Please make sure to <strong>update your app</strong> to the latest version for PC, Mac, or phone for the best experience.<br><br>After the 2 months, if you love it, you can choose to continue. I hope to see you back!<br><br>Best,<br>Bello Imam<br>Founder & CEO, Zeneva`;
+        const isMobileRecipient = recipient?.platformTag === 'Mobile App' || recipient?.channel === 'play' || recipient?.deviceType === 'Mobile App';
+        const storeName = isMobileRecipient ? 'Google Play Store' : 'Microsoft Store';
+        const storeInstructions = isMobileRecipient 
+          ? 'open Google Play on your phone and update your app to the latest version'
+          : 'open the Microsoft Store on your PC and click <strong>Get updates / Update</strong>';
+        
+        return `Hi ${name || 'there'},<br><br>This is Bello, Founder & CEO of Zeneva.<br><br>I noticed you haven't been back to Zeneva in ${timeText}, and I wanted to personally reach out.<br><br>We are constantly improving our platform and we really value the feedback of businesses like yours. To encourage you to give Zeneva another try, I've just granted your account <strong>2 full months of our premium Business Plan completely free</strong>.<br><br>There's no catch, and you don't need to put in a credit card. Just log in, explore the new features, and if you have any feedback or hit any snags, reply directly to this email.<br><br><strong>Important:</strong> We just pushed a major new update to the <strong>${storeName}</strong> with performance upgrades and new features! Please make sure to ${storeInstructions} for the best experience.<br><br>After the 2 months, if you love it, you can choose to continue. I hope to see you back!<br><br>Best,<br>Bello Imam<br>Founder & CEO, Zeneva`;
       }
     },
     {
@@ -450,7 +456,14 @@ export default function FollowUpCenter({
     {
       name: 'Founder Win-Back (Early Adopters)',
       subject: 'Zeneva has evolved. Have 2 Months of Business Plan on us.',
-      body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>This is Bello, the founder of Zeneva.<br><br>I noticed you signed up a while ago, explored the app for a few minutes, but never really got to experience what Zeneva can do for your business.<br><br>Since you last logged in, Zeneva has grown into something much more powerful and is now much better than anything else on the market. We are genuinely trying to solve the problems retail businesses face every day.<br><br>I really want you to give us another try. To make it a no-brainer, I've personally upgraded your account to our highest tier—the <strong>Business Plan</strong>—for <strong>2 full months completely free</strong>. No credit card required.<br><br>Also, we just pushed a major new update to the Microsoft Store, so be sure to update or download the latest version for the best experience.<br><br>Please give it a spin and let me know your thoughts. Your feedback is invaluable in helping us optimize and build exactly what you need. If you ran into any issues last time, just hit reply and I'll personally help you get set up.<br><br>Best,<br>Bello Imam<br>Founder, Zeneva`
+      body: (name: string, recipient: any) => {
+        const isMobileRecipient = recipient?.platformTag === 'Mobile App' || recipient?.channel === 'play' || recipient?.deviceType === 'Mobile App';
+        const storeNotice = isMobileRecipient
+          ? 'Also, we just pushed a major new update to the Google Play Store, so be sure to update your app on your phone for the best experience.'
+          : 'Also, we just pushed a major new update to the Microsoft Store, so be sure to open the Microsoft Store on your PC and click <strong>Get updates</strong> to update your app for the best experience.';
+
+        return `Hi ${name || 'there'},<br><br>This is Bello, Founder & CEO of Zeneva.<br><br>I noticed you signed up a while ago, explored the app for a few minutes, but never really got to experience what Zeneva can do for your business.<br><br>Since you last logged in, Zeneva has grown into something much more powerful and is now much better than anything else on the market. We are genuinely trying to solve the problems retail businesses face every day.<br><br>I really want you to give us another try. To make it a no-brainer, I've personally upgraded your account to our highest tier—the <strong>Business Plan</strong>—for <strong>2 full months completely free</strong>. No credit card required.<br><br>${storeNotice}<br><br>Please give it a spin and let me know your thoughts. Your feedback is invaluable in helping us optimize and build exactly what you need. If you ran into any issues last time, just hit reply and I'll personally help you get set up.<br><br>Best,<br>Bello Imam<br>Founder & CEO, Zeneva`;
+      }
     },
     {
       name: 'Feedback Request',
