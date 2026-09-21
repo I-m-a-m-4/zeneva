@@ -25,6 +25,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { safeToDate, cn } from '@/lib/utils';
 import { apiBase } from '@/lib/platform';
+import { wrapTransactionalEmail } from '@/lib/email-templates';
 import {
   SEGMENT_META,
   segmentCounts,
@@ -447,9 +448,19 @@ export default function FollowUpCenter({
       body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>I see you created an account with Zeneva but haven't added your products yet. I know setting up a new system can take some time, so I wanted to offer my help.<br><br>Do you need any assistance uploading your product list or setting up your initial inventory? I can walk you through the process or even help you import your existing data.<br><br>Just reply to this email and let me know how I can be of assistance.<br><br>Best,<br>Zeneva Team`
     },
     {
+      name: 'Founder Win-Back (Early Adopters)',
+      subject: 'Zeneva has evolved. Have 2 Months of Business Plan on us.',
+      body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>This is Bello, the founder of Zeneva.<br><br>I noticed you signed up a while ago, explored the app for a few minutes, but never really got to experience what Zeneva can do for your business.<br><br>Since you last logged in, Zeneva has grown into something much more powerful and is now much better than anything else on the market. We are genuinely trying to solve the problems retail businesses face every day.<br><br>I really want you to give us another try. To make it a no-brainer, I've personally upgraded your account to our highest tier—the <strong>Business Plan</strong>—for <strong>2 full months completely free</strong>. No credit card required.<br><br>Also, we just pushed a major new update to the Microsoft Store, so be sure to update or download the latest version for the best experience.<br><br>Please give it a spin and let me know your thoughts. Your feedback is invaluable in helping us optimize and build exactly what you need. If you ran into any issues last time, just hit reply and I'll personally help you get set up.<br><br>Best,<br>Bello Imam<br>Founder, Zeneva`
+    },
+    {
       name: 'Feedback Request',
       subject: 'How is Zeneva working out for your business?',
       body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>You've been using Zeneva for a while now, and I wanted to check in and see how everything is going.<br><br>Is the system doing everything you need it to do? We are currently planning our next set of features, and feedback from active business owners like you is incredibly valuable to us.<br><br>If there's anything you'd like to see improved, or a new feature that would make your life easier, please reply and let me know. I read every single response.<br><br>Best,<br>Zeneva Team`
+    },
+    {
+      name: 'Pro User (Low Usage)',
+      subject: 'Getting more out of your Zeneva Pro account',
+      body: (name: string, recipient: any) => `Hi ${name || 'there'},<br><br>This is Bello, the founder of Zeneva.<br><br>I noticed that while you're on our Pro plan, you haven't been fully utilizing all the powerful features available to you. You mostly drop in occasionally to update stock, but Zeneva can do so much more to help streamline your operations and grow your sales.<br><br>I'd love to personally jump on a quick 10-minute call to show you some advanced workflows—like our AI insights, smart merchandising, and automated reporting—that can save you hours every week.<br><br>Are you free sometime this week for a quick chat? Just hit reply and let me know.<br><br>Best,<br>Bello Imam<br>Founder, Zeneva`
     }
   ];
 
@@ -978,7 +989,7 @@ export default function FollowUpCenter({
 
       {/* Compose Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
             <DialogTitle>Send Strategic Follow-Up</DialogTitle>
             <DialogDescription>
@@ -987,7 +998,7 @@ export default function FollowUpCenter({
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2 mb-2 flex-wrap">
               <span className="text-xs font-semibold text-muted-foreground self-center">Templates:</span>
               {templates.map(t => (
                 <Button key={t.name} variant="outline" size="sm" className="text-[10px] h-6" onClick={() => applyTemplate(t)}>
@@ -1001,15 +1012,29 @@ export default function FollowUpCenter({
               <Input value={subject} onChange={e => setSubject(e.target.value)} />
             </div>
 
-            <div className="space-y-2">
-              <Label>Message Body (HTML Supported)</Label>
-              <Textarea 
-                className="min-h-[200px] font-mono text-xs" 
-                value={emailBody} 
-                onChange={e => setEmailBody(e.target.value)} 
-                placeholder="Hi {{name}}..."
-              />
-              <p className="text-[10px] text-muted-foreground">The Zeneva tracking pixel will be automatically appended to provide reach analytics.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Message Body (HTML Supported)</Label>
+                <Textarea 
+                  className="h-[300px] font-mono text-xs" 
+                  value={emailBody} 
+                  onChange={e => setEmailBody(e.target.value)} 
+                  placeholder="Hi {{name}}..."
+                />
+                <p className="text-[10px] text-muted-foreground">The Zeneva tracking pixel will be automatically appended.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Preview</Label>
+                <div className="h-[300px] border rounded-md overflow-hidden bg-white shadow-sm">
+                  <iframe
+                    sandbox=""
+                    referrerPolicy="no-referrer"
+                    srcDoc={emailBody ? wrapTransactionalEmail(emailBody) : '<div style="color:#9ca3af;font-family:sans-serif;padding:20px;text-align:center;">Preview will appear here</div>'}
+                    title="Email Preview"
+                    className="w-full h-full border-0"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

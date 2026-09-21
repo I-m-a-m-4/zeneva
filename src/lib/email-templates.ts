@@ -725,3 +725,82 @@ export function renderForProfile(
     html: renderCampaignEmail(draft, tokens, options),
   };
 }
+
+export function wrapTransactionalEmail(body: string): string {
+  const year = new Date().getFullYear();
+  const socialRow = SOCIAL_LINKS.map(
+    s => `<td style="padding:0 5px;">
+            <a href="${s.href}" style="text-decoration:none;">
+              <img src="${ASSETS}/social-${s.key}.png" width="30" height="30" alt="${s.label}" style="display:block;border:0;outline:none;text-decoration:none;border-radius:15px;" />
+            </a>
+          </td>`
+  ).join('');
+
+  return `<!doctype html>
+<html lang="en" style="margin:0;padding:0;">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<meta name="supported-color-schemes" content="light" />
+<!--[if !mso]><!-->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="${GOOGLE_FONTS_HREF}" rel="stylesheet" />
+<!--<![endif]-->
+<style type="text/css">
+  @import url('${GOOGLE_FONTS_HREF}');
+  body, table, td, p, h1, h2, h3, h4, h5, h6, a { -webkit-font-smoothing:antialiased; }
+  a { text-decoration:none; }
+</style>
+<!--[if mso]>
+<style type="text/css">
+  body, table, td, p, h1, h2, h3, h4, h5, h6, a { font-family:'Segoe UI',Arial,sans-serif !important; }
+</style>
+<![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:${BRAND.page};font-family:${FONT_BODY};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.page}" style="background-color:${BRAND.page};margin:0;padding:0;">
+<tr>
+<td align="center" style="padding:36px 12px;">
+  <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:100%;background-color:${BRAND.card};border:1px solid ${BRAND.line};border-radius:24px;overflow:hidden;font-family:${FONT_BODY};box-shadow:0 4px 24px rgba(0,0,0,0.03);">
+    <!-- Header / Brand Mark -->
+    <tr>
+      <td align="center" style="padding:32px 32px 14px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
+          <tr>
+            <td align="center">
+              <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="68" height="68" style="width:68px;height:68px;display:block;border:0;outline:none;text-decoration:none;object-fit:contain;" />
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <!-- Body -->
+    <tr>
+      <td align="left" style="padding:10px 32px 30px;font-family:${FONT_BODY};color:${BRAND.ink};font-size:16px;line-height:1.7;">
+        ${body}
+      </td>
+    </tr>
+    <!-- Footer -->
+    <tr>
+      <td bgcolor="#0f172a" style="background-color:#0f172a;border-top:3px solid ${BRAND.orange};padding:22px 32px 24px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 14px;">
+          <tr>${socialRow}</tr>
+        </table>
+        <p style="margin:0 0 6px;font-family:${FONT_BODY};font-size:12px;line-height:1.5;color:#94a3b8;">
+          <a href="${BASE_URL}" style="color:${BRAND.orangeDeep};font-weight:600;text-decoration:none;">zeneva.space</a>
+          &nbsp;&middot;&nbsp;
+          <a href="${UNSUBSCRIBE_TOKEN}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a>
+        </p>
+        <p style="margin:0;font-family:${FONT_BODY};font-size:11px;color:#64748b;">
+          &copy; ${year} Zeneva POS &amp; Inventory. All rights reserved.
+        </p>
+      </td>
+    </tr>
+  </table>
+</td>
+</tr>
+</table>
+</body>
+</html>`;
+}

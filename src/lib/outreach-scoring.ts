@@ -28,6 +28,7 @@ import { safeToDate } from '@/lib/utils';
 export type OutreachSegment =
   | 'expired_paid'      // was paying, lapsed — the single best win-back
   | 'trial_ending'      // trial expires within TRIAL_WARN_DAYS
+  | 'quick_dropoff'     // signed up, used briefly (<15 mins), never came back
   | 'power_free'        // heavy free user near a plan cap — the upgrade ask
   | 'onboarding_stalled'// signed up, never really started
   | 'dormant'           // was active, has gone quiet
@@ -205,6 +206,10 @@ export function scoreBusiness(
   const neverTraded = receiptCount === 0;
   const settledIn = daysSinceSignup !== null && daysSinceSignup >= ONBOARDING_GRACE_DAYS;
 
+  const totalUsage = users.reduce((acc, user) => acc + (user.totalUsageSeconds || 0), 0);
+  const droppedQuickly = totalUsage < 900; // less than 15 mins total usage
+  const longGone = daysSinceActive !== null && daysSinceActive >= 60; // over ~2 months
+
   if (expired) {
     segment = 'expired_paid';
     score = 95;
@@ -218,6 +223,11 @@ export function scoreBusiness(
       daysUntilExpiry === 0 ? 'Plan expires today' : `Plan expires in ${daysUntilExpiry} days`,
     );
     if (quiet) reasons.push('Not active recently — renewal at risk');
+  } else if (!paid && droppedQuickly && longGone) {
+    segment = 'quick_dropoff';
+    score = 90; // High priority for win-back
+    reasons.push(`Used for only ${Math.round(totalUsage / 60)} mins total`);
+    reasons.push(`Has not returned in ${daysSinceActive} days`);
   } else if (!paid && isNearCap(productCount, users.length, plan)) {
     segment = 'power_free';
     score = 80;
@@ -276,21 +286,27 @@ export function scoreBusiness(
   };
 }
 
-/** Free-plan account pressing against its product or staff cap. */
+/** Free-plan account showing power user behaviour. */
 function isNearCap(productCount: number, staffCount: number, plan: PlanId): boolean {
   const products = PRODUCT_LIMITS[plan];
   const staff = STAFF_LIMITS[plan];
-  const productPressure = Number.isFinite(products) && productCount >= products * POWER_FREE_USAGE_RATIO;
-  const staffPressure = Number.isFinite(staff) && staffCount >= staff;
+  // If products are unlimited, consider 50+ products as power usage.
+  const productPressure = Number.isFinite(products) 
+    ? productCount >= products * POWER_FREE_USAGE_RATIO 
+    : productCount >= 50;
+  // A solo founder (staffCount = 1) shouldn't trigger staff pressure on a 1-limit plan.
+  const staffPressure = Number.isFinite(staff) && staff > 1 && staffCount >= staff * POWER_FREE_USAGE_RATIO;
   return productPressure || staffPressure;
 }
 
 function capReason(productCount: number, staffCount: number, plan: PlanId): string {
   const products = PRODUCT_LIMITS[plan];
-  if (Number.isFinite(products) && productCount >= products * POWER_FREE_USAGE_RATIO) {
-    return `Using ${productCount} of ${products} products`;
+  if (Number.isFinite(products)) {
+    if (productCount >= products * POWER_FREE_USAGE_RATIO) return `${productCount} products in catalog (limit ${products})`;
+  } else if (productCount >= 50) {
+    return `${productCount} products in catalog (power user)`;
   }
-  return `${staffCount} staff on a ${STAFF_LIMITS[plan]}-seat plan`;
+  return `${staffCount} team members (limit ${STAFF_LIMITS[plan]})`;
 }
 
 /**
@@ -322,6 +338,7 @@ export function segmentCounts(scored: ScoredBusiness[]): Record<OutreachSegment,
   const counts: Record<OutreachSegment, number> = {
     expired_paid: 0,
     trial_ending: 0,
+    quick_dropoff: 0,
     power_free: 0,
     onboarding_stalled: 0,
     dormant: 0,
@@ -345,6 +362,11 @@ export const SEGMENT_META: Record<
   trial_ending: {
     label: 'Expiring soon',
     blurb: `Plan runs out within ${TRIAL_WARN_DAYS} days.`,
+    tone: 'warn',
+  },
+  quick_dropoff: {
+    label: 'Early abandoners',
+    blurb: 'Used for a few minutes months ago and never returned.',
     tone: 'warn',
   },
   power_free: {

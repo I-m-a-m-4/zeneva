@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { adminFirestore } from '@/firebase/admin';
 import { v4 as uuidv4 } from 'uuid';
-import { UNSUBSCRIBE_TOKEN } from '@/lib/email-templates';
+import { UNSUBSCRIBE_TOKEN, wrapTransactionalEmail } from '@/lib/email-templates';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://zeneva.space';
 
@@ -83,43 +83,7 @@ async function hasOptedOutOfMarketing(to: string): Promise<boolean> {
  * fragments and standalone campaign documents alike.
  */
 function wrapInTemplate(body: string): string {
-  const year = new Date().getFullYear();
-  return `
-    <div style="font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-      <div style="background-color: #fcfcfc; padding: 25px; border-bottom: 1px solid #f5f5f5; text-align: center;">
-        <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="60" height="60" style="width: 60px; height: 60px; object-fit: contain; display: inline-block; border: 0;" />
-      </div>
-
-      <div style="padding: 40px 30px; color: #1f2937; line-height: 1.7; font-size: 15px;">
-        ${body}
-      </div>
-
-      <div style="margin: 0 30px; padding: 30px 0; border-top: 1px solid #f0f0f0; font-size: 13px; color: #6b7280;">
-        <p style="margin-bottom: 15px;">Talk soon,<br/><strong>Zeneva Team</strong></p>
-        <p style="margin: 0; font-size: 12px; line-height: 1.5;">
-          <strong>Account Executive</strong><br/>
-          Zeneva POS & Inventory<br/>
-          <a href="https://zeneva.space" style="color: #f97316; text-decoration: none; font-weight: 600;">Launch your workspace →</a>
-        </p>
-      </div>
-
-      <!-- ZENEVA Premium Branded Bar - Orange -->
-      <div style="padding: 0 30px 40px;">
-        <div style="height: 50px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 8px; display: table; width: 100%; border-collapse: separate;">
-          <div style="display: table-cell; vertical-align: middle; text-align: center; color: white; font-weight: 900; letter-spacing: 3px; font-size: 14px; text-transform: capitalize;">
-            Zeneva POS & Inventory
-          </div>
-        </div>
-      </div>
-
-      <div style="background-color: #fffaf0; border-top: 1px solid #ffedd5; padding: 40px 30px; text-align: center; font-size: 11px; color: #7c2d12;">
-        <div style="font-weight: 800; letter-spacing: 0.2em; margin-bottom: 20px; color: #ea580c; font-size: 14px; text-transform: capitalize;">
-          Zeneva POS & Inventory
-        </div>
-        &copy; ${year} Zeneva POS & Inventory. All rights reserved.<br/>
-      </div>
-    </div>
-  `;
+  return wrapTransactionalEmail(body);
 }
 
 /**
