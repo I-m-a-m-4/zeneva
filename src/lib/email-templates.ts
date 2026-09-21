@@ -790,14 +790,39 @@ export function wrapTransactionalEmail(body: string): string {
     </tr>
     <!-- Body -->
     <tr>
-      <td align="left" style="padding:10px 32px 30px;font-family:${FONT_BODY};color:${BRAND.ink};font-size:16px;line-height:1.7;">
+      <td align="left" style="padding:10px 32px 20px;font-family:${FONT_BODY};color:${BRAND.ink};font-size:15px;line-height:1.7;">
         ${body}
+
+        <!-- Sign-off & Account Executive Card -->
+        <hr style="border:0;border-top:1px solid ${BRAND.line};margin:28px 0 20px 0;" />
+        <div style="font-family:${FONT_BODY};font-size:13px;color:#64748b;line-height:1.6;">
+          <p style="margin:0 0 12px;font-size:13px;color:#64748b;">Talk soon,<br/><strong style="color:#1e293b;font-size:14px;">Zeneva Team</strong></p>
+          <p style="margin:0 0 20px;font-size:12px;color:#94a3b8;line-height:1.5;">
+            <strong style="color:#475569;">Account Executive</strong><br/>
+            Zeneva POS &amp; Inventory<br/>
+            <a href="${BASE_URL}/dashboard" style="color:${BRAND.orangeDeep};font-weight:700;text-decoration:none;">Launch your workspace &rarr;</a>
+          </p>
+        </div>
+
+        <!-- Primary Orange Action Button -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 10px;">
+          <tr>
+            <td align="center" bgcolor="${BRAND.orange}" style="background-color:${BRAND.orange};border-radius:12px;text-align:center;">
+              <a href="${BASE_URL}/dashboard" style="display:block;padding:14px 24px;font-family:${FONT_DISPLAY};font-size:16px;font-weight:800;color:#ffffff;text-decoration:none;border-radius:12px;letter-spacing:0.3px;text-align:center;">
+                Zeneva POS &amp; Inventory
+              </a>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
     <!-- Footer -->
     <tr>
-      <td bgcolor="#0f172a" style="background-color:#0f172a;border-top:3px solid ${BRAND.orange};padding:22px 32px 24px;text-align:center;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 14px;">
+      <td bgcolor="#fffcf7" style="background-color:#fffcf7;border-top:1px solid #f3ebd8;padding:24px 32px 28px;text-align:center;">
+        <div style="font-family:${FONT_DISPLAY};font-size:18px;font-weight:800;color:${BRAND.orangeDeep};margin-bottom:10px;letter-spacing:-0.4px;">
+          Zeneva POS &amp; Inventory
+        </div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 10px;">
           <tr>${socialRow}</tr>
         </table>
         <p style="margin:0 0 6px;font-family:${FONT_BODY};font-size:12px;line-height:1.5;color:#94a3b8;">
@@ -805,7 +830,7 @@ export function wrapTransactionalEmail(body: string): string {
           &nbsp;&middot;&nbsp;
           <a href="${UNSUBSCRIBE_TOKEN}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a>
         </p>
-        <p style="margin:0;font-family:${FONT_BODY};font-size:11px;color:#64748b;">
+        <p style="margin:0;font-family:${FONT_BODY};font-size:11px;color:#a8a29e;">
           &copy; ${year} Zeneva POS &amp; Inventory. All rights reserved.
         </p>
       </td>
