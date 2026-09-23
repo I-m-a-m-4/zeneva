@@ -5,7 +5,7 @@ import * as React from 'react';
 import { Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, serverTimestamp, updateDoc, deleteDoc, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, doc, addDoc, serverTimestamp, updateDoc, deleteDoc, where, getDocs, setDoc } from 'firebase/firestore';
 import type { SupportThread, SupportMessage, UserProfile } from '@/types';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNowStrict, isToday, isYesterday } from 'date-fns';
@@ -371,7 +371,11 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
             await addDoc(messagesRef, payload);
 
             const threadRef = doc(firestore, 'supportThreads', thread.id);
-            await updateDoc(threadRef, {
+            await setDoc(threadRef, {
+                userId: thread.userId,
+                userName: thread.userName,
+                userEmail: thread.userEmail || null,
+                subject: thread.subject || 'Support',
                 lastMessage: payload.text,
                 lastMessageSnippet: payload.text,
                 lastMessageAt: serverTimestamp(),
@@ -380,7 +384,8 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                 isReadByAdmin: true,
                 // Mark unread for the user so the sidebar badge lights up on their end.
                 isReadByUser: false,
-            });
+                status: thread.status || 'open',
+            }, { merge: true });
 
             if (thread.userId) {
                 await addDoc(collection(firestore, `users/${thread.userId}/notifications`), {
@@ -429,8 +434,9 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
             setReply('');
             setAttachedImage(null);
             toast({ variant: 'success', title: 'Reply Sent' });
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not send reply.' });
+        } catch (e: any) {
+            console.error("Reply error:", e);
+            toast({ variant: 'destructive', title: 'Error', description: e?.message || 'Could not send reply.' });
         } finally {
             setIsSending(false);
         }
@@ -564,14 +570,20 @@ function ChatDetail({ thread, adminUser, onBack }: { thread: SupportThread, admi
                         });
 
                         const threadRef = doc(firestore, 'supportThreads', thread.id);
-                        await updateDoc(threadRef, {
+                        await setDoc(threadRef, {
+                            userId: thread.userId,
+                            userName: thread.userName,
+                            userEmail: thread.userEmail || null,
+                            subject: thread.subject || 'Support',
                             lastMessage: `🎙️ Voice note (${recordingSeconds}s)`,
                             lastMessageSnippet: `🎙️ Voice note (${recordingSeconds}s)`,
                             lastMessageAt: serverTimestamp(),
                             lastMessageSender: 'admin',
                             lastMessageSenderId: 'admin',
                             isReadByAdmin: true,
-                        });
+                            isReadByUser: false,
+                            status: thread.status || 'open',
+                        }, { merge: true });
 
                         toast({ variant: 'success', title: 'Voice Note Sent' });
                     } catch (e) {

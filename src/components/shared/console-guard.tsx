@@ -38,6 +38,9 @@ export function ConsoleGuard() {
       'some attributes of the server rendered HTML',
       'Hydration failed',
       'Firestore (11.10.0)',
+      'DialogContent requires a DialogTitle',
+      'Missing `Description`',
+      'aria-describedby={undefined}',
       // Firestore transport noise. These are routine when the SDK retries and
       // recovers, so users should never see them - but when the client gets
       // stuck offline on a machine with working internet, they are the only

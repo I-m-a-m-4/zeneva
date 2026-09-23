@@ -60,6 +60,7 @@ export interface CartItem {
     multiplier?: number;
     isPriceOverride?: boolean;
     originalPrice?: number;
+    priceOverrideNote?: string;
     costPriceOverride?: number;
     originalCostPrice?: number;
     addedViaBarcode?: boolean;

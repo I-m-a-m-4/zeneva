@@ -210,7 +210,7 @@ interface POSContextType {
   addToCart: (product: Product, unitName?: string, multiplier?: number, priceOverride?: number, selectedSerialNumber?: string) => void;
   removeFromCart: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
-  updateCartItemPrice: (cartItemId: string, newPrice?: number, newCostPrice?: number) => void;
+  updateCartItemPrice: (cartItemId: string, newPrice?: number, newCostPrice?: number, overrideNote?: string) => void;
   clearCart: () => void;
   selectedCustomer: Customer | null;
   selectCustomer: (customer: Customer | null) => void;
@@ -2278,6 +2278,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
               body: JSON.stringify({ businessId, event: 'inventory.updated', payload: { products: updatedProducts } })
             }).catch(console.error);
+
+            // Dispatch to custom external integration if configured
+            if (business?.settings?.customPushUrl && business?.settings?.customApiKey) {
+              const updates = updatedProducts.map(p => ({
+                id: p.id,
+                stock_quantity: p.stock || 0,
+                stock_status: (p.stock || 0) > 0 ? 'instock' : 'outofstock'
+              }));
+              fetch(business.settings.customPushUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': business.settings.customApiKey },
+                body: JSON.stringify({ updates })
+              }).catch(console.error);
+            }
           }
         } catch (err) { console.error('Webhook dispatch failed', err); }
       };
@@ -3478,7 +3492,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setCart(prev => prev.map(item => (item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId ? { ...item, quantity } : item));
   }, [removeFromCart, cart, toast]);
 
-  const updateCartItemPrice = useCallback((cartItemId: string, newPrice?: number, newCostPrice?: number) => {
+  const updateCartItemPrice = useCallback((cartItemId: string, newPrice?: number, newCostPrice?: number, overrideNote?: string) => {
     setCart(prev => prev.map(item => {
       if ((item.unit ? `${item.product.id}-${item.unit}` : item.product.id) === cartItemId) {
         return {
@@ -3486,6 +3500,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
           isPriceOverride: newPrice !== undefined ? true : item.isPriceOverride,
           product: newPrice !== undefined ? { ...item.product, price: newPrice } : item.product,
           costPriceOverride: newCostPrice,
+          priceOverrideNote: overrideNote,
         };
       }
       return item;

@@ -37,6 +37,7 @@ import {
     Smartphone,
     UserCheck,
     LifeBuoy,
+    Gift,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -170,6 +171,30 @@ function UserDetailContent() {
         }
     };
 
+    const handleGiftPlan = async () => {
+        if (!firestore || !user?.businessId) return;
+        setBusy(true);
+        try {
+            const ref = doc(firestore, 'businessInstances', user.businessId);
+            const expires = new Date();
+            expires.setMonth(expires.getMonth() + 2);
+            await runTransaction(firestore, async (tx) => {
+                tx.update(ref, { 
+                    plan: 'business',
+                    trialExpiresAt: expires,
+                    giftNotificationPending: true,
+                    giftMessage: '2 Months of Zeneva Business Plan on us!'
+                });
+            });
+            toast({ title: 'Plan Gifted', description: `${user.name} has been gifted a 2-month Business Plan.`, variant: 'success' });
+        } catch (e: any) {
+            toast({ title: 'Error', description: e?.message || 'Could not gift plan.', variant: 'destructive' });
+        } finally {
+            setBusy(false);
+            setConfirm(null);
+        }
+    };
+
     if (!userId) {
         return (
             <Card className="p-12 text-center">
@@ -263,6 +288,9 @@ function UserDetailContent() {
                             )}
                             <Button size="sm" variant="destructive" className="gap-1.5" disabled={busy} onClick={() => setConfirm('revoke')}>
                                 <KeyRound className="h-3.5 w-3.5" /> Revoke sessions
+                            </Button>
+                            <Button size="sm" variant="secondary" className="gap-1.5 border border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20" disabled={busy} onClick={handleGiftPlan}>
+                                <Gift className="h-3.5 w-3.5" /> Gift 2-Month Plan
                             </Button>
                         </div>
                     </div>

@@ -161,75 +161,6 @@ function ReportStatCard({ title, value, icon: Icon, description, delta, onClick 
 
 
 
-function getKpiInsight(id: string, data: any, comparison: any, currencySymbol: string) {
-    const pctDelta = comparison?.[id]?.deltaPct;
-    const up = pctDelta !== undefined && pctDelta > 0;
-    const down = pctDelta !== undefined && pctDelta < 0;
-
-    switch (id) {
-        case 'revenue':
-            return {
-                insight: `Revenue shows your top-line business growth. ${up ? 'Your revenue is growing compared to the previous period.' : down ? 'Revenue has declined. Consider running promotions or checking inventory availability.' : ''}`,
-                recommendation: 'Track which days bring in the most revenue and schedule your best staff during those peak times.'
-            };
-        case 'product-revenue':
-            return {
-                insight: `Physical goods account for ${data?.totalRevenue ? ((data.totalProductRevenue / data.totalRevenue) * 100).toFixed(1) : 0}% of your total revenue.`,
-                recommendation: 'Use ABC analysis to identify your top-selling products and ensure they never run out of stock.'
-            };
-        case 'service-revenue':
-            return {
-                insight: `Services typically yield higher margins than physical goods. They currently make up ${data?.totalRevenue ? ((data.totalServiceRevenue / data.totalRevenue) * 100).toFixed(1) : 0}% of your revenue.`,
-                recommendation: 'Consider bundling high-margin services with popular products to increase overall profitability.'
-            };
-        case 'sales':
-            return {
-                insight: `You processed ${data?.totalSales} total transactions in this period. ${up ? 'Transaction volume is up!' : ''}`,
-                recommendation: 'If transaction volume is high but average order value is low, train staff to suggest add-on items at checkout.'
-            };
-        case 'unique-products':
-            return {
-                insight: `You sold ${data?.uniqueProductsSold} different products out of your catalog of ${data?.catalogSize} items.`,
-                recommendation: `${data?.catalogSize > 0 && (data?.uniqueProductsSold / data?.catalogSize) < 0.2 ? 'A small fraction of your catalog is driving sales. Consider discounting or clearing out dead stock.' : 'A healthy mix of products are moving.'}`
-            };
-        case 'units-sold':
-            return {
-                insight: `A total of ${data?.totalItemsSold} items moved through your business. This averages to ${(data?.totalItemsSold / (data?.totalSales || 1)).toFixed(1)} items per transaction.`,
-                recommendation: 'Encourage bundle deals (e.g., "Buy 2 get 1 half price") to increase the number of items per sale.'
-            };
-        case 'daily-velocity':
-            return {
-                insight: `You are averaging ${data?.dailyAverageSales?.toFixed(1)} sales transactions per day.`,
-                recommendation: 'Identify your slowest days of the week and run "flash sales" exclusively on those days to smooth out velocity.'
-            };
-        case 'daily-revenue':
-            return {
-                insight: `Your business brings in an average of ${currencySymbol}${data?.dailyAverageRevenue?.toLocaleString(undefined, { maximumFractionDigits: 0 })} every day.`,
-                recommendation: 'Use this daily average to set realistic daily sales targets and motivate your team.'
-            };
-        case 'catalog-size':
-            return {
-                insight: `You have ${data?.catalogSize} unique products tracked in your system.`,
-                recommendation: 'Large catalogs tie up capital. Review the "Dead Stock Analysis" to find items that haven\'t sold in 60+ days.'
-            };
-        case 'avg-order':
-            return {
-                insight: `Customers spend an average of ${currencySymbol}${data?.averageOrderValue?.toLocaleString(undefined, { maximumFractionDigits: 0 })} per visit.`,
-                recommendation: 'Increasing average order value is the most cost-effective way to grow. Position impulse-buy items near the checkout.'
-            };
-        case 'customers':
-            return {
-                insight: `You saw ${data?.buyersInRange} unique purchasing customers out of a total database of ${data?.totalCustomers}.`,
-                recommendation: 'It costs 5x more to acquire a new customer than retain an existing one. Consider reaching out to customers who haven\'t bought recently.'
-            };
-        default:
-            return {
-                insight: 'Tracking this metric over time will give you a clearer picture of your business health.',
-                recommendation: 'Compare this metric across different seasons to identify cyclical trends.'
-            };
-    }
-}
-
 function DataInsightModalContent({
     insightModal,
     reportBatchReceipts,
@@ -254,39 +185,89 @@ function DataInsightModalContent({
         setPage(0);
     }, [insightModal?.id]);
 
-    const activeInsight = insightModal ? getKpiInsight(insightModal.id, finalReportData, comparison, currencySymbol || '$') : null;
-
     let tableContent = null;
     let totalItems = 0;
+    
+    let tableHeaders: string[] = [];
+    let tableRows: React.ReactNode[] = [];
 
-    if (insightModal?.id === 'sales') {
-        const sorted = [...reportBatchReceipts].sort((a, b) => safeToDate(b.createdAt).getTime() - safeToDate(a.createdAt).getTime());
-        totalItems = sorted.length;
-        const pageData = sorted.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+    const formatCurrency = (val: number) => `${currencySymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+    if (insightModal?.id === 'revenue') {
+        const dayMap = new Map<string, number>();
+        reportBatchReceipts.forEach(r => {
+            const dateStr = format(safeToDate(r.createdAt), 'yyyy-MM-dd');
+            dayMap.set(dateStr, (dayMap.get(dateStr) || 0) + r.total);
+        });
+        const dayList = Array.from(dayMap.entries()).sort((a, b) => b[1] - a[1]);
+        totalItems = dayList.length;
+        const pageData = dayList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableHeaders = ['Day', 'Total Revenue'];
+        tableRows = pageData.map(([day, total], idx) => (
+            <TableRow key={idx}>
+                <TableCell className="font-medium text-xs">{format(new Date(day), 'EEEE, MMM do')}</TableCell>
+                <TableCell className="text-right text-xs font-medium text-primary">{formatCurrency(total)}</TableCell>
+            </TableRow>
+        ));
+    } else if (insightModal?.id === 'net-cost') {
+        const costMap = new Map<string, {name: string, totalCost: number}>();
+        reportBatchReceipts.forEach(r => {
+            (r.items || []).forEach(item => {
+                const existing = costMap.get(item.productId) || { name: item.name, totalCost: 0 };
+                existing.totalCost += (item.costPrice || 0) * item.quantity;
+                costMap.set(item.productId, existing);
+            });
+        });
+        const costList = Array.from(costMap.values()).sort((a, b) => b.totalCost - a.totalCost);
+        totalItems = costList.length;
+        const pageData = costList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableHeaders = ['Product', 'Total COGS'];
+        tableRows = pageData.map((item, idx) => (
+            <TableRow key={idx}>
+                <TableCell className="font-medium text-xs truncate max-w-[120px]" title={item.name}>{item.name}</TableCell>
+                <TableCell className="text-right text-xs font-medium text-destructive">{formatCurrency(item.totalCost)}</TableCell>
+            </TableRow>
+        ));
+    } else if (insightModal?.id === 'net-profit') {
+        const rev = finalReportData?.totalRevenue ?? 0;
+        const cogs = finalReportData?.totalCost ?? 0;
+        const profit = finalReportData?.totalProfit ?? 0;
+        const deductions = rev - cogs - profit;
+        
         tableContent = (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full gap-4">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Receipt</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead>Component</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {pageData.map(r => (
-                            <TableRow key={r.id}>
-                                <TableCell className="font-medium text-xs">{r.receiptNumber || r.id.substring(0,8)}</TableCell>
-                                <TableCell className="text-xs">{format(safeToDate(r.createdAt), 'MMM d, h:mm a')}</TableCell>
-                                <TableCell className="text-right text-xs font-medium">{currencySymbol}{r.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                            </TableRow>
-                        ))}
+                        <TableRow>
+                            <TableCell className="font-medium text-xs">Gross Revenue</TableCell>
+                            <TableCell className="text-right text-xs text-emerald-600">+{formatCurrency(rev)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell className="font-medium text-xs">Cost of Goods (COGS)</TableCell>
+                            <TableCell className="text-right text-xs text-destructive">-{formatCurrency(cogs)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell className="font-medium text-xs">Expenses & Discounts</TableCell>
+                            <TableCell className="text-right text-xs text-destructive">-{formatCurrency(deductions)}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-t-2 bg-primary/5">
+                            <TableCell className="font-bold text-xs">Net Profit</TableCell>
+                            <TableCell className="text-right text-xs font-bold text-primary">{formatCurrency(profit)}</TableCell>
+                        </TableRow>
                     </TableBody>
                 </Table>
             </div>
         );
-    } else if (insightModal?.id === 'unique-products') {
+        totalItems = 1; 
+    } else if (insightModal?.id === 'product-revenue' || insightModal?.id === 'service-revenue' || insightModal?.id === 'unique-products' || insightModal?.id === 'units-sold') {
         const itemMap = new Map<string, {name: string, qty: number, total: number}>();
         reportBatchReceipts.forEach(r => {
             (r.items || []).forEach(item => {
@@ -296,32 +277,33 @@ function DataInsightModalContent({
                 itemMap.set(item.productId, existing);
             });
         });
-        const itemsList = Array.from(itemMap.values()).sort((a, b) => b.total - a.total);
+        
+        const sortByQty = insightModal?.id === 'units-sold';
+        const itemsList = Array.from(itemMap.values()).sort((a, b) => sortByQty ? (b.qty - a.qty) : (b.total - a.total));
         totalItems = itemsList.length;
         const pageData = itemsList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
-        tableContent = (
-            <div className="flex flex-col h-full">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Qty Sold</TableHead>
-                            <TableHead className="text-right">Revenue</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {pageData.map((item, idx) => (
-                            <TableRow key={idx}>
-                                <TableCell className="font-medium text-xs truncate max-w-[120px]" title={item.name}>{item.name}</TableCell>
-                                <TableCell className="text-xs">{item.qty}</TableCell>
-                                <TableCell className="text-right text-xs font-medium">{currencySymbol}{item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
-        );
+        tableHeaders = ['Product', 'Qty Sold', 'Revenue'];
+        tableRows = pageData.map((item, idx) => (
+            <TableRow key={idx}>
+                <TableCell className="font-medium text-xs truncate max-w-[120px]" title={item.name}>{item.name}</TableCell>
+                <TableCell className="text-xs">{item.qty}</TableCell>
+                <TableCell className="text-right text-xs font-medium text-primary">{formatCurrency(item.total)}</TableCell>
+            </TableRow>
+        ));
+    } else if (insightModal?.id === 'sales' || insightModal?.id === 'avg-order') {
+        const sorted = [...reportBatchReceipts].sort((a, b) => b.total - a.total);
+        totalItems = sorted.length;
+        const pageData = sorted.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableHeaders = ['Receipt', 'Date', 'Total'];
+        tableRows = pageData.map(r => (
+            <TableRow key={r.id}>
+                <TableCell className="font-medium text-xs">{r.receiptNumber || r.id.substring(0,8)}</TableCell>
+                <TableCell className="text-xs">{format(safeToDate(r.createdAt), 'MMM d, h:mm a')}</TableCell>
+                <TableCell className="text-right text-xs font-medium text-primary">{formatCurrency(r.total)}</TableCell>
+            </TableRow>
+        ));
     } else if (insightModal?.id === 'customers') {
         const customerMap = new Map<string, {name: string, phone: string, spent: number}>();
         reportBatchReceipts.forEach(r => {
@@ -335,24 +317,71 @@ function DataInsightModalContent({
         totalItems = custList.length;
         const pageData = custList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
+        tableHeaders = ['Customer', 'Phone', 'Spent'];
+        tableRows = pageData.map((c, idx) => (
+            <TableRow key={idx}>
+                <TableCell className="font-medium text-xs truncate max-w-[120px]">{c.name}</TableCell>
+                <TableCell className="text-xs">{c.phone || '-'}</TableCell>
+                <TableCell className="text-right text-xs font-medium text-primary">{formatCurrency(c.spent)}</TableCell>
+            </TableRow>
+        ));
+    } else if (insightModal?.id === 'daily-velocity' || insightModal?.id === 'daily-revenue') {
+        const dayMap = new Map<string, number>();
+        reportBatchReceipts.forEach(r => {
+            const dayOfWeek = format(safeToDate(r.createdAt), 'EEEE');
+            dayMap.set(dayOfWeek, (dayMap.get(dayOfWeek) || 0) + 1);
+        });
+        const dayList = Array.from(dayMap.entries()).sort((a, b) => b[1] - a[1]);
+        totalItems = dayList.length;
+        const pageData = dayList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableHeaders = ['Day of Week', 'Transactions'];
+        tableRows = pageData.map(([day, count], idx) => (
+            <TableRow key={idx}>
+                <TableCell className="font-medium text-xs">{day}</TableCell>
+                <TableCell className="text-right text-xs font-medium text-primary">{count}</TableCell>
+            </TableRow>
+        ));
+    } else if (insightModal?.id === 'catalog-size') {
+        const itemMap = new Map<string, {name: string, qty: number}>();
+        reportBatchReceipts.forEach(r => {
+            (r.items || []).forEach(item => {
+                const existing = itemMap.get(item.productId) || { name: item.name, qty: 0 };
+                existing.qty += item.quantity;
+                itemMap.set(item.productId, existing);
+            });
+        });
+        const deadStock: {name: string}[] = [];
+        products.forEach(p => {
+            if (!itemMap.has(p.id)) {
+                deadStock.push({ name: p.name });
+            }
+        });
+        
+        totalItems = deadStock.length;
+        const pageData = deadStock.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableHeaders = ['Unsold Products (Dead Stock)'];
+        tableRows = pageData.map((item, idx) => (
+            <TableRow key={idx}>
+                <TableCell className="font-medium text-xs text-muted-foreground">{item.name}</TableCell>
+            </TableRow>
+        ));
+    }
+
+    if (!tableContent && tableHeaders.length > 0) {
         tableContent = (
             <div className="flex flex-col h-full">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead className="text-right">Spent</TableHead>
+                            {tableHeaders.map((th, i) => (
+                                <TableHead key={i} className={i === tableHeaders.length - 1 && tableHeaders.length > 1 ? "text-right" : ""}>{th}</TableHead>
+                            ))}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {pageData.map((c, idx) => (
-                            <TableRow key={idx}>
-                                <TableCell className="font-medium text-xs truncate max-w-[120px]">{c.name}</TableCell>
-                                <TableCell className="text-xs">{c.phone || '-'}</TableCell>
-                                <TableCell className="text-right text-xs font-medium">{currencySymbol}{c.spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                            </TableRow>
-                        ))}
+                        {tableRows}
                     </TableBody>
                 </Table>
             </div>
@@ -360,38 +389,24 @@ function DataInsightModalContent({
     }
 
     const totalPages = Math.ceil(totalItems / rowsPerPage);
-    const hasData = ['sales', 'unique-products', 'customers'].includes(insightModal?.id || '');
+    const hasData = totalItems > 0;
 
     return (
-        <div className={cn("py-4", hasData ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "space-y-4")}>
-            <div className="space-y-4 flex flex-col">
-                <div className="text-3xl font-bold text-primary">{insightModal?.value}</div>
-                <p className="text-muted-foreground text-sm">{insightModal?.description}</p>
-                {activeInsight && (
-                    <div className="bg-muted p-4 rounded-lg flex flex-col gap-3 mt-auto">
-                        <div className="flex items-start gap-3">
-                            <Bot className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                            <p className="text-sm">{activeInsight.insight}</p>
-                        </div>
-                        <div className="flex items-start gap-3 border-t border-border pt-3">
-                            <Sparkles className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
-                            <p className="text-sm font-medium">{activeInsight.recommendation}</p>
-                        </div>
-                    </div>
-                )}
+        <div className="py-4 space-y-6">
+            <div className="space-y-2 flex flex-col items-center justify-center text-center p-4 bg-muted/20 rounded-xl border border-border/50">
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{insightModal?.title}</h4>
+                <div className="text-4xl font-bold text-primary">{insightModal?.value}</div>
+                <p className="text-muted-foreground text-xs mt-2 max-w-sm">{insightModal?.description}</p>
             </div>
 
-            {hasData && (
-                <div className="flex flex-col border rounded-lg bg-card overflow-hidden">
-                    <div className="p-3 bg-muted/50 border-b text-sm font-medium">
-                        Raw Data {totalItems > 0 ? `(${totalItems})` : ''}
+            {hasData ? (
+                <div className="flex flex-col border rounded-lg bg-card overflow-hidden shadow-sm">
+                    <div className="p-3 bg-muted/50 border-b text-sm font-medium flex items-center gap-2">
+                        <BarChart2 className="h-4 w-4 text-primary" />
+                        Data Breakdown {totalItems > 1 ? `(${totalItems})` : ''}
                     </div>
-                    <div className="flex-1 overflow-auto min-h-[220px]">
-                        {totalItems > 0 ? tableContent : (
-                            <div className="h-full flex items-center justify-center text-sm text-muted-foreground p-4">
-                                No raw data found for this period.
-                            </div>
-                        )}
+                    <div className="flex-1 overflow-auto min-h-[150px]">
+                        {tableContent}
                     </div>
                     {totalPages > 1 && (
                         <div className="p-2 border-t flex items-center justify-between bg-muted/20">
@@ -416,6 +431,10 @@ function DataInsightModalContent({
                             </Button>
                         </div>
                     )}
+                </div>
+            ) : (
+                <div className="p-8 text-center bg-muted/20 border rounded-lg border-dashed">
+                    <p className="text-sm text-muted-foreground">No transaction data available for this breakdown.</p>
                 </div>
             )}
         </div>
@@ -988,7 +1007,7 @@ export default function ReportsDashboard() {
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-grow">
                 <div className="flex flex-wrap items-center justify-between gap-4 no-capture border-b pb-4 mb-6">
-                    <TabsList className="flex flex-col md:grid md:grid-cols-4 w-full md:w-[650px] h-auto gap-1">
+                    <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x no-scrollbar md:w-[650px] h-auto gap-1">
                         <TabsTrigger value="analytics" className="text-sm font-semibold w-full">{t('reports.tabAnalytics')}</TabsTrigger>
                         <TabsTrigger value="profit-loss" className="text-sm font-semibold w-full">{t('reports.tabProfitLoss')}</TabsTrigger>
                         <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">{t('reports.tabDailySales')}</TabsTrigger>
@@ -1041,7 +1060,7 @@ export default function ReportsDashboard() {
                     <>
                         <TabsContent value="analytics" className="space-y-6 mt-0">
                             <Dialog open={!!insightModal} onOpenChange={(open) => !open && setInsightModal(null)}>
-                                <DialogContent className={['sales', 'unique-products', 'customers'].includes(insightModal?.id || '') ? "max-w-4xl" : ""}>
+                                <DialogContent className={['sales', 'unique-products', 'customers', 'net-profit'].includes(insightModal?.id || '') ? "max-w-4xl" : ""}>
                                     <DialogHeader>
                                         <DialogTitle>{insightModal?.title} Insights</DialogTitle>
                                     </DialogHeader>
@@ -1086,10 +1105,12 @@ export default function ReportsDashboard() {
                                     icon={Coins}
                                     description={`${t('reports.kpiNetProfitHint')} (Click for analysis)`}
                                     delta={comparison?.profit}
-                                    onClick={() => {
-                                        setActiveTab('profit-loss');
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
+                                    onClick={() => setInsightModal({
+                                        id: 'net-profit',
+                                        title: t('reports.kpiNetProfit'),
+                                        value: `${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        description: 'Breakdown of how your net profit is calculated.'
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiProductRevenue')}

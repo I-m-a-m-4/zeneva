@@ -893,7 +893,7 @@ function SettingsPageContent() {
             <PageTitle title={t('settings.title')} subtitle={t('settings.pageSubtitle')} />
 
             <Tabs defaultValue="general" className="space-y-6">
-                <TabsList className="w-full flex-wrap justify-start h-auto bg-transparent p-0 gap-2 mb-4 border-b pb-4">
+                <TabsList className="w-full flex justify-start overflow-x-auto overflow-y-hidden snap-x no-scrollbar h-auto bg-transparent p-0 gap-2 mb-4 border-b pb-4">
                     <TabsTrigger value="general" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabGeneral')}</TabsTrigger>
                     <TabsTrigger value="storefront" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabStorefront')}</TabsTrigger>
                     <TabsTrigger value="financials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabFinancialsBilling')}</TabsTrigger>

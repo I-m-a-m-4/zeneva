@@ -98,6 +98,7 @@ import { collection, doc, writeBatch, serverTimestamp, query, where, orderBy, li
 import type { Product, UserProfile } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import SmartImportDialog from '@/components/inventory/smart-import/smart-import-dialog';
+import { ProductStockHistoryChart } from '@/components/inventory/product-stock-history-chart';
 import CostPriceDialog from '@/components/inventory/cost-price-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -308,6 +309,7 @@ function InventoryPageContent() {
   } = usePOS();
 
   const [viewLayout, setViewLayout] = React.useState<'list' | 'grid'>('list');
+  const [stockHistoryProductId, setStockHistoryProductId] = React.useState<string | null>(null);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [isCostPriceOpen, setIsCostPriceOpen] = React.useState(false);
   const [selectedProductIds, setSelectedProductIds] = React.useState<string[]>([]);
@@ -1101,6 +1103,33 @@ function InventoryPageContent() {
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" variant="outline" className="h-9 gap-1.5 font-medium border-border/80 hover:bg-muted hover:text-foreground transition-colors">
+                    <Box className="h-3.5 w-3.5 text-primary" />
+                    <span className="sm:whitespace-nowrap">Tools</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-md">
+                  <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                    Management Tools
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setIsCostPriceOpen(true)} className="flex items-center gap-2.5 p-2 cursor-pointer rounded-md focus:bg-primary/10 focus:text-primary group">
+                    <Coins className="h-4 w-4 text-muted-foreground group-focus:text-primary transition-colors" />
+                    <span className="font-medium text-xs">Cost Prices</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="flex items-center gap-2.5 p-2 cursor-pointer rounded-md focus:bg-primary/10 focus:text-primary group">
+                    <Link href="/inventory/debts" className="flex items-center gap-2.5 w-full">
+                      <TrendingDown className="h-4 w-4 text-muted-foreground group-focus:text-primary transition-colors" />
+                      <span className="font-medium text-xs">{t('inventory.manageDebts')}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {canManageStock && (
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-9 gap-1.5 font-medium border-border/80 hover:bg-muted hover:text-foreground transition-colors">
                     <Truck className="h-3.5 w-3.5 text-primary" />
                     <span className="sm:whitespace-nowrap">Restock & Orders</span>
                     <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -1315,7 +1344,7 @@ function InventoryPageContent() {
 
       <div className="w-full mb-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:max-w-2xl">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden no-scrollbar">
             <TabsTrigger value="all">{t('inventory.tabAllProducts')}</TabsTrigger>
             <TabsTrigger value="health" className="flex items-center gap-1.5">
               {t('inventory.tabHealth')}
@@ -1345,8 +1374,8 @@ function InventoryPageContent() {
               <h2 className="text-lg font-bold tracking-tight">Inventory Analytics & Insights</h2>
               <p className="text-xs text-muted-foreground">Deep dive into stock valuation, movement trends, category distribution, and restock priorities.</p>
             </div>
-            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border text-xs">
-              <span className="text-[11px] font-semibold text-muted-foreground px-2">Period:</span>
+            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border text-xs w-full sm:w-auto overflow-x-auto no-scrollbar">
+              <span className="text-[11px] font-semibold text-muted-foreground px-2 whitespace-nowrap">Period:</span>
               {[
                 { id: '30d', label: '30 Days' },
                 { id: '90d', label: '90 Days' },
@@ -1358,7 +1387,7 @@ function InventoryPageContent() {
                   key={p.id}
                   onClick={() => setAnalyticsPeriod(p.id as any)}
                   className={cn(
-                    "px-3 py-1.5 rounded-md font-medium transition-all",
+                    "px-3 py-1.5 rounded-md font-medium transition-all whitespace-nowrap",
                     analyticsPeriod === p.id 
                       ? "bg-background text-foreground shadow-sm font-semibold" 
                       : "text-muted-foreground hover:text-foreground"
@@ -1806,6 +1835,15 @@ function InventoryPageContent() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!stockHistoryProductId} onOpenChange={(open) => !open && setStockHistoryProductId(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('inventory.stockHistory')}</DialogTitle>
+          </DialogHeader>
+          {stockHistoryProductId && <ProductStockHistoryChart productId={stockHistoryProductId} />}
+        </DialogContent>
+      </Dialog>
+
       {activeTab === 'health' && displayedProducts.length > 0 && (
         <div className="bg-gradient-to-r from-amber-500/10 via-primary/10 to-blue-500/10 border border-primary/20 rounded-xl p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-center gap-3">
@@ -2108,6 +2146,9 @@ function InventoryPageContent() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => setQuickRestockProduct(product)}>
                                   <PackagePlus className="me-2 h-4 w-4" /> Quick Restock
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setStockHistoryProductId(product.id)}>
+                                  <Activity className="me-2 h-4 w-4" /> View Stock History
                                 </DropdownMenuItem>
                               </>
                             )}

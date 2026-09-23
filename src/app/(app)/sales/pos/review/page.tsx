@@ -219,6 +219,7 @@ function ReviewPageContent() {
                  */
                 priceOverridden: !!cartItem.isPriceOverride,
                 listPrice: masterProduct?.price ?? cartItem.originalPrice ?? finalPrice,
+                priceOverrideNote: cartItem.priceOverrideNote,
             };
         });
 

@@ -14,15 +14,17 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Loader2, PackageOpen } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useI18n } from '@/context/i18n-context';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function ProductStockHistoryChart({ productId }: { productId: string }) {
     const { business, firestore } = usePOS();
     const { t } = useI18n();
     const [transactions, setTransactions] = React.useState<InventoryTransaction[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [activeTab, setActiveTab] = React.useState<'both' | 'in' | 'out'>('both');
 
     React.useEffect(() => {
         if (!business?.id || !firestore || !productId) {
@@ -56,47 +58,100 @@ export function ProductStockHistoryChart({ productId }: { productId: string }) {
 
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center h-64 border rounded-lg bg-muted/20 border-dashed">
+            <div className="flex justify-center items-center h-64 border rounded-lg bg-muted/20 border-dashed mt-4">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
         );
     }
 
-    if (transactions.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center h-64 border rounded-lg bg-muted/20 border-dashed">
-                <PackageOpen className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-                <h3 className="text-lg font-medium">No Stock History</h3>
-                <p className="text-sm text-muted-foreground mt-1">Stock adjustments and sales will appear here.</p>
-            </div>
-        );
+    // Process data for the chart (last 15 days)
+    const chartData: { date: string; inflow: number; outflow: number }[] = [];
+    for (let i = 14; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = format(d, 'dd MMM');
+        chartData.push({
+            date: dateStr,
+            inflow: 0,
+            outflow: 0
+        });
     }
 
-    // Process data for the chart
-    const chartData = transactions.map((tx) => {
-        return {
-            date: tx.date?.seconds ? format(new Date(tx.date.seconds * 1000), 'dd MMM HH:mm') : '',
-            rawDate: tx.date?.seconds ? new Date(tx.date.seconds * 1000) : new Date(),
-            stock: tx.closingStock !== undefined ? tx.closingStock : 0,
-            type: tx.type,
-            quantity: tx.quantity
-        };
+    let totalInflow = 0;
+    let totalOutflow = 0;
+
+    transactions.forEach((tx) => {
+        if (tx.date?.seconds) {
+            const txDate = new Date(tx.date.seconds * 1000);
+            const dateStr = format(txDate, 'dd MMM');
+            const dayData = chartData.find(d => d.date === dateStr);
+            const isAddition = tx.type === 'in' || tx.type === 'return' || (tx.type === 'adjustment' && tx.quantity > 0);
+            
+            if (isAddition) {
+                totalInflow += Math.abs(tx.quantity);
+                if (dayData) dayData.inflow += Math.abs(tx.quantity);
+            } else {
+                totalOutflow += Math.abs(tx.quantity);
+                if (dayData) dayData.outflow += Math.abs(tx.quantity);
+            }
+        }
     });
 
+    const hasData = totalInflow > 0 || totalOutflow > 0;
+
     return (
-        <Card className="shadow-sm border-primary/10">
-            <CardHeader className="pb-4">
-                <CardTitle className="text-base font-semibold">Cumulative Stock History</CardTitle>
-                <CardDescription>Track inventory levels over time for this product</CardDescription>
+        <Card className="shadow-sm border-primary/10 mt-4">
+            <CardHeader className="pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <CardTitle className="text-base font-semibold">Item Inflow and Outflow</CardTitle>
+                        <CardDescription>Track daily stock movement</CardDescription>
+                    </div>
+                    <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full sm:w-[300px]">
+                        <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="both">Both</TabsTrigger>
+                            <TabsTrigger value="in">Inflow</TabsTrigger>
+                            <TabsTrigger value="out">Outflow</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
             </CardHeader>
             <CardContent>
-                <div className="h-[300px] w-full mt-4">
+                <div className="flex gap-8 mb-6 mt-2">
+                    <div className="flex flex-col">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+                            Inflow
+                        </div>
+                        <div className="text-2xl font-bold mt-1">{totalInflow}</div>
+                    </div>
+                    <div className="flex flex-col">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="w-3 h-3 rounded-full bg-[#f43f5e]"></div>
+                            Outflow
+                        </div>
+                        <div className="text-2xl font-bold mt-1">{totalOutflow}</div>
+                    </div>
+                </div>
+
+                <div className="h-[300px] w-full relative">
+                    {!hasData && (
+                        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                            <div className="bg-background/80 px-4 py-2 rounded-lg text-sm text-muted-foreground font-medium backdrop-blur-sm border">
+                                No item movement in the selected date range
+                            </div>
+                        </div>
+                    )}
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
-                                <linearGradient id="colorStock" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                <linearGradient id="colorInflow" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                </linearGradient>
+                                <linearGradient id="colorOutflow" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" opacity={0.5} />
@@ -106,7 +161,6 @@ export function ProductStockHistoryChart({ productId }: { productId: string }) {
                                 tickLine={false} 
                                 tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                                 dy={10}
-                                minTickGap={30}
                             />
                             <YAxis 
                                 axisLine={false} 
@@ -115,44 +169,15 @@ export function ProductStockHistoryChart({ productId }: { productId: string }) {
                                 allowDecimals={false}
                             />
                             <Tooltip
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                        const data = payload[0].payload;
-                                        const isPositive = data.quantity > 0 || data.type === 'in' || data.type === 'return';
-                                        return (
-                                            <div className="bg-background border rounded-lg shadow-md p-3 text-sm flex flex-col gap-1.5 min-w-[150px]">
-                                                <div className="font-medium text-foreground mb-1">{data.date}</div>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-muted-foreground capitalize">Action:</span>
-                                                    <span className="font-medium capitalize">{data.type}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-muted-foreground">Change:</span>
-                                                    <span className={`font-semibold ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                        {isPositive ? '+' : ''}{data.quantity}
-                                                    </span>
-                                                </div>
-                                                <div className="h-px bg-border my-0.5"></div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-muted-foreground text-xs font-medium">Closing Stock:</span>
-                                                    <span className="font-bold">{data.stock}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                }}
+                                cursor={{ fill: 'hsl(var(--muted))', opacity: 0.2 }}
+                                contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                             />
-                            <Area
-                                type="linear"
-                                dataKey="stock"
-                                stroke="hsl(var(--primary))"
-                                strokeWidth={2}
-                                fillOpacity={1}
-                                fill="url(#colorStock)"
-                                animationDuration={1000}
-                                activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(var(--primary))" }}
-                            />
+                            {(activeTab === 'both' || activeTab === 'in') && (
+                                <Area type="linear" dataKey="inflow" name="Inflow" stroke="#10b981" fill="url(#colorInflow)" strokeWidth={2} activeDot={{ r: 6 }} />
+                            )}
+                            {(activeTab === 'both' || activeTab === 'out') && (
+                                <Area type="linear" dataKey="outflow" name="Outflow" stroke="#f43f5e" fill="url(#colorOutflow)" strokeWidth={2} activeDot={{ r: 6 }} />
+                            )}
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

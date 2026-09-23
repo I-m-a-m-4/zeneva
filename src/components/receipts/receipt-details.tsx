@@ -187,6 +187,11 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                                                 </span>
                                             )}
                                         </p>
+                                        {showAdminDetails && item.priceOverridden && item.priceOverrideNote && (
+                                            <p className="text-gray-500 text-[8px] italic mt-0.5 no-print leading-tight">
+                                                Note: {item.priceOverrideNote}
+                                            </p>
+                                        )}
                                         <p className="text-gray-500 text-[9px] mt-0.5">
                                             {item.quantity} x {showAdminDetails && item.priceOverridden && item.listPrice && item.listPrice !== item.price ? (
                                                 <span className="line-through mr-1 no-print">{currencySymbol}{item.listPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

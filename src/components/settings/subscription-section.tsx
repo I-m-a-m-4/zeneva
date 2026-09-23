@@ -540,6 +540,11 @@ export default function SubscriptionSection({ userProfile, businessInstance }: {
                                         {currency === 'NGN' ? '₦' : '$'}{displayBasePrice.toLocaleString()}
                                     </span>
                                     <span className="text-muted-foreground ml-1">/ month</span>
+                                    {isCurrentPlan && businessInstance?.trialExpiresAt && (
+                                        <div className="mt-2 text-xs font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-md inline-block">
+                                            Active until: {format(safeToDate(businessInstance.trialExpiresAt) || new Date(), 'MMM dd, yyyy')}
+                                        </div>
+                                    )}
 
                                 </CardDescription>
                             </CardHeader>

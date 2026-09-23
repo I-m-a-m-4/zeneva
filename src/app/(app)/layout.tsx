@@ -34,6 +34,7 @@ import { formatDistanceToNow } from 'date-fns';
 import Calculator from '@/components/shared/calculator';
 import ZenAIWidget from '@/components/shared/zen-ai-widget';
 import { FeatureUpdateModal } from '@/components/shared/feature-update-modal';
+import { GiftModal } from '@/components/shared/gift-modal';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate, getCountryFromIP } from '@/lib/utils';
@@ -1437,6 +1438,7 @@ export default function AuthenticatedLayout({
             className="relative flex h-full w-full overflow-hidden high-fidelity-shell"
           >
             <PageTracker />
+            <GiftModal />
             <Confetti trigger={isConfettiActive} onComplete={handleConfettiComplete} />
             <Sidebar collapsible="icon" className="flex-col bg-sidebar border-r no-print overflow-hidden">
               <SidebarHeader className="p-2 flex items-center gap-2 justify-center">
@@ -1838,7 +1840,7 @@ export default function AuthenticatedLayout({
                   // and its history rail scroll, the page frame does not.
                   isFullBleedRoute
                     ? "overflow-hidden"
-                    : "overflow-y-auto p-4 sm:p-6 md:pb-6 smooth-scroll"
+                    : "overflow-y-auto p-2 sm:p-2 md:pb-2 smooth-scroll"
                 )}
               >
                 <div className={cn("w-full transition-all duration-700", isFullBleedRoute ? "h-full" : "min-h-full pb-32 md:pb-0", showSubscriptionBlock && "blur-md pointer-events-none select-none opacity-40 scale-[0.98]")}>

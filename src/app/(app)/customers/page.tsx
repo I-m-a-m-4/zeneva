@@ -655,7 +655,7 @@ export default function CustomersPage() {
         */}
       <div className="w-full mb-4">
         <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'all' | 'health' | 'analytics')} className="w-full md:max-w-lg">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden no-scrollbar">
             <TabsTrigger value="all">All customers</TabsTrigger>
             <TabsTrigger value="health" className="flex items-center gap-1.5">
               Health

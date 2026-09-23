@@ -2,9 +2,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock, Shirt, Smartphone, Pill, Coffee } from "lucide-react";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock, Shirt, Smartphone, Pill, Coffee, GripVertical } from "lucide-react";
 import { CachedImage } from "@/components/shared/cached-image";
 import Link from "next/link";
 import * as React from "react";
@@ -73,7 +74,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     return (
         <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
             <CardContent
-                className="p-4 relative h-44 w-full bg-muted/20 flex items-center justify-center cursor-zoom-in"
+                className="relative aspect-square cursor-pointer bg-muted/30 p-2 flex items-center justify-center group overflow-hidden"
                 onClick={() => product.imageUrl && onPreview(product.imageUrl, product.name)}
             >
                 {product.imageUrl ? (
@@ -209,16 +210,23 @@ ProductItem.displayName = 'ProductItem';
 const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeFromCart, updateCartItemPrice, t, allowPosPriceOverride }: any) => {
     const [isEditingPrice, setIsEditingPrice] = React.useState(false);
     const [editSalePrice, setEditSalePrice] = React.useState(item.product.price.toString());
-    const [editCostPrice, setEditCostPrice] = React.useState(item.costPriceOverride ?? item.product.costPrice ?? '0');
+    const [editOverrideNote, setEditOverrideNote] = React.useState(item.priceOverrideNote ?? '');
+
+    React.useEffect(() => {
+        if (isEditingPrice) {
+            setEditSalePrice(item.product.price.toString());
+            setEditOverrideNote(item.priceOverrideNote ?? '');
+        }
+    }, [isEditingPrice, item.product.price, item.priceOverrideNote]);
 
     const handleSavePrices = () => {
         const parsedSale = parseFloat(editSalePrice);
-        const parsedCost = parseFloat(editCostPrice);
         if (!isNaN(parsedSale) && parsedSale >= 0) {
             updateCartItemPrice(
                 cartItemId,
                 parsedSale,
-                !isNaN(parsedCost) && parsedCost >= 0 ? parsedCost : undefined
+                undefined, // cost price
+                editOverrideNote.trim() || undefined
             );
         }
         setIsEditingPrice(false);
@@ -234,18 +242,36 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
                 {allowPosPriceOverride ? (
                     <Dialog open={isEditingPrice} onOpenChange={setIsEditingPrice}>
                         <DialogTrigger asChild>
-                            <p className="text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors underline decoration-dotted underline-offset-2">
-                                <span className="mr-0.5">{currencySymbol}</span>
-                                {(item.product.price * item.quantity).toLocaleString()}
+                            <p className="text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors flex items-center gap-1 group">
+                                <span className="underline decoration-dotted underline-offset-2 flex items-center">
+                                    {item.isPriceOverride && item.originalPrice !== undefined && (
+                                        <span className="line-through text-muted-foreground/60 mr-1.5 text-[10px]">
+                                            {currencySymbol}{(item.originalPrice * item.quantity).toLocaleString()}
+                                        </span>
+                                    )}
+                                    <span className="mr-0.5 font-medium">{currencySymbol}</span>
+                                    <span className="font-medium">{(item.product.price * item.quantity).toLocaleString()}</span>
+                                </span>
+                                {item.isPriceOverride && (
+                                    <span className="text-[9px] text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-1 py-0 rounded flex items-center font-bold tracking-tight uppercase">
+                                        (Override)
+                                    </span>
+                                )}
                             </p>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[350px]">
                             <DialogHeader>
-                                <DialogTitle>Edit Item Price</DialogTitle>
+                                <DialogTitle>Edit Sale Price</DialogTitle>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="salePrice">Sale Price</Label>
+                                    <Label>Original Sale Price</Label>
+                                    <div className="text-sm font-medium px-3 py-2 bg-muted/50 rounded-md border text-muted-foreground">
+                                        {currencySymbol}{(item.originalPrice !== undefined ? item.originalPrice : item.product.price).toLocaleString()}
+                                    </div>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="salePrice">Override Price</Label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
                                         <Input
@@ -255,23 +281,20 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
                                             value={editSalePrice}
                                             onChange={(e) => setEditSalePrice(e.target.value)}
                                             min="0"
+                                            placeholder="Enter new price"
                                         />
                                     </div>
+                                    <p className="text-[10px] text-muted-foreground">Set a custom price for this specific transaction.</p>
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="costPrice">Cost Price</Label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
-                                        <Input
-                                            id="costPrice"
-                                            type="number"
-                                            className="pl-8"
-                                            value={editCostPrice}
-                                            onChange={(e) => setEditCostPrice(e.target.value)}
-                                            min="0"
-                                        />
-                                    </div>
-                                    <p className="text-[10px] text-muted-foreground">Override the cost price for this specific transaction to calculate profit accurately.</p>
+                                    <Label htmlFor="overrideNote">Override Note (Optional)</Label>
+                                    <Textarea
+                                        id="overrideNote"
+                                        placeholder="Reason for price change (e.g., VIP discount)"
+                                        className="h-20 text-sm resize-none"
+                                        value={editOverrideNote}
+                                        onChange={(e) => setEditOverrideNote(e.target.value)}
+                                    />
                                 </div>
                             </div>
                             <DialogFooter>
@@ -280,9 +303,21 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
                         </DialogContent>
                     </Dialog>
                 ) : (
-                    <p className="text-xs text-muted-foreground">
-                        <span className="mr-0.5">{currencySymbol}</span>
-                        {(item.product.price * item.quantity).toLocaleString()}
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 group">
+                        <span className="flex items-center">
+                            {item.isPriceOverride && item.originalPrice !== undefined && (
+                                <span className="line-through text-muted-foreground/60 mr-1.5 text-[10px]">
+                                    {currencySymbol}{(item.originalPrice * item.quantity).toLocaleString()}
+                                </span>
+                            )}
+                            <span className="mr-0.5 font-medium">{currencySymbol}</span>
+                            <span className="font-medium">{(item.product.price * item.quantity).toLocaleString()}</span>
+                        </span>
+                        {item.isPriceOverride && (
+                            <span className="text-[9px] text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-1 py-0 rounded flex items-center font-bold tracking-tight uppercase">
+                                (Override)
+                            </span>
+                        )}
                     </p>
                 )}
             </div>
@@ -321,7 +356,7 @@ const CartContents = () => {
     const { currentUserProfile } = useUser();
 
     const canOverridePrice = currentUserProfile?.role === 'admin' || 
-        (currentUserProfile?.role === 'manager' && business?.settings?.allowPosPriceOverride !== false);
+        business?.settings?.allowPosPriceOverride !== false;
 
     // Suppress SSR/client hydration mismatch: cart is read from localStorage which
     // doesn't exist on the server. Render a neutral placeholder until mounted.
@@ -425,9 +460,55 @@ export default function SelectProductsPage() {
     const { t } = useI18n();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('all');
-    const [columnClass, setColumnClass] = React.useState('lg:grid-cols-4');
+    const [columns, setColumns] = React.useState<'3' | '4' | '5'>('4');
+    
+    React.useEffect(() => {
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+            setColumns('3');
+        }
+    }, []);
+
+    const gridStyle = {
+        display: 'grid',
+        gap: '0.5rem',
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(max(150px, calc(100% / ${columns} - 8px)), 100%), 1fr))`
+    };
+
     const [isNavigating, setIsNavigating] = React.useState(false);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+    
+    // Custom drag resize logic for the cart
+    const [cartWidth, setCartWidth] = React.useState(350);
+    const [isDragging, setIsDragging] = React.useState(false);
+
+    React.useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDragging) return;
+            // Calculate new width based on distance from right edge
+            const newWidth = window.innerWidth - e.clientX;
+            // Constrain width between 280px and 60% of the screen
+            setCartWidth(Math.max(280, Math.min(newWidth, window.innerWidth * 0.6)));
+        };
+
+        const handleMouseUp = () => {
+            if (isDragging) setIsDragging(false);
+        };
+
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            // Prevent text selection while dragging
+            document.body.style.userSelect = 'none';
+        } else {
+            document.body.style.userSelect = '';
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.userSelect = '';
+        };
+    }, [isDragging]);
 
 
     const [previewImage, setPreviewImage] = React.useState<{ src: string, alt: string } | null>(null);
@@ -585,8 +666,8 @@ export default function SelectProductsPage() {
     };
 
     return (
-        <div className="grid md:grid-cols-3 md:gap-8">
-            <div className="md:col-span-2">
+        <div className="flex flex-col md:flex-row w-full gap-4 md:gap-4">
+            <div className="flex-1 min-w-0 pr-0 md:pr-2">
                 <div className="flex flex-col mb-4 gap-2 sticky top-0 bg-background py-2 z-10 border-b">
                     <div className="flex items-center gap-2">
                         <div className="relative flex-1 group">
@@ -646,14 +727,14 @@ export default function SelectProductsPage() {
                                 <Button variant="outline" className="w-[150px] h-11 hidden lg:flex justify-between font-normal bg-background">
                                     <span className="flex items-center">
                                         <Columns className="h-4 w-4 me-2" />
-                                        {columnClass === 'lg:grid-cols-3' ? t('pos.columnsCount', { n: 3 }) : columnClass === 'lg:grid-cols-4' ? t('pos.columnsCount', { n: 4 }) : t('pos.columnsCount', { n: 5 })}
+                                        {t('pos.columnsCount', { n: parseInt(columns) })}
                                     </span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-[150px]">
-                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-3')}>{t('pos.columnsCount', { n: 3 })}</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-4')}>{t('pos.columnsCount', { n: 4 })}</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setColumnClass('lg:grid-cols-5')}>{t('pos.columnsCount', { n: 5 })}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumns('3')}>{t('pos.columnsCount', { n: 3 })}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumns('4')}>{t('pos.columnsCount', { n: 4 })}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumns('5')}>{t('pos.columnsCount', { n: 5 })}</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -670,7 +751,7 @@ export default function SelectProductsPage() {
                         // catalogue streams in from Firestore, and an empty grid used
                         // to read as "you have no products". Tiles in the grid's own
                         // shape say "these are loading" without claiming a count.
-                        <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
+                        <div style={gridStyle}>
                             {Array.from({ length: 8 }).map((_, i) => (
                                 <ProductCardSkeleton key={i} />
                             ))}
@@ -679,7 +760,7 @@ export default function SelectProductsPage() {
                         <>
                             {filteredProducts && filteredProducts.length > 0 ? (
                                 <div className="space-y-4">
-                                    <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-4", columnClass)}>
+                                    <div style={gridStyle}>
                                         {filteredProducts.map(product => (
                                             <ProductItem
                                                 key={product.id}
@@ -761,10 +842,27 @@ export default function SelectProductsPage() {
             </div>
 
 
+            {/* Draggable Divider (Desktop only) */}
+            <div 
+                className={cn(
+                    "hidden md:flex w-2 -mx-1 cursor-col-resize items-center justify-center transition-colors rounded-full z-20 group hover:bg-primary/10",
+                    isDragging && "bg-primary/20"
+                )}
+                onMouseDown={() => setIsDragging(true)}
+            >
+                <div className={cn(
+                    "w-[2px] h-12 rounded-full transition-colors",
+                    isDragging ? "bg-primary/50" : "bg-border group-hover:bg-primary/30"
+                )} />
+            </div>
+
             {/* Desktop Cart */}
-            <div className="hidden md:block">
+            <div 
+                className={cn("hidden md:block shrink-0 transition-[width] duration-75 ease-out", isDragging && "transition-none")} 
+                style={{ width: `${cartWidth}px` }}
+            >
                 <Card className="sticky top-6">
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between pb-4">
                         <CardTitle className="flex items-center gap-2">
                             <ShoppingCart className="h-5 w-5" />
                             <span>{t('pos.cart')}</span>

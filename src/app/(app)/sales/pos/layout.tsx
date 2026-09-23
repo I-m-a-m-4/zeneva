@@ -16,7 +16,7 @@ export default function POSLayout({ children }: { children: React.ReactNode }) {
   const currentStepIndex = steps.findIndex((step) => pathname === step.path);
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="px-2 py-6 sm:px-6 sm:py-6 mx-auto w-full max-w-[2000px]">
       <nav aria-label="Progress" className="mb-8 no-print">
         <ol role="list" className="flex items-center">
           {steps.map((step, stepIdx) => (
