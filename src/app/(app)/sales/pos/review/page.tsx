@@ -87,6 +87,8 @@ function ReviewPageContent() {
             quantity: item.quantity,
             price: item.product.price,
             costPrice: item.product.costPrice || 0,
+            priceOverridden: !!item.isPriceOverride,
+            priceOverrideNote: item.priceOverrideNote || null
         })),
         customer: selectedCustomer || undefined,
         subtotal,

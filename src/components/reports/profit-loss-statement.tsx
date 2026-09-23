@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { DollarSign, FileText, TrendingUp, TrendingDown, Coins, PieChart, Percent, ArrowUpRight, ArrowDownRight, Layers, Download } from 'lucide-react';
 import type { Receipt, Product, Expense } from '@/types';
 import ProfitLossChart from './profit-loss-chart';
@@ -138,7 +139,8 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     unitCost,
                     sellingPrice,
                     profit,
-                    isOverride: i.isPriceOverride || false,
+                    isOverride: i.priceOverridden || i.isPriceOverride || false,
+                    overrideNote: i.priceOverrideNote,
                 });
             });
         });
@@ -552,7 +554,20 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                                 {business?.settings?.allowPosPriceOverride && (
                                                     <TableCell className="text-center">
                                                         {item.isOverride ? (
-                                                            <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">Yes</Badge>
+                                                            item.overrideNote ? (
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger className="cursor-help">
+                                                                            <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">Yes</Badge>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent side="top">
+                                                                            <p className="max-w-[200px] text-xs font-medium">{item.overrideNote}</p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
+                                                            ) : (
+                                                                <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">Yes</Badge>
+                                                            )
                                                         ) : (
                                                             <span className="text-muted-foreground">-</span>
                                                         )}

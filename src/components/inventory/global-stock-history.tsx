@@ -347,6 +347,11 @@ export default function GlobalStockHistory() {
                                             <TableCell>
                                                 <div className="font-medium">{tx.productName || 'Unknown Product'}</div>
                                                 {tx.notes && <div className="text-xs text-muted-foreground mt-0.5">{tx.notes}</div>}
+                                                {tx.priceOverridden && tx.priceOverrideNote && (
+                                                    <div className="text-xs text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-sm inline-block mt-1 font-medium">
+                                                        Override Note: {tx.priceOverrideNote}
+                                                    </div>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className="capitalize">
