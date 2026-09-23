@@ -66,6 +66,7 @@ function StrategicOutreachConsole() {
   const [isLoadingLogs, setIsLoadingLogs] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [emailTopicFilter, setEmailTopicFilter] = React.useState<string>('all');
+  const [emailStatusFilter, setEmailStatusFilter] = React.useState<string>('all');
   
   const [selectedUser, setSelectedUser] = React.useState<UserProfile | null>(null);
 
@@ -126,16 +127,31 @@ function StrategicOutreachConsole() {
       const matchesSearch = !q || (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
       
       let matchesFilter = true;
+      const userSpecificLogs = logs.filter(l => l.sentTo && u.email && l.sentTo.toLowerCase() === u.email.toLowerCase());
+      
       if (emailTopicFilter && emailTopicFilter !== 'all') {
-         const hasLog = logs.some(l => 
-            (l.sentTo && u.email && l.sentTo.toLowerCase() === u.email.toLowerCase()) && 
-            l.subject === emailTopicFilter
-         );
-         matchesFilter = hasLog;
+         const matchingLogs = userSpecificLogs.filter(l => l.subject === emailTopicFilter);
+         matchesFilter = matchingLogs.length > 0;
+         
+         if (matchesFilter && emailStatusFilter !== 'all') {
+             const hasOpened = matchingLogs.some(l => l.status === 'opened' || (l.openCount && l.openCount > 0) || l.openedAt?.seconds);
+             if (emailStatusFilter === 'opened') {
+                 matchesFilter = hasOpened;
+             } else if (emailStatusFilter === 'unopened') {
+                 matchesFilter = !hasOpened;
+             }
+         }
+      } else if (emailStatusFilter !== 'all') {
+          const hasOpenedAny = userSpecificLogs.some(l => l.status === 'opened' || (l.openCount && l.openCount > 0) || l.openedAt?.seconds);
+          if (emailStatusFilter === 'opened') {
+              matchesFilter = hasOpenedAny && userSpecificLogs.length > 0;
+          } else if (emailStatusFilter === 'unopened') {
+              matchesFilter = !hasOpenedAny && userSpecificLogs.length > 0;
+          }
       }
       return matchesSearch && matchesFilter;
     });
-  }, [users, searchQuery, emailTopicFilter, logs]);
+  }, [users, searchQuery, emailTopicFilter, emailStatusFilter, logs]);
 
   const userLogs = React.useMemo(() => {
     if (!selectedUser) return [];
@@ -180,12 +196,24 @@ function StrategicOutreachConsole() {
                   <SelectValue placeholder="Filter by sent email..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All merchants</SelectItem>
+                  <SelectItem value="all">All emails</SelectItem>
                   {uniqueSubjects.map(subject => (
                     <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {emailTopicFilter !== 'all' && (
+                <Select value={emailStatusFilter} onValueChange={setEmailStatusFilter}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Filter by status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="opened">Opened (Seen)</SelectItem>
+                    <SelectItem value="unopened">Unopened (Unseen)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             
             <ScrollArea className="flex-1 border rounded-xl bg-card shadow-sm overflow-hidden">
