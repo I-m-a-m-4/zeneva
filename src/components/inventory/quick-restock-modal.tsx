@@ -64,6 +64,22 @@ export function QuickRestockModal({
                 createdAt: customDate
             }
         }, `Logged stock adjustment for ${product.name}`);
+
+        const isAddition = addedAmount >= 0;
+        addToQueue({
+            type: 'add-inventory-transaction',
+            payload: {
+                businessId: product.businessId || business?.id || '',
+                productId: product.id,
+                productName: product.name,
+                type: isAddition ? 'in' : 'out',
+                quantity: Math.abs(addedAmount),
+                closingStock: newTotal,
+                notes: `Quick restock: ${addedAmount > 0 ? '+' : ''}${addedAmount}${dateDesc}`,
+                createdBy: 'User',
+                date: customDate
+            }
+        }, `Logging inventory transaction for ${product.name}`);
         
         toast({
             title: 'Stock Updated',

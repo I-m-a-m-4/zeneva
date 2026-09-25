@@ -35,7 +35,8 @@ import {
   FileText,
   ImageOff,
   LayoutGrid,
-  List
+  List,
+  Camera
 } from "lucide-react";
 import { ReorderInvoiceModal } from '@/components/inventory/reorder-invoice-modal';
 import InventoryDepletionCard from '@/components/reports/inventory-depletion-card';
@@ -1123,6 +1124,12 @@ function InventoryPageContent() {
                       <span className="font-medium text-xs">{t('inventory.manageDebts')}</span>
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="flex items-center gap-2.5 p-2 cursor-pointer rounded-md focus:bg-primary/10 focus:text-primary group">
+                    <Link href="/inventory/stock-take" className="flex items-center gap-2.5 w-full">
+                      <Camera className="h-4 w-4 text-muted-foreground group-focus:text-primary transition-colors" />
+                      <span className="font-medium text-xs">Visual Stock Take</span>
+                    </Link>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -1324,6 +1331,14 @@ function InventoryPageContent() {
                   <DropdownMenuItem asChild>
                     <Link href="/inventory/suppliers">
                       <Truck className="me-2 h-4 w-4" /> Suppliers & Purchase Orders
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+
+                {canManageStock && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/inventory/stock-take">
+                      <Camera className="me-2 h-4 w-4" /> Visual Stock Take
                     </Link>
                   </DropdownMenuItem>
                 )}

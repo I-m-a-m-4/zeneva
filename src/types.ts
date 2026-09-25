@@ -603,6 +603,7 @@ export interface BusinessInstance {
         allowCashierExpenseLogging?: boolean;
         allowManagerCostPriceView?: boolean;
         requireAdminApprovalForVoids?: boolean;
+        allowBackorders?: boolean;
     };
 }
 

@@ -84,7 +84,7 @@ function UserActionsMenu({
     setUserPermissionsToUpdate,
 }: any) {
     return (
-        <DropdownMenu modal={false} open={openMenuUserId === user.id} onOpenChange={(open: boolean) => setOpenMenuUserId(open ? user.id : null)}>
+        <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
                 <Button
                     aria-haspopup="true"

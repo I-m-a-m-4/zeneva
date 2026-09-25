@@ -223,6 +223,22 @@ export default function PurchaseOrdersPage() {
                 }
               }
             }, `PO Restocked ${currentProd.name} (+${item.quantityOrdered})`);
+
+            addToQueue({
+              type: 'add-inventory-transaction',
+              payload: {
+                businessId: business.id,
+                productId: item.productId,
+                productName: currentProd.name,
+                type: 'in',
+                quantity: item.quantityOrdered || 0,
+                closingStock: newStock,
+                notes: `Restock (PO #${order.purchaseNumber})`,
+                referenceId: order.id,
+                createdBy: 'System',
+                date: new Date()
+              }
+            }, `Logging inventory transaction for ${currentProd.name}`);
           }
         }
       });

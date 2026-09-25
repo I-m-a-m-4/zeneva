@@ -33,16 +33,17 @@ import { useUser } from "@/firebase";
 
 function ProductCardSkeleton() {
     return (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden flex flex-col h-full border-[0.5px]">
             <CardContent className="p-0">
-                <Skeleton className="w-full h-32" />
+                <Skeleton className="w-full aspect-[4/3]" />
             </CardContent>
-            <CardHeader className="p-2 h-20">
-                <Skeleton className="h-5 w-3/4" />
+            <CardHeader className="p-3 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
             </CardHeader>
-            <CardFooter className="p-2 flex justify-between items-center">
+            <CardFooter className="p-3 pt-0 flex justify-between items-center mt-auto">
                 <Skeleton className="h-5 w-1/3" />
-                <Skeleton className="h-7 w-7 rounded-full" />
+                <Skeleton className="h-8 w-8 rounded-lg" />
             </CardFooter>
         </Card>
     );
@@ -72,23 +73,23 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     const hasVariants = variants && variants.length > 0;
 
     return (
-        <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm">
+        <Card key={product.id} className="overflow-hidden flex flex-col shadow-none border-[0.5px] border-border/40 bg-card/40 rounded-xl backdrop-blur-sm h-full w-full">
             <CardContent
-                className="relative aspect-square cursor-pointer bg-muted/30 p-2 flex items-center justify-center group overflow-hidden"
+                className="relative aspect-[4/3] w-full cursor-pointer bg-muted/30 p-2 flex items-center justify-center group overflow-hidden shrink-0"
                 onClick={() => product.imageUrl && onPreview(product.imageUrl, product.name)}
             >
                 {product.imageUrl ? (
-                    <div className="relative w-full h-full flex items-center justify-center">
+                    <div className="relative w-full h-full flex items-center justify-center p-1">
                         <CachedImage
                             src={product.imageUrl}
                             alt={product.name}
-                            className="max-w-full max-h-full object-contain hover:scale-105 transition-transform"
+                            className="max-w-full max-h-full h-full object-contain hover:scale-105 transition-transform"
                         />
                     </div>
 
                 ) : (
                     <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground/40">
-                        {renderCategoryIcon(industryConfig?.fastSwitcherIcon, 38)}
+                        {renderCategoryIcon(industryConfig?.fastSwitcherIcon, 32)}
                     </div>
                 )}
             </CardContent>
@@ -207,30 +208,45 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
 
 ProductItem.displayName = 'ProductItem';
 
-const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeFromCart, updateCartItemPrice, t, allowPosPriceOverride }: any) => {
+const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeFromCart, updateCartItemPrice, t, allowPosPriceOverride, allowCostPriceOverride }: any) => {
+    const { products } = usePOS();
+    const masterProduct = products?.find((p: any) => p.id === (item.product.parentId || item.product.id));
+    const baseCostPrice = item.costPriceOverride ?? item.product.costPrice ?? masterProduct?.costPrice ?? 0;
+
     const [isEditingPrice, setIsEditingPrice] = React.useState(false);
     const [editSalePrice, setEditSalePrice] = React.useState(item.product.price.toString());
+    const [editCostPrice, setEditCostPrice] = React.useState(baseCostPrice.toString());
     const [editOverrideNote, setEditOverrideNote] = React.useState(item.priceOverrideNote ?? '');
 
     React.useEffect(() => {
         if (isEditingPrice) {
             setEditSalePrice(item.product.price.toString());
+            setEditCostPrice(baseCostPrice.toString());
             setEditOverrideNote(item.priceOverrideNote ?? '');
         }
-    }, [isEditingPrice, item.product.price, item.priceOverrideNote]);
+    }, [isEditingPrice, item.product.price, baseCostPrice, item.priceOverrideNote]);
 
     const handleSavePrices = () => {
         const parsedSale = parseFloat(editSalePrice);
-        if (!isNaN(parsedSale) && parsedSale >= 0) {
-            updateCartItemPrice(
-                cartItemId,
-                parsedSale,
-                undefined, // cost price
-                editOverrideNote.trim() || undefined
-            );
-        }
+        const parsedCost = parseFloat(editCostPrice);
+
+        const newSalePrice = (!isNaN(parsedSale) && parsedSale >= 0 && allowPosPriceOverride) ? parsedSale : undefined;
+        const newCostPrice = (!isNaN(parsedCost) && parsedCost >= 0) ? parsedCost : undefined;
+
+        updateCartItemPrice(
+            cartItemId,
+            newSalePrice,
+            newCostPrice,
+            editOverrideNote.trim() || undefined
+        );
         setIsEditingPrice(false);
     };
+
+    const currentSale = parseFloat(editSalePrice) || 0;
+    const currentCost = parseFloat(editCostPrice) || 0;
+    const unitProfit = currentSale - currentCost;
+    const marginPercent = currentSale > 0 ? ((unitProfit / currentSale) * 100).toFixed(1) : '0';
+    const canEditAny = allowPosPriceOverride || allowCostPriceOverride;
 
     return (
         <div className="flex justify-between items-center py-1">
@@ -239,7 +255,7 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
                     {item.product.name}
                     {item.unit && <Badge variant="secondary" className="ms-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
                 </p>
-                {allowPosPriceOverride ? (
+                {canEditAny ? (
                     <Dialog open={isEditingPrice} onOpenChange={setIsEditingPrice}>
                         <DialogTrigger asChild>
                             <p className="text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors flex items-center gap-1 group">
@@ -252,53 +268,85 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
                                     <span className="mr-0.5 font-medium">{currencySymbol}</span>
                                     <span className="font-medium">{(item.product.price * item.quantity).toLocaleString()}</span>
                                 </span>
-                                {item.isPriceOverride && (
+                                {(item.isPriceOverride || item.costPriceOverride !== undefined) && (
                                     <span className="text-[9px] text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-1 py-0 rounded flex items-center font-bold tracking-tight uppercase">
                                         (Override)
                                     </span>
                                 )}
                             </p>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[350px]">
+                        <DialogContent className="sm:max-w-[400px]">
                             <DialogHeader>
-                                <DialogTitle>Edit Sale Price</DialogTitle>
+                                <DialogTitle>Override Price & Cost</DialogTitle>
+                                <p className="text-xs text-muted-foreground">Adjust selling price or cost price for this specific transaction to track profit accurately.</p>
                             </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid gap-2">
-                                    <Label>Original Sale Price</Label>
-                                    <div className="text-sm font-medium px-3 py-2 bg-muted/50 rounded-md border text-muted-foreground">
-                                        {currencySymbol}{(item.originalPrice !== undefined ? item.originalPrice : item.product.price).toLocaleString()}
+                            <div className="grid gap-4 py-3">
+                                <div className="grid gap-1.5">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <Label htmlFor="salePrice" className="font-semibold">Selling Price (Unit)</Label>
+                                        <span className="text-muted-foreground">Orig: {currencySymbol}{(item.originalPrice ?? item.product.price).toLocaleString()}</span>
                                     </div>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="salePrice">Override Price</Label>
                                     <div className="relative">
-                                        <span className="absolute left-3 top-2.5 text-muted-foreground">{currencySymbol}</span>
+                                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">{currencySymbol}</span>
                                         <Input
                                             id="salePrice"
                                             type="number"
-                                            className="pl-8"
+                                            step="0.01"
+                                            className="pl-8 text-sm"
                                             value={editSalePrice}
                                             onChange={(e) => setEditSalePrice(e.target.value)}
+                                            disabled={!allowPosPriceOverride}
                                             min="0"
-                                            placeholder="Enter new price"
+                                            placeholder="Enter selling price"
                                         />
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground">Set a custom price for this specific transaction.</p>
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="overrideNote">Override Note (Optional)</Label>
+
+                                <div className="grid gap-1.5">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <Label htmlFor="costPrice" className="font-semibold">Cost Price (Unit)</Label>
+                                        <span className="text-muted-foreground">Orig: {currencySymbol}{baseCostPrice.toLocaleString()}</span>
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">{currencySymbol}</span>
+                                        <Input
+                                            id="costPrice"
+                                            type="number"
+                                            step="0.01"
+                                            className="pl-8 text-sm"
+                                            value={editCostPrice}
+                                            onChange={(e) => setEditCostPrice(e.target.value)}
+                                            min="0"
+                                            placeholder="Enter cost price"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className={`flex items-center justify-between p-3 rounded-lg border text-xs ${unitProfit >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-400'}`}>
+                                    <div>
+                                        <p className="font-medium uppercase text-[10px] tracking-wider opacity-80">Unit Profit</p>
+                                        <p className="text-base font-bold">{currencySymbol}{unitProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-medium uppercase text-[10px] tracking-wider opacity-80">Margin</p>
+                                        <p className="text-base font-bold">{marginPercent}%</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="overrideNote" className="text-xs font-semibold">Override Note (Optional)</Label>
                                     <Textarea
                                         id="overrideNote"
-                                        placeholder="Reason for price change (e.g., VIP discount)"
-                                        className="h-20 text-sm resize-none"
+                                        placeholder="Reason for price change (e.g., VIP discount, clearance)"
+                                        className="h-16 text-xs resize-none"
                                         value={editOverrideNote}
                                         onChange={(e) => setEditOverrideNote(e.target.value)}
                                     />
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button onClick={handleSavePrices}>{t('common.save') || "Save"}</Button>
+                                <Button variant="outline" size="sm" onClick={() => setIsEditingPrice(false)}>Cancel</Button>
+                                <Button size="sm" onClick={handleSavePrices}>{t('common.save') || "Save Changes"}</Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -357,6 +405,7 @@ const CartContents = () => {
 
     const canOverridePrice = currentUserProfile?.role === 'admin' || 
         business?.settings?.allowPosPriceOverride !== false;
+    const canOverrideCostPrice = currentUserProfile?.role === 'admin';
 
     // Suppress SSR/client hydration mismatch: cart is read from localStorage which
     // doesn't exist on the server. Render a neutral placeholder until mounted.
@@ -415,6 +464,7 @@ const CartContents = () => {
                                 updateCartItemPrice={updateCartItemPrice}
                                 t={t}
                                 allowPosPriceOverride={canOverridePrice}
+                                allowCostPriceOverride={canOverrideCostPrice}
                             />
                         );
                     })}
@@ -460,19 +510,17 @@ export default function SelectProductsPage() {
     const { t } = useI18n();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('all');
-    const [columns, setColumns] = React.useState<'3' | '4' | '5'>('4');
+    const [columns, setColumns] = React.useState<'auto' | '3' | '4' | '5' | '6'>('4');
     
-    React.useEffect(() => {
-        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-            setColumns('3');
+    const gridClassName = React.useMemo(() => {
+        switch (columns) {
+            case '3': return 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 w-full';
+            case '4': return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 w-full';
+            case '5': return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 w-full';
+            case '6': return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 w-full';
+            default: return 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3.5 w-full';
         }
-    }, []);
-
-    const gridStyle = {
-        display: 'grid',
-        gap: '0.5rem',
-        gridTemplateColumns: `repeat(auto-fit, minmax(min(max(150px, calc(100% / ${columns} - 8px)), 100%), 1fr))`
-    };
+    }, [columns]);
 
     const [isNavigating, setIsNavigating] = React.useState(false);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
@@ -724,17 +772,22 @@ export default function SelectProductsPage() {
                         </DropdownMenu>
                         <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="w-[150px] h-11 hidden lg:flex justify-between font-normal bg-background">
+                                <Button variant="outline" className="w-[160px] h-11 hidden lg:flex justify-between font-normal bg-background">
                                     <span className="flex items-center">
                                         <Columns className="h-4 w-4 me-2" />
-                                        {t('pos.columnsCount', { n: parseInt(columns) })}
+                                        {columns === 'auto' ? 'Auto (Responsive)' : t('pos.columnsCount', { n: parseInt(columns) })}
                                     </span>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-[150px]">
+                            <DropdownMenuContent className="w-[160px]">
+                                <DropdownMenuItem onClick={() => setColumns('auto')}>
+                                    <span className={columns === 'auto' ? 'font-semibold text-primary' : ''}>Auto (Responsive)</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => setColumns('3')}>{t('pos.columnsCount', { n: 3 })}</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setColumns('4')}>{t('pos.columnsCount', { n: 4 })}</DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setColumns('5')}>{t('pos.columnsCount', { n: 5 })}</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setColumns('6')}>{t('pos.columnsCount', { n: 6 })}</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -751,7 +804,7 @@ export default function SelectProductsPage() {
                         // catalogue streams in from Firestore, and an empty grid used
                         // to read as "you have no products". Tiles in the grid's own
                         // shape say "these are loading" without claiming a count.
-                        <div style={gridStyle}>
+                        <div className={gridClassName}>
                             {Array.from({ length: 8 }).map((_, i) => (
                                 <ProductCardSkeleton key={i} />
                             ))}
@@ -760,7 +813,7 @@ export default function SelectProductsPage() {
                         <>
                             {filteredProducts && filteredProducts.length > 0 ? (
                                 <div className="space-y-4">
-                                    <div style={gridStyle}>
+                                    <div className={gridClassName}>
                                         {filteredProducts.map(product => (
                                             <ProductItem
                                                 key={product.id}

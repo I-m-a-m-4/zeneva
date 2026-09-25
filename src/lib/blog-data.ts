@@ -5023,6 +5023,77 @@ Lightspeed is a robust POS system popular with bicycle shops, apparel stores, an
 *   **Pros:** It handles complex, deep inventory structures very well, including matrix variants (size, color, material) and supplier purchase orders. It runs on standard iPads and PCs.
 *   **Cons:** Lightspeed's pricing is on the higher end, starting at over $60/month, and they encourage annual contract commitments. It lacks local market integrations for West Africa.
 `
+  },
+  {
+    slug: 'how-zeneva-solves-retail-theft',
+    title: 'How Zeneva Solves Retail Theft and Shrinkage',
+    excerpt: 'Retail theft and internal shrinkage can silently destroy a profitable business. Discover how Zeneva’s Visual Stock Take, Loss Prevention Scans, and Bank Transfer Verification protect your revenue.',
+    imageUrl: 'https://images.unsplash.com/photo-1555529771-835f59bfc50c?q=80&w=2070&auto=format&fit=crop',
+    category: 'Product Updates',
+    directAnswer: 'Zeneva solves retail theft by implementing AI-powered Visual Stock Take for instant reconciliation, Forensic Loss Scans that track suspicious voids or price overrides by cashiers, and instant Bank Transfer Verification that alerts staff directly at the till to prevent fake payment fraud.',
+    faq: [
+      { question: 'What is Visual Stock Take?', answer: 'Visual Stock Take allows you to snap a photo of your physical store shelves. Zen AI will automatically count the visible products and reconcile them against your recorded inventory, instantly flagging missing items without a manual count.' },
+      { question: 'How do you stop fake bank transfers?', answer: 'Zeneva integrates direct Bank Transfer Verification. When a transfer lands in your account, the Zeneva POS chimes immediately, confirming the payment is real. If it doesn’t chime, the transfer is unverified, stopping fake alert fraud instantly.' },
+      { question: 'Can Zeneva track internal employee theft?', answer: 'Yes. Zeneva’s forensic scanner continuously audits the audit log, looking for patterns like high volumes of cancelled receipts, deleted items, unapproved discounts, and manual stock reductions. It surfaces these directly to the business owner.' }
+    ],
+    tableData: {
+      title: 'Common Theft Methods vs. Zeneva Solutions',
+      headers: ['Theft Method', 'How it happens', 'How Zeneva Solves It'],
+      rows: [
+        ['Fake Transfers', 'Customer shows a fake payment SMS/App screen', 'POS chimes only when real money hits the bank account'],
+        ['Sweethearting', 'Cashier rings up a cheaper item for a friend', 'Forensic scan flags excessive voids, discounts, and overrides'],
+        ['Shelf Shrinkage', 'Items go missing from the shelf without being sold', 'AI Visual Stock Take compares shelf photos with expected stock in seconds'],
+        ['Phantom Returns', 'Cashier processes a fake return and pockets the cash', 'Returns require managerial PIN/approval or flag in the audit log']
+      ]
+    },
+    content: `
+## The Silent Profit Killer
+
+In the retail industry, shrinkage—the loss of inventory due to shoplifting, employee theft, or administrative error—is a massive drain on profitability. For a mini-mart or pharmacy operating on tight margins, losing just 2% of inventory to theft can wipe out 20% of your net profit.
+
+Standard POS systems track what gets sold. They do not track what goes missing. Zeneva was built differently: we designed it to actively protect your revenue.
+
+---
+
+## 1. Visual Stock Take (AI Shelf Scanning)
+
+Traditional stock counts are tedious. They require closing the store or paying staff overtime to manually count every item on every shelf. Because it’s so labor-intensive, businesses rarely do it, meaning theft goes unnoticed for months.
+
+Zeneva’s **Visual Stock Take** completely changes the game:
+*   **Snap a Photo:** Just take a picture of your shelf using your phone or tablet.
+*   **AI Counting:** Zen AI instantly analyzes the image and counts the visible products.
+*   **Instant Reconciliation:** Zeneva compares the counted items against the expected stock in your database and immediately highlights any variance. 
+
+If three bottles of premium shampoo are missing from the shelf but haven't been sold through the POS, you know immediately.
+
+---
+
+## 2. Bank Transfer Verification
+
+In markets where bank transfers are a primary payment method, "fake alert" fraud is rampant. Customers show cashiers a fake SMS or a spoofed banking app screen confirming a transfer that never actually happened. 
+
+Zeneva completely eliminates this vulnerability. Our POS connects directly to your settlement account. When a customer initiates a transfer:
+*   The cashier waits for the POS to chime.
+*   The chime **only** happens when the actual funds clear into your account.
+*   No chime? No goods handed over. 
+
+You never have to rely on a customer’s phone screen again.
+
+---
+
+## 3. Forensic Loss Prevention Scans
+
+Internal theft (employee theft) is often harder to catch than shoplifting. Cashiers might delete items from a receipt after the customer hands over cash, void transactions, or apply unauthorized discounts to friends.
+
+Zeneva acts as an automated auditor. Our **Forensic Loss Scan** continuously monitors the system's Audit Log for suspicious patterns:
+*   Are there an unusually high number of voided receipts during a specific shift?
+*   Is a particular cashier manually adjusting stock levels downwards?
+*   Are products being sold below cost price?
+
+The system surfaces these anomalies directly to the business owner's dashboard, turning hidden shrink into actionable intelligence.
+
+By combining AI-driven physical stock counts, fraud-proof payments, and forensic auditing, Zeneva provides an impenetrable shield for your retail business.
+`
   }
 ];
 

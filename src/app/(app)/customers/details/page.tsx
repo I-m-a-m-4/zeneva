@@ -783,8 +783,8 @@ function CustomerDetailContent() {
                     </CardHeader>
                     <CardContent>
                         {receipts && receipts.length > 0 ? (
-                            <div className="space-y-4">
-                                {receipts.slice(0, 5).map(receipt => {
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                                {receipts.map(receipt => {
                                     const isUnpaid = receipt.paymentMethod === 'Invoice' && receipt.status === 'unpaid';
                                     const isPending = receipt.paymentMethod === 'Invoice' && receipt.status === 'pending';
                                     const badgeText = isUnpaid ? t('invoices.statusUnpaid') : (isPending ? t('invoices.statusPending') : t('invoices.statusPaid'));

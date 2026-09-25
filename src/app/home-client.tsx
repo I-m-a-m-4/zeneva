@@ -198,6 +198,13 @@ const features = [
         iconColor: "text-red-600"
     },
     {
+        icon: ScanBarcode,
+        title: "Visual Stock Take (AI)",
+        description: "Reconcile your physical stock in seconds. Snap a photo of your shelf, and Zen AI will count the products and update your inventory automatically.",
+        bgColor: "bg-indigo-100",
+        iconColor: "text-indigo-600"
+    },
+    {
         icon: Layers,
         title: "Product Variants Support",
         description: "Easily manage products with multiple options like sizes, colors, or materials. Zeneva tracks stock and pricing perfectly for each variant.",

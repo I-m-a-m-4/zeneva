@@ -7,11 +7,12 @@ import { usePOS } from '@/context/pos-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Bug, MonitorSmartphone, Clock, Copy, CheckCircle2 } from 'lucide-react';
+import { Loader2, Bug, MonitorSmartphone, Clock, Copy, CheckCircle2, Search, Filter } from 'lucide-react';
 import { safeToDate } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
-
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 interface ErrorLog {
   id: string;
   message: string;
@@ -32,6 +33,8 @@ export default function DeveloperLogsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [usersMap, setUsersMap] = useState<Record<string, { name: string, email: string }>>({});
   const [businessesMap, setBusinessesMap] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
 
   // Super admin check
   const isSuperAdmin = 
@@ -117,6 +120,17 @@ export default function DeveloperLogsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const filteredLogs = logs.filter(log => {
+    const matchesSearch = searchQuery === '' || 
+      log.message.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (log.url && log.url.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (log.stack && log.stack.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesType = typeFilter === 'all' || log.type.toLowerCase().includes(typeFilter.toLowerCase());
+    
+    return matchesSearch && matchesType;
+  });
+
   if (isLoading) {
     return <div className="flex h-full items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -146,8 +160,39 @@ export default function DeveloperLogsPage() {
 
       <Card className="border shadow-sm">
         <CardHeader className="bg-muted/30 pb-4">
-          <CardTitle className="text-lg">Recent Errors</CardTitle>
-          <CardDescription>Global crashes, unhandled promises, and UI boundaries</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg">Recent Errors</CardTitle>
+              <CardDescription>Global crashes, unhandled promises, and UI boundaries</CardDescription>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search errors..."
+                  className="pl-8 h-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full sm:w-36 h-9">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    <SelectValue placeholder="Type" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                  <SelectItem value="unhandled_rejection">Promise</SelectItem>
+                  <SelectItem value="react_error">React</SelectItem>
+                  <SelectItem value="network">Network</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -174,7 +219,7 @@ export default function DeveloperLogsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {logs.map((log) => (
+                  {filteredLogs.map((log) => (
                     <TableRow key={log.id} className="group">
                       <TableCell className="align-top whitespace-nowrap pt-4">
                         <div className="flex items-center text-xs text-muted-foreground">
@@ -249,6 +294,13 @@ export default function DeveloperLogsPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {filteredLogs.length === 0 && logs.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                        No errors match your filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

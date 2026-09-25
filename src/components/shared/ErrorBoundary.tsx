@@ -7,6 +7,8 @@ import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
 interface Props {
   children?: ReactNode;
+  userId?: string;
+  businessId?: string;
 }
 
 interface State {
@@ -25,7 +27,10 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught React Error:', error, errorInfo);
     // Use the error-logger we just created
-    logErrorToFirestore(error, 'react').catch(console.error);
+    logErrorToFirestore(error, 'react', {
+      userId: this.props.userId,
+      businessId: this.props.businessId
+    }).catch(console.error);
   }
 
   public render() {

@@ -4,9 +4,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 // Save reference to original native console before any libraries hook it
 const nativeConsoleError = typeof window !== 'undefined' ? (window.console.error || console.error) : console.error;
 
-// Prevent spam: Max 5 errors per session
+// Prevent spam: Max 50 errors per session
 let errorCount = 0;
-const MAX_ERRORS_PER_SESSION = 5;
+const MAX_ERRORS_PER_SESSION = 10;
 let isLogging = false;
 
 interface ErrorLogPayload {
@@ -55,12 +55,14 @@ export const logErrorToFirestore = async (
     'Listen/channel',
     'Bad Request',
     '400',
+    'INTERNAL ASSERTION FAILED',
     // Font / favicon / CDN noise
     'fonts.googleapis.com',
     'favicon.ico',
     '404 (Not Found)',
-    // React dev mode noise
+    // React dev mode / Browser noise
     'Fast Refresh',
+    'ResizeObserver loop completed with undelivered notifications.',
     // Generic offline noise
     'Failed to load resource',
     // Admin cyber-shield — intentionally caught & handled errors

@@ -243,6 +243,7 @@ function SettingsPageContent() {
     const [allowCashierExpenseLogging, setAllowCashierExpenseLogging] = React.useState(false);
     const [allowManagerCostPriceView, setAllowManagerCostPriceView] = React.useState(false);
     const [requireAdminApprovalForVoids, setRequireAdminApprovalForVoids] = React.useState(false);
+    const [allowBackorders, setAllowBackorders] = React.useState(true);
 
     // Effect to populate form fields when business data loads
     React.useEffect(() => {
@@ -286,6 +287,7 @@ function SettingsPageContent() {
             setAllowCashierExpenseLogging(business.settings?.allowCashierExpenseLogging || false);
             setAllowManagerCostPriceView(business.settings?.allowManagerCostPriceView || false);
             setRequireAdminApprovalForVoids(business.settings?.requireAdminApprovalForVoids || false);
+            setAllowBackorders(business.settings?.allowBackorders ?? true);
         }
     }, [business]);
 
@@ -899,6 +901,7 @@ function SettingsPageContent() {
                     <TabsTrigger value="financials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabFinancialsBilling')}</TabsTrigger>
                     <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">{t('settings.tabSystemSecurity')}</TabsTrigger>
                     <TabsTrigger value="developers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">Developers</TabsTrigger>
+                    <TabsTrigger value="personalization" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-muted/50 rounded-md px-4 py-2">Personalization</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="general" className="space-y-6 mt-0">
@@ -1687,59 +1690,6 @@ function SettingsPageContent() {
                         </CardFooter>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Paintbrush className="h-5 w-5 text-primary" />Personalization</CardTitle>
-                            <CardDescription>Personalize point of sale rules and checkout behavior.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
-                                    <Label className="text-base text-stone-900">Allow Price Override at Checkout</Label>
-                                    <p className="text-sm text-muted-foreground">When enabled, cashiers can click on a product price in the cart to negotiate and manually change the price for that specific sale.</p>
-                                </div>
-                                <Switch checked={allowPosPriceOverride} onCheckedChange={setAllowPosPriceOverride} />
-                            </div>
-                            
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
-                                    <Label className="text-base text-stone-900">Allow Managers to View Cost Prices</Label>
-                                    <p className="text-sm text-muted-foreground">When enabled, Managers can see inventory cost prices and calculate profit. If disabled, they only see selling prices.</p>
-                                </div>
-                                <Switch checked={allowManagerCostPriceView} onCheckedChange={setAllowManagerCostPriceView} />
-                            </div>
-
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
-                                    <Label className="text-base text-stone-900">Require Admin Approval for Voids & Returns</Label>
-                                    <p className="text-sm text-muted-foreground">When enabled, Cashiers and Managers cannot void sales or process returns without an Admin PIN.</p>
-                                </div>
-                                <Switch checked={requireAdminApprovalForVoids} onCheckedChange={setRequireAdminApprovalForVoids} />
-                            </div>
-
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
-                                    <Label className="text-base text-stone-900">Allow Cashiers to Log Expenses</Label>
-                                    <p className="text-sm text-muted-foreground">When enabled, Cashiers can log small daily operational expenses. When disabled, only Managers and Admins can.</p>
-                                </div>
-                                <Switch checked={allowCashierExpenseLogging} onCheckedChange={setAllowCashierExpenseLogging} />
-                            </div>
-                        </CardContent>
-                        <CardFooter>
-                            <Button
-                                type="button"
-                                onClick={() => handleSettingsSubmit('pos', {
-                                    'settings.allowPosPriceOverride': allowPosPriceOverride,
-                                    'settings.allowCashierExpenseLogging': allowCashierExpenseLogging,
-                                    'settings.allowManagerCostPriceView': allowManagerCostPriceView,
-                                    'settings.requireAdminApprovalForVoids': requireAdminApprovalForVoids
-                                })}
-                                disabled={isSaving["pos"]}
-                            >
-                                {isSaving["pos"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('common.save')}
-                            </Button>
-                        </CardFooter>
-                    </Card>
 
                     <Card>
                         <CardHeader>
@@ -1836,6 +1786,70 @@ function SettingsPageContent() {
 
                 <TabsContent value="developers" className="space-y-6 mt-0">
                     <DevelopersTab business={business} />
+                </TabsContent>
+                
+                <TabsContent value="personalization" className="space-y-6 mt-0">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Paintbrush className="h-5 w-5 text-primary" />Personalization</CardTitle>
+                            <CardDescription>Personalize point of sale rules and checkout behavior.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Allow Price Override at Checkout</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, cashiers can click on a product price in the cart to negotiate and manually change the price for that specific sale.</p>
+                                </div>
+                                <Switch checked={allowPosPriceOverride} onCheckedChange={setAllowPosPriceOverride} />
+                            </div>
+                            
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Allow Managers to View Cost Prices</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, Managers can see inventory cost prices and calculate profit. If disabled, they only see selling prices.</p>
+                                </div>
+                                <Switch checked={allowManagerCostPriceView} onCheckedChange={setAllowManagerCostPriceView} />
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Require Admin Approval for Voids & Returns</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, Cashiers and Managers cannot void sales or process returns without an Admin PIN.</p>
+                                </div>
+                                <Switch checked={requireAdminApprovalForVoids} onCheckedChange={setRequireAdminApprovalForVoids} />
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Allow Cashiers to Log Expenses</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, Cashiers can log small daily operational expenses. When disabled, only Managers and Admins can.</p>
+                                </div>
+                                <Switch checked={allowCashierExpenseLogging} onCheckedChange={setAllowCashierExpenseLogging} />
+                            </div>
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-stone-900">Allow Backorders (Negative Stock)</Label>
+                                    <p className="text-sm text-muted-foreground">When enabled, stock quantities can go into the negative, allowing products to be sold even when out of stock.</p>
+                                </div>
+                                <Switch checked={allowBackorders} onCheckedChange={setAllowBackorders} />
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <Button
+                                type="button"
+                                onClick={() => handleSettingsSubmit('pos', {
+                                    'settings.allowPosPriceOverride': allowPosPriceOverride,
+                                    'settings.allowCashierExpenseLogging': allowCashierExpenseLogging,
+                                    'settings.allowManagerCostPriceView': allowManagerCostPriceView,
+                                    'settings.requireAdminApprovalForVoids': requireAdminApprovalForVoids,
+                                    'settings.allowBackorders': allowBackorders
+                                })}
+                                disabled={isSaving["pos"]}
+                            >
+                                {isSaving["pos"] && <Loader2 className="me-2 h-4 w-4 animate-spin" />}{t('common.save')}
+                            </Button>
+                        </CardFooter>
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>

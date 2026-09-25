@@ -80,6 +80,11 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                                                     Overridden
                                                 </span>
                                             )}
+                                            {showAdminDetails && item.priceOverridden && item.priceOverrideNote && (
+                                                <div className="text-[10px] text-muted-foreground italic font-normal mt-0.5 no-print">
+                                                    Note: {item.priceOverrideNote}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="py-3 text-center">{item.quantity}</td>
                                         <td className="py-3 text-right">

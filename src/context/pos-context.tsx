@@ -3454,7 +3454,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const totalQuantityInBaseUnit = newQuantity * (multiplier || 1);
 
     if (!isService && totalQuantityInBaseUnit > (product.stock || 0)) {
-        toast({ title: existingItem ? 'Backorder recorded' : 'Backorder started', description: `${product.name} is out of stock. Recording as debt.`, variant: 'backorder' as any });
+        if (business?.settings?.allowBackorders ?? true) {
+            toast({ title: existingItem ? 'Backorder recorded' : 'Backorder started', description: `${product.name} is out of stock. Recording as debt.`, variant: 'backorder' as any });
+        } else {
+            toast({ title: 'Out of stock', description: `Cannot add ${product.name}. Backorders are disabled.`, variant: 'destructive' });
+            return;
+        }
     }
 
     setCart(prev => {
@@ -3483,11 +3488,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (item && item.product.categoryType !== 'service') {
         const multiplier = item.multiplier || 1;
         if (quantity * multiplier > (item.product.stock || 0)) {
-            toast({
-                title: 'Entering Backorder',
-                description: `You are requesting more than the ${item.product.stock || 0} units available. This will be recorded as debt.`,
-                variant: 'backorder' as any
-            });
+            if (business?.settings?.allowBackorders ?? true) {
+                toast({
+                    title: 'Entering Backorder',
+                    description: `You are requesting more than the ${item.product.stock || 0} units available. This will be recorded as debt.`,
+                    variant: 'backorder' as any
+                });
+            } else {
+                toast({
+                    title: 'Out of stock',
+                    description: `Cannot update quantity for ${item.product.name}. Backorders are disabled.`,
+                    variant: 'destructive'
+                });
+                return;
+            }
         }
     }
 

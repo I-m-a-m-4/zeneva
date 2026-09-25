@@ -33,7 +33,7 @@
 
 import * as React from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import { ArrowDown, ArrowUp, Bot, Download, Package, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, Download, Package, Sparkles, ChevronDown } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,12 +51,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -306,18 +305,25 @@ export default function TopItemsPanel({
                 })}
           </CardDescription>
         </div>
-        <Select value={measure} onValueChange={v => setMeasure(v as RankBy)}>
-          <SelectTrigger className="h-8 w-[150px] shrink-0 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="h-8 w-[150px] shrink-0 text-xs flex items-center justify-between font-normal">
+              {MEASURES.find(m => m.value === measure)?.label}
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[150px]" align="end">
             {MEASURES.map(m => (
-              <SelectItem key={m.value} value={m.value} className="text-xs">
+              <DropdownMenuItem 
+                key={m.value} 
+                onClick={() => setMeasure(m.value as RankBy)} 
+                className="text-xs"
+              >
                 {m.label}
-              </SelectItem>
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col">

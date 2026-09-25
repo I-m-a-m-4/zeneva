@@ -11,6 +11,7 @@ import RevenueGrowthIndexChart from '@/components/admin/charts/RevenueGrowthInde
 import PlanDistributionChart from '@/components/admin/charts/PlanDistributionChart';
 import RetentionCohortChart from '@/components/admin/charts/RetentionCohortChart';
 import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessChart';
+import { AdminCatalogTab } from './components/admin-catalog-tab';
 import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersChart';
 import OperationsAdoptionPanel from '@/components/admin/charts/OperationsAdoptionPanel';
 import UserActivityDotPlot from '@/components/admin/charts/UserActivityDotPlot';
@@ -233,17 +234,34 @@ const CustomTooltip = (props: any) => {
     return <CustomTooltipContent {...props} />;
 };
 
-const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) => (
+const StatCard = ({ title, value, icon: Icon, description, trend }: { 
+    title: string, 
+    value: string | number, 
+    icon: React.ElementType, 
+    description?: string,
+    trend?: { value: number, label: string }
+}) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <Icon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-            <div className="text-2xl font-bold">
-                {value}
+            <div className="flex flex-wrap items-end justify-between gap-2">
+                <div className="text-2xl font-bold">
+                    {value}
+                </div>
+                {trend && (
+                    <div className={cn(
+                        "inline-flex items-center shrink-0 whitespace-nowrap text-xs font-medium px-2 py-0.5 rounded-full mb-1",
+                        trend.value >= 0 ? "text-emerald-600 bg-emerald-500/10" : "text-rose-600 bg-rose-500/10"
+                    )}>
+                        {trend.value > 0 ? '↑' : trend.value < 0 ? '↓' : ''}
+                        {Math.abs(trend.value)}% <span className="ml-1 text-[10px] opacity-70 font-normal">{trend.label}</span>
+                    </div>
+                )}
             </div>
-            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
         </CardContent>
     </Card>
 );
@@ -2702,6 +2720,7 @@ function AdminDashboardContent({
 
     const firestore = useFirestore();
     const { toast } = useToast();
+    const [metricsDays, setMetricsDays] = useState<number>(1);
 
     // Platform totals for the tab headings. The listeners feeding these tables
     // are capped at ADMIN_LOG_LIMIT rows, so the headings are counted on the
@@ -3323,6 +3342,47 @@ function AdminDashboardContent({
             businessesWithSalesList
         }
     }, [businesses, products, convertedReceipts, users, purchases]);
+
+    const trendData = useMemo(() => {
+        if (metricsDays === 0) return null;
+        
+        const now = Date.now();
+        const msInDay = 24 * 60 * 60 * 1000;
+        const periodMs = metricsDays * msInDay;
+        const currentStart = now - periodMs;
+        const previousStart = currentStart - periodMs;
+
+        const currentGmv = convertedReceipts.filter(r => safeToDate(r.createdAt).getTime() >= currentStart).reduce((sum, r) => sum + r.total, 0);
+        const previousGmv = convertedReceipts.filter(r => {
+            const t = safeToDate(r.createdAt).getTime();
+            return t >= previousStart && t < currentStart;
+        }).reduce((sum, r) => sum + r.total, 0);
+        const gmvTrend = previousGmv === 0 ? (currentGmv > 0 ? 100 : 0) : ((currentGmv - previousGmv) / previousGmv) * 100;
+
+        const currentSales = convertedReceipts.filter(r => safeToDate(r.createdAt).getTime() >= currentStart).length;
+        const previousSales = convertedReceipts.filter(r => {
+            const t = safeToDate(r.createdAt).getTime();
+            return t >= previousStart && t < currentStart;
+        }).length;
+        const salesTrend = previousSales === 0 ? (currentSales > 0 ? 100 : 0) : ((currentSales - previousSales) / previousSales) * 100;
+
+        const currentUsers = users.filter(u => safeToDate(u.createdAt).getTime() >= currentStart).length;
+        const previousUsers = users.filter(u => {
+            const t = safeToDate(u.createdAt).getTime();
+            return t >= previousStart && t < currentStart;
+        }).length;
+        const usersTrend = previousUsers === 0 ? (currentUsers > 0 ? 100 : 0) : ((currentUsers - previousUsers) / previousUsers) * 100;
+
+        const labelMap: Record<number, string> = { 1: 'yesterday', 7: 'last week', 30: 'last month' };
+        const label = `vs ${labelMap[metricsDays] || 'previous period'}`;
+
+        return {
+            gmv: { value: Math.round(gmvTrend), label },
+            sales: { value: Math.round(salesTrend), label },
+            users: { value: Math.round(usersTrend), label },
+        };
+    }, [convertedReceipts, users, metricsDays]);
+
     const analyticsData = useMemo(() => {
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
         const allUsers = users || [];
@@ -4145,6 +4205,10 @@ function AdminDashboardContent({
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList className="no-capture flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
                     <TabsTrigger value="overview" className="snap-start shrink-0">Overview</TabsTrigger>
+                    <TabsTrigger value="catalog" className="gap-2 snap-start shrink-0">
+                        <Package className="h-4 w-4" />
+                        Platform Catalog
+                    </TabsTrigger>
                     <TabsTrigger value="acquisition" className="gap-2 snap-start shrink-0">
                         <DoorOpen className="h-4 w-4" />
                         Acquisition
@@ -4180,11 +4244,25 @@ function AdminDashboardContent({
 
                 <TabsContent value="overview" className="space-y-6">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                             <CardTitle className="flex items-center gap-2">
                                 <HeartPulse className="h-5 w-5 text-red-500 animate-pulse" />
                                 Platform Overview Command
                             </CardTitle>
+                            <Select value={metricsDays.toString()} onValueChange={(val) => setMetricsDays(parseInt(val))}>
+                                <SelectTrigger className="w-[140px] h-8 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <CalendarIcon className="h-3 w-3" />
+                                        <SelectValue placeholder="Timeframe" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="1">Last 24 Hours</SelectItem>
+                                    <SelectItem value="7">Last 7 Days</SelectItem>
+                                    <SelectItem value="30">Last 30 Days</SelectItem>
+                                    <SelectItem value="0">All Time (No trends)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </CardHeader>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4">
                         <button onClick={() => handleOpenDetailModal('totalUsers')} className="text-left w-full h-full transition-transform active:scale-95">
@@ -4193,6 +4271,7 @@ function AdminDashboardContent({
                                 value={analyticsData.totalUsers} 
                                 icon={Users} 
                                 description="Total registered user accounts"
+                                trend={trendData?.users}
                             />
                         </button>
                         <button onClick={() => handleOpenDetailModal('totalBusinesses')} className="text-left w-full h-full transition-transform active:scale-95">
@@ -4250,7 +4329,7 @@ function AdminDashboardContent({
                             <StatCard title="MRR" value={`₦${Math.round(analyticsData.mrr).toLocaleString()}`} icon={DollarSign} description={analyticsData.mrrDescription} />
                         </button>
                         <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" />
+                            <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" trend={trendData?.sales} />
                         </button>
                         <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="Activated" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description="Businesses with >10 products" />
@@ -4802,6 +4881,10 @@ function AdminDashboardContent({
 
                     </div>
                  </TabsContent>
+
+                <TabsContent value="catalog" className="space-y-6">
+                    <AdminCatalogTab products={products} businesses={businesses} />
+                </TabsContent>
 
                 {/* Everyone who installed and never got as far as an account. This
                     is the only surface in the app that sees a signed-out user —
@@ -5964,7 +6047,7 @@ function AdminDashboardContent({
             />
 
             <Dialog open={isSalesVelocityOpen} onOpenChange={isSalesVelocityOpen ? setIsSalesVelocityOpen : undefined}>
-                <DialogContent className="max-w-4xl w-[95vw]">
+                <DialogContent className="max-w-6xl w-[95vw]">
                     <DialogHeader>
                         <DialogTitle className="flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center gap-2">
@@ -5993,8 +6076,8 @@ function AdminDashboardContent({
                     
                     <div className="grid gap-6 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <StatCard title="Total Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString()}`} icon={DollarSign} />
-                            <StatCard title="Total Sales Count" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} />
+                            <StatCard title="Total Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString()}`} icon={DollarSign} trend={trendData?.gmv} />
+                            <StatCard title="Total Sales Count" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} trend={trendData?.sales} />
                             <StatCard title="Overall ARPU" value={`₦${(analyticsData.platformGmv / (analyticsData.revenueGeneratingBusinessesCount || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Users} />
                         </div>
                         

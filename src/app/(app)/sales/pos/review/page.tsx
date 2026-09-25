@@ -86,7 +86,7 @@ function ReviewPageContent() {
             name: item.product.name,
             quantity: item.quantity,
             price: item.product.price,
-            costPrice: item.product.costPrice || 0,
+            costPrice: item.costPriceOverride ?? item.product.costPrice ?? 0,
             priceOverridden: !!item.isPriceOverride,
             priceOverrideNote: item.priceOverrideNote || null
         })),

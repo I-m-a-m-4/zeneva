@@ -41,6 +41,7 @@ import ProfitLossStatement from '@/components/reports/profit-loss-statement';
 import RevenueForecastCard from '@/components/reports/revenue-forecast-card';
 import DailyCustomerRetentionChart from '@/components/reports/daily-customer-retention-chart';
 import BusinessRatingPanel from '@/components/reports/business-rating-panel';
+import { DeltaChip } from '@/components/reports/delta-chip';
 import StaffPerformance from '@/components/reports/staff-performance';
 import CategoryPerformance from '@/components/reports/category-performance';
 import MarginLeaksPanel from '@/components/reports/margin-leaks';
@@ -889,6 +890,38 @@ export default function ReportsDashboard() {
         if (!previousReceipts) return null;
         const current = summarisePeriod(deepReceipts, products || [], reportBatchExpenses);
         const prior = summarisePeriod(previousReceipts, products || [], previousExpenses);
+
+        let priorProductRevenue = 0;
+        let priorServiceRevenue = 0;
+        let priorCost = 0;
+
+        previousReceipts.forEach(r => {
+            let receiptProductSum = 0;
+            let receiptServiceSum = 0;
+            
+            r.items?.forEach(i => {
+                const product = products?.find(p => p.id === i.productId);
+                const itemRevenue = (Number(i.price) || 0) * (Number(i.quantity) || 0);
+                if (product?.categoryType === 'service') {
+                    receiptServiceSum += itemRevenue;
+                } else {
+                    receiptProductSum += itemRevenue;
+                }
+            });
+
+            const receiptTotalRaw = receiptProductSum + receiptServiceSum;
+            const actualReceiptRevenue = Number(r.total) || 0;
+
+            if (receiptTotalRaw > 0) {
+                priorProductRevenue += ((receiptProductSum / receiptTotalRaw) * actualReceiptRevenue);
+                priorServiceRevenue += ((receiptServiceSum / receiptTotalRaw) * actualReceiptRevenue);
+            } else {
+                priorProductRevenue += actualReceiptRevenue;
+            }
+            
+            priorCost += (r.totalCost ?? r.items?.reduce((sumCost, item) => sumCost + ((item.costPrice || 0) * (item.quantity || 0)), 0) ?? 0);
+        });
+
         return {
             revenue: periodDelta(current.revenue, prior.revenue),
             sales: periodDelta(current.sales, prior.sales),
@@ -902,8 +935,11 @@ export default function ReportsDashboard() {
                     : null,
             expenses: periodDelta(current.totalExpenses, prior.totalExpenses),
             netProfit: periodDelta(current.netProfit, prior.netProfit),
+            productRevenue: periodDelta(finalReportData?.totalProductRevenue || 0, priorProductRevenue),
+            serviceRevenue: periodDelta(finalReportData?.totalServiceRevenue || 0, priorServiceRevenue),
+            cost: periodDelta(finalReportData?.totalCost || 0, priorCost),
         };
-    }, [previousReceipts, deepReceipts, products]);
+    }, [previousReceipts, deepReceipts, products, previousExpenses, reportBatchExpenses, finalReportData]);
 
     /**
      * Export the Analytics tab as data rather than as a picture.
@@ -1094,6 +1130,7 @@ export default function ReportsDashboard() {
                                     value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={FileText}
                                     description={t('reports.kpiNetCostHint')}
+                                    delta={comparison?.cost}
                                     onClick={() => {
                                         setActiveTab('profit-loss');
                                         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1117,6 +1154,7 @@ export default function ReportsDashboard() {
                                     value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={Package}
                                     description={t('reports.kpiProductRevenueHint')}
+                                    delta={comparison?.productRevenue}
                                     onClick={() => setInsightModal({
                                         id: 'product-revenue',
                                         title: t('reports.kpiProductRevenue'),
@@ -1129,6 +1167,7 @@ export default function ReportsDashboard() {
                                     value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={TrendingUp}
                                     description={t('reports.kpiServiceRevenueHint')}
+                                    delta={comparison?.serviceRevenue}
                                     onClick={() => setInsightModal({
                                         id: 'service-revenue',
                                         title: t('reports.kpiServiceRevenue'),
@@ -1179,6 +1218,7 @@ export default function ReportsDashboard() {
                                     value={finalReportData?.dailyAverageSales?.toFixed(1) || '0'}
                                     icon={TrendingUp}
                                     description={t('reports.kpiDailyVelocityHint')}
+                                    delta={comparison?.sales}
                                     onClick={() => setInsightModal({
                                         id: 'daily-velocity',
                                         title: t('reports.kpiDailyVelocity'),
@@ -1191,6 +1231,7 @@ export default function ReportsDashboard() {
                                     value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
                                     description={t('reports.kpiDailyRevenueHint')}
+                                    delta={comparison?.revenue}
                                     onClick={() => setInsightModal({
                                         id: 'daily-revenue',
                                         title: t('reports.kpiDailyRevenue'),
@@ -1227,6 +1268,7 @@ export default function ReportsDashboard() {
                                     title={t('reports.kpiCustomers')}
                                     value={finalReportData?.totalCustomers.toLocaleString() || '0'}
                                     icon={Users}
+                                    delta={comparison?.buyers}
                                     onClick={() => setInsightModal({
                                         id: 'customers',
                                         title: t('reports.kpiCustomers'),

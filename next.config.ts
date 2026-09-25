@@ -62,7 +62,6 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
-    serverMinification: false,
     serverActions: {
       bodySizeLimit: '50mb',
     },

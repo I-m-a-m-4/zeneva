@@ -416,6 +416,8 @@ export default function AuthenticatedLayout({
         router.push(`/settings?tab=${tab}`);
       } else if (action === 'contact_support') {
         router.push('/settings?tab=support');
+      } else if (action === 'open_visual_stock_take') {
+        router.push('/inventory/stock-take');
       }
     };
     window.addEventListener('zen-page-action', handlePageAction);
@@ -1430,7 +1432,7 @@ export default function AuthenticatedLayout({
   }
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary userId={user?.uid} businessId={businessInstance?.id}>
       <>
       <TooltipProvider>
         <SidebarProvider defaultOpen={true} className="h-full">

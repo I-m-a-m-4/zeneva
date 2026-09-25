@@ -22,7 +22,8 @@ import {
     Info,
     CalendarIcon,
     ArrowDownLeft,
-    ArrowUpRight
+    ArrowUpRight,
+    Search
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -390,18 +391,32 @@ function EditProductContent() {
     }, [stockLogs, product?.stock]);
 
     const [logFilter, setLogFilter] = React.useState('all');
+    const [logSearchTerm, setLogSearchTerm] = React.useState('');
     const [salesPeriod, setSalesPeriod] = React.useState<'30d' | '90d' | '6m' | '1y' | 'all'>('6m');
 
     const filteredLogs = React.useMemo(() => {
-        if (logFilter === 'all') return combinedLogs;
-        return combinedLogs.filter((log: any) => {
-            if (logFilter === 'in') return log.type === 'in';
-            if (logFilter === 'out') return log.type === 'out';
-            if (logFilter === 'return') return log.type === 'return';
-            if (logFilter === 'adjustment') return log.type === 'adjustment';
-            return true;
-        });
-    }, [combinedLogs, logFilter]);
+        let result = combinedLogs;
+        
+        if (logFilter !== 'all') {
+            result = result.filter((log: any) => {
+                if (logFilter === 'in') return log.type === 'in';
+                if (logFilter === 'out') return log.type === 'out';
+                if (logFilter === 'return') return log.type === 'return';
+                if (logFilter === 'adjustment') return log.type === 'adjustment';
+                return true;
+            });
+        }
+        
+        if (logSearchTerm.trim()) {
+            const lower = logSearchTerm.toLowerCase();
+            result = result.filter((log: any) => 
+                (log.notes && log.notes.toLowerCase().includes(lower)) ||
+                (log.userEmail && log.userEmail.toLowerCase().includes(lower))
+            );
+        }
+
+        return result;
+    }, [combinedLogs, logFilter, logSearchTerm]);
 
     const salesData = React.useMemo(() => {
         const salesLogs = combinedLogs.filter((log: any) => log.type === 'out');
@@ -629,11 +644,12 @@ function EditProductContent() {
                         businessId: business.id,
                         productId: product.id,
                         productName: product.name,
-                        type: 'adjustment',
+                        type: adjustment > 0 ? 'in' : 'out',
                         quantity: Math.abs(adjustment),
                         closingStock: values.stock,
-                        notes: `Manual adjustment from ${product.stock} to ${values.stock}`,
-                        createdBy: currentUserProfile.name
+                        notes: `Manual adjustment from ${product.stock} to ${values.stock} (${adjustment > 0 ? '+' : ''}${adjustment})`,
+                        createdBy: currentUserProfile.name,
+                        date: new Date()
                     }
                 }, `Logging inventory transaction for ${product.name}`);
             }
@@ -1490,7 +1506,7 @@ function EditProductContent() {
 
                 {product?.id && (categoryType === 'product' || categoryType === 'service') && (
                     <div className="mt-4">
-                        <ProductStockHistoryChart productId={product.id} />
+                        <ProductStockHistoryChart productId={product.id} externalLogs={stockLogs} />
                     </div>
                 )}
 
@@ -1509,6 +1525,16 @@ function EditProductContent() {
                                             : t('inventory.stockHistoryHint')}
                                     </CardDescription>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative">
+                                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search logs..."
+                                            value={logSearchTerm}
+                                            onChange={(e) => setLogSearchTerm(e.target.value)}
+                                            className="pl-8 h-8 w-[150px] sm:w-[200px] text-xs"
+                                        />
+                                    </div>
                                 <DropdownMenu modal={false}>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" size="sm" className="w-[150px] h-8 text-[11px] justify-between bg-background font-normal">
@@ -1526,6 +1552,7 @@ function EditProductContent() {
                                         {categoryType === 'product' && <DropdownMenuItem onClick={() => setLogFilter('adjustment')}>{t('inventory.logFilterAdjustments')}</DropdownMenuItem>}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">

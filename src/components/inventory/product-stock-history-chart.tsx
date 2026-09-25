@@ -14,20 +14,31 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useI18n } from '@/context/i18n-context';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export function ProductStockHistoryChart({ productId }: { productId: string }) {
+export function ProductStockHistoryChart({ productId, externalLogs }: { productId: string; externalLogs?: InventoryTransaction[] }) {
     const { business, firestore } = usePOS();
     const { t } = useI18n();
     const [transactions, setTransactions] = React.useState<InventoryTransaction[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [activeTab, setActiveTab] = React.useState<'both' | 'in' | 'out'>('both');
+    const [timeRange, setTimeRange] = React.useState<'15d' | '30d' | '90d' | 'all'>('all');
 
     React.useEffect(() => {
         if (!business?.id || !firestore || !productId) {
+            if (externalLogs && externalLogs.length > 0) {
+                setTransactions(externalLogs);
+            }
             setIsLoading(false);
             return;
         }
@@ -41,20 +52,33 @@ export function ProductStockHistoryChart({ productId }: { productId: string }) {
         );
 
         const unsubscribe = onSnapshot(txQuery, (snap) => {
-            const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryTransaction))
-                                  .sort((a, b) => ((a.date?.seconds || 0) - (b.date?.seconds || 0)));
+            const rawLogs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryTransaction));
             
-            // Limit client-side to last 100 transactions to prevent massive charts
-            const recentLogs = logs.slice(-100);
+            // Merge with external/legacy audit logs if provided
+            const allLogsMap = new Map<string, InventoryTransaction>();
+            (externalLogs || []).forEach(l => { if (l.id) allLogsMap.set(l.id, l); });
+            rawLogs.forEach(l => { if (l.id) allLogsMap.set(l.id, l); });
+            
+            const combinedLogs = Array.from(allLogsMap.values()).sort((a, b) => {
+                const timeA = parseTxDate(a.date)?.getTime() || 0;
+                const timeB = parseTxDate(b.date)?.getTime() || 0;
+                return timeA - timeB;
+            });
+            
+            // Limit client-side to last 200 transactions
+            const recentLogs = combinedLogs.slice(-200);
             setTransactions(recentLogs);
             setIsLoading(false);
         }, (err) => {
             console.error('Failed to load product stock history:', err);
+            if (externalLogs && externalLogs.length > 0) {
+                setTransactions(externalLogs);
+            }
             setIsLoading(false);
         });
 
         return () => unsubscribe();
-    }, [business?.id, firestore, productId]);
+    }, [business?.id, firestore, productId, externalLogs]);
 
     if (isLoading) {
         return (
@@ -64,14 +88,42 @@ export function ProductStockHistoryChart({ productId }: { productId: string }) {
         );
     }
 
-    // Process data for the chart (last 15 days)
-    const chartData: { date: string; inflow: number; outflow: number }[] = [];
-    for (let i = 14; i >= 0; i--) {
+function parseTxDate(dateVal: any): Date | null {
+    if (!dateVal) return null;
+    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
+    if (typeof dateVal.seconds === 'number') return new Date(dateVal.seconds * 1000);
+    if (dateVal instanceof Date) return dateVal;
+    if (typeof dateVal === 'number') return new Date(dateVal);
+    if (typeof dateVal === 'string') {
+        const d = new Date(dateVal);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+}
+
+    // Process data for the chart based on selected time range
+    let daysCount = 15;
+    if (timeRange === '30d') daysCount = 30;
+    else if (timeRange === '90d') daysCount = 90;
+    else if (timeRange === 'all') {
+        let oldestTime = Date.now();
+        transactions.forEach(tx => {
+            const d = parseTxDate(tx.date);
+            if (d && d.getTime() < oldestTime) oldestTime = d.getTime();
+        });
+        const diffDays = Math.ceil((Date.now() - oldestTime) / (1000 * 60 * 60 * 24));
+        daysCount = Math.max(15, Math.min(diffDays + 2, 365));
+    }
+
+    const chartData: { date: string; fullDate: string; inflow: number; outflow: number }[] = [];
+    for (let i = daysCount - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const dateStr = format(d, 'dd MMM');
+        const fullDate = format(d, 'yyyy-MM-dd');
         chartData.push({
             date: dateStr,
+            fullDate,
             inflow: 0,
             outflow: 0
         });
@@ -81,18 +133,24 @@ export function ProductStockHistoryChart({ productId }: { productId: string }) {
     let totalOutflow = 0;
 
     transactions.forEach((tx) => {
-        if (tx.date?.seconds) {
-            const txDate = new Date(tx.date.seconds * 1000);
-            const dateStr = format(txDate, 'dd MMM');
-            const dayData = chartData.find(d => d.date === dateStr);
-            const isAddition = tx.type === 'in' || tx.type === 'return' || (tx.type === 'adjustment' && tx.quantity > 0);
+        const txDate = parseTxDate(tx.date);
+        if (txDate) {
+            const fullDateStr = format(txDate, 'yyyy-MM-dd');
+            const dayData = chartData.find(d => d.fullDate === fullDateStr);
             
-            if (isAddition) {
-                totalInflow += Math.abs(tx.quantity);
-                if (dayData) dayData.inflow += Math.abs(tx.quantity);
-            } else {
-                totalOutflow += Math.abs(tx.quantity);
-                if (dayData) dayData.outflow += Math.abs(tx.quantity);
+            const isAddition = tx.type === 'in' || tx.type === 'return' || 
+                (tx.type === 'adjustment' && !tx.notes?.toLowerCase().includes('decrease') && !tx.notes?.toLowerCase().includes('subtracted') && !tx.notes?.toLowerCase().includes('reduction'));
+            
+            const qty = Math.abs(tx.quantity || 0);
+
+            if (dayData) {
+                if (isAddition) {
+                    totalInflow += qty;
+                    dayData.inflow += qty;
+                } else {
+                    totalOutflow += qty;
+                    dayData.outflow += qty;
+                }
             }
         }
     });
@@ -107,13 +165,34 @@ export function ProductStockHistoryChart({ productId }: { productId: string }) {
                         <CardTitle className="text-base font-semibold">Item Inflow and Outflow</CardTitle>
                         <CardDescription>Track daily stock movement</CardDescription>
                     </div>
-                    <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full sm:w-[300px]">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="both">Both</TabsTrigger>
-                            <TabsTrigger value="in">Inflow</TabsTrigger>
-                            <TabsTrigger value="out">Outflow</TabsTrigger>
-                        </TabsList>
-                    </Tabs>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-9 text-xs justify-between font-normal min-w-[120px]">
+                                    <span>
+                                        {timeRange === '15d' ? 'Last 15 Days' :
+                                         timeRange === '30d' ? 'Last 30 Days' :
+                                         timeRange === '90d' ? 'Last 90 Days' : 'All Time'}
+                                    </span>
+                                    <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-2" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-[140px]">
+                                <DropdownMenuItem onClick={() => setTimeRange('15d')}>Last 15 Days</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setTimeRange('30d')}>Last 30 Days</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setTimeRange('90d')}>Last 90 Days</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setTimeRange('all')}>All Time</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full sm:w-[220px]">
+                            <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="both">Both</TabsTrigger>
+                                <TabsTrigger value="in">Inflow</TabsTrigger>
+                                <TabsTrigger value="out">Outflow</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>
