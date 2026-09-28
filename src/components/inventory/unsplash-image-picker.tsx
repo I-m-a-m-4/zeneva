@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { apiBase } from '@/lib/platform';
 import { usePOS } from '@/context/pos-context';
+import { useFirestore } from '@/firebase';
+import { logAuditEvent } from '@/lib/audit';
 import { hasProFeatures } from '@/lib/plan';
 import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
 
@@ -74,7 +76,8 @@ const getQuerySuggestions = (raw: string): string[] => {
 };
 
 export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', disabled = false }: UnsplashImagePickerProps) {
-    const { business } = usePOS();
+    const { business, currentUserProfile } = usePOS();
+    const firestore = useFirestore();
     const isPro = hasProFeatures(business);
     const [showUpgrade, setShowUpgrade] = useState(false);
 
@@ -231,6 +234,16 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
             const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
             
             onImageSelect(imageUrl, file);
+
+            // Audit log image fetch action for tracking in Admin / Audit Logs
+            if (firestore && business?.id && currentUserProfile) {
+                logAuditEvent(firestore, business.id, currentUserProfile, {
+                    action: 'product.image_fetch',
+                    entity: { type: 'product', id: targetImage.id, name: targetImage.title || query },
+                    details: { searchQuery: query, selectedUrl: imageUrl, imageId: targetImage.id }
+                });
+            }
+
             setOpen(false);
         } catch (err) {
             console.error('Error preparing image:', err);

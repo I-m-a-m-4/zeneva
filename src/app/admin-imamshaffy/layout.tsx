@@ -5,13 +5,12 @@ import { useUser, useFirestore } from '@/firebase';
 import { terminalListenerErrorHandler } from '@/firebase/retry';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap, Clapperboard, PieChart, MoreHorizontal, Mail, Smartphone, Database, Sparkles, ShoppingBag } from 'lucide-react';
+import { Loader, LogOut, LayoutDashboard, Newspaper, Bell, MessageSquare, Crown, Sun, Moon, Bug, Users, Zap, Clapperboard, PieChart, MoreHorizontal, Mail, Smartphone, Database, Sparkles, FileDigit, UserCheck, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuth, signOut } from 'firebase/auth';
 import { cn } from '@/lib/utils';
 import Confetti from '@/components/shared/confetti';
 import { usePOS } from '@/context/pos-context';
-import Admin2FAGate from '@/components/admin/admin-2fa-gate';
 import { useTheme } from 'next-themes';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -33,11 +32,13 @@ const ADMIN_EMAIL = 'belloimam431@gmail.com';
  */
 const navLinks = [
   { href: '/admin-imamshaffy', label: 'Dashboard', icon: LayoutDashboard, primary: true },
-  { href: '/admin-imamshaffy/catalog', label: 'Catalog', icon: ShoppingBag, primary: true },
+  { href: '/admin-imamshaffy/invoices', label: 'Invoices Hub', icon: FileDigit, primary: true },
   { href: '/admin-imamshaffy/users', label: 'Users', icon: Users, primary: true },
+  { href: '/admin-imamshaffy/customers', label: 'Customers', icon: UserCheck },
+  { href: '/admin-imamshaffy/catalog', label: 'Catalog', icon: ShoppingBag },
   { href: '/admin-imamshaffy/investors', label: 'Cap Table', icon: PieChart },
   { href: '/admin-imamshaffy/achievements', label: 'Achievements', icon: Crown },
-  { href: '/admin-imamshaffy/outreach', label: 'Outreach', icon: Mail, primary: true },
+  { href: '/admin-imamshaffy/outreach', label: 'Email', icon: Mail },
   { href: '/admin-imamshaffy/blog', label: 'Blog', icon: Newspaper },
   { href: '/admin-imamshaffy/marketing', label: 'Studio', icon: Clapperboard },
   { href: '/admin-imamshaffy/promos', label: 'Promo Popups', icon: Sparkles },
@@ -347,9 +348,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Page content — extra bottom padding on mobile to clear the bottom nav */}
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 overflow-y-auto pb-24 md:pb-8">
-          <Admin2FAGate>
-            {children}
-          </Admin2FAGate>
+          {children}
         </main>
 
         {/* Mobile Bottom Navigation — four primary links plus a "More" sheet.

@@ -654,10 +654,32 @@ export default function ReportsDashboard() {
                     // Try to trigger the analytics CSV export if available
                     const btn = document.querySelector('[data-export-analytics-csv]') as HTMLButtonElement;
                     if (btn) btn.click();
-                    else downloadCsv(reportBatchReceipts, products, customers);
+                    else {
+                        const rows: (string | number)[][] = [
+                            ['Receipt ID', 'Date', 'Total', 'Payment Method', 'Items Count'],
+                            ...reportBatchReceipts.map(r => [
+                                r.id || r.receiptNumber || '',
+                                r.timestamp?.seconds ? new Date(r.timestamp.seconds * 1000).toISOString().split('T')[0] : '',
+                                r.total || 0,
+                                r.paymentMethod || '',
+                                r.items?.length || 0
+                            ])
+                        ];
+                        downloadCsv(`zeneva-report-receipts-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+                    }
                 } else {
                     // Raw receipts data export (Daily Sales style)
-                    downloadCsv(reportBatchReceipts, products, customers);
+                    const rows: (string | number)[][] = [
+                        ['Receipt ID', 'Date', 'Total', 'Payment Method', 'Items Count'],
+                        ...reportBatchReceipts.map(r => [
+                            r.id || r.receiptNumber || '',
+                            r.timestamp?.seconds ? new Date(r.timestamp.seconds * 1000).toISOString().split('T')[0] : '',
+                            r.total || 0,
+                            r.paymentMethod || '',
+                            r.items?.length || 0
+                        ])
+                    ];
+                    downloadCsv(`zeneva-report-receipts-${new Date().toISOString().slice(0, 10)}.csv`, rows);
                 }
             } else if (action === 'switch_report_tab') {
                 setActiveTab(payload || 'profit-loss');

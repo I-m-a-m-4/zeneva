@@ -111,7 +111,7 @@ import { QuickRestockModal } from '@/components/inventory/quick-restock-modal';
 import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { useBranch } from '@/context/branch-context';
-import { cn, safeToDate } from '@/lib/utils';
+import { cn, safeToDate, smartSearchMatch } from '@/lib/utils';
 import { apiBase } from '@/lib/platform';
 import { trackFeature } from '@/lib/product-telemetry';
 import GlobalStockHistory from '@/components/inventory/global-stock-history';
@@ -454,13 +454,13 @@ function InventoryPageContent() {
     // Local products only
     let base = [...(products || [])];
     
-    // Apply local search filter
+    // Apply local search filter with smart hyphen/space-tolerant search
     if (searchTerm.trim()) {
-      const lower = searchTerm.toLowerCase();
       base = base.filter(p => 
-        p.name.toLowerCase().includes(lower) || 
-        p.sku?.toLowerCase().includes(lower) ||
-        p.category?.toLowerCase().includes(lower)
+        smartSearchMatch(p.name, searchTerm) || 
+        smartSearchMatch(p.sku, searchTerm) ||
+        smartSearchMatch(p.barcode, searchTerm) ||
+        smartSearchMatch(p.category, searchTerm)
       );
     }
 
@@ -1331,14 +1331,6 @@ function InventoryPageContent() {
                   <DropdownMenuItem asChild>
                     <Link href="/inventory/suppliers">
                       <Truck className="me-2 h-4 w-4" /> Suppliers & Purchase Orders
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-
-                {canManageStock && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/inventory/stock-take">
-                      <Camera className="me-2 h-4 w-4" /> Visual Stock Take
                     </Link>
                   </DropdownMenuItem>
                 )}

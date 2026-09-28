@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Dialog,
   DialogContent,
@@ -408,22 +409,25 @@ export default function PurchaseOrdersPage() {
             <div className="p-3 bg-muted/40 rounded-lg space-y-3 border">
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Products to Order</Label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Select value={selectedProductId} onValueChange={(val) => {
-                  setSelectedProductId(val);
-                  const prod = products?.find(p => p.id === val);
-                  if (prod && (prod.costPrice || prod.price)) {
-                    setItemCost((prod.costPrice || prod.price).toString());
-                  }
-                }}>
-                  <SelectTrigger className="sm:col-span-3">
-                    <SelectValue placeholder="Search product to add..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products?.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name} (Stock: {p.stock || 0})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={(products || []).map(p => ({
+                    value: p.id,
+                    label: `${p.name}${p.sku ? ` [${p.sku}]` : ''} (Stock: ${p.stock ?? 0})`
+                  }))}
+                  value={selectedProductId}
+                  onChange={(val) => {
+                    setSelectedProductId(val);
+                    const prod = products?.find(p => p.id === val);
+                    if (prod && (prod.costPrice || prod.price)) {
+                      setItemCost((prod.costPrice || prod.price).toString());
+                    }
+                  }}
+                  placeholder="Search & pick product to add..."
+                  searchPlaceholder="Search product by name or SKU..."
+                  triggerClassName="sm:col-span-3 text-xs"
+                  allowDeselect={false}
+                  modal={true}
+                />
 
                 <div className="grid gap-1">
                   <span className="text-[11px] text-muted-foreground">Quantity</span>

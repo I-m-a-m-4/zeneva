@@ -21,9 +21,10 @@ import {
     AlertCircle,
     Info,
     CalendarIcon,
-    ArrowDownLeft,
     ArrowUpRight,
-    Search
+    ArrowDownLeft,
+    Search,
+    Camera
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -97,6 +98,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { UnsplashImagePicker } from '@/components/inventory/unsplash-image-picker';
+import ProductVisualStockTakeDialog from '@/components/inventory/product-visual-stock-take-dialog';
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import Image from "next/image";
@@ -193,6 +195,7 @@ function EditProductContent() {
     const [stockLogs, setStockLogs] = React.useState<AuditLog[]>([]);
     const [isLogsLoading, setIsLogsLoading] = React.useState(true);
     const [quantityToAddInput, setQuantityToAddInput] = React.useState<string>('');
+    const [isVisualStockDialogOpen, setIsVisualStockDialogOpen] = React.useState(false);
 
     // Category Management
     const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = React.useState(false);
@@ -1047,6 +1050,42 @@ function EditProductContent() {
                                                                     {product ? "Enter the quantity of new stock purchased/added" : "Manage initial stock level for this item"}
                                                                 </p>
                                                             </div>
+                                                            <Button 
+                                                                type="button" 
+                                                                variant="outline" 
+                                                                size="sm" 
+                                                                className="shrink-0 text-xs gap-1.5 border-emerald-500/40 bg-emerald-50/50 hover:bg-emerald-100/70 hover:border-emerald-500/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/40 text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200 transition-colors font-medium shadow-none"
+                                                                onClick={() => setIsVisualStockDialogOpen(true)}
+                                                            >
+                                                                <Camera className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                                                <span className="text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200">Visual Stock Take</span>
+                                                            </Button>
+                                                            <ProductVisualStockTakeDialog
+                                                                open={isVisualStockDialogOpen}
+                                                                onOpenChange={setIsVisualStockDialogOpen}
+                                                                productName={product?.name || form.getValues('name') || 'Product'}
+                                                                currentStock={currentStock}
+                                                                onApplyCount={(counted, mode) => {
+                                                                    if (mode === 'add') {
+                                                                        setQuantityToAddInput(String(counted));
+                                                                        field.onChange(currentStock + counted);
+                                                                        toast({
+                                                                            title: "Stock Restock Applied 📦",
+                                                                            description: `Added +${counted} units of ${product?.name || 'product'} to stock.`,
+                                                                            variant: "success",
+                                                                        });
+                                                                    } else {
+                                                                        const added = counted - currentStock;
+                                                                        setQuantityToAddInput(String(added));
+                                                                        field.onChange(counted);
+                                                                        toast({
+                                                                            title: "Total Stock Updated 📦",
+                                                                            description: `Stock level set to ${counted} units.`,
+                                                                            variant: "success",
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            />
                                                         </div>
                                                         
                                                         {/* Visual Math UI */}

@@ -11,7 +11,6 @@ import RevenueGrowthIndexChart from '@/components/admin/charts/RevenueGrowthInde
 import PlanDistributionChart from '@/components/admin/charts/PlanDistributionChart';
 import RetentionCohortChart from '@/components/admin/charts/RetentionCohortChart';
 import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessChart';
-import { AdminCatalogTab } from './components/admin-catalog-tab';
 import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersChart';
 import OperationsAdoptionPanel from '@/components/admin/charts/OperationsAdoptionPanel';
 import UserActivityDotPlot from '@/components/admin/charts/UserActivityDotPlot';
@@ -99,10 +98,18 @@ import {
     ChevronUp,
     DoorOpen,
     UploadCloud,
+    FileDigit,
+    ReceiptText,
+    Wallet,
+    CreditCard,
+    ArrowDownRight,
+    ArrowUpRight,
+    CheckCheck,
+    FileSpreadsheet,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import html2canvas from 'html2canvas';
 import Image from 'next/image';
 import {
@@ -234,34 +241,17 @@ const CustomTooltip = (props: any) => {
     return <CustomTooltipContent {...props} />;
 };
 
-const StatCard = ({ title, value, icon: Icon, description, trend }: { 
-    title: string, 
-    value: string | number, 
-    icon: React.ElementType, 
-    description?: string,
-    trend?: { value: number, label: string }
-}) => (
+const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <Icon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-            <div className="flex flex-wrap items-end justify-between gap-2">
-                <div className="text-2xl font-bold">
-                    {value}
-                </div>
-                {trend && (
-                    <div className={cn(
-                        "inline-flex items-center shrink-0 whitespace-nowrap text-xs font-medium px-2 py-0.5 rounded-full mb-1",
-                        trend.value >= 0 ? "text-emerald-600 bg-emerald-500/10" : "text-rose-600 bg-rose-500/10"
-                    )}>
-                        {trend.value > 0 ? '↑' : trend.value < 0 ? '↓' : ''}
-                        {Math.abs(trend.value)}% <span className="ml-1 text-[10px] opacity-70 font-normal">{trend.label}</span>
-                    </div>
-                )}
+            <div className="text-2xl font-bold">
+                {value}
             </div>
-            {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </CardContent>
     </Card>
 );
@@ -668,7 +658,7 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                             <CardTitle className="text-2xl font-bold">₦{Math.round(totalSubscriptionRevenue).toLocaleString()}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-[10px] text-muted-foreground">Zeneva's own subscription fees collected to date. Not platform GMV — that is what merchants sold. Dollar payments converted at ₦1,500/$1.</p>
+                            <p className="text-[10px] text-muted-foreground">Zeneva&apos;s own subscription fees collected to date. Not platform GMV — that is what merchants sold. Dollar payments converted at ₦1,500/$1.</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -925,6 +915,7 @@ function UserListDialog({ open, onOpenChange, title, description, users, busines
                                 <TableHead>Name</TableHead>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Business</TableHead>
+                                <TableHead>Usage Time</TableHead>
                                 <TableHead>Status</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -936,6 +927,7 @@ function UserListDialog({ open, onOpenChange, title, description, users, busines
                                         <TableCell className="font-medium max-w-[140px] truncate" title={biz?.name || u.name}>{biz?.name || u.name || 'Unknown User'}</TableCell>
                                         <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground" title={u.email}>{u.email}</TableCell>
                                         <TableCell className="max-w-[130px] truncate" title={biz?.name || 'N/A'}>{biz?.name || 'N/A'}</TableCell>
+                                        <TableCell className="text-xs font-mono tabular-nums whitespace-nowrap">{formatDuration(u.totalUsageSeconds ?? 0)}</TableCell>
                                         <TableCell><Badge variant={u.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">{u.status || 'active'}</Badge></TableCell>
                                     </TableRow>
                                 );
@@ -1340,10 +1332,10 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
 
     // KPIs
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const activeNow = useMemo(() =>
-        users.filter(u => u.lastSeen?.toDate && u.lastSeen.toDate() > fiveMinAgo).length,
-        [users]
-    );
+    const activeNow = useMemo(() => {
+        const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+        return users.filter(u => u.lastSeen?.toDate && u.lastSeen.toDate() > cutoff).length;
+    }, [users]);
 
     const usersWithUsage = users.filter(u => (u.totalUsageSeconds ?? 0) > 0);
     const totalUsageSeconds = usersWithUsage.reduce((sum, u) => sum + (u.totalUsageSeconds ?? 0), 0);
@@ -2163,7 +2155,7 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                     </CardTitle>
                     <CardDescription>
                         Cumulative app usage time per user. Tracked since v3.0.0. Click a column header to sort,
-                        or click any row to open that user's full usage breakdown.
+                        or click any row to open that user&apos;s full usage breakdown.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -2286,7 +2278,7 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl w-[95vw]">
                 <DialogHeader>
-                    <DialogTitle>{user?.name}'s Profile</DialogTitle>
+                    <DialogTitle>{user?.name}&apos;s Profile</DialogTitle>
                     <DialogDescription>Detailed view of user account and associated business data.</DialogDescription>
                 </DialogHeader>
 
@@ -2342,6 +2334,13 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                                 <Badge variant={user.status === 'inactive' ? 'destructive' : 'outline'} className="capitalize">
                                     {user.status || 'active'}
                                 </Badge>
+                            </div>
+                        </div>
+                        <div>
+                            <Label className="text-xs text-muted-foreground font-bold">Total Usage Time</Label>
+                            <div className="mt-1 flex items-center gap-1.5 font-medium">
+                                <Clock className="h-4 w-4 text-primary" />
+                                <span>{formatDuration(user.totalUsageSeconds ?? 0)}</span>
                             </div>
                         </div>
                         <div>
@@ -2465,8 +2464,6 @@ function BusinessIntelDialog({
     open: boolean;
     onOpenChange: (v: boolean) => void;
 }) {
-    if (!business) return null;
-
     const productCount = businessProducts.length;
     const totalStock = businessProducts.reduce((s, p) => s + (p.stock || 0), 0);
     const productsWithImages = businessProducts.filter(p => p.imageUrl);
@@ -2522,6 +2519,8 @@ function BusinessIntelDialog({
         const isBulk = gaps.length > 0 && (bulkGaps / gaps.length) > 0.6;
         return { type: isBulk ? 'bulk' : 'manual', batches, avgGapMins, maxGapMins, minGapMins };
     }, [businessProducts]);
+
+    if (!business) return null;
 
     const currency = business.settings?.currency === 'USD' ? '$' : '₦';
 
@@ -2664,6 +2663,7 @@ function BusinessIntelDialog({
                                 <div className="flex flex-wrap gap-2 pr-2">
                                     {productsWithImages.map(p => (
                                         <div key={p.id} className="relative group w-[72px] h-[72px] rounded-lg overflow-hidden border bg-muted flex-shrink-0 cursor-pointer">
+                                            {/* eslint-disable-next-line @next/next/no-img-element -- runtime image URL that next/image cannot optimize without a remote allowlist */}
                                             <img
                                                 src={p.imageUrl}
                                                 alt={p.name}
@@ -2697,8 +2697,9 @@ function BusinessIntelDialog({
 // ==============================================================================
 
 function AdminDashboardContent({
-    users, businesses, products, receipts, purchases, applications, downloadClicks, grants, checkoutAttempts, branches, onRefresh, isRefreshing,
-    storefrontShares = [], receiptShares = [], onlineOrders = [], importAttempts = []
+    users, businesses, products, receipts, purchases, applications, downloadClicks, grants, checkoutAttempts, branches,
+    storefrontShares = [], receiptShares = [], onlineOrders = [], importAttempts = [],
+    invoices = [], expenses = [], bills = [], estimates = [], recurringInvoices = [], paymentsReceived = [], creditNotes = [], vendors = [], services = []
 }: {
     users: any[];
     businesses: any[];
@@ -2710,17 +2711,129 @@ function AdminDashboardContent({
     grants: any[];
     checkoutAttempts: any[];
     branches?: any[];
-    onRefresh?: () => void;
-    isRefreshing?: boolean;
     storefrontShares?: any[];
     receiptShares?: any[];
     onlineOrders?: any[];
     importAttempts?: any[];
+    invoices?: any[];
+    expenses?: any[];
+    bills?: any[];
+    estimates?: any[];
+    recurringInvoices?: any[];
+    paymentsReceived?: any[];
+    creditNotes?: any[];
+    vendors?: any[];
+    services?: any[];
 }) {
 
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [metricsDays, setMetricsDays] = useState<number>(1);
+
+    const invoiceMetrics = useMemo(() => {
+        const invList = (invoices || []).map(inv => {
+            const biz = businesses?.find(b => b.id === inv.businessId);
+            const rate = biz?.settings?.currency === 'USD' ? (biz?.settings?.usdToNgnRate || 1500) : 1;
+            const total = (Number(inv.total || inv.grandTotal || inv.amount || 0)) * rate;
+            const amountPaid = (Number(inv.amountPaid || (inv.status === 'paid' ? inv.total || 0 : 0))) * rate;
+            const balanceDue = (Number(inv.balanceDue ?? (total - amountPaid))) * rate;
+            const rawDate = inv.dueDate || inv.due_date || inv.paymentDue || inv.createdAt;
+            const dueDate = toDate(rawDate);
+            const isOverdue = inv.status !== 'paid' && !!dueDate && dueDate.getTime() < Date.now();
+            return {
+                ...inv,
+                normalizedTotal: total,
+                normalizedPaid: amountPaid,
+                normalizedBalance: Math.max(0, balanceDue),
+                isOverdue,
+                dueDate
+            };
+        });
+
+        const grossInvoiced = invList.reduce((sum, i) => sum + i.normalizedTotal, 0);
+        const collectedFromInvoices = invList.reduce((sum, i) => sum + i.normalizedPaid, 0);
+        const outstandingBalance = invList.reduce((sum, i) => sum + i.normalizedBalance, 0);
+        const overdueBalance = invList.filter(i => i.isOverdue).reduce((sum, i) => sum + i.normalizedBalance, 0);
+
+        const paidCount = invList.filter(i => i.status === 'paid').length;
+        const pendingCount = invList.filter(i => i.status === 'pending' || i.status === 'unpaid' || i.status === 'sent').length;
+        const overdueCount = invList.filter(i => i.isOverdue).length;
+        const partiallyPaidCount = invList.filter(i => i.status === 'partially_paid' || (i.normalizedPaid > 0 && i.normalizedBalance > 0)).length;
+
+        const collectionEfficiency = grossInvoiced > 0 ? Math.round((collectedFromInvoices / grossInvoiced) * 100) : 0;
+
+        // Expenses
+        const expList = (expenses || []).map(exp => {
+            const biz = businesses?.find(b => b.id === exp.businessId);
+            const rate = biz?.settings?.currency === 'USD' ? (biz?.settings?.usdToNgnRate || 1500) : 1;
+            return {
+                ...exp,
+                normalizedAmount: (Number(exp.amount || exp.total || 0)) * rate
+            };
+        });
+        const totalExpenses = expList.reduce((sum, e) => sum + e.normalizedAmount, 0);
+
+        // Bills (accounts payable)
+        const billsList = (bills || []).map(b => {
+            const biz = businesses?.find(biz => biz.id === b.businessId);
+            const rate = biz?.settings?.currency === 'USD' ? (biz?.settings?.usdToNgnRate || 1500) : 1;
+            const total = (Number(b.total || b.amount || 0)) * rate;
+            const paid = (Number(b.amountPaid || (b.status === 'paid' ? total : 0))) * rate;
+            const balance = Math.max(0, (Number(b.balanceDue ?? (total - paid))) * rate);
+            return {
+                ...b,
+                normalizedTotal: total,
+                normalizedPaid: paid,
+                normalizedBalance: balance
+            };
+        });
+        const totalBills = billsList.reduce((sum, b) => sum + b.normalizedTotal, 0);
+        const billsUnpaid = billsList.reduce((sum, b) => sum + b.normalizedBalance, 0);
+
+        // Estimates / Quotes
+        const estList = (estimates || []).map(est => {
+            const biz = businesses?.find(biz => biz.id === est.businessId);
+            const rate = biz?.settings?.currency === 'USD' ? (biz?.settings?.usdToNgnRate || 1500) : 1;
+            return {
+                ...est,
+                normalizedTotal: (Number(est.total || est.amount || 0)) * rate
+            };
+        });
+        const totalEstimates = estList.reduce((sum, e) => sum + e.normalizedTotal, 0);
+        const acceptedEstimates = estList.filter(e => e.status === 'accepted' || e.status === 'converted').length;
+        const estimateConversionRate = estList.length > 0 ? Math.round((acceptedEstimates / estList.length) * 100) : 0;
+
+        // Net Operating Cashflow (Collected - Expenses)
+        const netCashflow = collectedFromInvoices - totalExpenses;
+
+        return {
+            invList,
+            grossInvoiced,
+            collectedFromInvoices,
+            outstandingBalance,
+            overdueBalance,
+            totalInvoicesCount: invList.length,
+            paidCount,
+            pendingCount,
+            overdueCount,
+            partiallyPaidCount,
+            collectionEfficiency,
+            expList,
+            totalExpenses,
+            billsList,
+            totalBills,
+            billsUnpaid,
+            estList,
+            totalEstimates,
+            acceptedEstimates,
+            estimateConversionRate,
+            netCashflow,
+            recurringInvoicesCount: (recurringInvoices || []).length,
+            paymentsReceivedCount: (paymentsReceived || []).length,
+            creditNotesCount: (creditNotes || []).length,
+            vendorsCount: (vendors || []).length,
+            servicesCount: (services || []).length
+        };
+    }, [invoices, expenses, bills, estimates, recurringInvoices, paymentsReceived, creditNotes, vendors, services, businesses]);
 
     // Platform totals for the tab headings. The listeners feeding these tables
     // are capped at ADMIN_LOG_LIMIT rows, so the headings are counted on the
@@ -2931,7 +3044,7 @@ function AdminDashboardContent({
             }
         };
         fetchSubscribers();
-    }, [firestore]);
+    }, [firestore, users]);
 
     // Broadcast State
     const [broadcastTitle, setBroadcastTitle] = useState('');
@@ -3342,54 +3455,14 @@ function AdminDashboardContent({
             businessesWithSalesList
         }
     }, [businesses, products, convertedReceipts, users, purchases]);
-
-    const trendData = useMemo(() => {
-        if (metricsDays === 0) return null;
-        
-        const now = Date.now();
-        const msInDay = 24 * 60 * 60 * 1000;
-        const periodMs = metricsDays * msInDay;
-        const currentStart = now - periodMs;
-        const previousStart = currentStart - periodMs;
-
-        const currentGmv = convertedReceipts.filter(r => safeToDate(r.createdAt).getTime() >= currentStart).reduce((sum, r) => sum + r.total, 0);
-        const previousGmv = convertedReceipts.filter(r => {
-            const t = safeToDate(r.createdAt).getTime();
-            return t >= previousStart && t < currentStart;
-        }).reduce((sum, r) => sum + r.total, 0);
-        const gmvTrend = previousGmv === 0 ? (currentGmv > 0 ? 100 : 0) : ((currentGmv - previousGmv) / previousGmv) * 100;
-
-        const currentSales = convertedReceipts.filter(r => safeToDate(r.createdAt).getTime() >= currentStart).length;
-        const previousSales = convertedReceipts.filter(r => {
-            const t = safeToDate(r.createdAt).getTime();
-            return t >= previousStart && t < currentStart;
-        }).length;
-        const salesTrend = previousSales === 0 ? (currentSales > 0 ? 100 : 0) : ((currentSales - previousSales) / previousSales) * 100;
-
-        const currentUsers = users.filter(u => safeToDate(u.createdAt).getTime() >= currentStart).length;
-        const previousUsers = users.filter(u => {
-            const t = safeToDate(u.createdAt).getTime();
-            return t >= previousStart && t < currentStart;
-        }).length;
-        const usersTrend = previousUsers === 0 ? (currentUsers > 0 ? 100 : 0) : ((currentUsers - previousUsers) / previousUsers) * 100;
-
-        const labelMap: Record<number, string> = { 1: 'yesterday', 7: 'last week', 30: 'last month' };
-        const label = `vs ${labelMap[metricsDays] || 'previous period'}`;
-
-        return {
-            gmv: { value: Math.round(gmvTrend), label },
-            sales: { value: Math.round(salesTrend), label },
-            users: { value: Math.round(usersTrend), label },
-        };
-    }, [convertedReceipts, users, metricsDays]);
-
     const analyticsData = useMemo(() => {
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
         const allUsers = users || [];
+        const registeredUsers = allUsers.filter(u => Boolean(u.email || u.name || u.phone));
         const activeUsers = allUsers.filter(u => u.status === 'active' || u.status === 'minimized' || u.status === undefined || !u.status);
         const inactiveUsers = allUsers.filter(u => u.status === 'inactive');
 
-        const totalUsers = activeUsers.length;
+        const totalUsers = registeredUsers.length;
         const totalBusinesses = activeBusinesses.length;
 
         const totalProducts = products?.length || 0;
@@ -3726,6 +3799,26 @@ function AdminDashboardContent({
         // Operations & adoption metrics now live in OperationsAdoptionPanel, which
         // scopes them to the reader's chosen timeframe instead of all-time.
 
+        // Dynamic Usage & Retention calculation
+        const usersWithUsage = (activeUsers || []).filter(u => typeof u.totalUsageSeconds === 'number' && u.totalUsageSeconds > 0);
+        const totalSecondsAcrossUsers = usersWithUsage.reduce((sum, u) => sum + (u.totalUsageSeconds || 0), 0);
+        const averageUsageSeconds = usersWithUsage.length > 0 
+            ? Math.round(totalSecondsAcrossUsers / usersWithUsage.length)
+            : 0;
+
+        const sevenDaysAgo = subDays(new Date(), 7);
+        const eligibleCohort = (allUsers || []).filter(u => {
+            const created = toDate(u.createdAt);
+            return created && created <= sevenDaysAgo;
+        });
+        const retainedInCohort = eligibleCohort.filter(u => {
+            const lastSeenDate = toDate(u.lastSeen);
+            return lastSeenDate && lastSeenDate >= sevenDaysAgo;
+        });
+        const weeklyRetentionRate = eligibleCohort.length > 0
+            ? Math.round((retainedInCohort.length / eligibleCohort.length) * 100)
+            : 0;
+
         return {
             totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold,
             totalReceipts, platformAOV, mrr, arr, mrrDescription, arrDescription, annualSubsCount, monthlySubsCount, annualMrr, monthlyMrr, ltv, activeUsers, inactiveUsers,
@@ -3738,7 +3831,9 @@ function AdminDashboardContent({
             downloadStats,
             payingBusinesses,
             validPurchases,
-            revenueGeneratingBusinessesCount
+            revenueGeneratingBusinessesCount,
+            averageUsageSeconds,
+            weeklyRetentionRate
         };
     }, [users, businesses, products, convertedReceipts, purchases, downloadClicks, velocityFilter]);
 
@@ -3767,9 +3862,9 @@ function AdminDashboardContent({
             case 'totalUsers':
                 setUserListModalState({
                     open: true,
-                    title: 'Total Platform Users',
-                    description: 'Complete register of all authenticated accounts active across all businesses.',
-                    users: users || []
+                    title: 'Total Registered Users',
+                    description: 'Complete register of all registered user accounts active across all businesses.',
+                    users: (users || []).filter(u => Boolean(u.email || u.name || u.phone))
                 });
                 return;
             case 'activated':
@@ -4190,12 +4285,6 @@ function AdminDashboardContent({
                     </p>
                 </div>
                 <div className="no-capture flex items-center gap-2">
-                    {onRefresh && (
-                        <Button onClick={onRefresh} disabled={isRefreshing} variant="outline" className="gap-2">
-                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-                        </Button>
-                    )}
                     <Button onClick={handleDownloadReport} disabled={isDownloading} variant="outline">
                         <Download className="mr-2 h-4 w-4" /> {isDownloading ? "Downloading..." : "Download Report"}
                     </Button>
@@ -4205,9 +4294,9 @@ function AdminDashboardContent({
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList className="no-capture flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
                     <TabsTrigger value="overview" className="snap-start shrink-0">Overview</TabsTrigger>
-                    <TabsTrigger value="catalog" className="gap-2 snap-start shrink-0">
-                        <Package className="h-4 w-4" />
-                        Platform Catalog
+                    <TabsTrigger value="invoicing" className="gap-2 snap-start shrink-0">
+                        <FileDigit className="h-4 w-4 text-primary" />
+                        Invoicing & Operations ({invoiceMetrics.totalInvoicesCount})
                     </TabsTrigger>
                     <TabsTrigger value="acquisition" className="gap-2 snap-start shrink-0">
                         <DoorOpen className="h-4 w-4" />
@@ -4244,25 +4333,11 @@ function AdminDashboardContent({
 
                 <TabsContent value="overview" className="space-y-6">
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                        <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <HeartPulse className="h-5 w-5 text-red-500 animate-pulse" />
                                 Platform Overview Command
                             </CardTitle>
-                            <Select value={metricsDays.toString()} onValueChange={(val) => setMetricsDays(parseInt(val))}>
-                                <SelectTrigger className="w-[140px] h-8 text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <CalendarIcon className="h-3 w-3" />
-                                        <SelectValue placeholder="Timeframe" />
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">Last 24 Hours</SelectItem>
-                                    <SelectItem value="7">Last 7 Days</SelectItem>
-                                    <SelectItem value="30">Last 30 Days</SelectItem>
-                                    <SelectItem value="0">All Time (No trends)</SelectItem>
-                                </SelectContent>
-                            </Select>
                         </CardHeader>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4">
                         <button onClick={() => handleOpenDetailModal('totalUsers')} className="text-left w-full h-full transition-transform active:scale-95">
@@ -4271,7 +4346,6 @@ function AdminDashboardContent({
                                 value={analyticsData.totalUsers} 
                                 icon={Users} 
                                 description="Total registered user accounts"
-                                trend={trendData?.users}
                             />
                         </button>
                         <button onClick={() => handleOpenDetailModal('totalBusinesses')} className="text-left w-full h-full transition-transform active:scale-95">
@@ -4329,7 +4403,7 @@ function AdminDashboardContent({
                             <StatCard title="MRR" value={`₦${Math.round(analyticsData.mrr).toLocaleString()}`} icon={DollarSign} description={analyticsData.mrrDescription} />
                         </button>
                         <button onClick={() => setIsSalesVelocityOpen(true)} className="text-left w-full h-full transition-transform active:scale-95">
-                            <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" trend={trendData?.sales} />
+                            <StatCard title="Sales Velocity" value={`₦${analyticsData.averageSalesPerDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}/day`} icon={Activity} description="Platform momentum" />
                         </button>
                         <button onClick={() => handleOpenDetailModal('activated')} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard title="Activated" value={platformAnalytics.activatedBusinessesCount} icon={UserCheck} description="Businesses with >10 products" />
@@ -4359,6 +4433,135 @@ function AdminDashboardContent({
                         />
                         <StatCard title="Platform AOV" value={`₦${analyticsData.platformAOV.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={ShoppingCart} description="Avg. Receipt Value" />
                     </div>
+                    </Card>
+
+                    {/* Zeneva Invoicing & Operations Overview Card */}
+                    <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
+                        <CardHeader className="pb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="space-y-1">
+                                    <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                                        <FileDigit className="h-5 w-5 text-primary" />
+                                        Invoicing & Financial Operations Command
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Live cross-business transaction telemetry: Invoices, collections, bills, expenses, and net cashflow.
+                                    </CardDescription>
+                                </div>
+                                <Badge variant="outline" className="w-fit border-primary/30 text-primary font-mono text-xs">
+                                    {invoiceMetrics.collectionEfficiency}% Collection Efficiency
+                                </Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Gross Invoiced</span>
+                                        <FileText className="h-4 w-4 text-blue-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        ₦{Math.round(invoiceMetrics.grossInvoiced).toLocaleString()}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {invoiceMetrics.totalInvoicesCount} invoices issued across businesses
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Collected Invoices</span>
+                                        <CheckCheck className="h-4 w-4 text-emerald-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                        ₦{Math.round(invoiceMetrics.collectedFromInvoices).toLocaleString()}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {invoiceMetrics.paidCount} fully paid · {invoiceMetrics.partiallyPaidCount} partial
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Unpaid / Receivables</span>
+                                        <Wallet className="h-4 w-4 text-amber-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                                        ₦{Math.round(invoiceMetrics.outstandingBalance).toLocaleString()}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {invoiceMetrics.overdueCount > 0 
+                                            ? `₦${Math.round(invoiceMetrics.overdueBalance).toLocaleString()} overdue (${invoiceMetrics.overdueCount})` 
+                                            : `${invoiceMetrics.pendingCount} pending payment`}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Incurred Expenses</span>
+                                        <ArrowDownRight className="h-4 w-4 text-rose-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                                        ₦{Math.round(invoiceMetrics.totalExpenses).toLocaleString()}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {invoiceMetrics.expList.length} logged business expenses
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Vendor Bills (AP)</span>
+                                        <ReceiptText className="h-4 w-4 text-purple-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        ₦{Math.round(invoiceMetrics.totalBills).toLocaleString()}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        ₦{Math.round(invoiceMetrics.billsUnpaid).toLocaleString()} unpaid to {invoiceMetrics.vendorsCount} vendors
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Estimates & Quotes</span>
+                                        <FileSpreadsheet className="h-4 w-4 text-cyan-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        ₦{Math.round(invoiceMetrics.totalEstimates).toLocaleString()}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {invoiceMetrics.estList.length} quotes ({invoiceMetrics.estimateConversionRate}% converted)
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Recurring Invoices</span>
+                                        <RefreshCw className="h-4 w-4 text-indigo-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {invoiceMetrics.recurringInvoicesCount}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Active recurring billing schedules
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Net Invoicing Cashflow</span>
+                                        <ArrowUpRight className={`h-4 w-4 ${invoiceMetrics.netCashflow >= 0 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                                    </div>
+                                    <div className={`text-2xl font-bold ${invoiceMetrics.netCashflow >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                        {invoiceMetrics.netCashflow < 0 ? '-' : ''}₦{Math.abs(Math.round(invoiceMetrics.netCashflow)).toLocaleString()}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Collections minus expenses
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
                     </Card>
 
                     {/* Dot Plot moved to overview as requested */}
@@ -4574,7 +4777,7 @@ function AdminDashboardContent({
                                     <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600">
                                         <CurrencyAmount symbol="₦" amount={analyticsData.totalSubscriptionRevenue} hideFraction={true} className="items-center" symbolClassName="text-[0.55em] font-medium opacity-70 mr-1" />
                                     </p>
-                                    <p className="text-sm text-muted-foreground mt-2">Zeneva's own revenue</p>
+                                    <p className="text-sm text-muted-foreground mt-2">Zeneva&apos;s own revenue</p>
                                     <p className="text-xs text-pink-600/80 font-semibold mt-4 flex items-center"><Download className="h-3 w-3 mr-1" /> Click to download certified visual</p>
                                 </CardContent>
                             </Card>
@@ -4686,6 +4889,7 @@ function AdminDashboardContent({
                                                 <div className="flex items-center gap-3 min-w-0">
                                                     <span className="flex items-center justify-center w-6 h-6 group-hover:scale-110 transition-transform">
                                                         {item.flag
+                                                            // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                             ? <img src={`https://flagcdn.com/w40/${item.flag}.png`} alt="" className="w-6 h-4 rounded-sm object-cover inline-block" />
                                                             : <span className="text-xl">🌐</span>}
                                                     </span>
@@ -4721,24 +4925,31 @@ function AdminDashboardContent({
                                             const getFlag = (c: string) => {
                                                 const normalized = c.toLowerCase();
                                                 if (normalized.includes('nigeria')) {
+                                                    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                     return <img src="https://flagcdn.com/w40/ng.png" alt="Nigeria" className="w-6 h-4 rounded-sm object-cover inline-block" />;
                                                 }
                                                 if (normalized.includes('united states') || normalized === 'usa') {
+                                                    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                     return <img src="https://flagcdn.com/w40/us.png" alt="USA" className="w-6 h-4 rounded-sm object-cover inline-block" />;
                                                 }
                                                 if (normalized.includes('united kingdom') || normalized === 'uk') {
+                                                    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                     return <img src="https://flagcdn.com/w40/gb.png" alt="UK" className="w-6 h-4 rounded-sm object-cover inline-block" />;
                                                 }
                                                 if (normalized.includes('ghana')) {
+                                                    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                     return <img src="https://flagcdn.com/w40/gh.png" alt="Ghana" className="w-6 h-4 rounded-sm object-cover inline-block" />;
                                                 }
                                                 if (normalized.includes('canada')) {
+                                                    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                     return <img src="https://flagcdn.com/w40/ca.png" alt="Canada" className="w-6 h-4 rounded-sm object-cover inline-block" />;
                                                 }
                                                 if (normalized.includes('south africa')) {
+                                                    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                     return <img src="https://flagcdn.com/w40/za.png" alt="South Africa" className="w-6 h-4 rounded-sm object-cover inline-block" />;
                                                 }
                                                 if (normalized.includes('kenya')) {
+                                                    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
                                                     return <img src="https://flagcdn.com/w40/ke.png" alt="Kenya" className="w-6 h-4 rounded-sm object-cover inline-block" />;
                                                 }
                                                 if (normalized.includes('onboarding')) return <span className="text-xl">⏳</span>;
@@ -4780,7 +4991,7 @@ function AdminDashboardContent({
                                 <Database className="h-5 w-5 text-blue-500" />
                                 Operational Cost & Usage Tracking
                             </CardTitle>
-                            <CardDescription>Track Zeneva's live infrastructure costs, database reads, and store performance.</CardDescription>
+                            <CardDescription>Track Zeneva&apos;s live infrastructure costs, database reads, and store performance.</CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
                             <a href="https://console.cloud.google.com/billing/01459A-506211-CE0671?project=studio-3699136485-6747d" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors cursor-pointer group">
@@ -4853,21 +5064,29 @@ function AdminDashboardContent({
                             />
                             <StatCard 
                                 title="Avg. Active Time" 
-                                value="1h 45m" 
+                                value={formatDuration(analyticsData.averageUsageSeconds)} 
                                 icon={Timer} 
-                                description="Daily average session length" 
+                                description="Average cumulative session length" 
                             />
                             <StatCard 
                                 title="Weekly Retention" 
-                                value="68%" 
+                                value={`${analyticsData.weeklyRetentionRate}%`} 
                                 icon={TrendingUp} 
-                                description="Return rate after 7 days" 
+                                description="7-day cohort return rate" 
                             />
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <UserGrowthChart users={users || []} />
                             <DailyActiveUsersChart users={users || []} receipts={convertedReceipts || []} />
-                            <FeatureStickinessChart businesses={businesses || []} products={products || []} />
+                            <FeatureStickinessChart 
+                                businesses={businesses || []} 
+                                products={products || []} 
+                                users={users || []}
+                                receipts={invoices.concat(receipts)}
+                                expenses={expenses}
+                                estimates={estimates}
+                                bills={bills}
+                            />
                             <div className="lg:col-span-2">
                                 <RetentionCohortChart users={users || []} receipts={convertedReceipts || []} businesses={businesses || []} />
                             </div>
@@ -4882,8 +5101,291 @@ function AdminDashboardContent({
                     </div>
                  </TabsContent>
 
-                <TabsContent value="catalog" className="space-y-6">
-                    <AdminCatalogTab products={products} businesses={businesses} />
+                {/* Zeneva Invoicing & Financial Operations Tab */}
+                <TabsContent value="invoicing" className="space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold flex items-center gap-2">
+                                <FileDigit className="h-6 w-6 text-primary" />
+                                Zeneva Invoicing & Operations Telemetry
+                            </h2>
+                            <p className="text-sm text-muted-foreground">
+                                Real-time platform-wide registry of invoices, collections, business expenses, vendor bills, and quotations.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs px-3 py-1">
+                                {invoiceMetrics.totalInvoicesCount} Total Invoices
+                            </Badge>
+                            <Badge variant="secondary" className="font-mono text-xs px-3 py-1">
+                                {invoiceMetrics.collectionEfficiency}% Platform Collection Rate
+                            </Badge>
+                        </div>
+                    </div>
+
+                    {/* Top KPI Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Invoiced Volume</CardTitle>
+                                <FileText className="h-4 w-4 text-primary" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">₦{Math.round(invoiceMetrics.grossInvoiced).toLocaleString()}</div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {invoiceMetrics.paidCount} paid · {invoiceMetrics.pendingCount} unpaid · {invoiceMetrics.overdueCount} overdue
+                                </p>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Net Collections</CardTitle>
+                                <CheckCheck className="h-4 w-4 text-emerald-500" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                    ₦{Math.round(invoiceMetrics.collectedFromInvoices).toLocaleString()}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {invoiceMetrics.collectionEfficiency}% of gross invoiced receivables collected
+                                </p>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Unpaid Receivables</CardTitle>
+                                <Wallet className="h-4 w-4 text-amber-500" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                                    ₦{Math.round(invoiceMetrics.outstandingBalance).toLocaleString()}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    ₦{Math.round(invoiceMetrics.overdueBalance).toLocaleString()} overdue past payment deadline
+                                </p>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Operating Cashflow</CardTitle>
+                                <ArrowUpRight className={`h-4 w-4 ${invoiceMetrics.netCashflow >= 0 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                            </CardHeader>
+                            <CardContent>
+                                <div className={`text-2xl font-bold ${invoiceMetrics.netCashflow >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                    {invoiceMetrics.netCashflow < 0 ? '-' : ''}₦{Math.abs(Math.round(invoiceMetrics.netCashflow)).toLocaleString()}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    ₦{Math.round(invoiceMetrics.collectedFromInvoices).toLocaleString()} in · ₦{Math.round(invoiceMetrics.totalExpenses).toLocaleString()} exp
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Invoices Feed & Operations Log */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Live Invoices Table */}
+                        <Card className="lg:col-span-2">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <ReceiptText className="h-5 w-5 text-primary" />
+                                            Platform Invoices ({invoiceMetrics.invList.length})
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Live invoices generated across all merchant organizations.
+                                        </CardDescription>
+                                    </div>
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                        Live Firestore
+                                    </Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-[460px]">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="text-xs font-bold">Invoice / Ref</TableHead>
+                                                <TableHead className="text-xs font-bold">Business</TableHead>
+                                                <TableHead className="text-xs font-bold">Client / Recipient</TableHead>
+                                                <TableHead className="text-xs font-bold">Status</TableHead>
+                                                <TableHead className="text-right text-xs font-bold">Amount</TableHead>
+                                                <TableHead className="text-right text-xs font-bold">Balance Due</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {invoiceMetrics.invList.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center text-muted-foreground py-12 text-sm">
+                                                        No invoices recorded across tenants yet.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                invoiceMetrics.invList.slice(0, 50).map((inv: any, idx: number) => {
+                                                    const biz = businesses?.find((b: any) => b.id === inv.businessId);
+                                                    const status = inv.isOverdue ? 'overdue' : (inv.status || 'pending');
+                                                    const statusVariant: any = {
+                                                        paid: 'default',
+                                                        partially_paid: 'secondary',
+                                                        pending: 'outline',
+                                                        overdue: 'destructive'
+                                                    }[status] || 'outline';
+
+                                                    return (
+                                                        <TableRow key={inv.id || idx} className="hover:bg-muted/30">
+                                                            <TableCell className="font-mono text-xs font-semibold">
+                                                                {inv.receiptNumber || inv.invoiceNumber || inv.id?.slice(0, 8) || 'INV-Auto'}
+                                                            </TableCell>
+                                                            <TableCell className="text-xs font-medium max-w-[140px] truncate" title={biz?.name || inv.businessName || 'Merchant'}>
+                                                                {biz?.name || inv.businessName || 'Merchant'}
+                                                            </TableCell>
+                                                            <TableCell className="text-xs max-w-[140px] truncate" title={inv.customerName || inv.clientName || 'Walk-in Customer'}>
+                                                                {inv.customerName || inv.clientName || 'Walk-in Customer'}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Badge variant={statusVariant} className="text-[10px] uppercase font-mono">
+                                                                    {status}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right font-mono text-xs font-semibold">
+                                                                ₦{Math.round(inv.normalizedTotal || 0).toLocaleString()}
+                                                            </TableCell>
+                                                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                                                ₦{Math.round(inv.normalizedBalance || 0).toLocaleString()}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+
+                        {/* Operations Breakdown: Expenses & Bills */}
+                        <div className="space-y-6">
+                            {/* Incurred Expenses Card */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center justify-between">
+                                        <span className="flex items-center gap-2">
+                                            <ArrowDownRight className="h-4 w-4 text-rose-500" />
+                                            Expenses Telemetry
+                                        </span>
+                                        <Badge variant="outline" className="font-mono text-xs">
+                                            ₦{Math.round(invoiceMetrics.totalExpenses).toLocaleString()}
+                                        </Badge>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Operating expenditure logged by tenant businesses.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <ScrollArea className="h-[180px]">
+                                        {invoiceMetrics.expList.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground py-6 text-center">No tenant expenses logged yet.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {invoiceMetrics.expList.slice(0, 10).map((exp: any, i: number) => {
+                                                    const biz = businesses?.find((b: any) => b.id === exp.businessId);
+                                                    return (
+                                                        <div key={exp.id || i} className="flex items-center justify-between p-2 rounded-lg border bg-card/40 text-xs">
+                                                            <div className="truncate pr-2">
+                                                                <p className="font-medium truncate">{exp.title || exp.category || 'Expense'}</p>
+                                                                <p className="text-[10px] text-muted-foreground truncate">{biz?.name || 'Business'}</p>
+                                                            </div>
+                                                            <span className="font-mono font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                                                                ₦{Math.round(exp.normalizedAmount || 0).toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </ScrollArea>
+                                </CardContent>
+                            </Card>
+
+                            {/* Vendor Bills (AP) Card */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center justify-between">
+                                        <span className="flex items-center gap-2">
+                                            <ReceiptText className="h-4 w-4 text-purple-500" />
+                                            Vendor Bills (AP)
+                                        </span>
+                                        <Badge variant="outline" className="font-mono text-xs">
+                                            {invoiceMetrics.billsList.length} Bills
+                                        </Badge>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Accounts payable owed to registered vendors.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-2 text-center">
+                                            <div className="p-2 rounded-lg border bg-muted/20">
+                                                <p className="text-[10px] text-muted-foreground">Total AP Volume</p>
+                                                <p className="text-sm font-bold font-mono">₦{Math.round(invoiceMetrics.totalBills).toLocaleString()}</p>
+                                            </div>
+                                            <div className="p-2 rounded-lg border bg-muted/20">
+                                                <p className="text-[10px] text-muted-foreground">Unpaid to Vendors</p>
+                                                <p className="text-sm font-bold font-mono text-purple-600 dark:text-purple-400">₦{Math.round(invoiceMetrics.billsUnpaid).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                                            <span>Registered Vendors: <strong className="text-foreground">{invoiceMetrics.vendorsCount}</strong></span>
+                                            <span>Catalog Services: <strong className="text-foreground">{invoiceMetrics.servicesCount}</strong></span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Estimates & Quotes Card */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center justify-between">
+                                        <span className="flex items-center gap-2">
+                                            <FileSpreadsheet className="h-4 w-4 text-cyan-500" />
+                                            Estimates & Quotes
+                                        </span>
+                                        <Badge variant="outline" className="font-mono text-xs text-cyan-600">
+                                            {invoiceMetrics.estimateConversionRate}% Converted
+                                        </Badge>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Quotations generated and conversion pipeline.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-muted-foreground">Issued Quotations:</span>
+                                            <span className="font-mono font-bold">{invoiceMetrics.estList.length}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-muted-foreground">Gross Estimate Value:</span>
+                                            <span className="font-mono font-bold">₦{Math.round(invoiceMetrics.totalEstimates).toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-muted-foreground">Accepted / Won:</span>
+                                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{invoiceMetrics.acceptedEstimates}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="text-muted-foreground">Credit Notes Issued:</span>
+                                            <span className="font-mono font-bold">{invoiceMetrics.creditNotesCount}</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
                 </TabsContent>
 
                 {/* Everyone who installed and never got as far as an account. This
@@ -4971,6 +5473,7 @@ function AdminDashboardContent({
                                                     <TableHead>User</TableHead>
                                                     <TableHead>Business Name</TableHead>
                                                     <TableHead>Plan</TableHead>
+                                                    <TableHead>Usage Time</TableHead>
                                                     <TableHead>Device</TableHead>
                                                     <TableHead>Language</TableHead>
                                                     <TableHead>Activity</TableHead>
@@ -4995,6 +5498,12 @@ function AdminDashboardContent({
                                                                 {business ? (
                                                                     business.accessLevel === 'lifetime' ? <Badge variant="default" className="bg-green-600 hover:bg-green-700">Lifetime</Badge> : <Badge variant="secondary" className="capitalize">{business.plan || 'starter'}</Badge>
                                                                 ) : <Badge variant="outline">N/A</Badge>}
+                                                            </TableCell>
+                                                            <TableCell onClick={() => { setSelectedUserForDetail(user); setIsUserDetailOpen(true); }} className="cursor-pointer font-mono text-xs tabular-nums">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                    <span>{formatDuration(user.totalUsageSeconds ?? 0)}</span>
+                                                                </div>
                                                             </TableCell>
                                                             <TableCell>
                                                                 {(() => {
@@ -5034,6 +5543,7 @@ function AdminDashboardContent({
                                                                     if (!lang) return <span className="text-muted-foreground text-xs">Unknown</span>;
                                                                     return (
                                                                         <Badge variant="outline" className="flex items-center gap-1.5 w-fit text-xs font-normal">
+                                                                            {/* eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns */}
                                                                             <img src={`https://flagcdn.com/w40/${lang.flag}.png`} alt="" className="w-4 h-3 rounded-sm object-cover" />
                                                                             <span>{lang.nativeLabel}</span>
                                                                         </Badge>
@@ -5390,7 +5900,7 @@ function AdminDashboardContent({
                     <Card className="mt-6 border-orange-500/30 shadow-md">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-foreground">
-                                <Sparkles className="h-5 w-5 text-orange-500" /> "What's New" Feature Release Video Modal
+                                <Sparkles className="h-5 w-5 text-orange-500" /> &quot;What&apos;s New&quot; Feature Release Video Modal
                             </CardTitle>
                             <CardDescription>
                                 Broadcast a major release modal with an embedded YouTube video or MP4 demo, displayed once to all users.
@@ -5464,7 +5974,7 @@ function AdminDashboardContent({
                                 className="bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs h-9 px-5 rounded-xl shadow-sm"
                             >
                                 {isSavingFeatureUpdate && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                                Publish "What's New" Video Update
+                                Publish &quot;What&apos;s New&quot; Video Update
                             </Button>
                         </CardFooter>
                     </Card>
@@ -6047,7 +6557,7 @@ function AdminDashboardContent({
             />
 
             <Dialog open={isSalesVelocityOpen} onOpenChange={isSalesVelocityOpen ? setIsSalesVelocityOpen : undefined}>
-                <DialogContent className="max-w-6xl w-[95vw]">
+                <DialogContent className="max-w-4xl w-[95vw]">
                     <DialogHeader>
                         <DialogTitle className="flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center gap-2">
@@ -6076,8 +6586,8 @@ function AdminDashboardContent({
                     
                     <div className="grid gap-6 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <StatCard title="Total Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString()}`} icon={DollarSign} trend={trendData?.gmv} />
-                            <StatCard title="Total Sales Count" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} trend={trendData?.sales} />
+                            <StatCard title="Total Platform GMV" value={`₦${analyticsData.platformGmv.toLocaleString()}`} icon={DollarSign} />
+                            <StatCard title="Total Sales Count" value={analyticsData.totalReceipts.toLocaleString()} icon={FileText} />
                             <StatCard title="Overall ARPU" value={`₦${(analyticsData.platformGmv / (analyticsData.revenueGeneratingBusinessesCount || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Users} />
                         </div>
                         
@@ -6115,33 +6625,6 @@ function AdminDashboardContent({
     );
 }
 
-// Helper to convert Firebase Admin timestamp objects `{ _seconds, _nanoseconds }`
-// back into Firestore client Timestamp-like objects with a `.toDate()` method.
-const reviveTimestamps = (obj: any): any => {
-    if (obj === null || obj === undefined) return obj;
-    if (obj instanceof Date) return obj;
-    if (Array.isArray(obj)) return obj.map(reviveTimestamps);
-    
-    if (typeof obj === 'object') {
-        if ('_seconds' in obj && '_nanoseconds' in obj) {
-            const ms = obj._seconds * 1000 + obj._nanoseconds / 1000000;
-            const d = new Date(ms);
-            return {
-                seconds: obj._seconds,
-                nanoseconds: obj._nanoseconds,
-                toDate: () => d
-            };
-        }
-        
-        const newObj: any = {};
-        for (const key in obj) {
-            newObj[key] = reviveTimestamps(obj[key]);
-        }
-        return newObj;
-    }
-    return obj;
-};
-
 /**
  * How many rows the append-only admin logs load.
  *
@@ -6169,29 +6652,20 @@ const ADMIN_LOG_LIMIT = 250;
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
 
-    const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('name')), [firestore]);
+    // Firestore fallback listeners (without orderBy('name') so users without a name are not omitted)
+    const usersQuery = useMemoFirebase(() => query(collection(firestore, 'users')), [firestore]);
     const businessesQuery = useMemoFirebase(() => query(collection(firestore, 'businessInstances')), [firestore]);
     const productsQuery = useMemoFirebase(() => query(collection(firestore, 'products')), [firestore]);
     const applicationsQuery = useMemoFirebase(() => query(collection(firestore, 'job_applications'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const grantsQuery = useMemoFirebase(() => query(collection(firestore, 'grants'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const receiptsQuery = useMemoFirebase(() => query(collection(firestore, 'receipts'), orderBy('createdAt', 'desc')), [firestore]);
     const purchasesQuery = useMemoFirebase(() => query(collection(firestore, 'purchases')), [firestore]);
-    // Deliberately unbounded: one doc per visitor (not per click), and it backs
-    // an all-time platform breakdown, so a limit would silently change the
-    // windows/macos/android split. It is also not growing — its only writer is
-    // api/download/[platform], which is still a disabled .bak route.
     const downloadClicksQuery = useMemoFirebase(() => query(collection(firestore, 'download_clicks')), [firestore]);
     const branchesQuery = useMemoFirebase(() => query(collection(firestore, 'branches')), [firestore]);
     const checkoutAttemptsQuery = useMemoFirebase(() => query(collection(firestore, 'checkout_attempts'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const importAttemptsQuery = useMemoFirebase(() => query(collection(firestore, 'import_attempts'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const storefrontSharesQuery = useMemoFirebase(() => query(collection(firestore, 'storefront_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const receiptSharesQuery = useMemoFirebase(() => query(collection(firestore, 'receipt_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
-    // NOTE: the orderBy on a collectionGroup needs a COLLECTION_GROUP-scoped
-    // index on onlineOrders.createdAt — Firestore only auto-creates single-field
-    // indexes at COLLECTION scope. It is declared in firestore.indexes.json, so
-    // `firebase deploy --only firestore:indexes` must land BEFORE this ships or
-    // this listener throws. Deploying an index first is safe: it is additive and
-    // does not affect the running app.
     const onlineOrdersQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'onlineOrders'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
 
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);

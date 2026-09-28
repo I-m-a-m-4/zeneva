@@ -16,7 +16,7 @@ import type { UserProfile } from '@/types';
  * out of a theft report while still recording exactly what happened.
  */
 type AuditAction =
-    | 'product.create' | 'product.update' | 'product.delete' | 'product.bulk_update' | 'product.stock_adjustment'
+    | 'product.create' | 'product.update' | 'product.delete' | 'product.bulk_update' | 'product.stock_adjustment' | 'product.image_fetch'
     | 'sale.create' | 'sale.void'
     | 'customer.create' | 'customer.update' | 'customer.delete' | 'customer.merge'
     | 'user.invite' | 'user.update_status' | 'user.impersonate' | 'user.stop_impersonate'

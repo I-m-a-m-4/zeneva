@@ -58,6 +58,7 @@ import {
     WifiOff,
     Printer,
     ScanBarcode,
+    Camera,
     Monitor,
     BarChart3,
     TrendingUp,
@@ -198,11 +199,11 @@ const features = [
         iconColor: "text-red-600"
     },
     {
-        icon: ScanBarcode,
-        title: "Visual Stock Take (AI)",
-        description: "Reconcile your physical stock in seconds. Snap a photo of your shelf, and Zen AI will count the products and update your inventory automatically.",
-        bgColor: "bg-indigo-100",
-        iconColor: "text-indigo-600"
+        icon: Camera,
+        title: "AI Visual Stock Take",
+        description: "Reconcile physical stock in seconds. Snap a live photo of your shelves or cartons, and computer vision with Zen AI segments, counts units automatically, and updates your inventory.",
+        bgColor: "bg-emerald-100",
+        iconColor: "text-emerald-600"
     },
     {
         icon: Layers,

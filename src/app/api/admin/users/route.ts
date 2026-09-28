@@ -27,10 +27,16 @@ export async function GET(req: Request) {
     try {
         const snapshot = await adminFirestore
             .collection('users')
-            .orderBy('name')
             .get();
 
         const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Sort in memory so documents missing a 'name' field are never dropped by Firestore
+        users.sort((a: any, b: any) => {
+            const nameA = (a.name || a.email || a.phone || '').toLowerCase();
+            const nameB = (b.name || b.email || b.phone || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
 
         // No-cache headers so the browser also doesn't cache this
         return NextResponse.json(users, {

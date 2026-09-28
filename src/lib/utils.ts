@@ -69,3 +69,37 @@ export async function getCountryFromIP(): Promise<string> {
 
   return country;
 }
+
+/**
+ * Smart search matching that ignores hyphens, spaces, punctuation, case, and token order.
+ * E.g., searching "coca cola" matches "Coca-Cola Zero", "CocaCola", "coca_cola", etc.
+ */
+export function smartSearchMatch(target: string | undefined | null, query: string): boolean {
+  if (!target || !query) return false;
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  
+  const rawTarget = String(target).toLowerCase();
+  
+  // 1. Direct sub-string match
+  if (rawTarget.includes(q)) return true;
+
+  // 2. Normalized match (replace hyphens, underscores, slashes, dots with spaces)
+  const normTarget = rawTarget.replace(/[-_/\s.]+/g, ' ');
+  const normQuery = q.replace(/[-_/\s.]+/g, ' ');
+  if (normTarget.includes(normQuery)) return true;
+
+  // 3. Compact stripped match (remove all non-alphanumeric chars)
+  const stripTarget = rawTarget.replace(/[^a-z0-9]/g, '');
+  const stripQuery = q.replace(/[^a-z0-9]/g, '');
+  if (stripQuery.length > 0 && stripTarget.includes(stripQuery)) return true;
+
+  // 4. Tokenized word-boundary matching (all query terms must exist in target)
+  const queryTokens = normQuery.split(' ').filter(Boolean);
+  const targetTokens = normTarget.split(' ').filter(Boolean);
+
+  return queryTokens.every(qToken => {
+    const qStrip = qToken.replace(/[^a-z0-9]/g, '');
+    return targetTokens.some(tToken => tToken.includes(qToken)) || (qStrip.length > 0 && stripTarget.includes(qStrip));
+  });
+}

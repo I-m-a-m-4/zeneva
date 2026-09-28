@@ -620,8 +620,9 @@ function GoalSetting({
 
 export default function AchievementsPage() {
   const { toast } = useToast();
-  const { business, triggerConfetti, currencySymbol } = usePOS();
+  const { business, triggerConfetti, currencySymbol, currentUserProfile } = usePOS();
   const { set } = useAchievements();
+  const isCashier = currentUserProfile?.role === 'cashier';
   const searchParams = useSearchParams();
   const formatFigure = useFigureFormatter();
 
@@ -679,16 +680,17 @@ export default function AchievementsPage() {
   return (
     <div className="space-y-6">
       <PageTitle
-        title="Achievements & Goals"
-        subtitle="Celebrate your milestones and set new targets for your business."
+        title={isCashier ? "Your Goals" : "Achievements & Goals"}
+        subtitle={isCashier ? "Set and track your own goals." : "Celebrate your milestones and set new targets for your business."}
       />
 
-      <NextMilestoneHero set={set} formatFigure={formatFigure} />
+      {!isCashier && <NextMilestoneHero set={set} formatFigure={formatFigure} />}
 
       {/* Rating badges: the only section here whose progress moves every day, so it
           is what makes the page worth reopening. */}
-      <RatingBadges />
+      {!isCashier && <RatingBadges />}
 
+      {!isCashier && (
       <Card>
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-primary">
@@ -750,6 +752,7 @@ export default function AchievementsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <GoalSetting set={set} formatFigure={formatFigure} />
 

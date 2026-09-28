@@ -69,7 +69,7 @@ import {
   BUSINESS_INSTANCE_KEY,
   POS_HELD_SALES_KEY
 } from '@/lib/constants';
-import { safeToDate } from '@/lib/utils';
+import { safeToDate, smartSearchMatch } from '@/lib/utils';
 import { isSubscriptionActive as resolveSubscriptionActive } from '@/lib/plan';
 import { trackFeature } from '@/lib/product-telemetry';
 import { useBranch } from './branch-context';
@@ -3279,7 +3279,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const isOnline = isRealOnline;
 
     if (products && products.length > 0) {
-      const local = products.filter(p => p.name.toLowerCase().includes(lower) || p.sku?.toLowerCase().includes(lower));
+      const local = products.filter(p =>
+        smartSearchMatch(p.name, term) ||
+        smartSearchMatch(p.sku, term) ||
+        smartSearchMatch(p.barcode, term) ||
+        smartSearchMatch(p.category, term)
+      );
       if (local.length >= 10 || !isOnline) return local.slice(0, 30);
     }
     

@@ -45,7 +45,8 @@ import {
     Search,
     Tag,
     Wallet,
-    PieChart
+    PieChart,
+    Camera
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -172,6 +173,7 @@ export default function Home() {
                 "featureList": [
                     "Offline-capable Point of Sale (POS)",
                     "AI-driven Inventory Management and Forecasting",
+                    "AI Visual Stock Take & Instant Shelf Reconciliation",
                     "Multi-location Store Management",
                     "Multi-currency Checkout (USD, NGN)",
                     "Real-time Sales Analytics",
@@ -528,6 +530,15 @@ export default function Home() {
                                         iconColor: "text-amber-600",
                                         hoverBg: "bg-[#FFFBEB]", // Light Amber
                                         badgeKey: "landing.badgeNew"
+                                    },
+                                    {
+                                        icon: Camera,
+                                        titleKey: "landing.f20t",
+                                        descKey: "landing.f20d",
+                                        bgColor: "bg-emerald-100",
+                                        iconColor: "text-emerald-600",
+                                        hoverBg: "bg-[#ECFDF5]", // Light Emerald
+                                        badgeKey: "landing.badgeNew"
                                     }
                                 ].map((feature, index) => (
                                     <div key={index} className="group relative p-8 bg-white border-2 border-dashed border-slate-200 rounded-lg overflow-hidden transition-all duration-300 isolate cursor-pointer shadow-sm">
@@ -551,6 +562,133 @@ export default function Home() {
                                         <div className="absolute bottom-4 start-4 h-3 w-3 border-b-2 border-s-2 border-slate-300 z-10"></div>
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* Spotlight Banner: AI Visual Stock Take */}
+                            <div className="mt-14 relative overflow-hidden rounded-2xl border-2 border-dashed border-emerald-500/30 bg-gradient-to-br from-emerald-50/60 via-white to-teal-50/30 p-8 sm:p-12 shadow-sm">
+                                <div className="absolute top-0 end-0 -mt-10 -me-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                                <div className="grid lg:grid-cols-12 gap-8 items-center relative z-10">
+                                    <div className="lg:col-span-7 text-start">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 text-xs font-semibold uppercase tracking-wider mb-4">
+                                            <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                                            <span>Computer Vision & AI Shelf Counting</span>
+                                            <span className="ms-1 bg-emerald-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">NEW</span>
+                                        </div>
+
+                                        <h3 className="text-3xl sm:text-4xl font-light tracking-tight text-slate-900 font-bricolage mb-4">
+                                            Count Physical Shelves in Seconds. <br className="hidden sm:inline" />
+                                            <span className="text-emerald-700 font-medium">Not Hours.</span>
+                                        </h3>
+
+                                        <p className="text-slate-600 text-base sm:text-lg leading-relaxed mb-6 max-w-xl font-dm-sans">
+                                            Say goodbye to tedious clipboards and manual counting errors. Point your phone or tablet camera at store shelves, cartons, or displays — Zeneva segments items, groups matching units, and updates your inventory in one click.
+                                        </p>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+                                            <div className="flex items-center gap-2.5 text-sm text-slate-700">
+                                                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-700 shrink-0">
+                                                    <Check className="w-3 h-3" />
+                                                </div>
+                                                <span>Instant optical unit recognition</span>
+                                            </div>
+                                            <div className="flex items-center gap-2.5 text-sm text-slate-700">
+                                                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-700 shrink-0">
+                                                    <Check className="w-3 h-3" />
+                                                </div>
+                                                <span>AI double-check for dense stacks</span>
+                                            </div>
+                                            <div className="flex items-center gap-2.5 text-sm text-slate-700">
+                                                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-700 shrink-0">
+                                                    <Check className="w-3 h-3" />
+                                                </div>
+                                                <span>Flashlight & rear-camera toggle</span>
+                                            </div>
+                                            <div className="flex items-center gap-2.5 text-sm text-slate-700">
+                                                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-700 shrink-0">
+                                                    <Check className="w-3 h-3" />
+                                                </div>
+                                                <span>1-tap stock update or restock add</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-4">
+                                            <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-700/20">
+                                                <Link href="/inventory" className="gap-2">
+                                                    <Camera className="w-4 h-4" />
+                                                    Explore Visual Stock Take
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </Link>
+                                            </Button>
+                                            <span className="text-xs text-slate-500 font-medium">Included on all plans • Zero extra hardware required</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Interactive Visual Viewfinder Mockup */}
+                                    <div className="lg:col-span-5">
+                                        <div className="relative mx-auto max-w-sm rounded-2xl bg-slate-950 p-3 shadow-2xl border border-slate-800">
+                                            {/* Top Scanner Header */}
+                                            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800 text-slate-300 text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                                                    <span className="font-mono text-[11px] text-emerald-400 font-semibold">LIVE CAMERA ACTIVE</span>
+                                                </div>
+                                                <span className="text-[11px] text-slate-400">Shelf Recognition</span>
+                                            </div>
+
+                                            {/* Viewfinder Canvas Simulation */}
+                                            <div className="relative aspect-[4/3] bg-gradient-to-b from-slate-900 via-slate-800 to-slate-950 rounded-lg overflow-hidden flex items-center justify-center my-2 border border-slate-800">
+                                                {/* Grid Lines */}
+                                                <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
+
+                                                {/* Corner Reticles */}
+                                                <div className="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-emerald-400"></div>
+                                                <div className="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-emerald-400"></div>
+                                                <div className="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-emerald-400"></div>
+                                                <div className="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-emerald-400"></div>
+
+                                                {/* Laser Scanning Beam */}
+                                                <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent top-1/2 -translate-y-1/2 shadow-[0_0_12px_#34d399] animate-pulse"></div>
+
+                                                {/* Mock Bounding Boxes with count labels */}
+                                                <div className="absolute top-6 left-8 w-14 h-16 border-2 border-emerald-400 bg-emerald-500/15 rounded">
+                                                    <span className="absolute -top-2.5 -left-2 bg-emerald-500 text-white text-[9px] font-mono font-bold px-1 rounded-full">1</span>
+                                                </div>
+                                                <div className="absolute top-6 left-28 w-14 h-16 border-2 border-emerald-400 bg-emerald-500/15 rounded">
+                                                    <span className="absolute -top-2.5 -left-2 bg-emerald-500 text-white text-[9px] font-mono font-bold px-1 rounded-full">2</span>
+                                                </div>
+                                                <div className="absolute top-6 right-8 w-14 h-16 border-2 border-emerald-400 bg-emerald-500/15 rounded">
+                                                    <span className="absolute -top-2.5 -left-2 bg-emerald-500 text-white text-[9px] font-mono font-bold px-1 rounded-full">3</span>
+                                                </div>
+                                                <div className="absolute bottom-7 left-12 w-16 h-16 border-2 border-emerald-400 bg-emerald-500/15 rounded">
+                                                    <span className="absolute -top-2.5 -left-2 bg-emerald-500 text-white text-[9px] font-mono font-bold px-1 rounded-full">4</span>
+                                                </div>
+                                                <div className="absolute bottom-7 right-12 w-16 h-16 border-2 border-emerald-400 bg-emerald-500/15 rounded">
+                                                    <span className="absolute -top-2.5 -left-2 bg-emerald-500 text-white text-[9px] font-mono font-bold px-1 rounded-full">5</span>
+                                                </div>
+
+                                                {/* Floating Result Badge */}
+                                                <div className="absolute bottom-2.5 px-3 py-1 rounded-full bg-slate-900/90 border border-emerald-500/40 text-emerald-300 text-xs font-medium backdrop-blur-md flex items-center gap-1.5 shadow-lg">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                    <span>5 Units Detected in Frame</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Bottom Quick Action Strip */}
+                                            <div className="flex items-center justify-between p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                                                <div>
+                                                    <p className="text-[10px] text-slate-400 uppercase font-semibold">Detected Count</p>
+                                                    <p className="text-lg font-bold text-white font-mono">5 <span className="text-xs text-slate-400 font-normal">units</span></p>
+                                                </div>
+                                                <div className="flex gap-1.5">
+                                                    <span className="px-2.5 py-1 text-[11px] rounded-md bg-emerald-600 text-white font-semibold flex items-center gap-1 shadow-sm">
+                                                        <Check className="w-3 h-3" /> Set Stock
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -611,6 +749,20 @@ export default function Home() {
                                                         <h4 className="font-semibold text-slate-900 text-base"><T k="landing.zenMarketTitle" /></h4>
                                                         <p className="text-sm text-slate-600 mt-1 leading-relaxed">
                                                             <T k="landing.zenMarketBody" />
+                                                        </p>
+                                                    </div>
+                                                </li>
+                                                <li className="flex items-start gap-4">
+                                                    <div className="bg-emerald-500/10 p-2.5 rounded-xl shrink-0 border border-emerald-500/20 shadow-sm">
+                                                        <Camera className="w-6 h-6 text-emerald-600" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-semibold text-slate-900 text-base flex items-center gap-2">
+                                                            <T k="landing.zenVisualStockTakeTitle" />
+                                                            <span className="bg-emerald-500/10 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">NEW</span>
+                                                        </h4>
+                                                        <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                                                            <T k="landing.zenVisualStockTakeBody" />
                                                         </p>
                                                     </div>
                                                 </li>
@@ -753,6 +905,11 @@ export default function Home() {
                                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">
                                         <Bot className="h-4 w-4 text-primary" />
                                         <span className="font-medium text-xs"><T k="landing.chipInsights" /></span>
+                                    </div>
+                                    <div className="hidden sm:block w-16 h-px border-t border-dashed border-slate-200"></div>
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-300/80 bg-emerald-50/80 cursor-pointer">
+                                        <Camera className="h-4 w-4 text-emerald-600" />
+                                        <span className="font-medium text-xs text-emerald-800"><T k="landing.chipVisualStockTake" /></span>
                                     </div>
                                     <div className="hidden sm:block w-16 h-px border-t border-dashed border-slate-200"></div>
                                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-100/80 cursor-pointer">

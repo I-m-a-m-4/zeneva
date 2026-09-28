@@ -856,6 +856,7 @@ export type ExpenseCategory =
     | 'maintenance'
     | 'packaging'
     | 'inventory_freight'
+    | 'supplier_payment'
     | 'petty_cash'
     | 'taxes'
     | 'miscellaneous';

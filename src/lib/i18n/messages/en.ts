@@ -202,6 +202,8 @@ const en = {
     f18d: 'Gain deep insights with advanced analytics on your top spending customers and highest-moving stock items.',
     f19t: 'Instant Web Image Search',
     f19d: 'Never worry about product photography again. Source authentic high-resolution retail packaging and catalogue photos from the web in 1 click.',
+    f20t: 'AI Visual Stock Take',
+    f20d: 'Reconcile physical inventory in seconds. Snap a photo of your shelves or cartons — computer vision and Zen AI segment items, count units automatically, and update stock.',
     howBadge: 'The Operating System for Profit-Driven Retail',
     howHeading: 'Zen AI: The Brain Behind Every Sale',
     howBody:
@@ -216,6 +218,9 @@ const en = {
     zenMarketTitle: 'Market Opportunities',
     zenMarketBody:
       'Shows the business owner new untapped market opportunities and flags cash trapped in inventory.',
+    zenVisualStockTakeTitle: 'Visual Stock Take',
+    zenVisualStockTakeBody:
+      'Point your camera at physical shelves or boxes. Computer vision counts units and syncs discrepancies into inventory in seconds.',
     nodePos: 'POS',
     nodeInventory: 'Inventory',
     nodeStorefront: 'Storefront',
@@ -223,6 +228,7 @@ const en = {
     nodeAnalytics: 'Analytics',
     chipForecasting: 'Smart Forecasting',
     chipInsights: 'Actionable Insights',
+    chipVisualStockTake: 'Visual Stock Take',
     chipUnifiedData: 'Unified Data',
     bizHeading: 'Perfect for Your Business',
     bizSub:

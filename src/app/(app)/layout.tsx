@@ -389,8 +389,8 @@ export default function AuthenticatedLayout({
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Trigger Zen AI with dictation when Control key is pressed
-      if (e.key === 'Control') {
+      // Trigger Zen AI with dictation when Alt key is pressed
+      if (e.key === 'Alt') {
         // Prevent default browser hotkey triggers if any
         setIsZenAIOpen(true);
         setDictationTrigger(prev => prev + 1);

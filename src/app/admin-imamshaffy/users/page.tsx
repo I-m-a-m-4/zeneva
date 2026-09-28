@@ -188,7 +188,7 @@ const COLUMNS = [
   { key: 'business', label: 'Business', className: 'hidden md:table-cell min-w-[160px]' },
   { key: 'role', label: 'Role', className: 'min-w-[100px]' },
   { key: 'plan', label: 'Plan', className: 'hidden lg:table-cell min-w-[90px]' },
-  { key: 'usage', label: 'Usage', className: 'hidden xl:table-cell min-w-[90px]' },
+  { key: 'usage', label: 'Usage', className: 'hidden md:table-cell min-w-[90px]' },
   { key: 'seen', label: 'Last active', className: 'hidden sm:table-cell min-w-[140px]' },
   { key: 'segment', label: 'Segment', className: 'hidden lg:table-cell min-w-[100px]' },
   { key: 'status', label: 'Status', className: 'min-w-[90px]' },
@@ -255,8 +255,7 @@ export default function UsersPage() {
   // themselves — there is no refetch to call.
   const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
 
-  // One read for every business, joined in memory below. A per-user lookup would
-  // be one read per row, which is exactly what this page must not do.
+  // One read for every business, joined in memory below.
   const businessesQuery = useMemoFirebase(() => {
     if (!firestore || !canManageUsers) return null;
     return query(collection(firestore, 'businessInstances'));
@@ -638,6 +637,7 @@ export default function UsersPage() {
                                 here so nothing is lost on a narrow screen. */}
                             <div className="mt-0.5 text-xs text-muted-foreground md:hidden">
                               {business?.name || (user.onboardingStep ? `Onboarding (Step ${user.onboardingStep})` : (user.email ? 'No business' : 'Pending Signup'))}
+                              <span> · {formatDuration(user.totalUsageSeconds ?? 0)}</span>
                               <span className="sm:hidden">
                                 {' · '}
                                 {toDate(user.lastSeen)
@@ -657,7 +657,7 @@ export default function UsersPage() {
                           <TableCell className="hidden lg:table-cell">
                             <span className="text-xs capitalize">{planOf(user, bizIndex)}</span>
                           </TableCell>
-                          <TableCell className="hidden whitespace-nowrap text-xs tabular-nums xl:table-cell">
+                          <TableCell className="hidden whitespace-nowrap text-xs tabular-nums md:table-cell">
                             {formatDuration(user.totalUsageSeconds ?? 0)}
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
@@ -860,7 +860,7 @@ export default function UsersPage() {
             <AlertDialogDescription>
               {userToUpdate?.action === 'deactivate'
                 ? <>This will mark <strong>{userToUpdate?.user.name}</strong> as inactive, and they will not be able to log in. Their data will be preserved.</>
-                : <>This will reactivate <strong>{userToUpdate?.user.name}</strong>'s account, allowing them to log in again.</>
+                : <>This will reactivate <strong>{userToUpdate?.user.name}</strong>&apos;s account, allowing them to log in again.</>
               }
             </AlertDialogDescription>
           </AlertDialogHeader>

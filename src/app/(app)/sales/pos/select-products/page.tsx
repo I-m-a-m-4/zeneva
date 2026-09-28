@@ -13,7 +13,7 @@ import type { Product } from '@/types';
 import { isFashionIndustry, getIndustryConfig, type IndustryConfig } from "@/lib/industry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { cn, smartSearchMatch } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -638,13 +638,13 @@ export default function SelectProductsPage() {
     const filteredProducts = React.useMemo(() => {
         let base = (products || []).filter(p => !p.parentId); // Hide child variants from main grid
 
-        // Apply instant local substring filter
+        // Apply instant local substring filter with smart hyphen/space-tolerant search
         if (searchTerm.trim()) {
-            const lower = searchTerm.toLowerCase();
             base = base.filter(p =>
-                p.name.toLowerCase().includes(lower) ||
-                p.sku?.toLowerCase().includes(lower) ||
-                p.category?.toLowerCase().includes(lower)
+                smartSearchMatch(p.name, searchTerm) ||
+                smartSearchMatch(p.sku, searchTerm) ||
+                smartSearchMatch(p.barcode, searchTerm) ||
+                smartSearchMatch(p.category, searchTerm)
             );
         }
 
@@ -813,19 +813,20 @@ export default function SelectProductsPage() {
                         <>
                             {filteredProducts && filteredProducts.length > 0 ? (
                                 <div className="space-y-4">
-                                    <div className={gridClassName}>
+                                    <div className={filteredProducts.length === 1 ? "flex w-full" : gridClassName}>
                                         {filteredProducts.map(product => (
-                                            <ProductItem
-                                                key={product.id}
-                                                product={product}
-                                                currencySymbol={currencySymbol}
-                                                handleAddToCart={() => handleAddToCart(product)}
-                                                addToCart={addToCart}
-                                                onPreview={(src, alt) => setPreviewImage({ src, alt })}
-                                                variants={productVariants.get(product.id) || []}
-                                                isFashion={isFashion}
-                                                industryConfig={industryConfig}
-                                            />
+                                            <div key={product.id} className={filteredProducts.length === 1 ? "w-[200px] sm:w-[250px]" : "w-full"}>
+                                                <ProductItem
+                                                    product={product}
+                                                    currencySymbol={currencySymbol}
+                                                    handleAddToCart={() => handleAddToCart(product)}
+                                                    addToCart={addToCart}
+                                                    onPreview={(src, alt) => setPreviewImage({ src, alt })}
+                                                    variants={productVariants.get(product.id) || []}
+                                                    isFashion={isFashion}
+                                                    industryConfig={industryConfig}
+                                                />
+                                            </div>
                                         ))}
                                     </div>
                                 </div>

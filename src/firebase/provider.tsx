@@ -61,12 +61,18 @@ export const FirebaseProvider = ({ children, firebaseApp, firestore, auth }: Fir
     // Optimistic initial state for offline support
     let cachedUser: any = null;
     if (typeof window !== 'undefined') {
-      cachedUser = secureStorage.getItem('zeneva_auth_session');
+      try {
+        cachedUser = secureStorage.getItem('zeneva_auth_session');
+      } catch (e) {
+        console.error("Error reading cached user session:", e);
+      }
     }
 
+    const immediateUser = auth?.currentUser || cachedUser;
+
     return {
-      user: cachedUser,
-      isUserLoading: true, // Still loading until Firebase confirms
+      user: immediateUser,
+      isUserLoading: !immediateUser, // Bypass blocking loader if cached/immediate session exists
       userError: null,
     };
   });

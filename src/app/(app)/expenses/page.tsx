@@ -101,7 +101,10 @@ import { downloadCsv } from '@/lib/csv';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart as PieChartIcon } from 'lucide-react';
 import type { Expense, ExpenseCategory, ExpensePaymentMethod } from '@/types';
+import { Combobox } from '@/components/ui/combobox';
 import {
   collection,
   query,
@@ -122,17 +125,18 @@ import {
 // ======================== EXPENSE DEFINITIONS ========================
 
 export const EXPENSE_CATEGORIES: { id: ExpenseCategory; label: string; icon: React.ElementType; color: string }[] = [
-  { id: 'utilities', label: 'Utilities & Power (Fuel / Gen / NEPA)', icon: Zap, color: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30' },
-  { id: 'salaries', label: 'Staff Salaries & Wages', icon: Users2, color: 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/30' },
-  { id: 'rent', label: 'Shop Rent & Lease', icon: Building2, color: 'text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-950/30' },
-  { id: 'logistics', label: 'Logistics & Transportation', icon: Truck, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30' },
-  { id: 'marketing', label: 'Marketing & Ads', icon: Megaphone, color: 'text-pink-600 bg-pink-50 border-pink-200 dark:bg-pink-950/30' },
-  { id: 'maintenance', label: 'Maintenance & Repairs', icon: Wrench, color: 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950/30' },
-  { id: 'packaging', label: 'Bags & Packaging Material', icon: Package, color: 'text-teal-600 bg-teal-50 border-teal-200 dark:bg-teal-950/30' },
-  { id: 'inventory_freight', label: 'Stock Waybill & Freight', icon: FileSpreadsheet, color: 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30' },
-  { id: 'petty_cash', label: 'Daily Petty Cash', icon: Coins, color: 'text-lime-600 bg-lime-50 border-lime-200 dark:bg-lime-950/30' },
-  { id: 'taxes', label: 'Taxes, Levies & Fees', icon: ReceiptText, color: 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/30' },
-  { id: 'miscellaneous', label: 'Miscellaneous / Other', icon: Tag, color: 'text-slate-600 bg-slate-50 border-slate-200 dark:bg-slate-900/30' },
+  { id: 'utilities', label: 'Utilities & Power (Fuel / Gen / NEPA)', icon: Zap, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'salaries', label: 'Staff Salaries & Wages', icon: Users2, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'rent', label: 'Shop Rent & Lease', icon: Building2, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'logistics', label: 'Logistics & Transportation', icon: Truck, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'marketing', label: 'Marketing & Ads', icon: Megaphone, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'maintenance', label: 'Maintenance & Repairs', icon: Wrench, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'packaging', label: 'Bags & Packaging Material', icon: Package, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'inventory_freight', label: 'Stock Waybill & Freight', icon: FileSpreadsheet, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'supplier_payment', label: 'Supplier & Inventory Procurement', icon: Boxes, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'petty_cash', label: 'Daily Petty Cash', icon: Coins, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'taxes', label: 'Taxes, Levies & Fees', icon: ReceiptText, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
+  { id: 'miscellaneous', label: 'Miscellaneous / Other', icon: Tag, color: 'text-zinc-900 bg-zinc-100 border-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 dark:border-zinc-700' },
 ];
 
 export const PAYMENT_METHODS: { id: ExpensePaymentMethod; label: string }[] = [
@@ -264,6 +268,14 @@ function ExpensesAndPurchasesContent() {
   const [isAddSupplierOpen, setIsAddSupplierOpen] = React.useState(false);
   const [editingSupplier, setEditingSupplier] = React.useState<Supplier | null>(null);
   const [deletingSupplier, setDeletingSupplier] = React.useState<Supplier | null>(null);
+
+  // Drill-down KPI Modal State
+  const [selectedKpiModal, setSelectedKpiModal] = React.useState<{
+    id: 'total_outflow' | 'operating_overheads' | 'month_expenses' | 'drawer_outflow' | 'stock_procurement' | 'paid_suppliers' | 'accounts_payable' | 'suppliers';
+    title: string;
+    description: string;
+  } | null>(null);
+  const [kpiModalSearch, setKpiModalSearch] = React.useState('');
 
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -555,6 +567,67 @@ function ExpensesAndPurchasesContent() {
   }, [suppliers, searchSuppliers]);
 
   // -------------------------------------------------------------
+  // CHART DATA COMPUTATION
+  // -------------------------------------------------------------
+  const chartData = React.useMemo(() => {
+    // 1. Expenses by Category
+    const catMap = new Map<string, number>();
+    filteredExpenses.forEach(e => {
+      const cat = EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label.split('(')[0].trim() || e.category;
+      catMap.set(cat, (catMap.get(cat) || 0) + (Number(e.amount) || 0));
+    });
+    const expensesByCategory = Array.from(catMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    // 2. Spending Trend (Dynamic period based on timeRange filter)
+    const trendMap = new Map<string, { date: string; expenses: number; purchases: number }>();
+    const now = new Date();
+
+    let daysCount = 30;
+    if (timeRange === '7d' || timeRange === 'week') daysCount = 7;
+    else if (timeRange === 'month') daysCount = 30;
+    else if (timeRange === 'today') daysCount = 1;
+    else if (timeRange === 'year' || timeRange === 'all') daysCount = 90;
+
+    if (daysCount === 1) {
+      const todayStr = now.toISOString().split('T')[0];
+      trendMap.set(todayStr, { date: 'Today', expenses: 0, purchases: 0 });
+    } else {
+      for (let i = daysCount - 1; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const key = d.toISOString().split('T')[0];
+        trendMap.set(key, {
+          date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          expenses: 0,
+          purchases: 0
+        });
+      }
+    }
+    
+    filteredExpenses.forEach(e => {
+      const dateStr = safeToDate(e.date)?.toISOString().split('T')[0];
+      if (dateStr && trendMap.has(dateStr)) {
+        trendMap.get(dateStr)!.expenses += (Number(e.amount) || 0);
+      }
+    });
+
+    filteredPurchases.forEach(p => {
+      const dateStr = safeToDate(p.orderDate)?.toISOString().split('T')[0];
+      if (dateStr && trendMap.has(dateStr)) {
+        trendMap.get(dateStr)!.purchases += (Number(p.totalAmount) || 0);
+      }
+    });
+
+    return {
+      expensesByCategory,
+      spendingTrend: Array.from(trendMap.values())
+    };
+  }, [filteredExpenses, filteredPurchases, timeRange]);
+
+  const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
+
+  // -------------------------------------------------------------
   // EXPENSE ACTIONS
   // -------------------------------------------------------------
   const resetExpenseForm = () => {
@@ -752,6 +825,27 @@ function ExpensesAndPurchasesContent() {
 
       await addDoc(collection(firestore, 'supplier_purchases'), payload);
 
+      // Auto-log initial payment to supplier as an Expense
+      if (amtPaid > 0) {
+        await addDoc(collection(firestore, 'expenses'), {
+          businessId: business.id,
+          title: `Supplier Payment (${poNum} - ${supplier?.name || 'Supplier'})`,
+          amount: amtPaid,
+          category: 'supplier_payment',
+          paymentMethod: (orderPaymentMethod as any) || 'bank_transfer',
+          description: `Payment for Purchase Order ${poNum} to ${supplier?.name || 'Supplier'}`,
+          date: Timestamp.fromDate(new Date(orderDate)),
+          recipient: supplier?.name || 'Supplier',
+          deductFromCashDrawer: orderPaymentMethod === 'cash',
+          status: 'paid',
+          referenceId: poNum,
+          createdByName: currentUserProfile?.name || 'Staff',
+          createdById: currentUserProfile?.id,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
       // Update supplier's debt and lifetime spend
       if (supplier) {
         await updateDoc(doc(firestore, 'suppliers', supplier.id), {
@@ -854,6 +948,27 @@ function ExpensesAndPurchasesContent() {
         updatedAt: serverTimestamp(),
       });
 
+      // Auto-log supplier payment as an Expense
+      if (payActual > 0) {
+        await addDoc(collection(firestore, 'expenses'), {
+          businessId: business.id,
+          title: `Supplier Payment (${purchase.poNumber} - ${purchase.supplierName})`,
+          amount: payActual,
+          category: 'supplier_payment',
+          paymentMethod: (payMethod as any) || 'bank_transfer',
+          description: `Payment towards Purchase Order ${purchase.poNumber} (${purchase.supplierName})`,
+          date: serverTimestamp(),
+          recipient: purchase.supplierName,
+          deductFromCashDrawer: payMethod === 'cash',
+          status: 'paid',
+          referenceId: purchase.poNumber,
+          createdByName: currentUserProfile?.name || 'Staff',
+          createdById: currentUserProfile?.id,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
       // Update supplier debt
       if (purchase.supplierId) {
         await updateDoc(doc(firestore, 'suppliers', purchase.supplierId), {
@@ -933,7 +1048,7 @@ function ExpensesAndPurchasesContent() {
         e.notes || ''
       ]);
     });
-    downloadCsv(rows, `Zeneva-Expenses-${business?.name || 'Store'}`);
+    downloadCsv(`zeneva-expenses-${format(new Date(), 'yyyy-MM-dd')}.csv`, rows);
     toast({ title: 'Expenses Exported' });
   };
 
@@ -957,7 +1072,7 @@ function ExpensesAndPurchasesContent() {
         p.notes || ''
       ]);
     });
-    downloadCsv(rows, `Zeneva-Purchases-${business?.name || 'Store'}`);
+    downloadCsv(`zeneva-purchases-${format(new Date(), 'yyyy-MM-dd')}.csv`, rows);
     toast({ title: 'Purchases Exported' });
   };
 
@@ -1004,9 +1119,22 @@ function ExpensesAndPurchasesContent() {
       {/* ======================== COMBINED OUTFLOW KPI CARDS ======================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* ROW 1 */}
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'total_outflow',
+              title: 'Total Cash Outflow Breakdown',
+              description: 'Combined operational expenses and stock procurement payments.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Total Cash Outflow</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-primary transition-colors flex items-center justify-between">
+              <span>Total Cash Outflow</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
               {currencySymbol}{metrics.combinedOutflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
@@ -1018,9 +1146,22 @@ function ExpensesAndPurchasesContent() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'operating_overheads',
+              title: 'Operating Overheads Breakdown',
+              description: 'All-time shop operational costs categorized by utility, rent, staff, packaging, etc.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-amber-500/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Operating Overheads</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors flex items-center justify-between">
+              <span>Operating Overheads</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-amber-600 dark:text-amber-400">
               {currencySymbol}{metrics.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
@@ -1033,9 +1174,22 @@ function ExpensesAndPurchasesContent() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'month_expenses',
+              title: 'Expenses This Month Breakdown',
+              description: 'Operational costs incurred during the current calendar month.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-amber-500/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Expenses This Month</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors flex items-center justify-between">
+              <span>Expenses This Month</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-amber-600 dark:text-amber-400">
               {currencySymbol}{metrics.monthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
@@ -1048,9 +1202,22 @@ function ExpensesAndPurchasesContent() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'drawer_outflow',
+              title: 'Drawer / Till Cash Outflow',
+              description: 'Operating cash expenses deducted directly from the daily cash register till.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-emerald-500/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Drawer / Till Outflow</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center justify-between">
+              <span>Drawer / Till Outflow</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               {currencySymbol}{metrics.expensesFromDrawer.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
@@ -1064,9 +1231,22 @@ function ExpensesAndPurchasesContent() {
         </Card>
 
         {/* ROW 2 */}
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'stock_procurement',
+              title: 'Stock Procurement Bills',
+              description: 'Purchase orders issued to distributors and wholesalers for inventory restock.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-blue-500/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Stock Procurement</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center justify-between">
+              <span>Stock Procurement</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {currencySymbol}{metrics.totalProcurement.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
@@ -1079,9 +1259,22 @@ function ExpensesAndPurchasesContent() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'paid_suppliers',
+              title: 'Settled Procurement Payments',
+              description: 'Purchase bills fully or partially settled to suppliers.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-blue-500/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Paid to Suppliers</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center justify-between">
+              <span>Paid to Suppliers</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {currencySymbol}{metrics.totalPurchasesPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
@@ -1094,9 +1287,22 @@ function ExpensesAndPurchasesContent() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'accounts_payable',
+              title: 'Accounts Payable (Supplier Debt)',
+              description: 'Outstanding purchase bill balances owed to suppliers.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-rose-500/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Accounts Payable (Debt)</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors flex items-center justify-between">
+              <span>Accounts Payable (Debt)</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-rose-500" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-rose-600 dark:text-rose-400">
               {currencySymbol}{metrics.totalSupplierDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
@@ -1109,9 +1315,22 @@ function ExpensesAndPurchasesContent() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xs">
+        <Card 
+          onClick={() => {
+            setKpiModalSearch('');
+            setSelectedKpiModal({
+              id: 'suppliers',
+              title: 'Active Suppliers Directory',
+              description: 'Wholesalers, distributors, and vendors registered in your database.',
+            });
+          }}
+          className="shadow-xs cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
+        >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium">Active Suppliers</CardDescription>
+            <CardDescription className="text-xs uppercase font-medium group-hover:text-primary transition-colors flex items-center justify-between">
+              <span>Active Suppliers</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+            </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
               {suppliers.length}
             </CardTitle>
@@ -1124,6 +1343,119 @@ function ExpensesAndPurchasesContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ======================== ANALYTICS CHARTS ======================== */}
+      {(chartData.expensesByCategory.length > 0 || chartData.spendingTrend.some(d => d.expenses > 0 || d.purchases > 0)) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="lg:col-span-2 shadow-xs">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-lg">
+                  Cash Outflow Trend ({timeRange === '7d' || timeRange === 'week' ? 'Last 7 Days' : timeRange === 'month' ? 'Last 30 Days' : timeRange === 'today' ? 'Today' : 'Over Time'})
+                </CardTitle>
+                <CardDescription>Daily comparison of operating expenses vs stock procurement</CardDescription>
+              </div>
+              <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setTimeRange('7d')}
+                  className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === '7d' || timeRange === 'week' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  7D
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeRange('month')}
+                  className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === 'month' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  30D
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeRange('year')}
+                  className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === 'year' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Year
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeRange('all')}
+                  className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === 'all' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  All
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData.spendingTrend} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} dy={10} />
+                    <YAxis 
+                      width={65}
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 11, fill: '#6b7280' }} 
+                      tickFormatter={(val) => {
+                        if (val >= 1_000_000) return `${currencySymbol}${(val / 1_000_000).toFixed(1)}M`;
+                        if (val >= 1_000) return `${currencySymbol}${(val / 1_000).toFixed(1)}k`;
+                        return `${currencySymbol}${val}`;
+                      }} 
+                    />
+                    <RechartsTooltip 
+                      formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, undefined]}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid currentColor', borderColor: 'rgba(150,150,150,0.2)', backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      cursor={{fill: 'currentColor', opacity: 0.05}}
+                    />
+                    <Bar dataKey="expenses" name="Operating Expenses" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="purchases" name="Stock Procurement" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-xs">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Expenses by Category</CardTitle>
+              <CardDescription>Breakdown of where your money goes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] w-full flex items-center justify-center">
+                {chartData.expensesByCategory.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData.expensesByCategory}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {chartData.expensesByCategory.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip 
+                        formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, undefined]}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid currentColor', borderColor: 'rgba(150,150,150,0.2)', backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-sm text-muted-foreground flex flex-col items-center">
+                    <PieChartIcon className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                    No expense data
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ======================== UNIFIED TABS ======================== */}
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
@@ -1173,9 +1505,19 @@ function ExpensesAndPurchasesContent() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {EXPENSE_CATEGORIES.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                    ))}
+                    {EXPENSE_CATEGORIES.map(c => {
+                      const CatIcon = c.icon;
+                      return (
+                        <SelectItem key={c.id} value={c.id} className="cursor-pointer py-1.5 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className={cn("p-1 rounded-md text-xs transition-colors group-data-[highlighted]:bg-white/20 group-data-[highlighted]:text-white group-data-[highlighted]:border-transparent", c.color)}>
+                              <CatIcon className="h-3.5 w-3.5 text-current" />
+                            </span>
+                            <span className="font-medium group-data-[highlighted]:text-primary-foreground">{c.label}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
 
@@ -1630,102 +1972,153 @@ function ExpensesAndPurchasesContent() {
           setEditingExpense(null);
         }
       }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[650px] p-6 rounded-xl border border-border shadow-2xl">
           <form onSubmit={handleCreateExpense}>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                {isEditExpenseOpen ? 'Edit Expense' : 'Record Operating Expense'}
-              </DialogTitle>
-              <DialogDescription>
-                Log overhead expenses, utility bills, maintenance, salaries, or petty cash paid from the till.
-              </DialogDescription>
+            <DialogHeader className="pb-2 border-b">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                  <Wallet className="h-6 w-6" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold tracking-tight">
+                    {isEditExpenseOpen ? 'Edit Operating Expense' : 'Record Operating Expense'}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                    Log overhead expenses, utility bills, maintenance, salaries, or petty cash paid from the till.
+                  </DialogDescription>
+                </div>
+              </div>
             </DialogHeader>
 
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="title">Expense Description / Title *</Label>
+            <div className="grid gap-4 py-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Expense Title */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="title" className="text-xs font-semibold text-foreground/90">
+                    Expense Description / Title <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     id="title"
                     required
-                    placeholder="e.g. Generator Petrol, Shop Rent, Nylon Bags"
+                    placeholder="e.g. Generator Petrol, Shop Rent, Packaging Bags"
                     value={expenseTitle}
                     onChange={(e) => setExpenseTitle(e.target.value)}
+                    className="h-10 text-sm rounded-lg bg-muted/20 hover:bg-muted/40 hover:text-foreground text-foreground transition-colors"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="amount">Amount ({currencySymbol}) *</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="any"
-                    required
-                    placeholder="0.00"
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                  />
+                {/* Amount */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="amount" className="text-xs font-semibold text-foreground/90">
+                    Amount ({currencySymbol}) <span className="text-rose-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-muted-foreground select-none">
+                      {currencySymbol}
+                    </span>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="any"
+                      required
+                      placeholder="0.00"
+                      value={expenseAmount}
+                      onChange={(e) => setExpenseAmount(e.target.value)}
+                      className="h-10 text-sm pl-7 rounded-lg bg-muted/20 hover:bg-muted/40 hover:text-foreground text-foreground transition-colors font-mono font-medium"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="date">Date Incurred *</Label>
+                {/* Date Incurred */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="date" className="text-xs font-semibold text-foreground/90">
+                    Date Incurred <span className="text-rose-500">*</span>
+                  </Label>
                   <Input
                     id="date"
                     type="date"
                     required
                     value={expenseDate}
                     onChange={(e) => setExpenseDate(e.target.value)}
+                    className="h-10 text-sm rounded-lg bg-muted/20 hover:bg-muted/40 hover:text-foreground text-foreground transition-colors"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="category">Category *</Label>
+                {/* Category Dropdown */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="category" className="text-xs font-semibold text-foreground/90">
+                    Category <span className="text-rose-500">*</span>
+                  </Label>
                   <Select value={expenseCategory} onValueChange={(v: any) => setExpenseCategory(v)}>
-                    <SelectTrigger id="category">
-                      <SelectValue />
+                    <SelectTrigger id="category" className="h-10 text-sm rounded-lg bg-muted/20 hover:bg-muted/40 hover:text-foreground text-foreground transition-colors w-full">
+                      <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {EXPENSE_CATEGORIES.map(c => (
-                        <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                      ))}
+                    <SelectContent className="max-h-[300px]">
+                      {EXPENSE_CATEGORIES.map(c => {
+                        const CatIcon = c.icon;
+                        return (
+                          <SelectItem key={c.id} value={c.id} className="cursor-pointer py-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className={cn("p-1 rounded-md text-xs transition-colors group-data-[highlighted]:bg-white/20 group-data-[highlighted]:text-white group-data-[highlighted]:border-transparent", c.color)}>
+                                <CatIcon className="h-3.5 w-3.5 text-current" />
+                              </span>
+                              <span className="font-medium group-data-[highlighted]:text-primary-foreground">{c.label}</span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="method">Payment Method *</Label>
+                {/* Payment Method Dropdown */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="method" className="text-xs font-semibold text-foreground/90">
+                    Payment Method <span className="text-rose-500">*</span>
+                  </Label>
                   <Select value={expenseMethod} onValueChange={(v: any) => setExpenseMethod(v)}>
-                    <SelectTrigger id="method">
-                      <SelectValue />
+                    <SelectTrigger id="method" className="h-10 text-sm rounded-lg bg-muted/20 hover:bg-muted/40 hover:text-foreground text-foreground transition-colors w-full">
+                      <SelectValue placeholder="Select payment method" />
                     </SelectTrigger>
                     <SelectContent>
                       {PAYMENT_METHODS.map(m => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                        <SelectItem key={m.id} value={m.id} className="cursor-pointer py-2 text-xs font-medium">
+                          {m.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="recipient">Paid To / Recipient (Optional)</Label>
+                {/* Recipient */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="recipient" className="text-xs font-semibold text-foreground/90">
+                    Paid To / Recipient <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
                   <Input
                     id="recipient"
-                    placeholder="e.g. Filling Station, Landlord, Delivery Guy"
+                    placeholder="e.g. Filling Station, Landlord, Delivery Driver"
                     value={expenseRecipient}
                     onChange={(e) => setExpenseRecipient(e.target.value)}
+                    className="h-10 text-sm rounded-lg bg-muted/20 hover:bg-muted/40 hover:text-foreground text-foreground transition-colors"
                   />
                 </div>
 
+                {/* Cash Drawer Deduction Toggle */}
                 {expenseMethod === 'cash' && (
-                  <div className="sm:col-span-2 flex items-center justify-between p-3 border rounded-lg bg-amber-500/5 border-amber-500/20">
-                    <div>
-                      <Label htmlFor="deduct-drawer" className="font-semibold text-sm cursor-pointer text-amber-900 dark:text-amber-300">
-                        Deduct from Cash Drawer / Till
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Subtract this cash expense from daily register balance reconciliation.
-                      </p>
+                  <div className="sm:col-span-2 flex items-center justify-between p-3.5 border rounded-xl bg-amber-500/10 border-amber-500/30 dark:border-amber-500/20 hover:bg-amber-500/15 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                        <Wallet className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <Label htmlFor="deduct-drawer" className="font-semibold text-xs cursor-pointer text-amber-950 dark:text-amber-200">
+                          Deduct from Cash Drawer / Till
+                        </Label>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400/80">
+                          Subtract this cash expense from daily register balance reconciliation.
+                        </p>
+                      </div>
                     </div>
                     <Switch
                       id="deduct-drawer"
@@ -1735,24 +2128,32 @@ function ExpensesAndPurchasesContent() {
                   </div>
                 )}
 
-                <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="notes">Notes / Reference (Optional)</Label>
+                {/* Notes */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="notes" className="text-xs font-semibold text-foreground/90">
+                    Notes / Reference <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
                   <Textarea
                     id="notes"
-                    placeholder="Add receipt number or additional context..."
+                    placeholder="Add receipt number, invoice reference or context..."
                     value={expenseNotes}
                     onChange={(e) => setExpenseNotes(e.target.value)}
-                    className="resize-none h-16"
+                    className="resize-none h-20 text-sm rounded-lg bg-muted/20 hover:bg-muted/40 hover:text-foreground text-foreground transition-colors"
                   />
                 </div>
               </div>
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setIsAddExpenseOpen(false); setIsEditExpenseOpen(false); }}>
+            <DialogFooter className="pt-2 border-t gap-2 sm:gap-0">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                onClick={() => { setIsAddExpenseOpen(false); setIsEditExpenseOpen(false); }}
+                className="h-10 px-4 text-xs font-medium"
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting} className="h-10 px-5 text-xs font-semibold shadow-md">
                 {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {isEditExpenseOpen ? 'Save Changes' : 'Record Expense'}
               </Button>
@@ -1837,21 +2238,19 @@ function ExpensesAndPurchasesContent() {
                     <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-background p-2 rounded-md border text-xs">
                       <div className="col-span-5">
                         <Label className="text-[10px] text-muted-foreground">Product</Label>
-                        <Select
+                        <Combobox
+                          options={(products || []).map(p => ({
+                            value: p.id,
+                            label: `${p.name}${p.sku ? ` [${p.sku}]` : ''} (Stock: ${p.stock ?? 0})`
+                          }))}
                           value={item.productId}
-                          onValueChange={(val) => handleOrderItemChange(idx, 'productId', val)}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Pick inventory item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(products || []).map(p => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name} (Stock: {p.stock})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(val) => handleOrderItemChange(idx, 'productId', val)}
+                          placeholder="Pick inventory item"
+                          searchPlaceholder="Search product or SKU..."
+                          triggerClassName="h-8 text-xs font-normal"
+                          allowDeselect={false}
+                          modal={true}
+                        />
                       </div>
 
                       <div className="col-span-2">
@@ -2237,6 +2636,291 @@ function ExpensesAndPurchasesContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ======================== DRILL-DOWN KPI MODAL ======================== */}
+      {selectedKpiModal && (
+        <Dialog open={!!selectedKpiModal} onOpenChange={(open) => { if (!open) setSelectedKpiModal(null); }}>
+          <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <Wallet className="h-5 w-5 text-primary" />
+                {selectedKpiModal.title}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedKpiModal.description}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-2 space-y-3 flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="relative px-1 pt-1 pb-1">
+                <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search breakdown records..."
+                  className="pl-9 text-xs focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-0 shadow-xs"
+                  value={kpiModalSearch}
+                  onChange={(e) => setKpiModalSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="flex-1 overflow-y-auto border rounded-md">
+                {(() => {
+                  const q = kpiModalSearch.toLowerCase().trim();
+                  const startOfThisMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+                  if (selectedKpiModal.id === 'total_outflow') {
+                    // Unified timeline of expenses + purchases
+                    const combinedList: { id: string; date: Date | null; type: 'expense' | 'purchase'; title: string; subtitle: string; amount: number; badge: string; raw: any }[] = [];
+                    
+                    expenses.forEach(e => {
+                      combinedList.push({
+                        id: `exp-${e.id}`,
+                        date: safeToDate(e.date),
+                        type: 'expense',
+                        title: e.title,
+                        subtitle: `Category: ${EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label.split('(')[0].trim() || e.category}`,
+                        amount: Number(e.amount) || 0,
+                        badge: e.paymentMethod.replace('_', ' '),
+                        raw: e,
+                      });
+                    });
+
+                    purchases.forEach(p => {
+                      combinedList.push({
+                        id: `pur-${p.id}`,
+                        date: safeToDate(p.orderDate),
+                        type: 'purchase',
+                        title: `Stock Procurement (${p.poNumber})`,
+                        subtitle: `Supplier: ${p.supplierName} (${p.items?.length || 0} items)`,
+                        amount: Number(p.totalAmount) || 0,
+                        badge: p.status,
+                        raw: p,
+                      });
+                    });
+
+                    combinedList.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+
+                    const filtered = combinedList.filter(item => 
+                      !q || item.title.toLowerCase().includes(q) || item.subtitle.toLowerCase().includes(q) || item.badge.toLowerCase().includes(q)
+                    );
+
+                    if (filtered.length === 0) {
+                      return <div className="p-8 text-center text-xs text-muted-foreground">No records found matching your query.</div>;
+                    }
+
+                    return (
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs">Type</TableHead>
+                            <TableHead className="text-xs">Date</TableHead>
+                            <TableHead className="text-xs">Description</TableHead>
+                            <TableHead className="text-xs">Details</TableHead>
+                            <TableHead className="text-xs text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map(item => (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <Badge variant="outline" className={item.type === 'expense' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'}>
+                                  {item.type === 'expense' ? 'Expense' : 'Procurement'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs font-mono text-muted-foreground">
+                                {item.date ? format(item.date, 'MMM d, yyyy') : 'N/A'}
+                              </TableCell>
+                              <TableCell className="font-medium text-xs">{item.title}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{item.subtitle}</TableCell>
+                              <TableCell className="text-xs text-right font-bold font-mono">
+                                {currencySymbol}{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    );
+                  }
+
+                  if (selectedKpiModal.id === 'operating_overheads' || selectedKpiModal.id === 'month_expenses' || selectedKpiModal.id === 'drawer_outflow') {
+                    let expList = expenses;
+                    if (selectedKpiModal.id === 'month_expenses') {
+                      expList = expList.filter(e => (safeToDate(e.date) || new Date(0)) >= startOfThisMonth);
+                    } else if (selectedKpiModal.id === 'drawer_outflow') {
+                      expList = expList.filter(e => e.deductFromCashDrawer);
+                    }
+
+                    const filtered = expList.filter(e =>
+                      !q || e.title.toLowerCase().includes(q) || (e.recipient || '').toLowerCase().includes(q) || (e.notes || '').toLowerCase().includes(q) || e.category.toLowerCase().includes(q)
+                    );
+
+                    if (filtered.length === 0) {
+                      return <div className="p-8 text-center text-xs text-muted-foreground">No expenses found for this criteria.</div>;
+                    }
+
+                    return (
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs">Date</TableHead>
+                            <TableHead className="text-xs">Expense Title</TableHead>
+                            <TableHead className="text-xs">Category</TableHead>
+                            <TableHead className="text-xs">Payment Method</TableHead>
+                            <TableHead className="text-xs">Recipient</TableHead>
+                            <TableHead className="text-xs text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map(e => {
+                            const catLabel = EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label.split('(')[0].trim() || e.category;
+                            const d = safeToDate(e.date);
+                            return (
+                              <TableRow key={e.id}>
+                                <TableCell className="text-xs font-mono text-muted-foreground">
+                                  {d ? format(d, 'MMM d, yyyy') : 'N/A'}
+                                </TableCell>
+                                <TableCell className="font-medium text-xs">{e.title}</TableCell>
+                                <TableCell className="text-xs">
+                                  <Badge variant="secondary" className="font-normal text-[11px]">{catLabel}</Badge>
+                                </TableCell>
+                                <TableCell className="text-xs capitalize">
+                                  {e.paymentMethod.replace('_', ' ')}
+                                  {e.deductFromCashDrawer && <Badge variant="outline" className="ml-1 text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Drawer</Badge>}
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{e.recipient || '-'}</TableCell>
+                                <TableCell className="text-xs text-right font-bold font-mono text-amber-600 dark:text-amber-400">
+                                  {currencySymbol}{Number(e.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    );
+                  }
+
+                  if (selectedKpiModal.id === 'stock_procurement' || selectedKpiModal.id === 'paid_suppliers' || selectedKpiModal.id === 'accounts_payable') {
+                    let poList = purchases;
+                    if (selectedKpiModal.id === 'paid_suppliers') {
+                      poList = poList.filter(p => p.paymentStatus === 'paid' || p.amountPaid > 0);
+                    } else if (selectedKpiModal.id === 'accounts_payable') {
+                      poList = poList.filter(p => (p.balanceDue || 0) > 0);
+                    }
+
+                    const filtered = poList.filter(p =>
+                      !q || p.poNumber.toLowerCase().includes(q) || p.supplierName.toLowerCase().includes(q) || p.items?.some(i => i.productName.toLowerCase().includes(q))
+                    );
+
+                    if (filtered.length === 0) {
+                      return <div className="p-8 text-center text-xs text-muted-foreground">No purchase orders found.</div>;
+                    }
+
+                    return (
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs">PO Number</TableHead>
+                            <TableHead className="text-xs">Order Date</TableHead>
+                            <TableHead className="text-xs">Supplier</TableHead>
+                            <TableHead className="text-xs">Status</TableHead>
+                            <TableHead className="text-xs text-right">Total Bill</TableHead>
+                            <TableHead className="text-xs text-right">Amount Paid</TableHead>
+                            <TableHead className="text-xs text-right">Balance Due</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map(p => {
+                            const d = safeToDate(p.orderDate);
+                            return (
+                              <TableRow key={p.id}>
+                                <TableCell className="font-mono text-xs font-semibold">{p.poNumber}</TableCell>
+                                <TableCell className="text-xs font-mono text-muted-foreground">
+                                  {d ? format(d, 'MMM d, yyyy') : 'N/A'}
+                                </TableCell>
+                                <TableCell className="font-medium text-xs">{p.supplierName}</TableCell>
+                                <TableCell className="text-xs">
+                                  <Badge 
+                                    variant="outline" 
+                                    className={cn(
+                                      "capitalize text-[10px]",
+                                      p.status === 'received' && "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+                                      p.status === 'ordered' && "bg-blue-500/10 text-blue-600 border-blue-500/20",
+                                      p.status === 'cancelled' && "bg-destructive/10 text-destructive border-destructive/20"
+                                    )}
+                                  >
+                                    {p.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-right font-mono font-medium">
+                                  {currencySymbol}{Number(p.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-xs text-right font-mono text-emerald-600 dark:text-emerald-400">
+                                  {currencySymbol}{Number(p.amountPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-xs text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                                  {currencySymbol}{Number(p.balanceDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    );
+                  }
+
+                  if (selectedKpiModal.id === 'suppliers') {
+                    const filtered = suppliers.filter(s =>
+                      !q || s.name.toLowerCase().includes(q) || (s.contactPerson || '').toLowerCase().includes(q) || (s.phone || '').toLowerCase().includes(q)
+                    );
+
+                    if (filtered.length === 0) {
+                      return <div className="p-8 text-center text-xs text-muted-foreground">No suppliers found.</div>;
+                    }
+
+                    return (
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs">Supplier Name</TableHead>
+                            <TableHead className="text-xs">Contact Person</TableHead>
+                            <TableHead className="text-xs">Phone / Email</TableHead>
+                            <TableHead className="text-xs">Payment Terms</TableHead>
+                            <TableHead className="text-xs text-right">Total Purchased</TableHead>
+                            <TableHead className="text-xs text-right">Debt Owed</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map(s => (
+                            <TableRow key={s.id}>
+                              <TableCell className="font-medium text-xs">{s.name}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{s.contactPerson || '-'}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{s.phone || s.email || '-'}</TableCell>
+                              <TableCell className="text-xs">{s.paymentTerms || 'Immediate'}</TableCell>
+                              <TableCell className="text-xs text-right font-mono font-medium">
+                                {currencySymbol}{Number(s.totalPurchased || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell className="text-xs text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                                {currencySymbol}{Number(s.totalDebt || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    );
+                  }
+
+                  return null;
+                })()}
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2 border-t">
+              <Button variant="outline" onClick={() => setSelectedKpiModal(null)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -5,6 +5,17 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  body[data-scroll-locked],
+  body[style*="overflow: hidden"],
+  body[style*="padding-right"] {
+    padding-right: 0px !important;
+    margin-right: 0px !important;
+  }
+
   :root {
     --background: 30 100% 99%;
     --foreground: 224 71% 4%;

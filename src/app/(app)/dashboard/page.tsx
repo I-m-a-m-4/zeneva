@@ -2,6 +2,7 @@
 'use client';
 import *as React from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import PageTitle from '@/components/shared/page-title';
 import SummaryCard from '@/components/dashboard/summary-card';
 import TodaysFocus from '@/components/dashboard/todays-focus';
@@ -83,6 +84,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const { t } = useI18n();
   const dashboardRef = React.useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
 
@@ -467,10 +469,19 @@ export default function DashboardPage() {
   const { currentUserProfile } = usePOS();
 
   const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => { setMounted(true); }, []);
+  React.useEffect(() => { 
+    setMounted(true); 
+    if (currentUserProfile?.role === 'cashier') {
+      router.replace('/sales/pos/select-products');
+    }
+  }, [currentUserProfile?.role, router]);
 
   const hasReportPermission = currentUserProfile?.permissions?.view_reports ?? (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'owner');
   const isRestricted = mounted ? !hasReportPermission : false;
+
+  if (currentUserProfile?.role === 'cashier') {
+    return <DashboardSkeleton restricted={true} />;
+  }
 
   if (isLoading || !finalDashboardData) {
     return <DashboardSkeleton restricted={isRestricted} />;

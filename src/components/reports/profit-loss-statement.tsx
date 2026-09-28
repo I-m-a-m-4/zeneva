@@ -402,7 +402,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
     return (
         <div className="space-y-6 animate-in fade-in duration-300 px-2 lg:px-6">
             {/* Executive P&L Key Metrics */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <Card className="border border-border/60 bg-gradient-to-br from-card to-muted/20">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-semibold text-muted-foreground">{t('reports.plsGrossRevenue')}</CardTitle>
@@ -439,6 +439,21 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                 })}
                             </Badge>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border border-rose-500/30 bg-gradient-to-br from-rose-500/10 via-card to-card">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-semibold text-rose-600 dark:text-rose-400">Expenses & Procurement</CardTitle>
+                        <TrendingDown className="h-4 w-4 text-rose-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
+                            {currencySymbol}{financialSummary.totalOperatingExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </div>
+                        <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-1 font-medium">
+                            {financialSummary.grossRevenue > 0 ? ((financialSummary.totalOperatingExpenses / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}% of Revenue
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -503,16 +518,19 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             />
                         </div>
                         <Button variant="outline" size="sm" onClick={() => {
-                            const csvData = filteredItems.map(item => ({
-                                Date: item.date,
-                                Receipt: item.receiptRef,
-                                Product: item.name,
-                                Qty: item.qty,
-                                'Unit Cost': item.unitCost,
-                                'Selling Price': item.sellingPrice,
-                                'Total Profit': item.profit
-                            }));
-                            downloadCsv(csvData, 'profit_statement.csv');
+                            const rows: (string | number)[][] = [
+                                ['Date', 'Receipt', 'Product', 'Qty', 'Unit Cost', 'Selling Price', 'Total Profit'],
+                                ...filteredItems.map(item => [
+                                    item.date,
+                                    item.receiptRef,
+                                    item.name,
+                                    item.qty,
+                                    item.unitCost,
+                                    item.sellingPrice,
+                                    item.profit
+                                ])
+                            ];
+                            downloadCsv('profit_statement.csv', rows);
                         }}>
                             <Download className="mr-2 h-3.5 w-3.5" /> Export CSV
                         </Button>
