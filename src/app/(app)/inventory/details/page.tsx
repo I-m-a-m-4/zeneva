@@ -290,6 +290,7 @@ function EditProductContent() {
                     productId: product.id,
                     type,
                     quantity: Math.abs(rawAdj || 0),
+                    closingStock: details.newStock !== undefined ? Number(details.newStock) : undefined,
                     date: log.createdAt,
                     notes: details.reason || log.action,
                     createdBy: log.userName || 'System',
@@ -298,8 +299,38 @@ function EditProductContent() {
                 };
             }).filter((l: any) => l.quantity > 0 || l.type === 'adjustment'); // keep 0 adjustments just in case
             
+            const toSec = (d: any): number => {
+                if (!d) return 0;
+                if (typeof d.seconds === 'number') return d.seconds;
+                if (typeof d.toMillis === 'function') return d.toMillis() / 1000;
+                if (typeof d.toDate === 'function') return d.toDate().getTime() / 1000;
+                if (typeof d.getTime === 'function') return d.getTime() / 1000;
+                if (typeof d === 'string' || typeof d === 'number') {
+                    const parsed = new Date(d).getTime();
+                    return isNaN(parsed) ? 0 : parsed / 1000;
+                }
+                return 0;
+            };
+
             const txRefs = new Set(txLogs.map(t => t.referenceId).filter(Boolean));
-            const filteredLegacy = mappedLegacy.filter((l: any) => !txRefs.has(l.id));
+            const filteredLegacy = mappedLegacy.filter((l: any) => {
+                // 1. Exact referenceId match (original dedup)
+                if (txRefs.has(l.id)) return false;
+
+                // 2. Full Edit Page or Quick Restock duplicate check:
+                // These always queue an inventory transaction alongside the audit log.
+                // If an inventory transaction matches this product and quantity within a time window, drop the audit log.
+                const legacySec = toSec(l.date);
+                const isDuplicate = txLogs.some((tx: any) => {
+                    if (tx.productId !== l.productId) return false;
+                    if (Math.abs(tx.quantity) !== l.quantity) return false;
+                    const txSec = toSec(tx.date);
+                    return legacySec > 0 && txSec > 0 && Math.abs(txSec - legacySec) < 60;
+                });
+                if (isDuplicate) return false;
+
+                return true;
+            });
             
             setStockLogs([...txLogs, ...filteredLegacy] as any);
             setIsLogsLoading(false);
@@ -347,9 +378,16 @@ function EditProductContent() {
         // since inventory_transactions are server-authoritative.
         const all = [...stockLogs];
         const sorted = all.sort((a, b) => {
-            const dateA = a.date?.toDate ? a.date.toDate() : new Date();
-            const dateB = b.date?.toDate ? b.date.toDate() : new Date();
-            return dateB.getTime() - dateA.getTime();
+            const getMs = (d: any): number => {
+                if (!d) return 0;
+                if (typeof d.toMillis === 'function') return d.toMillis();
+                if (typeof d.toDate === 'function') return d.toDate().getTime();
+                if (typeof d.getTime === 'function') return d.getTime();
+                if (typeof d.seconds === 'number') return d.seconds * 1000;
+                const parsed = new Date(d).getTime();
+                return isNaN(parsed) ? 0 : parsed;
+            };
+            return getMs(b.date) - getMs(a.date);
         });
 
         // Compute running balance backwards
@@ -371,7 +409,7 @@ function EditProductContent() {
                 anomalies.push('Stock was oversold (balance dropped below zero).');
             }
 
-            if ((tx.type === 'in' || tx.type === 'out') && !tx.referenceId && !tx.notes?.includes('Initial')) {
+            if ((tx.type === 'in' || tx.type === 'out') && !tx.referenceId && !tx.notes?.includes('Initial') && !tx.notes?.includes('Manual adjustment') && !tx.notes?.includes('Quick restock')) {
                 anomalies.push('Missing transaction reference ID.');
             }
 
@@ -641,6 +679,7 @@ function EditProductContent() {
                     }
                 }, `Logging stock adjustment for ${product.name}`);
 
+                const txRefId = `adj_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
                 addToQueue({
                     type: 'add-inventory-transaction',
                     payload: {
@@ -652,6 +691,7 @@ function EditProductContent() {
                         closingStock: values.stock,
                         notes: `Manual adjustment from ${product.stock} to ${values.stock} (${adjustment > 0 ? '+' : ''}${adjustment})`,
                         createdBy: currentUserProfile.name,
+                        referenceId: txRefId,
                         date: new Date()
                     }
                 }, `Logging inventory transaction for ${product.name}`);
