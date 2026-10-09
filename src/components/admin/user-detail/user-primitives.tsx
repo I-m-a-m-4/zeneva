@@ -53,40 +53,62 @@ export function userLanguage(raw: unknown) {
 }
 
 /**
- * Online dot + relative last-seen. Online means seen within five minutes.
- *
- * Goes through `toDate`, unlike the original which required a real Timestamp and
- * rendered a plain Date as "Never".
+ * Online dot + relative last-seen.
+ * - Green dot (< 5 mins & active): Online
+ * - Yellow/amber dot (< 20 mins or idle/away/minimized): Away / Idle
+ * - Gray dot (> 20 mins or never): Offline
  */
 export const UserPresence = ({ lastSeen, status }: { lastSeen: any, status?: string }) => {
     const lastSeenDate = toDate(lastSeen);
     if (!lastSeenDate) {
-        return <span className="text-muted-foreground text-xs">Never</span>;
+        return (
+            <div className="flex items-center gap-1.5" title="Offline (Never seen)">
+                <span className="relative flex h-2.5 w-2.5">
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-muted-foreground/40"></span>
+                </span>
+                <span className="text-muted-foreground text-xs">Never</span>
+            </div>
+        );
     }
 
-    const isOnline = lastSeenDate > new Date(Date.now() - 5 * 60 * 1000);
-    const isMinimized = isOnline && status === 'minimized';
+    const diffMs = Math.max(0, Date.now() - lastSeenDate.getTime());
+    const isMinimizedOrIdle = status === 'minimized' || status === 'idle' || status === 'away';
+    const isOnline = diffMs < 5 * 60 * 1000 && !isMinimizedOrIdle;
+    const isAway = !isOnline && (diffMs < 20 * 60 * 1000 || isMinimizedOrIdle);
+
+    const tooltipLabel = isOnline
+        ? 'Online now'
+        : isAway
+            ? (status === 'minimized' ? 'App Minimized' : 'Away / Idle')
+            : 'Offline';
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" title={tooltipLabel}>
             {isOnline ? (
                 <span className="relative flex h-2.5 w-2.5 group">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isMinimized ? 'bg-amber-400' : 'bg-green-400'} opacity-75`}></span>
-                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isMinimized ? 'bg-amber-500' : 'bg-green-500'}`}></span>
-                    {isMinimized && (
-                        <div className="absolute left-full ml-2 hidden group-hover:block whitespace-nowrap bg-black text-white text-[10px] px-1.5 py-0.5 rounded shadow z-50">
-                            App Minimized
-                        </div>
-                    )}
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"></span>
+                    <div className="absolute left-full ml-2 hidden group-hover:block whitespace-nowrap bg-black text-white text-[10px] px-1.5 py-0.5 rounded shadow z-50">
+                        Online
+                    </div>
+                </span>
+            ) : isAway ? (
+                <span className="relative flex h-2.5 w-2.5 group">
+                    <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)]"></span>
+                    <div className="absolute left-full ml-2 hidden group-hover:block whitespace-nowrap bg-black text-white text-[10px] px-1.5 py-0.5 rounded shadow z-50">
+                        {status === 'minimized' ? 'App Minimized' : 'Away / Idle'}
+                    </div>
                 </span>
             ) : (
-                <span className="relative flex h-2.5 w-2.5">
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-muted-foreground/50"></span>
+                <span className="relative flex h-2.5 w-2.5 group" title="Offline">
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-muted-foreground/40"></span>
                 </span>
             )}
             <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(lastSeenDate, { addSuffix: true })}
+                {diffMs < 60 * 1000 ? 'Just now' : formatDistanceToNow(lastSeenDate, { addSuffix: true })}
             </span>
         </div>
     );
 };
+

@@ -102,7 +102,7 @@ export default function ProfitLossChart({ receipts, currencySymbol }: ProfitLoss
                         <p className="text-sm font-bold truncate text-destructive/80">{currencySymbol}{totals.cost.toLocaleString()}</p>
                     </div>
                     <div className="space-y-1">
-                        <p className="text-[10px] uppercase text-muted-foreground font-semibold font-bold text-primary">{t('reports.kpiNetProfit')}</p>
+                        <p className="text-[10px] uppercase text-muted-foreground font-semibold font-bold text-primary">{t('reports.colGrossProfit')}</p>
                         <p className="text-sm font-bold truncate text-primary">{currencySymbol}{totals.profit.toLocaleString()}</p>
                     </div>
                 </div>

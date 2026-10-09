@@ -72,6 +72,7 @@ export function SplashScreen() {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="mb-6"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- logo URL is configured at runtime and may be an external or data: URL */}
               <img 
                 src={AppConfig.logoUrl} 
                 alt="Zeneva Logo" 

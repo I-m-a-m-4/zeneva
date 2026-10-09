@@ -17,6 +17,7 @@ function definitionFor(value: string) {
 
 function Flag({ code }: { code: string }) {
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- flagcdn.com is a runtime-selected flag that is not in images.remotePatterns
     <img
       src={`https://flagcdn.com/16x12/${code}.png`}
       alt=""

@@ -23,6 +23,7 @@ import { logAuditEvent } from '@/lib/audit';
 import { useI18n } from '@/context/i18n-context';
 import { trackFeature } from '@/lib/product-telemetry';
 import { formatNumber, formatDateTime } from '@/lib/i18n/format';
+import { qualifyReferralOnSale } from '@/actions/referral';
 
 
 function ReviewPageContent() {
@@ -478,8 +479,23 @@ function ReviewPageContent() {
             title: navigator.onLine ? t('pos.saleRecorded') : t('pos.saleQueuedOffline'),
             description: navigator.onLine
                 ? t('pos.saleRecordedDescription', { number: receiptData.receiptNumber })
-                : t('pos.saleQueuedOfflineDescription'),
+                : undefined,
         });
+
+        // If this business was referred and hasn't claimed reward yet, qualify on first sale
+        if (business?.referredBy && !business.referredBy.rewardClaimed && user) {
+            user.getIdToken().then(token => {
+                qualifyReferralOnSale({ idToken: token }).then(res => {
+                    if (res.ok && res.rewarded) {
+                        toast({
+                            variant: 'success',
+                            title: '🎉 Referral Bonus Unlocked!',
+                            description: 'You and your referrer have both earned 30 days of free Zeneva Pro!',
+                        });
+                    }
+                }).catch(err => console.warn('Referral qualification error:', err));
+            }).catch(() => {});
+        }
 
         // Note: We don't set isCompleting(false) here if redirect is happening
         // to prevent the auto-submit useEffect from re-firing.

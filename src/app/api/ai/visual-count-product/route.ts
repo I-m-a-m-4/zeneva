@@ -24,7 +24,7 @@ function fail(status: number, error: string, extra: Record<string, any> = {}) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { image, productName } = body;
+    const { image, productName, productImage } = body;
 
     if (!image || !productName) {
       return fail(400, "Missing image or productName");
@@ -36,6 +36,40 @@ export async function POST(req: Request) {
     }
 
     const google = createGoogleGenerativeAI({ apiKey });
+
+    const contentItems: any[] = [
+      {
+        type: 'text',
+        text: `You are an expert computer vision inventory counter. Look at the provided photo to accurately count how many units of the product "${productName}" are present.` +
+              (productImage ? ` I have also provided a reference image of the product to help you identify it.` : ``) +
+              `\nGroup similar items that match this product and ignore background fixtures, price tags, or unrelated items. If items are stacked or in rows, count all visible individual units.`
+      }
+    ];
+
+    if (productImage) {
+      try {
+        const isDataUrl = productImage.startsWith('data:');
+        contentItems.push({
+          type: 'text',
+          text: 'Reference image of the product:'
+        });
+        contentItems.push({
+          type: 'image',
+          image: isDataUrl ? productImage.replace(/^data:image\/\w+;base64,/, '') : new URL(productImage.startsWith('http') ? productImage : `https://zeneva.space${productImage}`)
+        });
+      } catch (e) {
+        console.error("Failed to attach reference image", e);
+      }
+    }
+
+    contentItems.push({
+      type: 'text',
+      text: 'Photo to count items from:'
+    });
+    contentItems.push({
+      type: 'image',
+      image: image.replace(/^data:image\/\w+;base64,/, '')
+    });
 
     const { object } = await generateObject({
       model: google('gemini-1.5-flash-latest'),
@@ -53,17 +87,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `You are an expert computer vision inventory counter. Look at this photo and accurately count how many units of the product "${productName}" are present.
-Group similar items that match this product and ignore background fixtures, price tags, or unrelated items. If items are stacked or in rows, count all visible individual units.`
-            },
-            {
-              type: 'image',
-              image: image.replace(/^data:image\/\w+;base64,/, '')
-            }
-          ],
+          content: contentItems,
         },
       ],
     });

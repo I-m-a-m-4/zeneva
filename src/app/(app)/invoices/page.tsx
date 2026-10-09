@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { safeToDate } from "@/lib/utils";
 import { useI18n } from "@/context/i18n-context";
+import { InvoicingPromoBanner } from "@/components/invoices/invoicing-promo-banner";
 
 function InvoiceRowSkeleton() {
     return (
@@ -109,8 +110,9 @@ export default function InvoicesPage() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="min-h-[calc(100vh-5.5rem)] flex flex-col justify-between space-y-6 pb-2">
+            <div className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">{t('invoices.title')}</h1>
                     <p className="text-muted-foreground">{t('invoices.subtitle')}</p>
@@ -238,6 +240,12 @@ export default function InvoicesPage() {
                     )}
                 </CardContent>
             </Card>
+            </div>
+
+            {/* Fixed / Pinned to footer of the invoice page */}
+            <div className="sticky bottom-0 z-20 pt-4 pb-1 bg-gradient-to-t from-background via-background/95 to-transparent">
+                <InvoicingPromoBanner />
+            </div>
         </div>
     );
 }

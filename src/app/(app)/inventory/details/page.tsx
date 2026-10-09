@@ -1104,6 +1104,7 @@ function EditProductContent() {
                                                                 open={isVisualStockDialogOpen}
                                                                 onOpenChange={setIsVisualStockDialogOpen}
                                                                 productName={product?.name || form.getValues('name') || 'Product'}
+                                                                productImage={product?.imageUrl || imagePreview}
                                                                 currentStock={currentStock}
                                                                 onApplyCount={(counted, mode) => {
                                                                     if (mode === 'add') {

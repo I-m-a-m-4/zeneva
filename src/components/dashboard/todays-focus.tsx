@@ -98,7 +98,7 @@ export default function TodaysFocus() {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Today's focus</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Today&apos;s focus</p>
           <p className="truncate text-sm font-semibold text-foreground">{body.label}</p>
           <p className="truncate text-xs text-muted-foreground">{body.detail}</p>
         </div>

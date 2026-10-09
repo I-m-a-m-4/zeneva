@@ -690,20 +690,46 @@ export function summarisePeriod(
     }
   }
 
+  const isPurchase = (exp: any) => {
+    if (!exp) return false;
+    const cat = String(exp.category || '').toLowerCase().trim();
+    const type = String(exp.type || '').toLowerCase().trim();
+    const expType = String(exp.expenseType || '').toLowerCase().trim();
+    return (
+      cat === 'supplier_payment' ||
+      cat === 'procurement' ||
+      cat === 'inventory_procurement' ||
+      cat === 'purchase' ||
+      cat === 'purchases' ||
+      type === 'purchase' ||
+      expType === 'purchase'
+    );
+  };
+
   let totalExpenses = 0;
+  let totalPurchases = 0;
   for (const exp of expenses || []) {
     if (exp?.status !== 'pending') { // Only count actual spent money (paid)
-      totalExpenses += num(exp?.amount);
+      const amt = num(exp?.amount);
+      if (isPurchase(exp)) {
+        totalPurchases += amt;
+      } else {
+        totalExpenses += amt;
+      }
     }
   }
 
   const sales = list.length;
-  const profit = anyCost ? costedRevenue - costSum : null;
+  // Effective Cost of Goods Sold includes unit cost of sold goods plus supplier inventory purchases.
+  // Both subtract directly from revenue to determine Gross Profit.
+  // Operating expenses (rent, utilities, etc.) subtract from Gross Profit to determine Net Profit.
+  const grossProfit = anyCost
+    ? (costedRevenue - costSum - totalPurchases)
+    : (revenue - totalPurchases);
+  const profit = anyCost || totalPurchases > 0 ? grossProfit : null;
 
-  // Net Profit is total revenue - total expenses 
-  // (ignoring COGS profit here as net profit is usually Revenue - Expenses in basic cash flow unless specified otherwise, but standard net profit is gross profit - operating expenses. If we have profit, use profit - expenses, else revenue - expenses. Let's provide Revenue - Expenses as cashflow net profit, or Gross Profit - Expenses if costs are fully tracked).
-  // The user asked "deduct my expenses from the revenue I generate". So netProfit = revenue - totalExpenses.
-  const netProfit = revenue - totalExpenses;
+  // Net Profit = Gross Profit - Operating Expenses (purchases subtract from revenue, never from net profit)
+  const netProfit = grossProfit - totalExpenses;
 
   return {
     revenue,

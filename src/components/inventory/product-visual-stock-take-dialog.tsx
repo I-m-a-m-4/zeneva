@@ -34,6 +34,7 @@ interface ProductVisualStockTakeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productName: string;
+  productImage?: string | null;
   currentStock: number;
   onApplyCount: (counted: number, mode: 'add' | 'set') => void;
 }
@@ -44,6 +45,7 @@ export default function ProductVisualStockTakeDialog({
   open,
   onOpenChange,
   productName,
+  productImage,
   currentStock,
   onApplyCount,
 }: ProductVisualStockTakeDialogProps) {
@@ -284,6 +286,7 @@ export default function ProductVisualStockTakeDialog({
         body: JSON.stringify({
           image: capturedImage,
           productName,
+          productImage,
         }),
       });
 

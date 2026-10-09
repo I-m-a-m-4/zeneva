@@ -50,6 +50,7 @@ export default function MarketingFooter() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 pb-12 border-b border-white/10">
             <div className="lg:col-span-4 gap-x-2 gap-y-2">
               <div className="flex cursor-pointer mb-8 gap-x-2 gap-y-2 items-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- logo URL is configured at runtime and may be an external or data: URL */}
                 <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
               </div>
               <p className="max-w-3xl text-white/70">{t('footer.lead')}</p>
@@ -136,8 +137,8 @@ export default function MarketingFooter() {
               <div>
                 <h4 className="text-xs uppercase tracking-[0.2em] text-white/80">{t('footer.colFeatures')}</h4>
                 <ul className="mt-3 space-y-2 text-sm">
-                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkInventory')}</a></li>
-                  <li><a href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkPos')}</a></li>
+                  <li><Link href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkInventory')}</Link></li>
+                  <li><Link href="/#features" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkPos')}</Link></li>
                   {/* Zen AI has its own product page now — this used to drop
                       the visitor at the homepage feature grid. Reuses the
                       existing linkAiInsights key so no catalogue needs an edit. */}

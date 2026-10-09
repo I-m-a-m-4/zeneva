@@ -68,7 +68,7 @@ export default function InstallPrompt() {
                                 <p>To install this app on your iPhone/iPad:</p>
                                 <ol className="list-decimal list-inside space-y-2">
                                     <li>Tap the <Share className="inline h-4 w-4" /> Share button in your browser menu.</li>
-                                    <li>Scroll down and tap "Add to Home Screen".</li>
+                                    <li>Scroll down and tap &quot;Add to Home Screen&quot;.</li>
                                 </ol>
                                 <Button variant="outline" onClick={handleDismiss} className="w-full mt-2">
                                     Maybe Later

@@ -234,8 +234,10 @@ function DataInsightModalContent({
     } else if (insightModal?.id === 'net-profit') {
         const rev = finalReportData?.totalRevenue ?? 0;
         const cogs = finalReportData?.totalCost ?? 0;
+        const purchases = (finalReportData as any)?.totalPurchases ?? 0;
+        const unitCost = Math.max(0, cogs - purchases);
+        const opex = (finalReportData as any)?.totalOperatingExpenses ?? Math.max(0, rev - cogs - (finalReportData?.totalProfit ?? 0));
         const profit = finalReportData?.totalProfit ?? 0;
-        const deductions = rev - cogs - profit;
         
         tableContent = (
             <div className="flex flex-col h-full gap-4">
@@ -251,13 +253,31 @@ function DataInsightModalContent({
                             <TableCell className="font-medium text-xs">Gross Revenue</TableCell>
                             <TableCell className="text-right text-xs text-emerald-600">+{formatCurrency(rev)}</TableCell>
                         </TableRow>
-                        <TableRow>
-                            <TableCell className="font-medium text-xs">Cost of Goods (COGS)</TableCell>
-                            <TableCell className="text-right text-xs text-destructive">-{formatCurrency(cogs)}</TableCell>
+                        {unitCost > 0 && (
+                            <TableRow>
+                                <TableCell className="font-medium text-xs">Cost of Goods Sold (Unit Costs)</TableCell>
+                                <TableCell className="text-right text-xs text-destructive">-{formatCurrency(unitCost)}</TableCell>
+                            </TableRow>
+                        )}
+                        {purchases > 0 && (
+                            <TableRow>
+                                <TableCell className="font-medium text-xs">Supplier Purchases / Restock (COGS)</TableCell>
+                                <TableCell className="text-right text-xs text-amber-600">-{formatCurrency(purchases)}</TableCell>
+                            </TableRow>
+                        )}
+                        {unitCost === 0 && purchases === 0 && (
+                            <TableRow>
+                                <TableCell className="font-medium text-xs">Cost of Goods Sold (COGS)</TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground">-{formatCurrency(0)}</TableCell>
+                            </TableRow>
+                        )}
+                        <TableRow className="border-t bg-muted/20">
+                            <TableCell className="font-semibold text-xs text-foreground">Gross Profit</TableCell>
+                            <TableCell className="text-right text-xs font-semibold text-foreground">+{formatCurrency(rev - cogs)}</TableCell>
                         </TableRow>
                         <TableRow>
-                            <TableCell className="font-medium text-xs">Expenses & Discounts</TableCell>
-                            <TableCell className="text-right text-xs text-destructive">-{formatCurrency(deductions)}</TableCell>
+                            <TableCell className="font-medium text-xs">Operating Expenses (Overheads)</TableCell>
+                            <TableCell className="text-right text-xs text-destructive">-{formatCurrency(opex)}</TableCell>
                         </TableRow>
                         <TableRow className="border-t-2 bg-primary/5">
                             <TableCell className="font-bold text-xs">Net Profit</TableCell>
@@ -526,7 +546,7 @@ export default function ReportsDashboard() {
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
-        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, buyersInRange: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0, totalCost: 0 };
+        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, buyersInRange: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0, totalCost: 0, totalPurchases: 0, totalOperatingExpenses: 0, grossProfit: 0 };
 
         const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
         const totalSales = targetReceipts.length;
@@ -578,10 +598,40 @@ export default function ReportsDashboard() {
             return d.toISOString().split('T')[0];
         })).size || 1;
 
-        const totalCost = targetReceipts.reduce((sum, r) => sum + (r.totalCost ?? r.items?.reduce((sumCost, item) => sumCost + ((item.costPrice || 0) * (item.quantity || 0)), 0) ?? 0), 0);
-        const grossProfit = targetReceipts.reduce((sum, r) => sum + (r.profit ?? (r.total - (r.totalCost ?? 0))), 0);
-        const totalExpenses = reportBatchExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-        const totalProfit = grossProfit - totalExpenses;
+        const receiptCost = targetReceipts.reduce((sum, r) => sum + (r.totalCost ?? r.items?.reduce((sumCost, item) => sumCost + ((item.costPrice || 0) * (item.quantity || 0)), 0) ?? 0), 0);
+        
+        const isPurchaseExpense = (e: Expense) => {
+            if (!e) return false;
+            const cat = String(e.category || '').toLowerCase().trim();
+            const type = String((e as any).type || '').toLowerCase().trim();
+            const expType = String((e as any).expenseType || '').toLowerCase().trim();
+            return (
+                cat === 'supplier_payment' || 
+                cat === 'procurement' || 
+                cat === 'inventory_procurement' ||
+                cat === 'purchase' ||
+                cat === 'purchases' ||
+                type === 'purchase' ||
+                expType === 'purchase'
+            );
+        };
+
+        const realizedExpenses = reportBatchExpenses.filter(e => (e as any)?.status !== 'pending');
+
+        const totalPurchases = realizedExpenses
+            .filter(isPurchaseExpense)
+            .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+        const totalOperatingExpenses = realizedExpenses
+            .filter(e => !isPurchaseExpense(e))
+            .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+        // Effective Cost of Goods Sold:
+        // Direct unit COGS on sold items + supplier purchases / restock offset directly against Revenue under COGS.
+        // Supplier purchases subtract from Revenue under COGS, NEVER from Net Profit as an operating expense.
+        const effectiveCost = receiptCost + totalPurchases;
+        const grossProfit = totalRevenue - effectiveCost;
+        const totalProfit = grossProfit - totalOperatingExpenses;
 
         return {
             totalRevenue,
@@ -626,7 +676,10 @@ export default function ReportsDashboard() {
             dailyAverageSales: activeDays > 0 ? totalSales / activeDays : 0,
             dailyAverageRevenue: activeDays > 0 ? totalRevenue / activeDays : 0,
             totalProfit,
-            totalCost
+            totalCost: effectiveCost,
+            totalPurchases,
+            totalOperatingExpenses,
+            grossProfit
         };
     }, [reportBatchReceipts, receipts, products, customers, reportBatchExpenses, activeBranchId, stats?.totalCustomers]);
 
@@ -944,6 +997,27 @@ export default function ReportsDashboard() {
             priorCost += (r.totalCost ?? r.items?.reduce((sumCost, item) => sumCost + ((item.costPrice || 0) * (item.quantity || 0)), 0) ?? 0);
         });
 
+        const isPurchase = (e: Expense) => {
+            if (!e) return false;
+            const cat = String(e.category || '').toLowerCase().trim();
+            const type = String((e as any).type || '').toLowerCase().trim();
+            const expType = String((e as any).expenseType || '').toLowerCase().trim();
+            return (
+                cat === 'supplier_payment' ||
+                cat === 'procurement' ||
+                cat === 'inventory_procurement' ||
+                cat === 'purchase' ||
+                cat === 'purchases' ||
+                type === 'purchase' ||
+                expType === 'purchase'
+            );
+        };
+        const priorPurchases = (previousExpenses || [])
+            .filter(e => (e as any)?.status !== 'pending')
+            .filter(isPurchase)
+            .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        const effectivePriorCost = priorCost + priorPurchases;
+
         return {
             revenue: periodDelta(current.revenue, prior.revenue),
             sales: periodDelta(current.sales, prior.sales),
@@ -959,7 +1033,7 @@ export default function ReportsDashboard() {
             netProfit: periodDelta(current.netProfit, prior.netProfit),
             productRevenue: periodDelta(finalReportData?.totalProductRevenue || 0, priorProductRevenue),
             serviceRevenue: periodDelta(finalReportData?.totalServiceRevenue || 0, priorServiceRevenue),
-            cost: periodDelta(finalReportData?.totalCost || 0, priorCost),
+            cost: periodDelta(finalReportData?.totalCost || 0, effectivePriorCost),
         };
     }, [previousReceipts, deepReceipts, products, previousExpenses, reportBatchExpenses, finalReportData]);
 

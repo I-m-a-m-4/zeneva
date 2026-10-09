@@ -239,6 +239,26 @@ export async function trackLaunchStage(
 ): Promise<void> {
   if (typeof window === 'undefined') return;
 
+  // Never record telemetry from local development, tests, or admin-flagged devices
+  try {
+    const hostname = window.location.hostname;
+    const isDevHost =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.endsWith('.local') ||
+      window.location.port === '9007';
+
+    if (isDevHost || process.env.NODE_ENV === 'development') {
+      return;
+    }
+
+    if (window.localStorage.getItem('zeneva_is_admin_device') === 'true') {
+      return;
+    }
+  } catch {
+    /* ignore storage/location errors */
+  }
+
   try {
     const key = dedupeKey(stage, detail);
 

@@ -112,6 +112,7 @@ export function CachedImage({ src, className, alt, fallback, ...props }: CachedI
 
   // Fallback for Tauri or Data URIs
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- runtime image URL that next/image cannot optimize without a remote allowlist
     <img
       src={displaySrc || sanitizedSrc}
       className={cn("transition-opacity duration-300", className)}

@@ -173,7 +173,7 @@ export default function AddUserDialog({ isOpen, onOpenChange, businessId, busine
                 <DialogHeader>
                     <DialogTitle>Invite New User</DialogTitle>
                     <DialogDescription>
-                        Enter the user's details. They will receive an email with a secure link to join your business.
+                        Enter the user&apos;s details. They will receive an email with a secure link to join your business.
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>

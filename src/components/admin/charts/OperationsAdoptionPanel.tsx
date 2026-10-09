@@ -502,20 +502,23 @@ export default function OperationsAdoptionPanel({
     const hasSales = current.sales > 0;
 
     /** Only the peak bucket gets a number — a value on every bar goes unread. */
-    const peakLabel = (peak: number, format1: (v: number) => string) => (props: any) => {
-        const { x, y, width, value } = props;
-        if (value === null || value === undefined || peak <= 0 || Math.abs(value - peak) > 0.001) return null;
-        return (
-            <text
-                x={x + width / 2}
-                y={y - 6}
-                textAnchor="middle"
-                className="fill-foreground"
-                style={{ fontSize: 11, fontWeight: 600 }}
-            >
-                {format1(value)}
-            </text>
-        );
+    const peakLabel = (peak: number, format1: (v: number) => string) => {
+        function PeakLabel(props: any) {
+            const { x, y, width, value } = props;
+            if (value === null || value === undefined || peak <= 0 || Math.abs(value - peak) > 0.001) return null;
+            return (
+                <text
+                    x={x + width / 2}
+                    y={y - 6}
+                    textAnchor="middle"
+                    className="fill-foreground"
+                    style={{ fontSize: 11, fontWeight: 600 }}
+                >
+                    {format1(value)}
+                </text>
+            );
+        }
+        return PeakLabel;
     };
 
     const adoptionSeries = [

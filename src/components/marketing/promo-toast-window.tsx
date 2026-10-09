@@ -149,6 +149,7 @@ export function PromoToastWindow() {
               className="relative cursor-pointer overflow-hidden group/poster"
             >
               {config.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- runtime image URL that next/image cannot optimize without a remote allowlist
                 <img
                   src={config.imageUrl}
                   alt={config.title || 'Promotional Offer'}
@@ -180,6 +181,7 @@ export function PromoToastWindow() {
                   onClick={handleAction}
                   className="relative h-36 w-full cursor-pointer overflow-hidden bg-muted/30"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- runtime image URL that next/image cannot optimize without a remote allowlist */}
                   <img
                     src={config.imageUrl}
                     alt={config.title || 'Promotional Offer'}

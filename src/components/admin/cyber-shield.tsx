@@ -1321,7 +1321,7 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                             Confirm Sales Wipe
                         </DialogTitle>
                         <DialogDescription className="text-xs font-bold text-muted-foreground mt-2 border-b pb-4">
-                            You are about to permanently delete all sales and receipt records for <span className="text-amber-600 font-bold">"{wipeSalesName}"</span>.
+                            You are about to permanently delete all sales and receipt records for <span className="text-amber-600 font-bold">&quot;{wipeSalesName}&quot;</span>.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1346,7 +1346,7 @@ export default function CyberShield({ allBusinesses, allUsers, isLoadingBusiness
                                     className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                                 />
                                 <label htmlFor="confirmWipe" className="text-[11px] font-bold text-muted-foreground leading-none">
-                                    I confirm that I want to permanently delete all sales history for "{wipeSalesName}".
+                                    I confirm that I want to permanently delete all sales history for &quot;{wipeSalesName}&quot;.
                                 </label>
                             </div>
                         </div>

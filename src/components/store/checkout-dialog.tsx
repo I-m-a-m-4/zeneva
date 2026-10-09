@@ -55,7 +55,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
         setSelectedShipping(undefined);
     }
 
-    const createOrderInFirestore = async (paymentDetails: { method: 'Paystack' | 'Bank Transfer', reference?: string, status: 'paid' | 'pending' }) => {
+    const createOrderInFirestore = React.useCallback(async (paymentDetails: { method: 'Paystack' | 'Bank Transfer', reference?: string, status: 'paid' | 'pending' }) => {
         if (!firestore || !business) throw new Error("Firestore or Business not available");
 
         const batch = writeBatch(firestore);
@@ -115,7 +115,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
         await batch.commit();
 
         return { orderId: newOrderRef.id, finalCustomerName: customerName };
-    }
+    }, [firestore, business, name, email, phone, address, cart, total, chosenShippingOption]);
 
     const handleSuccessfulPayment = React.useCallback(async (transaction: any) => {
         toast({ title: "Processing...", description: "Verifying your payment securely." });
@@ -152,7 +152,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange }: CheckoutDialogP
         } finally {
             setIsSubmitting(false);
         }
-    }, [total, createOrderInFirestore, toast, onOrderPlaced]);
+    }, [total, createOrderInFirestore, toast, onOrderPlaced, business]);
 
 
     const handlePlaceOrder = async () => {

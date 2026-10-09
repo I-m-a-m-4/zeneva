@@ -366,6 +366,8 @@ export function UserActivityTracker() {
                         // existing heartbeat.
                         language: localeRef.current,
                         lastPage: pathname || '/',
+                        ...(user.email ? { email: user.email } : {}),
+                        ...(user.displayName ? { name: user.displayName } : {}),
                         ...pageViewFields,
                         // Feature counters, dwell time and route render timings.
                         // Nothing here costs a write of its own — the whole product

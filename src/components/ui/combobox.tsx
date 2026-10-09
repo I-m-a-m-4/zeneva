@@ -38,7 +38,6 @@ type ComboboxProps = {
   modal?: boolean
   renderSelected?: (option: ComboboxOption) => React.ReactNode
   renderItem?: (option: ComboboxOption) => React.ReactNode
-  allowDeselect?: boolean
 }
 
 export function Combobox({
@@ -57,7 +56,6 @@ export function Combobox({
   modal = false,
   renderSelected,
   renderItem,
-  allowDeselect = true,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const selectedOption = options.find((option) => option.value === value)
@@ -69,7 +67,7 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between", triggerClassName)}
+          className={cn("w-full justify-between active:scale-100 transition-colors", triggerClassName)}
           disabled={disabled}
         >
           {selectedOption
@@ -102,8 +100,7 @@ export function Combobox({
                   key={`${option.value}-${index}`}
                   value={option.label}
                   onSelect={() => {
-                    const newValue = allowDeselect ? (option.value === value ? "" : option.value) : option.value
-                    onChange(newValue)
+                    onChange(option.value === value ? "" : option.value)
                     setOpen(false)
                   }}
                   className={cn("cursor-pointer", itemClassName)}

@@ -46,7 +46,7 @@ export function DateRangePicker({ className, date, onDateChange }: DateRangePick
         );
 
         return basePresets;
-    }, [business]);
+    }, [business, t]);
 
     const getDisplayString = () => {
         if (!date?.from) return "Pick a date range";
@@ -70,7 +70,7 @@ export function DateRangePicker({ className, date, onDateChange }: DateRangePick
 
     return (
         <div className={cn('grid gap-2', className)}>
-            <Popover open={isOpen} onOpenChange={setIsOpen} modal={false}>
+            <Popover open={isOpen} onOpenChange={setIsOpen}>
                 <PopoverTrigger asChild>
                     <Button
                         id="date"

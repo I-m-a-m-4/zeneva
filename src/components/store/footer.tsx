@@ -35,6 +35,7 @@ export default function StoreFooter({ business }: { business: BusinessInstance |
                     {/* Column 1: Business Info */}
                     <div className="lg:col-span-2 space-y-4">
                          <div className="flex items-center gap-2">
+                             {/* eslint-disable-next-line @next/next/no-img-element -- logo URL is configured at runtime and may be an external or data: URL */}
                              <img src={business.settings?.logoUrl || AppConfig.logoIconUrl} alt={`${businessName} Logo`} className="h-8 w-8" />
                             <h3 className="font-instrument-serif text-2xl font-semibold tracking-tight">{businessName}</h3>
                         </div>

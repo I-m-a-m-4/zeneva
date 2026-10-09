@@ -287,7 +287,7 @@ export default function ReportsDashboard() {
                     </CardHeader>
                     <CardContent className="text-center py-12 text-muted-foreground">
                         <div className="font-semibold flex items-center justify-center gap-2 mb-2"><Bot className="h-4 w-4 text-primary"/> Zen AI</div>
-                        <p className="text-sm">This feature requires a 'cost price' field for each product to calculate profit margins. We're working on adding this capability.</p>
+                        <p className="text-sm">This feature requires a &apos;cost price&apos; field for each product to calculate profit margins. We&apos;re working on adding this capability.</p>
                     </CardContent>
                 </Card>
              </>

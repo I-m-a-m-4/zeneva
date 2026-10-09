@@ -108,7 +108,7 @@ export default function UserActivityDotPlot({ users, businesses }: UserActivityD
             .slice(0, 50);
 
         return { columns: cols, activeUsers: relevantUsers, usersByBucket: uByBucket };
-    }, [users, journeys]);
+    }, [users, journeys, rangeDays]);
 
     if (loading) {
         return (

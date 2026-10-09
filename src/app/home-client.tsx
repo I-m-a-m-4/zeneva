@@ -391,7 +391,7 @@ export default function Home() {
         ]
     };
 
-    const referralLink = typeof window !== 'undefined' ? `${window.location.origin}/signup` : '/signup';
+    const referralLink = 'https://zeneva.space/signup';
     const handleCopyLink = () => {
         if (referralLink) {
             navigator.clipboard.writeText(referralLink)

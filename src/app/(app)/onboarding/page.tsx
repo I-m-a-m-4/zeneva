@@ -20,7 +20,40 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, CalendarIcon, ArrowRight, ArrowLeft, Building, MapPin, Globe, CalendarDays, Landmark } from 'lucide-react';
+import {
+  Loader2,
+  CalendarIcon,
+  ArrowRight,
+  ArrowLeft,
+  Building,
+  MapPin,
+  Globe,
+  CalendarDays,
+  Landmark,
+  Home,
+  ShoppingCart,
+  Users,
+  FileText,
+  BarChart2,
+  Settings,
+  Bot,
+  Package,
+  Activity,
+  AlertCircle,
+  ShoppingBag,
+  Search,
+  Bell,
+  CheckCircle2,
+  ArrowUpRight,
+  DollarSign,
+  TrendingUp,
+  Truck,
+  CreditCard,
+  ShieldCheck,
+  AlertTriangle,
+  Award,
+  LifeBuoy,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackLaunchStage } from '@/lib/launch-telemetry';
 import { format } from 'date-fns';
@@ -55,9 +88,56 @@ const onboardingSchemaBase = z.object({
 
 type OnboardingFormValues = z.infer<typeof onboardingSchemaBase>;
 
-const industries = [
-  'Retail & E-commerce', 'Supermarket & Groceries (Multiple Categories)', 'Pharmacy & Health', 'Fashion & Boutique', 'Restaurant & Cafe', 'Electronics & Gadgets', 'Home & Furniture', 'Other'
+interface IndustryOption {
+  id: string;
+  name: string;
+  label: string;
+}
+
+const INDUSTRY_OPTIONS: IndustryOption[] = [
+  {
+    id: 'retail',
+    name: 'Retail & E-commerce',
+    label: 'Retail & E-commerce',
+  },
+  {
+    id: 'supermarket',
+    name: 'Supermarket & Groceries (Multiple Categories)',
+    label: 'Supermarket & Groceries',
+  },
+  {
+    id: 'pharmacy',
+    name: 'Pharmacy & Health',
+    label: 'Pharmacy & Health',
+  },
+  {
+    id: 'fashion',
+    name: 'Fashion & Boutique',
+    label: 'Fashion & Boutique',
+  },
+  {
+    id: 'restaurant',
+    name: 'Restaurant & Cafe',
+    label: 'Restaurant & Cafe',
+  },
+  {
+    id: 'electronics',
+    name: 'Electronics & Gadgets',
+    label: 'Electronics & Gadgets',
+  },
+  {
+    id: 'furniture',
+    name: 'Home & Furniture',
+    label: 'Home & Furniture',
+  },
+  {
+    id: 'other',
+    name: 'Other',
+    label: 'Other',
+  },
 ];
+
+const industries = INDUSTRY_OPTIONS.map(i => i.name);
 const months = [
   'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
 ];
@@ -862,9 +942,301 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 w-full flex flex-col items-center justify-center min-h-screen py-8 px-4 lg:px-8 bg-background/40 overflow-y-auto backdrop-blur-sm">
+    <div className="relative min-h-screen w-full overflow-hidden bg-background">
+      {/* Underlying realistic Zeneva dashboard preview */}
+      <div
+        className="fixed inset-0 pointer-events-none select-none overflow-hidden filter blur-[2px] opacity-75 dark:opacity-60 scale-[1.01]"
+        aria-hidden="true"
+      >
+        <div className="flex h-screen w-full bg-background text-foreground">
+          {/* Authentic Zeneva Sidebar */}
+          <aside className="hidden lg:flex w-64 flex-col border-r bg-card/85 shrink-0 select-none">
+            {/* Sidebar Header */}
+            <div className="h-16 flex items-center gap-3 px-5 border-b">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold shadow-md shadow-orange-500/25">
+                Z
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-sm leading-tight truncate">Zeneva Retail</div>
+                <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Main Store
+                </div>
+              </div>
+            </div>
 
-      <div className="w-full max-w-4xl space-y-5 sm:space-y-6 bg-gradient-to-b from-orange-500/10 via-card/95 to-card/95 dark:via-card/80 dark:to-card/80 backdrop-blur-xl border border-dashed border-orange-500/40 p-6 sm:p-8 rounded-xl my-auto shadow-none">
+            {/* Sidebar Menu */}
+            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+              <div className="space-y-0.5">
+                <div className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Main</div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-orange-500/15 text-orange-600 dark:text-orange-400 font-semibold text-xs">
+                  <Home className="h-4 w-4 text-orange-500" />
+                  <span>Dashboard</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <ShoppingCart className="h-4 w-4" />
+                  <span>Sales & POS</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Globe className="h-4 w-4" />
+                  <span>Storefront</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Truck className="h-4 w-4" />
+                  <span>Online Orders</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Package className="h-4 w-4" />
+                  <span>Inventory Catalog</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Users className="h-4 w-4" />
+                  <span>Customers CRM</span>
+                </div>
+              </div>
+
+              <div className="space-y-0.5">
+                <div className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Financials</div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <FileText className="h-4 w-4" />
+                  <span>Invoices</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <CreditCard className="h-4 w-4" />
+                  <span>Expenses</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Building className="h-4 w-4" />
+                  <span>Purchases & POs</span>
+                </div>
+              </div>
+
+              <div className="space-y-0.5">
+                <div className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Intelligence</div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <BarChart2 className="h-4 w-4" />
+                  <span>Analytics & Reports</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Bot className="h-4 w-4 text-purple-500" />
+                  <span>Zen AI Copilot</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Audit Logs</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>Terminal Alerts</span>
+                </div>
+              </div>
+
+              <div className="space-y-0.5">
+                <div className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">System</div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Award className="h-4 w-4 text-amber-500" />
+                  <span>Achievements</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <LifeBuoy className="h-4 w-4" />
+                  <span>Help & Support</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 text-xs">
+                  <Settings className="h-4 w-4" />
+                  <span>Store Settings</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar User Profile Footer */}
+            <div className="p-3 border-t bg-muted/20 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-orange-500/20 text-orange-600 font-bold text-xs flex items-center justify-center">
+                IB
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold truncate">Imamshaffy Bello</div>
+                <div className="text-[10px] text-orange-600 font-medium">Owner</div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Workspace Area */}
+          <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+            {/* Header */}
+            <header className="h-16 border-b bg-card/60 px-6 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-4 flex-1 max-w-md">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-background/80 text-muted-foreground text-xs w-full">
+                  <Search className="h-3.5 w-3.5 shrink-0" />
+                  <span>Search products, orders, receipts... (Ctrl+K)</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-medium border border-emerald-500/20">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>POS Terminal Online</span>
+                </div>
+                <div className="h-8 px-3 rounded-lg border flex items-center gap-1.5 text-xs text-muted-foreground bg-background/60">
+                  <Bell className="h-3.5 w-3.5" />
+                  <span className="h-4 w-4 rounded-full bg-orange-500 text-white text-[10px] flex items-center justify-center font-bold">2</span>
+                </div>
+                <div className="h-8 px-3 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm">
+                  <Bot className="h-3.5 w-3.5" />
+                  <span>Ask Zen AI</span>
+                </div>
+              </div>
+            </header>
+
+            {/* Dashboard Content Container */}
+            <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
+              {/* Page Title & Controls */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl lg:text-2xl font-bold tracking-tight">Dashboard</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Real-time overview of your retail sales, inventory, and operations.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="px-3 py-1.5 rounded-lg border bg-card text-xs text-muted-foreground flex items-center gap-2">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    <span>Today: {format(new Date(), 'MMM d, yyyy')}</span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium">
+                    Download Report
+                  </div>
+                </div>
+              </div>
+
+              {/* Today's Focus Card */}
+              <div className="p-4 rounded-xl border border-orange-500/30 bg-gradient-to-r from-orange-500/10 via-card to-card flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-orange-500/20 text-orange-600 flex items-center justify-center shrink-0">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">Today's Focus</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-600 font-semibold">Priority</span>
+                    </div>
+                    <p className="text-xs text-foreground font-medium mt-0.5">Restock fast-moving beverage & snack inventory before weekend rush.</p>
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-orange-600 flex items-center gap-1">
+                  Take Action <ArrowUpRight className="h-3.5 w-3.5" />
+                </div>
+              </div>
+
+              {/* Summary Metrics (6 Cards in Grid) */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                {[
+                  { title: 'Total Revenue', value: '₦1,850,400', sub: '+14.2% vs last week', icon: DollarSign, color: 'text-emerald-500 bg-emerald-500/10' },
+                  { title: 'Gross Profit', value: '₦620,150', sub: '33.5% margin', icon: TrendingUp, color: 'text-blue-500 bg-blue-500/10' },
+                  { title: 'POS Transactions', value: '342', sub: 'Today (Avg ₦5,410)', icon: ShoppingCart, color: 'text-orange-500 bg-orange-500/10' },
+                  { title: 'Units Sold', value: '1,128', sub: 'Across 48 items', icon: ShoppingBag, color: 'text-purple-500 bg-purple-500/10' },
+                  { title: 'Active Customers', value: '186', sub: '+12 new today', icon: Users, color: 'text-amber-500 bg-amber-500/10' },
+                  { title: 'Low Stock Alerts', value: '4 SKUs', sub: 'Needs reorder', icon: AlertCircle, color: 'text-rose-500 bg-rose-500/10' },
+                ].map((stat, idx) => {
+                  const Icon = stat.icon;
+                  return (
+                    <div key={idx} className="p-3.5 rounded-xl border bg-card/85 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground truncate">{stat.title}</span>
+                        <div className={cn("h-6 w-6 rounded-md flex items-center justify-center shrink-0", stat.color)}>
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                      <div className="text-lg font-bold tracking-tight">{stat.value}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">{stat.sub}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Charts & Analytics Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* Sales Velocity Chart */}
+                <div className="lg:col-span-2 p-5 rounded-xl border bg-card/85 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold">Sales & Revenue Velocity</h4>
+                      <p className="text-[11px] text-muted-foreground">Hourly transaction breakdown across active registers</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <span className="h-2 w-2 rounded-full bg-orange-500" /> Today
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/40 ml-2" /> Yesterday
+                    </div>
+                  </div>
+                  {/* Visual Chart Wave */}
+                  <div className="h-44 w-full flex items-end gap-2.5 pt-6 px-2">
+                    {[35, 48, 62, 55, 78, 65, 88, 92, 80, 95, 88, 72, 85, 98, 90, 82].map((h, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                        <div
+                          className="w-full rounded-t-sm bg-gradient-to-t from-orange-500/20 via-orange-500/60 to-orange-500 transition-all"
+                          style={{ height: `${h}%` }}
+                        />
+                        <span className="text-[9px] text-muted-foreground/60">{i + 8}h</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Category Donut Breakdown */}
+                <div className="p-5 rounded-xl border bg-card/85 shadow-sm space-y-4">
+                  <div>
+                    <h4 className="text-sm font-bold">Revenue by Category</h4>
+                    <p className="text-[11px] text-muted-foreground">Product category sales contribution</p>
+                  </div>
+                  <div className="space-y-3 pt-2">
+                    {[
+                      { name: 'Beverages & Soft Drinks', pct: 38, amt: '₦703,150', color: 'bg-orange-500' },
+                      { name: 'Groceries & Staples', pct: 28, amt: '₦518,110', color: 'bg-amber-500' },
+                      { name: 'Toiletries & Personal', pct: 20, amt: '₦370,080', color: 'bg-emerald-500' },
+                      { name: 'Confectionery & Snacks', pct: 14, amt: '₦259,060', color: 'bg-blue-500' },
+                    ].map((cat, i) => (
+                      <div key={i} className="space-y-1">
+                        <div className="flex justify-between text-xs font-medium">
+                          <span className="truncate">{cat.name}</span>
+                          <span>{cat.amt}</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                          <div className={cn("h-full rounded-full", cat.color)} style={{ width: `${cat.pct}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Transactions Table */}
+              <div className="p-5 rounded-xl border bg-card/85 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold">Recent Completed Sales</h4>
+                  <span className="text-xs text-orange-600 font-medium">View All Receipts →</span>
+                </div>
+                <div className="divide-y text-xs">
+                  {[
+                    { id: 'REC-9041', cashier: 'Bello (Reg 1)', items: '4 items', total: '₦14,200', time: '2 mins ago', method: 'POS Card' },
+                    { id: 'REC-9040', cashier: 'Amina (Reg 2)', items: '12 items', total: '₦38,500', time: '8 mins ago', method: 'Cash' },
+                    { id: 'REC-9039', cashier: 'Bello (Reg 1)', items: '2 items', total: '₦4,800', time: '14 mins ago', method: 'Transfer' },
+                    { id: 'REC-9038', cashier: 'Amina (Reg 2)', items: '6 items', total: '₦18,900', time: '22 mins ago', method: 'POS Card' },
+                  ].map((row, i) => (
+                    <div key={i} className="py-2.5 flex items-center justify-between text-muted-foreground">
+                      <span className="font-mono font-medium text-foreground">{row.id}</span>
+                      <span>{row.cashier}</span>
+                      <span>{row.items}</span>
+                      <span className="px-2 py-0.5 rounded bg-muted text-[10px]">{row.method}</span>
+                      <span className="font-bold text-foreground">{row.total}</span>
+                      <span className="text-[11px]">{row.time}</span>
+                      <span className="text-emerald-500 font-medium">Completed</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Glassmorphic Onboarding Modal */}
+      <div className="fixed inset-0 z-50 w-full flex flex-col items-center justify-center min-h-screen py-8 px-4 lg:px-8 bg-background/40 dark:bg-black/45 overflow-y-auto backdrop-blur-[2px]">
+        <div className="w-full max-w-4xl space-y-5 sm:space-y-6 bg-gradient-to-b from-orange-500/10 via-card/95 to-card/95 dark:via-card/85 dark:to-card/85 backdrop-blur-sm border border-dashed border-orange-500/40 p-6 sm:p-8 rounded-xl my-auto shadow-none">
         <div className="text-center mb-6 relative z-10">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
             {t.title.replace('{name}', currentUserProfile?.name ? currentUserProfile.name.split(' ')[0] : 'Merchant')}
@@ -893,21 +1265,61 @@ export default function OnboardingPage() {
                       <FormField control={form.control} name="organizationName" render={({ field }) => (
                         <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">{t.storeName} <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="e.g. Zenith Supermarket" className="h-10 sm:h-12 text-sm shadow-none" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
                       )} />
-                      <FormField control={form.control} name="industry" render={({ field }) => (
-                        <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">{t.industry} <span className="text-destructive">*</span></FormLabel>
-                          <FormControl>
-                            <Combobox
-                              options={industries.map(i => ({ label: i, value: i }))}
-                              value={field.value}
-                              onChange={field.onChange}
-                              placeholder={t.selectIndustry}
-                              searchPlaceholder={t.searchIndustries}
-                              triggerClassName="h-10 sm:h-12 text-sm font-normal justify-between w-full"
-                              avoidCollisions={false}
-                            />
-                          </FormControl>
-                          <FormMessage className="text-[11px]" /></FormItem>
-                      )} />
+                      <FormField
+                        control={form.control}
+                        name="industry"
+                        render={({ field, fieldState }) => (
+                          <FormItem className="space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <FormLabel className="text-xs sm:text-sm font-semibold">
+                                {t.industry} <span className="text-destructive">*</span>
+                              </FormLabel>
+                              {field.value && (
+                                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                  {INDUSTRY_OPTIONS.find((i) => i.name === field.value)?.label || field.value}
+                                </span>
+                              )}
+                            </div>
+                            <FormControl>
+                              <div
+                                role="radiogroup"
+                                aria-label={t.industry}
+                                className={cn(
+                                  "flex flex-wrap gap-2 sm:gap-2.5 pt-1 pb-1 transition-colors",
+                                  fieldState.error
+                                    ? "p-2 rounded-xl bg-destructive/5 border border-dashed border-destructive/40"
+                                    : ""
+                                )}
+                              >
+                                {INDUSTRY_OPTIONS.map((item) => {
+                                  const isSelected = field.value === item.name;
+                                  return (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      role="radio"
+                                      aria-checked={isSelected}
+                                      onClick={() => {
+                                        field.onChange(item.name);
+                                      }}
+                                      className={cn(
+                                        "rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium transition-colors duration-150 cursor-pointer select-none",
+                                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1",
+                                        isSelected
+                                          ? "bg-orange-500 text-white border border-orange-500 shadow-sm shadow-orange-500/25"
+                                          : "bg-background hover:bg-muted text-foreground border border-border/80 dark:border-border/60 hover:border-foreground/30"
+                                      )}
+                                    >
+                                      {item.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </FormControl>
+                            <FormMessage className="text-[11px]" />
+                          </FormItem>
+                        )}
+                      />
                       {form.watch("industry") === "Other" && (
                         <FormField control={form.control} name="customIndustry" render={({ field }) => (
                           <FormItem className="space-y-2">
@@ -934,7 +1346,7 @@ export default function OnboardingPage() {
                               }}
                               placeholder={t.selectLanguage}
                               searchPlaceholder={t.searchLanguages}
-                              triggerClassName="h-10 sm:h-12 text-sm font-normal justify-between w-full"
+                              triggerClassName="h-10 sm:h-12 text-sm font-normal justify-between w-full active:scale-100 transition-colors shadow-none"
                               avoidCollisions={false}
                               renderSelected={(opt) => (
                                 <span className="flex items-center gap-2">
@@ -1043,5 +1455,6 @@ export default function OnboardingPage() {
         </Card>
       </div>
     </div>
+  </div>
   );
 }

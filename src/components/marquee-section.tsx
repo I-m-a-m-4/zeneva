@@ -1,72 +1,67 @@
 import React from 'react';
 import {
-    Package,
+    FileText,
     BarChart3,
     Users,
-    FileText,
     Tag,
     Globe,
     CreditCard,
     TrendingUp,
-    WifiOff,
     ShieldCheck,
-    Smartphone,
-    Printer,
-    ScanBarcode
+    Clock,
+    DollarSign,
+    CheckCircle,
+    Receipt
 } from 'lucide-react';
 
 const MARQUEE_ITEMS = [
     {
-        label: "Smart Inventory",
-        icon: <Package className="w-6 h-6 text-slate-700" />
-    },
-    {
-        label: "Advanced Analytics",
-        icon: <BarChart3 className="w-6 h-6 text-slate-700" />
-    },
-    {
-        label: "Staff Accounts",
-        icon: <Users className="w-6 h-6 text-slate-700" />
-    },
-    {
-        label: "Invoices & Receipts",
+        label: "Autonomous Invoicing",
         icon: <FileText className="w-6 h-6 text-slate-700" />
     },
     {
-        label: "Discounts & Promos",
-        icon: <Tag className="w-6 h-6 text-slate-700" />
-    },
-    {
-        label: "Online Storefront",
+        label: "Global Payments (USD/EUR)",
         icon: <Globe className="w-6 h-6 text-slate-700" />
     },
     {
-        label: "Instant Payments",
-        icon: <CreditCard className="w-6 h-6 text-slate-700" />
+        label: "Client Payment Portal",
+        icon: <Users className="w-6 h-6 text-slate-700" />
     },
     {
-        label: "Profit Analysis",
+        label: "Recurring & Retainer Billing",
         icon: <TrendingUp className="w-6 h-6 text-slate-700" />
     },
     {
-        label: "Offline Mode",
-        icon: <WifiOff className="w-6 h-6 text-slate-700" />
+        label: "Automatic Payment Reminders",
+        icon: <Clock className="w-6 h-6 text-slate-700" />
     },
     {
-        label: "Audit Logs",
+        label: "Quotes & Estimates",
+        icon: <CheckCircle className="w-6 h-6 text-slate-700" />
+    },
+    {
+        label: "Instant Card Checkout",
+        icon: <CreditCard className="w-6 h-6 text-slate-700" />
+    },
+    {
+        label: "Revenue Analytics",
+        icon: <BarChart3 className="w-6 h-6 text-slate-700" />
+    },
+    {
+        label: "Digital Receipts",
+        icon: <Receipt className="w-6 h-6 text-slate-700" />
+    },
+    {
+        label: "Audit Logs & Security",
         icon: <ShieldCheck className="w-6 h-6 text-slate-700" />
     },
     {
-        label: "Mobile POS",
-        icon: <Smartphone className="w-6 h-6 text-slate-700" />
+        label: "Multi-Currency Settlement",
+        icon: <DollarSign className="w-6 h-6 text-slate-700" />
     },
     {
-        label: "Barcode Scanning",
-        icon: <ScanBarcode className="w-6 h-6 text-slate-700" />
-    },
-    {
-        label: "Receipt Printing",
-        icon: <Printer className="w-6 h-6 text-slate-700" />
+        label: "Tax & VAT Compliance",
+        icon: <Tag className="w-6 h-6 text-slate-700" />
     }
 ];
 

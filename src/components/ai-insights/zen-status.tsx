@@ -47,6 +47,8 @@ const TOOL_LINES: Record<string, string> = {
   queryCustomer: 'Looking up customer',
   getTopCustomers: 'Ranking your regulars',
   getCustomerPurchaseHistory: 'Reading purchase history',
+  queryExpenses: 'Reviewing operating expenses',
+  queryPurchases: 'Reviewing supplier purchases',
   getAtRiskCustomers: 'Spotting lapsed customers',
   getBranchPerformance: 'Comparing branches',
   getStaffPerformance: 'Totalling sales per staff',

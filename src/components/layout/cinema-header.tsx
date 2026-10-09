@@ -5,7 +5,7 @@ import { useUser } from '@/firebase';
 import Link from "next/link";
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Menu, X, LogOut, Download, Home, User, CreditCard, Newspaper, Mail } from 'lucide-react';
+import { LayoutGrid, X, LogOut, Download, Home, User, CreditCard, Newspaper, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -70,6 +70,7 @@ export default function CinemaHeader({ threshold = 50 }: { threshold?: number })
           {/* Logo */}
           <Link href="/" className="flex items-center group">
             <div className="transition-all duration-300">
+                {/* eslint-disable-next-line @next/next/no-img-element -- logo URL is configured at runtime and may be an external or data: URL */}
                 <img 
                     src={AppConfig.logoUrl} 
                     alt="Zeneva Logo" 
@@ -82,19 +83,20 @@ export default function CinemaHeader({ threshold = 50 }: { threshold?: number })
             </div>
           </Link>
 
-          {/* Trigger Button (The Grid icon from image) */}
+          {/* Trigger Button (Modular App / Inventory Grid icon matching screenshot) */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label={isMenuOpen ? "Close menu" : "Open application menu"}
             className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-md transition-all duration-300 shadow-sm border border-slate-200",
-                isMenuOpen ? "bg-orange-600 text-white border-transparent" : 
-                scrolled ? "bg-slate-950 text-white border-transparent" : "bg-white text-slate-950 hover:scale-110"
+                "w-11 h-11 flex items-center justify-center rounded-xl transition-all duration-300 shadow-md border cursor-pointer",
+                isMenuOpen ? "bg-[#F47125] text-white border-transparent scale-95" : 
+                scrolled ? "bg-white text-slate-950 border-slate-200 hover:shadow-lg hover:scale-105 active:scale-95" : "bg-white text-slate-950 border-white/40 hover:scale-105 hover:shadow-lg active:scale-95"
             )}
           >
             {isMenuOpen ? (
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 stroke-[2.5]" />
             ) : (
-              <Menu className="w-6 h-6" />
+              <LayoutGrid className="w-5 h-5 stroke-[2.2] text-slate-900" />
             )}
           </button>
         </nav>
@@ -123,6 +125,7 @@ export default function CinemaHeader({ threshold = 50 }: { threshold?: number })
             >
                 {/* Header of Drawer */}
                 <div className="p-6 flex items-center justify-between border-b border-dashed border-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- logo URL is configured at runtime and may be an external or data: URL */}
                     <img 
                         src={AppConfig.logoUrl} 
                         alt="Zeneva Logo" 

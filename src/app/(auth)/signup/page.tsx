@@ -15,11 +15,12 @@ import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, sign
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import { usePOS } from '@/context/pos-context';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader, ChevronLeft, ChevronRight, Building, UserCheck, Play, Pause, Sparkles, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Loader, ChevronLeft, ChevronRight, Building, UserCheck, Play, Pause, Sparkles, ArrowRight, Gift, CheckCircle2, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AppConfig } from '@/lib/config';
 import Image from 'next/image';
 import { doc, getDoc } from 'firebase/firestore';
+import { applyReferralCode } from '@/actions/referral';
 
 const makeSignupSchema = (t: (key: string) => string) => z.object({
   email: z.string()
@@ -93,6 +94,9 @@ function SignupPageContent() {
   const [invitationDetails, setInvitationDetails] = useState<{ businessName: string, role: string } | null>(null);
   const [isLoadingInvitation, setIsLoadingInvitation] = useState(true);
   const invitationCode = searchParams.get('invitationCode');
+  const refFromQuery = searchParams.get('ref') || searchParams.get('referral');
+  const [referralCode, setReferralCode] = useState(refFromQuery || '');
+  const [showReferralInput, setShowReferralInput] = useState(!!refFromQuery);
 
   const [isPlaying, setIsPlaying] = useState(true);
 
@@ -209,6 +213,14 @@ function SignupPageContent() {
           if (!userDocSnap.exists()) {
             await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
             await waitForUserProfile(firestore, user.uid);
+            if (referralCode.trim()) {
+              try {
+                const token = await user.getIdToken();
+                await applyReferralCode({ idToken: token, code: referralCode.trim() });
+              } catch (e) {
+                console.warn('Failed to apply referral code:', e);
+              }
+            }
             triggerRefresh();
             await new Promise(resolve => setTimeout(resolve, 1500));
             router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');
@@ -299,6 +311,14 @@ function SignupPageContent() {
       if (!userDocSnap.exists()) {
         await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
         await waitForUserProfile(firestore, user.uid);
+        if (referralCode.trim()) {
+          try {
+            const token = await user.getIdToken();
+            await applyReferralCode({ idToken: token, code: referralCode.trim() });
+          } catch (e) {
+            console.warn('Failed to apply referral code:', e);
+          }
+        }
         triggerRefresh();
 
         // Send welcome email asynchronously
@@ -375,6 +395,14 @@ function SignupPageContent() {
       // Pass invitation code to the creation function with empty strings for name and phone
       await createUserProfileDocument(firestore, userCredential.user, '', '', invitationCode);
       await waitForUserProfile(firestore, userCredential.user.uid);
+      if (referralCode.trim()) {
+        try {
+          const token = await userCredential.user.getIdToken();
+          await applyReferralCode({ idToken: token, code: referralCode.trim() });
+        } catch (e) {
+          console.warn('Failed to apply referral code:', e);
+        }
+      }
 
       triggerRefresh();
 
@@ -532,6 +560,68 @@ function SignupPageContent() {
                     </FormItem>
                   )}
                 />
+
+                {/* Referral Code Field */}
+                {!invitationCode && (
+                  <div className="space-y-1.5 pt-1">
+                    {!showReferralInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowReferralInput(true)}
+                        className="text-xs text-primary hover:underline flex items-center gap-1.5 font-medium transition-colors"
+                      >
+                        <Gift className="h-3.5 w-3.5" />
+                        Have a referral code? (Get 30 Days Free)
+                      </button>
+                    ) : (
+                      <div className="space-y-2 rounded-md border border-primary/25 bg-primary/5 p-2.5">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold flex items-center gap-1.5 text-primary">
+                            <Gift className="h-3.5 w-3.5" />
+                            Referral Code (30 Days Free Pro)
+                          </Label>
+                          {!refFromQuery ? (
+                            <button
+                              type="button"
+                              onClick={() => { setShowReferralInput(false); setReferralCode(''); }}
+                              className="text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-sm border border-emerald-500/20">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Auto-Applied
+                            </span>
+                          )}
+                        </div>
+
+                        <Input
+                          placeholder="e.g. ZEN-A8K2F9"
+                          value={referralCode}
+                          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                          readOnly={!!refFromQuery}
+                          className={cn(
+                            "h-9 text-xs uppercase tracking-wider font-mono font-bold text-foreground bg-background rounded-sm shadow-xs",
+                            refFromQuery ? "border-emerald-500/40 cursor-default" : "border-primary/20"
+                          )}
+                        />
+
+                        <p className="text-[10px] text-muted-foreground">
+                          {refFromQuery ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 inline shrink-0" />
+                              Referral applied! 30 free days will unlock for both stores.
+                            </span>
+                          ) : (
+                            "Both you and your referrer unlock 30 days of free Pro upon activation!"
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Button type="submit" className="w-full" disabled={isLoading || isLoadingInvitation || isGoogleLoading}>
                   {isLoading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : t('auth.createAccountSubmit')}
                 </Button>

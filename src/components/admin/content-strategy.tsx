@@ -244,7 +244,7 @@ export default function ContentStrategyCenter({ platformStats }: ContentStrategy
                 <div className="space-y-2 border-t border-slate-100 pt-4">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Compelling Hook / Introduction</span>
                   <p className="text-sm text-slate-700 leading-relaxed italic bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    "{result.introduction}"
+                    &quot;{result.introduction}&quot;
                   </p>
                 </div>
 

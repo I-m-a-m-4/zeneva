@@ -351,6 +351,7 @@ export default function CampaignComposer({
                         : 'border-border bg-card hover:bg-muted/50 text-muted-foreground',
                     )}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- runtime image URL that next/image cannot optimize without a remote allowlist */}
                     <img
                       src={asset.path}
                       alt={asset.label}

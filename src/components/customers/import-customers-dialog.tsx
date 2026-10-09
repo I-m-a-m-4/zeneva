@@ -260,7 +260,7 @@ export default function ImportCustomersDialog({ isOpen, onOpenChange, onSuccess,
         <DialogHeader>
           <DialogTitle>Import Customers from CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk-add customers. Ensure your file has columns for 'Name' and 'Email' or 'Phone'.
+            Upload a CSV file to bulk-add customers. Ensure your file has columns for &apos;Name&apos; and &apos;Email&apos; or &apos;Phone&apos;.
           </DialogDescription>
         </DialogHeader>
 

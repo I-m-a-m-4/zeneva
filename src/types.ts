@@ -528,6 +528,21 @@ export interface BusinessInstance {
     isVerified?: boolean;
     featureOverrides?: Record<string, boolean>;
 
+    /** Referral program properties */
+    referralCode?: string;
+    referredBy?: {
+        code: string;
+        referrerBusinessId: string;
+        referrerBusinessName?: string;
+        appliedAt: any;
+        rewardClaimed: boolean;
+    };
+    referralStats?: {
+        totalReferred: number;
+        completedReferrals: number;
+        rewardDaysEarned: number;
+    };
+
     settings?: {
         phone?: string;
         email?: string;
@@ -969,4 +984,24 @@ export interface InventoryTransaction {
     notes?: string;
     referenceId?: string; // e.g., Receipt ID or PO ID
     createdBy?: string;
+}
+
+export type ReferralPhase = 'signed_up' | 'products_added' | 'first_sale_completed';
+
+export interface ReferralRecord {
+    id: string;
+    referralCode: string;
+    referrerBusinessId: string;
+    referrerOwnerId: string;
+    referrerBusinessName?: string;
+    refereeBusinessId: string;
+    refereeOwnerId: string;
+    refereeBusinessName?: string;
+    status: 'pending' | 'completed';
+    currentPhase?: ReferralPhase;
+    completedPhases?: ReferralPhase[];
+    rewardDays: number;
+    qualificationTrigger?: 'first_sale' | 'code_applied' | 'payment';
+    createdAt: any;
+    completedAt?: any;
 }

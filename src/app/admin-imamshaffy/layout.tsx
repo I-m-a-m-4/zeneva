@@ -69,6 +69,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { notify } = useNativeNotifications();
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && user?.email && ADMIN_EMAILS.includes(user.email)) {
+      try {
+        localStorage.setItem('zeneva_is_admin_device', 'true');
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (!firestore || !user || user.email !== ADMIN_EMAIL) return;
 
     const q = query(

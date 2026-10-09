@@ -14,7 +14,11 @@
 
 import {
   baseLanguage,
+  classifyLaunchDoc,
+  filterLaunches,
   furthestStage,
+  isSuspectedBot,
+  isSuspectedDev,
   launchDate,
   stageLabel,
   summariseLaunches,
@@ -279,6 +283,46 @@ const step = (s: ReturnType<typeof summariseLaunches>, key: string) =>
   check('13c: login_succeeded is not in the sign-up funnel order', !LAUNCH_STAGE_ORDER.includes('login_succeeded' as LaunchStage));
   check('13d: app_opened is first', LAUNCH_STAGE_ORDER[0] === 'app_opened');
   check('13e: onboarding_completed is last', LAUNCH_STAGE_ORDER[LAUNCH_STAGE_ORDER.length - 1] === 'onboarding_completed');
+}
+
+/* ── 14. Bot and Developer Test Filtering ───────────────────────────────────── */
+{
+  // A. Bots: Headless screen resolutions that bounced at app_opened
+  const botDoc1: LaunchDoc = { installId: 'bot1', screen: '1280x1200', launches: 1 };
+  const botDoc2: LaunchDoc = { installId: 'bot2', userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', launches: 1 };
+  const botDoc3: LaunchDoc = { installId: 'bot3', country: 'SG', locale: 'zh-CN', launches: 1 };
+  check('14a: 1280x1200 headless screen is flagged as bot', isSuspectedBot(botDoc1));
+  check('14b: bot user agent is flagged as bot', isSuspectedBot(botDoc2));
+  check('14c: SG datacenter zh-CN ping is flagged as bot', isSuspectedBot(botDoc3));
+
+  // A real account that signed up is NEVER a bot
+  const realSignup: LaunchDoc = { installId: 'real1', screen: '1280x1200', signedUp: true, stages: { signup_succeeded: T } };
+  check('14d: signedUp user is never flagged as bot', !isSuspectedBot(realSignup));
+
+  // B. Dev: Current device or high open loops (15+ opens without signup)
+  const devDoc1: LaunchDoc = { installId: 'dev1', launches: 25, stages: { reached_login: T } };
+  const devDoc2: LaunchDoc = { installId: 'my-install-id', launches: 3 };
+  check('14e: 25 opens without signup is flagged as dev loop', isSuspectedDev(devDoc1));
+  check('14f: current install id is flagged as dev', isSuspectedDev(devDoc2, 'my-install-id'));
+  check('14g: normal user with 3 opens is not dev', !isSuspectedDev({ installId: 'normal', launches: 3 }, 'my-install-id'));
+
+  // C. filterLaunches filters cleanly
+  const mixed: LaunchDoc[] = [
+    botDoc1,
+    botDoc2,
+    devDoc1,
+    { installId: 'real-user', stages: { reached_signup: T, signup_started: T }, launches: 2 },
+    realSignup,
+  ];
+
+  const resGenuine = filterLaunches(mixed, { mode: 'genuine' });
+  check('14h: genuine mode excludes bots and dev loops', resGenuine.docs.length === 2);
+  check('14i: bot count accurate', resGenuine.botCount === 2);
+  check('14j: dev count accurate', resGenuine.devCount === 1);
+  check('14k: genuine count accurate', resGenuine.genuineCount === 2);
+
+  const resAll = filterLaunches(mixed, { mode: 'all' });
+  check('14l: all mode preserves all records', resAll.docs.length === 5);
 }
 
 /* ── Report ────────────────────────────────────────────────────────────────── */

@@ -72,6 +72,7 @@ import { useI18n } from '@/context/i18n-context';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { PhoneInput } from '@/components/ui/phone-input';
+import ReferralBanner from '@/components/referrals/referral-banner';
 
 const NIGERIAN_BANKS = [
     { label: "Access Bank", value: "044" },
@@ -893,6 +894,8 @@ function SettingsPageContent() {
     return (
         <div className="space-y-6">
             <PageTitle title={t('settings.title')} subtitle={t('settings.pageSubtitle')} />
+
+            <ReferralBanner />
 
             <Tabs defaultValue="general" className="space-y-6">
                 <TabsList className="w-full flex justify-start overflow-x-auto overflow-y-hidden snap-x no-scrollbar h-auto bg-transparent p-0 gap-2 mb-4 border-b pb-4">

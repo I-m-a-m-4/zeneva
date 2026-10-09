@@ -403,9 +403,12 @@ const CartContents = () => {
     const { t } = useI18n();
     const { currentUserProfile } = useUser();
 
-    const canOverridePrice = currentUserProfile?.role === 'admin' || 
-        business?.settings?.allowPosPriceOverride !== false;
-    const canOverrideCostPrice = currentUserProfile?.role === 'admin';
+    const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id;
+    const canOverridePrice = isAdmin || (
+        business?.settings?.allowPosPriceOverride === true &&
+        currentUserProfile?.permissions?.override_prices !== false
+    );
+    const canOverrideCostPrice = isAdmin;
 
     // Suppress SSR/client hydration mismatch: cart is read from localStorage which
     // doesn't exist on the server. Render a neutral placeholder until mounted.

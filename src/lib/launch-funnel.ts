@@ -185,6 +185,137 @@ export function furthestStage(doc: LaunchDoc): LaunchStage {
   return 'app_opened';
 }
 
+export type LaunchClassification = 'genuine' | 'bot' | 'dev';
+
+/**
+ * Identifies automated scanners, crawlers, and headless pings that bounced
+ * without genuine user interaction.
+ */
+export function isSuspectedBot(doc: LaunchDoc): boolean {
+  // A signed-up or onboarded user is never a bot
+  if (doc.signedUp || doc.onboarded) return false;
+
+  const stage = furthestStage(doc);
+  const ua = (doc.userAgent || '').toLowerCase();
+
+  // 1. Explicit bot/crawler User-Agent tokens
+  if (
+    ua &&
+    /bot|crawl|spider|headless|lighthouse|phantom|scrape|slurp|bingpreview|bytespider|censys|shodan|python|curl|wget|urllib/i.test(
+      ua,
+    )
+  ) {
+    return true;
+  }
+
+  // 2. Typical headless scraper viewports that bounced immediately at app_opened
+  const isHeadlessViewport =
+    doc.screen === '1280x1200' || doc.screen === '800x600' || doc.screen === '0x0';
+  if (isHeadlessViewport && stage === 'app_opened') {
+    return true;
+  }
+
+  // 3. Automated datacenter probes: SG/HK cloud pings in zh-CN with 1 launch that stopped at app_opened
+  const isDatacenterCloudPing =
+    (doc.country === 'SG' || doc.country === 'HK') &&
+    doc.locale === 'zh-CN' &&
+    stage === 'app_opened' &&
+    (doc.launches || 1) <= 1;
+
+  if (isDatacenterCloudPing) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Identifies developer testing loops (e.g. going back and forth 15+ times
+ * during testing without signing up, or matching the admin device).
+ */
+export function isSuspectedDev(
+  doc: LaunchDoc,
+  currentInstallId?: string,
+  excludedIds?: Set<string>,
+): boolean {
+  if (excludedIds && excludedIds.has(doc.installId)) return true;
+  if (currentInstallId && doc.installId === currentInstallId) return true;
+
+  // Never flag users who completed sign-up as dev loops unless explicitly in excludedIds
+  if (doc.signedUp || doc.onboarded) return false;
+
+  // A device that opened 15+ times without ever completing sign-up is almost certainly
+  // a developer or tester testing login/signup forms repeatedly
+  if ((doc.launches || 1) >= 15) {
+    return true;
+  }
+
+  return false;
+}
+
+export function classifyLaunchDoc(
+  doc: LaunchDoc,
+  currentInstallId?: string,
+  excludedIds?: Set<string>,
+): LaunchClassification {
+  if (isSuspectedDev(doc, currentInstallId, excludedIds)) return 'dev';
+  if (isSuspectedBot(doc)) return 'bot';
+  return 'genuine';
+}
+
+export interface FilterLaunchesResult {
+  docs: LaunchDoc[];
+  totalCount: number;
+  genuineCount: number;
+  botCount: number;
+  devCount: number;
+}
+
+export function filterLaunches(
+  docs: LaunchDoc[],
+  options?: {
+    mode?: 'genuine' | 'all' | 'bots' | 'dev';
+    currentInstallId?: string;
+    excludedIds?: Set<string>;
+  },
+): FilterLaunchesResult {
+  const mode = options?.mode || 'genuine';
+  const currentInstallId = options?.currentInstallId;
+  const excludedIds = options?.excludedIds;
+
+  let botCount = 0;
+  let devCount = 0;
+  let genuineCount = 0;
+
+  const classified = docs.map((doc) => {
+    const kind = classifyLaunchDoc(doc, currentInstallId, excludedIds);
+    if (kind === 'bot') botCount++;
+    else if (kind === 'dev') devCount++;
+    else genuineCount++;
+    return { doc, kind };
+  });
+
+  let filteredDocs: LaunchDoc[];
+  if (mode === 'all') {
+    filteredDocs = docs;
+  } else if (mode === 'bots') {
+    filteredDocs = classified.filter((x) => x.kind === 'bot').map((x) => x.doc);
+  } else if (mode === 'dev') {
+    filteredDocs = classified.filter((x) => x.kind === 'dev').map((x) => x.doc);
+  } else {
+    // 'genuine'
+    filteredDocs = classified.filter((x) => x.kind === 'genuine').map((x) => x.doc);
+  }
+
+  return {
+    docs: filteredDocs,
+    totalCount: docs.length,
+    genuineCount,
+    botCount,
+    devCount,
+  };
+}
+
 /** Which drawn step an install's furthest stage belongs to. */
 function stepIndexFor(doc: LaunchDoc): number {
   const stages = doc.stages || {};

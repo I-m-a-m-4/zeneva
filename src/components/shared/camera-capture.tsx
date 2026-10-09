@@ -83,6 +83,7 @@ export function CameraCapture({ onCapture, isProcessing = false }: CameraCapture
                 </div>
             ) : (
                 <div className="relative rounded-xl overflow-hidden bg-black aspect-video sm:aspect-auto sm:h-[400px]">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- runtime image URL that next/image cannot optimize without a remote allowlist */}
                     <img
                         src={preview}
                         alt="Preview"

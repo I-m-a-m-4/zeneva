@@ -5,7 +5,7 @@ import { useUser } from '@/firebase';
 import Link from "next/link";
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Menu, X, LogOut, Loader2 } from 'lucide-react';
+import { LayoutGrid, Menu, X, LogOut, Loader2, ChevronDown, Bot, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -20,12 +20,30 @@ export default function MarketingHeader() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [zenAiDropdownOpen, setZenAiDropdownOpen] = useState(false);
+  const dropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const router = useRouter();
   const { t } = useI18n();
   const [mounted, setMounted] = React.useState(false);
   const [showBanner, setShowBanner] = useState(true);
 
+  const handleMouseEnterZenAi = () => {
+    if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+    setZenAiDropdownOpen(true);
+  };
+
+  const handleMouseLeaveZenAi = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setZenAiDropdownOpen(false);
+    }, 180);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+    };
+  }, []);
 
   React.useEffect(() => {
     setMounted(true);
@@ -95,6 +113,7 @@ export default function MarketingHeader() {
             {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center justify-center" prefetch={false} onClick={() => setIsMobileMenuOpen(false)}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- logo URL is configured at runtime and may be an external or data: URL */}
               <img src={AppConfig.logoUrl} alt="Zeneva Logo" className="h-16 w-auto" />
             </Link>
           </div>
@@ -102,7 +121,103 @@ export default function MarketingHeader() {
           {/* Nav Links */}
           <div className="hidden md:flex gap-8 items-center">
             {navLinks.map((link) => {
-              const isActive = (pathname === link.href) || (link.href === '/blog' && pathname.startsWith('/blog')) || (link.href === '/about/our-mission' && pathname.startsWith('/about'));
+              const isZenAi = link.href === "/zen-ai";
+              const isZenAiActive = pathname.startsWith('/zen-ai');
+              const isActive = isZenAi 
+                ? isZenAiActive 
+                : (pathname === link.href) || (link.href === '/blog' && pathname.startsWith('/blog')) || (link.href === '/about/our-mission' && pathname.startsWith('/about'));
+
+              if (isZenAi) {
+                return (
+                  <div
+                    key={link.href}
+                    className="relative group py-2"
+                    onMouseEnter={handleMouseEnterZenAi}
+                    onMouseLeave={handleMouseLeaveZenAi}
+                  >
+                    <Link
+                      href="/zen-ai"
+                      className={cn(
+                        "transition-colors text-base font-medium tracking-tight font-dm-sans inline-flex items-center gap-1.5 hover:text-black",
+                        isActive ? "text-black font-semibold" : "text-slate-700"
+                      )}
+                    >
+                      <span>{t(link.labelKey)}</span>
+                      <ChevronDown className={cn(
+                        "w-3.5 h-3.5 transition-transform duration-200 text-slate-400 group-hover:text-black",
+                        zenAiDropdownOpen && "rotate-180 text-black"
+                      )} />
+                    </Link>
+
+                    {/* Floating Dropdown Card */}
+                    {zenAiDropdownOpen && (
+                      <div className="absolute top-full -left-6 w-[390px] pt-2 z-50">
+                        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-2.5 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <div className="px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center justify-between">
+                            <span>Zen AI Ecosystem</span>
+                            <span className="text-[10px] font-mono text-[#EA580C] font-normal">Next-Gen Retail</span>
+                          </div>
+
+                          <Link
+                            href="/zen-ai"
+                            onClick={() => setZenAiDropdownOpen(false)}
+                            className={cn(
+                              "flex items-start gap-3.5 p-3 rounded-xl transition-all group/item",
+                              pathname === '/zen-ai' ? "bg-orange-50/80 border border-orange-200/60" : "hover:bg-slate-50"
+                            )}
+                          >
+                            <div className="w-10 h-10 rounded-xl bg-orange-100/90 border border-orange-200 text-[#EA580C] flex items-center justify-center shrink-0 group-hover/item:scale-105 group-hover/item:bg-[#EA580C] group-hover/item:text-white transition-all shadow-xs">
+                              <Bot className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-slate-900 group-hover/item:text-[#EA580C] transition-colors">
+                                  Zen AI Copilot
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold">
+                                  AVAILABLE
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed font-dm-sans">
+                                Conversational retail copilot. Predictive restocks, trapped capital recovery &amp; sales velocity.
+                              </p>
+                            </div>
+                          </Link>
+
+                          <div className="border-t border-slate-100 my-1" />
+
+                          <Link
+                            href="/zen-ai/cameras"
+                            onClick={() => setZenAiDropdownOpen(false)}
+                            className={cn(
+                              "flex items-start gap-3.5 p-3 rounded-xl transition-all group/item",
+                              pathname.startsWith('/zen-ai/cameras') ? "bg-orange-50/80 border border-orange-200/60" : "hover:bg-slate-50"
+                            )}
+                          >
+                            <div className="w-10 h-10 rounded-xl bg-amber-100/90 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 group-hover/item:scale-105 group-hover/item:bg-amber-600 group-hover/item:text-white transition-all shadow-xs">
+                              <Video className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-slate-900 group-hover/item:text-[#EA580C] transition-colors">
+                                  Zen Vision Stream Server
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-orange-100 text-[#EA580C] border border-orange-200 font-bold">
+                                  NEW
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed font-dm-sans">
+                                Turn dumb CCTV into an intelligent stream server. Foot traffic, dwell heatmaps &amp; loss prevention.
+                              </p>
+                            </div>
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <a
                   key={link.href}
@@ -114,7 +229,7 @@ export default function MarketingHeader() {
                 >
                   {t(link.labelKey)}
                 </a>
-              )
+              );
             })}
           </div>
 
@@ -146,7 +261,7 @@ export default function MarketingHeader() {
               {isMobileMenuOpen ? (
                 <X className="h-6 w-6 transition-transform duration-300 ease-in-out hover:rotate-90" />
               ) : (
-                <Menu className="h-6 w-6" />
+                <LayoutGrid className="h-5 w-5 stroke-[2.2]" />
               )}
             </button>
           </div>
@@ -162,16 +277,51 @@ export default function MarketingHeader() {
       )}>
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col items-center">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full text-center py-4 text-lg font-medium text-slate-700 tracking-tight font-dm-sans hover:text-black border-b-2 border-dashed border-slate-200"
-              >
-                {t(link.labelKey)}
-              </a>
-            ))}
+            {navLinks.map((link) => {
+              if (link.href === "/zen-ai") {
+                return (
+                  <div key={link.href} className="w-full py-3 border-b-2 border-dashed border-slate-200">
+                    <div className="text-center font-bold text-xs uppercase tracking-wider text-slate-400 py-1 font-mono">
+                      {t(link.labelKey)} Ecosystem
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 pt-2 pb-1">
+                      <Link
+                        href="/zen-ai"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center justify-between p-3 rounded-xl bg-slate-50 text-slate-900 font-medium text-base hover:bg-orange-50 hover:text-[#EA580C] transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Bot className="w-5 h-5 text-[#EA580C]" />
+                          <span>Zen AI Copilot</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Available</span>
+                      </Link>
+                      <Link
+                        href="/zen-ai/cameras"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center justify-between p-3 rounded-xl bg-slate-50 text-slate-900 font-medium text-base hover:bg-orange-50 hover:text-[#EA580C] transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Video className="w-5 h-5 text-amber-600" />
+                          <span>Zen Vision Stream Server</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-100 text-[#EA580C] font-bold">NEW</span>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full text-center py-4 text-lg font-medium text-slate-700 tracking-tight font-dm-sans hover:text-black border-b-2 border-dashed border-slate-200"
+                >
+                  {t(link.labelKey)}
+                </a>
+              );
+            })}
           </div>
           <div className="mt-8 flex flex-col gap-4">
             {mounted && user ? (

@@ -82,9 +82,8 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                 scannerInstanceRef.current = null;
             }
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- startScanning is re-created every render and sets state; listing it here would re-init the camera in a loop
     }, [isOpen]);
-    // Note: 'scanner' is excluded from deps to prevent infinite loops, 
-    // we use the local variable inside the effect or handleClose.
 
     const startScanning = async (scannerInstance: Html5Qrcode) => {
         setIsStarting(true);
@@ -118,12 +117,6 @@ export function BarcodeScanner({ onScan, isOpen, onClose }: BarcodeScannerProps)
                     device.label.toLowerCase().includes('rear')
                 );
                 const cameraId = backCamera ? backCamera.id : devices[0].id;
-
-                // Check if element is still mounted after async camera permission/listing delays
-                if (!document.getElementById("barcode-reader")) {
-                    console.log("Scanner unmounted during init");
-                    return;
-                }
 
                 await scannerInstance.start(
                     cameraId,

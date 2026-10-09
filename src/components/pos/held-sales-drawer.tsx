@@ -61,7 +61,7 @@ export default function HeldSalesDrawer({ trigger }: HeldSalesDrawerProps) {
                         Parked Sales
                     </SheetTitle>
                     <SheetDescription className="text-[11px] mt-0.5">
-                        View and resume transactions you've put on hold.
+                        View and resume transactions you&apos;ve put on hold.
                     </SheetDescription>
                 </SheetHeader>
                 <ScrollArea className="h-[calc(100vh-120px)] mt-6 pr-4">
@@ -109,7 +109,7 @@ export default function HeldSalesDrawer({ trigger }: HeldSalesDrawerProps) {
 
                                         {sale.notes && (
                                             <div className="mb-3 p-2 bg-muted/50 rounded text-xs italic text-muted-foreground">
-                                                "{sale.notes}"
+                                                &quot;{sale.notes}&quot;
                                             </div>
                                         )}
 

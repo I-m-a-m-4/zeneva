@@ -56,6 +56,7 @@ import {
   realEmail,
   type CustomerDuplicateMatch,
 } from '@/lib/customer-health';
+import { advanceReferralPhase } from '@/actions/referral';
 
 import { 
   POS_CART_KEY, 
@@ -3008,6 +3009,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction).catch(console.error);
     
     setQueuedActions(prev => [...prev, newAction]);
+
+    // Advance referral qualification phase to 'products_added' for referred businesses
+    if (action.type === 'add-product' && business?.referredBy && !business.referredBy.rewardClaimed && user) {
+      user.getIdToken().then(token => {
+        advanceReferralPhase({ idToken: token, phase: 'products_added' }).catch(() => {});
+      }).catch(() => {});
+    }
     
     // Proactive Sync: If online, trigger processQueue in the next tick
     if (isRealOnline) {
@@ -3015,7 +3023,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     
     return id;
-  }, [businessId, business, toast, processQueue, currentUserProfile, isRealOnline, activeBranchId]);
+  }, [businessId, business, toast, processQueue, currentUserProfile, isRealOnline, activeBranchId, user]);
 
   const addProductWithImage = useCallback(async (productData: any, imageFile: File | null) => {
     let imageUrl = productData.imageUrl || '';

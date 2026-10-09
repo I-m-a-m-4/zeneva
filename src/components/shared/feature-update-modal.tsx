@@ -204,6 +204,7 @@ export function FeatureUpdateModal() {
                   className="w-full h-full object-cover"
                 />
               ) : update.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- runtime image URL that next/image cannot optimize without a remote allowlist
                 <img
                   src={update.imageUrl}
                   alt={update.title}
@@ -244,6 +245,7 @@ export function FeatureUpdateModal() {
                       }}
                       className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-orange-500/20 border border-orange-400/35 text-orange-300 shadow-md backdrop-blur-md"
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- logo URL is configured at runtime and may be an external or data: URL */}
                       <img src={AppConfig.logoIconUrl} alt="Zeneva" className="h-4 w-4" />
                       <span className="text-xs font-semibold tracking-wide">
                         {update.badge || 'v3.3.0 Update'}

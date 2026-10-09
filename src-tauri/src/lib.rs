@@ -61,7 +61,78 @@ pub fn run() {
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_notification::init())
-    .plugin(tauri_plugin_shell::init());
+    .plugin(tauri_plugin_shell::init())
+    .plugin(
+        tauri::plugin::Builder::<tauri::Wry>::new("auth-navigation")
+            .on_page_load(|webview, payload| {
+                let url = payload.url().as_str();
+                if url.contains("accounts.google.com") || url.contains("google.com/o/oauth2") {
+                    let js = r#"
+                        (function() {
+                            function injectNav() {
+                                if (document.getElementById('zeneva-auth-nav-bar')) return;
+                                var bar = document.createElement('div');
+                                bar.id = 'zeneva-auth-nav-bar';
+                                bar.style.cssText = 'position:fixed;top:14px;left:16px;z-index:2147483647;display:flex;align-items:center;gap:10px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;user-select:none;pointer-events:auto;';
+                                
+                                var btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Cancel &amp; Back to Zeneva';
+                                btn.style.cssText = 'background:#18181b;color:#f47125;border:1px solid rgba(244,113,37,0.4);padding:8px 16px;border-radius:9999px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.6);display:flex;align-items:center;transition:all 0.2s cubic-bezier(0.16, 1, 0.3, 1);outline:none;';
+                                
+                                btn.onmouseover = function() {
+                                    btn.style.background = '#f47125';
+                                    btn.style.color = '#ffffff';
+                                    btn.style.borderColor = '#f47125';
+                                    btn.style.boxShadow = '0 6px 20px rgba(244,113,37,0.4)';
+                                };
+                                btn.onmouseout = function() {
+                                    btn.style.background = '#18181b';
+                                    btn.style.color = '#f47125';
+                                    btn.style.borderColor = 'rgba(244,113,37,0.4)';
+                                    btn.style.boxShadow = '0 4px 16px rgba(0,0,0,0.6)';
+                                };
+                                btn.onclick = function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (window.history.length > 1) {
+                                        window.history.back();
+                                    } else if (document.referrer) {
+                                        window.location.href = document.referrer;
+                                    } else {
+                                        window.history.back();
+                                    }
+                                };
+                                
+                                window.addEventListener('keydown', function(e) {
+                                    if (e.key === 'Escape') {
+                                        if (window.history.length > 1) {
+                                            window.history.back();
+                                        } else if (document.referrer) {
+                                            window.location.href = document.referrer;
+                                        }
+                                    }
+                                });
+                                
+                                bar.appendChild(btn);
+                                if (document.body) {
+                                    document.body.appendChild(bar);
+                                } else {
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                        document.body.appendChild(bar);
+                                    });
+                                }
+                            }
+                            injectNav();
+                            var interval = setInterval(injectNav, 300);
+                            setTimeout(function() { clearInterval(interval); }, 15000);
+                        })();
+                    "#;
+                    let _ = webview.eval(js);
+                }
+            })
+            .build()
+    );
 
   // Single-instance: if a second instance is launched, show the existing window
   #[cfg(desktop)]

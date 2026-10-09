@@ -193,7 +193,7 @@ export function RevenueValuationCard({
                 <li>
                   Excludes {snapshot.internalPurchasesExcluded} test{' '}
                   {snapshot.internalPurchasesExcluded === 1 ? 'payment' : 'payments'} from the
-                  company's own accounts ({money(snapshot.internalRevenueExcluded, currency)}). Your
+                  company&apos;s own accounts ({money(snapshot.internalRevenueExcluded, currency)}). Your
                   own money is not revenue.
                 </li>
               )}
@@ -388,7 +388,7 @@ export function RevenueValuationCard({
           </Card>
 
           <p className="text-[11px] text-muted-foreground">
-            Read from Zeneva's own subscription payments as of{' '}
+            Read from Zeneva&apos;s own subscription payments as of{' '}
             {snapshot.asOf.toLocaleString()}. Recording a valuation adds a dated entry to the
             history below — it does not overwrite anything.
           </p>

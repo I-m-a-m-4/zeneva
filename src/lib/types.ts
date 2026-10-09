@@ -217,6 +217,19 @@ export interface BusinessInstance {
     accessLevel?: 'lifetime';
     status?: 'active' | 'deleted';
     deletedAt?: any;
+    referralCode?: string;
+    referredBy?: {
+        code: string;
+        referrerBusinessId: string;
+        referrerBusinessName?: string;
+        appliedAt: any;
+        rewardClaimed: boolean;
+    };
+    referralStats?: {
+        totalReferred: number;
+        completedReferrals: number;
+        rewardDaysEarned: number;
+    };
     settings?: {
         phone?: string;
         email?: string;

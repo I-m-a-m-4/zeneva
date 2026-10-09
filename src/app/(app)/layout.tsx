@@ -18,7 +18,7 @@ import { ProductTour } from '@/components/ProductTour';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck, Bug, Wallet
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck, Bug, Wallet, Gift
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -1338,6 +1338,7 @@ export default function AuthenticatedLayout({
     '/users': ['admin', 'owner', 'super-admin'],
     '/audit-log': ['admin', 'owner', 'super-admin'],
     '/billing': ['admin', 'owner', 'super-admin'],
+    '/referrals': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/settings': ['admin', 'owner', 'super-admin'],
     '/support': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],
     '/terminal-alerts': ['admin', 'manager', 'vendor_operator', 'owner', 'super-admin'],

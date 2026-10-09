@@ -1,9 +1,8 @@
-
-
 'use client';
 
 import * as React from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -12,7 +11,7 @@ import { format } from 'date-fns';
 import { BusinessInstance, SubscriptionHistory, UserProfile } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, History, ShieldCheck } from 'lucide-react';
+import { Loader2, History, ShieldCheck, Gift } from 'lucide-react';
 import TrialCountdown from '@/components/settings/trial-countdown';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +20,8 @@ import RefreshButton from '@/components/shared/refresh-button';
 import { usePOS } from '@/context/pos-context';
 import { useI18n } from '@/context/i18n-context';
 import { BillingBodySkeleton } from './skeleton';
+import ReferralBanner from '@/components/referrals/referral-banner';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const SubscriptionSection = dynamic(
     () => import('@/components/settings/subscription-section'),
@@ -35,20 +36,18 @@ const SubscriptionSection = dynamic(
     }
 );
 
-/*
- * There is no credit top-up rail here, deliberately.
- *
- * Zen AI credits are an allowance of the plan and nothing else — they are not sold
- * separately. A shop that wants more AI moves up a tier, which is what the plans
- * below are for. The removed section (`ai-credits-section.tsx`, with its Paystack
- * and Dodo rails and a three-pack price list) sold credits as a one-off product;
- * that product is scrapped, so the only surface that quotes an allowance is the
- * plan card, and the only surface that shows the balance is `/ai-insights`.
- *
- * `aiBonusCredits` still exists on the business document and is still spent after
- * the allowance — see `src/lib/server/ai-credits.ts`. It just has one writer now,
- * the super-admin grant on `/admin-imamshaffy/ai-usage`.
- */
+const ReferralDashboard = dynamic(
+    () => import('@/components/referrals/referral-dashboard'),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="flex flex-col items-center justify-center p-12 space-y-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading referral program...</p>
+            </div>
+        ),
+    }
+);
 
 function BillingPageSkeleton() {
     return <BillingBodySkeleton />;
@@ -67,20 +66,27 @@ const LifetimeAccessStatus = () => {
     );
 };
 
-
-
-
-function BillingPage() {
+function BillingPageContent() {
   const { user, isUserLoading } = useUser();
   const { business: currentBusiness, currentUserProfile: userProfile, isLoading: isPosLoading, isImpersonating } = usePOS();
   const firestore = useFirestore();
   const { t } = useI18n();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const tabParam = searchParams.get('tab');
+  const activeTab = tabParam === 'referrals' ? 'referrals' : 'subscription';
+
+  const handleTabChange = (newTab: string) => {
+    if (newTab === 'referrals') {
+      router.replace('/billing?tab=referrals', { scroll: false });
+    } else {
+      router.replace('/billing', { scroll: false });
+    }
+  };
 
   const subscriptionHistoryQuery = useMemoFirebase(() => {
     if (!currentBusiness?.id || !firestore) return null;
-    // Bounded: the page renders this as a flat list with no pagination, and a
-    // long-lived account accumulates a row per renewal. Newest 50 is well past
-    // what anyone scrolls, and the ordering already puts them first.
     return query(collection(firestore, 'businessInstances', currentBusiness.id, 'subscription_history'), orderBy('timestamp', 'desc'), limit(50));
   }, [currentBusiness?.id, firestore]);
   const { data: subscriptionHistory, isLoading: isHistoryLoading } = useCollection<SubscriptionHistory>(subscriptionHistoryQuery);
@@ -96,10 +102,25 @@ function BillingPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <PageTitle title={t('billing.title')} subtitle={t('billing.subtitle')} />
-        <RefreshButton />
+        <div className="flex items-center gap-3 shrink-0">
+          <TabsList className="bg-muted p-1 h-10 border border-border/40">
+            <TabsTrigger value="subscription" className="gap-2 px-4 py-1.5 text-xs font-semibold">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <span>Billing</span>
+            </TabsTrigger>
+            <TabsTrigger value="referrals" className="gap-2 px-4 py-1.5 text-xs font-semibold">
+              <Gift className="h-4 w-4 text-amber-500" />
+              <span>Refer & Earn</span>
+              <span className="rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 text-[10px] font-bold">
+                +30 Days Free
+              </span>
+            </TabsTrigger>
+          </TabsList>
+          <RefreshButton />
+        </div>
       </div>
 
       {isImpersonating && (
@@ -112,75 +133,80 @@ function BillingPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />{t('billing.sectionTitle')}</CardTitle>
-          <CardDescription>{t('billing.sectionDesc')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-            <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
-                <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">{t('billing.currentStatus')}</p>
-                {currentBusiness.accessLevel === 'lifetime' ? (
-                    <LifetimeAccessStatus />
-                ) : (
-                    <TrialCountdown business={currentBusiness} />
-                )}
-                
-            </div>
-            <SubscriptionSection userProfile={userProfile} businessInstance={currentBusiness} />
-        </CardContent>
-      </Card>
+      {/* Tab 1: Subscription & Plans */}
+      <TabsContent value="subscription" className="space-y-6 mt-0">
+        <ReferralBanner onSwitchTab={() => handleTabChange('referrals')} />
 
-      <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" />{t('billing.historyTitle')}</CardTitle>
-            <CardDescription>{t('billing.historyDesc')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <ScrollArea className="h-60">
-                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>{t('inventory.colAction')}</TableHead>
-                            <TableHead>{t('billing.colAmount')}</TableHead>
-                            <TableHead className="text-right">{t('common.date')}</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {subscriptionHistory && subscriptionHistory.length > 0 ? (
-                            subscriptionHistory
-                              .filter(item => !(item.amount === 0 && !item.action.includes('Admin Grant')))
-                              .map(item => (
-                                <TableRow key={item.id}>
-                                    <TableCell className="font-medium">{item.action}</TableCell>
-                                    {/*
-                                      * The row's own currency, not a hardcoded ₦.
-                                      *
-                                      * Every writer into `subscription_history` records a
-                                      * `currency`, and the Dodo subscription webhook writes
-                                      * USD. Printing ₦ against those showed an $8 payment as
-                                      * "₦8", which reads as a mis-charge of a factor of
-                                      * 1,500. Historical rows from the scrapped credit-pack
-                                      * rail are USD too, and are still listed here.
-                                      */}
-                                    <TableCell>{item.currency === 'USD' ? '$' : '₦'}{item.amount.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(safeToDate(item.timestamp), 'PPp') : t('inventory.notAvailable')}</TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />{t('billing.sectionTitle')}</CardTitle>
+              <CardDescription>{t('billing.sectionDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
+                    <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">{t('billing.currentStatus')}</p>
+                    {currentBusiness.accessLevel === 'lifetime' ? (
+                        <LifetimeAccessStatus />
+                    ) : (
+                        <TrialCountdown business={currentBusiness} />
+                    )}
+                </div>
+                <SubscriptionSection userProfile={userProfile} businessInstance={currentBusiness} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" />{t('billing.historyTitle')}</CardTitle>
+                <CardDescription>{t('billing.historyDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-60">
+                     <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                                    {t('billing.noHistory')}
-                                </TableCell>
+                                <TableHead>{t('inventory.colAction')}</TableHead>
+                                <TableHead>{t('billing.colAmount')}</TableHead>
+                                <TableHead className="text-right">{t('common.date')}</TableHead>
                             </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </ScrollArea>
-        </CardContent>
-      </Card>
-    </div>
+                        </TableHeader>
+                        <TableBody>
+                            {subscriptionHistory && subscriptionHistory.length > 0 ? (
+                                subscriptionHistory
+                                  .filter(item => !(item.amount === 0 && !item.action.includes('Admin Grant')))
+                                  .map(item => (
+                                    <TableRow key={item.id}>
+                                        <TableCell className="font-medium">{item.action}</TableCell>
+                                        <TableCell>{item.currency === 'USD' ? '$' : '₦'}{item.amount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right text-muted-foreground">{item.timestamp ? format(safeToDate(item.timestamp), 'PPp') : t('inventory.notAvailable')}</TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                                        {t('billing.noHistory')}
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 2: Referral Program */}
+        <TabsContent value="referrals" className="space-y-6 mt-0">
+          <ReferralDashboard />
+        </TabsContent>
+      </Tabs>
   );
 }
 
-export default BillingPage;
+export default function BillingPage() {
+  return (
+    <React.Suspense fallback={<BillingPageSkeleton />}>
+      <BillingPageContent />
+    </React.Suspense>
+  );
+}

@@ -395,21 +395,28 @@ function ExpensesAndPurchasesContent() {
     const now = new Date();
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Filtered Expenses
-    const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    const expensesFromDrawer = expenses.filter(e => e.deductFromCashDrawer).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    const monthExpenses = expenses.filter(e => safeToDate(e.date) >= startOfThisMonth).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const isPurchase = (e: any) =>
+      e.category === 'supplier_payment' ||
+      e.category === 'procurement' ||
+      e.category === 'inventory_procurement';
 
-    // Filtered Purchases
+    // True Operating Expenses (Rent, Utilities, Staff, Logistics, Maintenance, etc. - excluding inventory purchases)
+    const operatingExpensesList = expenses.filter(e => !isPurchase(e));
+    const totalOperatingExpenses = operatingExpensesList.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const expensesFromDrawer = operatingExpensesList.filter(e => e.deductFromCashDrawer).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const monthExpenses = operatingExpensesList.filter(e => safeToDate(e.date) >= startOfThisMonth).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    // Filtered Purchases (Inventory Procurement)
     const totalProcurement = purchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
     const totalPurchasesPaid = purchases.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
     const totalSupplierDebt = purchases.reduce((sum, p) => sum + (Number(p.balanceDue) || 0), 0);
 
-    // Combined Cash Outflow (Total Expenses + Total Purchase Bills)
-    const combinedOutflow = totalExpenses + totalProcurement;
+    // Combined Cash Outflow (Operating Expenses + Paid Restock Procurement)
+    const combinedOutflow = totalOperatingExpenses + totalPurchasesPaid;
 
     return {
-      totalExpenses,
+      totalExpenses: totalOperatingExpenses,
+      totalOperatingExpenses,
       expensesFromDrawer,
       monthExpenses,
       totalProcurement,
@@ -1141,7 +1148,7 @@ function ExpensesAndPurchasesContent() {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Expenses ({currencySymbol}{metrics.totalExpenses.toLocaleString()}) + Restock ({currencySymbol}{metrics.totalProcurement.toLocaleString()})
+              Operating ({currencySymbol}{metrics.totalOperatingExpenses.toLocaleString()}) + Restock ({currencySymbol}{metrics.totalPurchasesPaid.toLocaleString()})
             </p>
           </CardContent>
         </Card>
@@ -2742,7 +2749,11 @@ function ExpensesAndPurchasesContent() {
                   }
 
                   if (selectedKpiModal.id === 'operating_overheads' || selectedKpiModal.id === 'month_expenses' || selectedKpiModal.id === 'drawer_outflow') {
-                    let expList = expenses;
+                    const isPurchase = (e: any) =>
+                      e.category === 'supplier_payment' ||
+                      e.category === 'procurement' ||
+                      e.category === 'inventory_procurement';
+                    let expList = expenses.filter(e => !isPurchase(e));
                     if (selectedKpiModal.id === 'month_expenses') {
                       expList = expList.filter(e => (safeToDate(e.date) || new Date(0)) >= startOfThisMonth);
                     } else if (selectedKpiModal.id === 'drawer_outflow') {

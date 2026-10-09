@@ -224,6 +224,17 @@ service cloud.firestore {
       allow read, update, delete: if isSuperAdmin();
     }
 
+    match /referrals/{referralId} {
+      allow get: if isSuperAdmin() ||
+                    (isUserAuthenticated() &&
+                     (resource.data.get('referrerOwnerId', '') == request.auth.uid ||
+                      resource.data.get('refereeOwnerId', '') == request.auth.uid));
+      allow list: if isSuperAdmin() ||
+                     (isUserAuthenticated() &&
+                      resource.data.get('referrerBusinessId', '') == getCurrentUserBusinessId());
+      allow create, update, delete: if isSuperAdmin();
+    }
+
     // =================================================================
     // Multi-Tenant Collections
     // =================================================================
