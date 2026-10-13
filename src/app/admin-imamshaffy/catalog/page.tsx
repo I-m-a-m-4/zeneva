@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { useFirestore } from '@/firebase';
-import { collectionGroup, query, orderBy, limit, getDocs, startAfter, where } from 'firebase/firestore';
+import { collectionGroup, query, limit, getDocs } from 'firebase/firestore';
 import { ShoppingBag, Search, ChevronLeft, ChevronRight, Loader, Tag, Package, DollarSign, Boxes, TrendingUp, AlertCircle, PieChart as PieChartIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -19,17 +19,10 @@ export default function CatalogPage() {
   const isDarkMode = resolvedTheme === 'dark';
   const firestore = useFirestore();
 
-  const [products, setProducts] = useState<Product[]>([]);
   const [allCatalogProducts, setAllCatalogProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Pagination state
-  const [lastVisibleDocs, setLastVisibleDocs] = useState<any[]>([]);
-  const [currentLastDoc, setCurrentLastDoc] = useState<any>(null);
   const [pageIndex, setPageIndex] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // 1. Fetch Global Catalog Metrics across all businesses
@@ -103,83 +96,29 @@ export default function CatalogPage() {
     };
   }, [allCatalogProducts]);
 
-  // 2. Fetch Paginated Products
-  const fetchProducts = async (isNextPage: boolean = false, isPrevPage: boolean = false) => {
-    if (!firestore) return;
-    setIsLoading(true);
-    setError(null);
+  // Compute Filtered & Paginated Products from Global Catalog
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) return allCatalogProducts;
+    const term = searchQuery.toLowerCase().trim();
+    return allCatalogProducts.filter(p =>
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.sku && p.sku.toLowerCase().includes(term)) ||
+      (p.category && p.category.toLowerCase().includes(term)) ||
+      (p.businessId && p.businessId.toLowerCase().includes(term))
+    );
+  }, [allCatalogProducts, searchQuery]);
 
-    try {
-      let q = query(
-        collectionGroup(firestore, 'products'),
-        orderBy('createdAt', 'desc')
-      );
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
 
-      if (searchQuery.trim() !== '') {
-        const term = searchQuery.toLowerCase().trim();
-        q = query(
-          collectionGroup(firestore, 'products'),
-          orderBy('lowercaseName'),
-          where('lowercaseName', '>=', term),
-          where('lowercaseName', '<=', term + '\uf8ff')
-        );
-      }
+  const displayedProducts = useMemo(() => {
+    const startIndex = pageIndex * PAGE_SIZE;
+    return filteredProducts.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredProducts, pageIndex]);
 
-      if (isNextPage && currentLastDoc) {
-        q = query(q, startAfter(currentLastDoc), limit(PAGE_SIZE));
-      } else if (isPrevPage && pageIndex > 1) {
-        const prevLastDoc = lastVisibleDocs[pageIndex - 2];
-        q = query(q, startAfter(prevLastDoc), limit(PAGE_SIZE));
-      } else {
-        q = query(q, limit(PAGE_SIZE));
-      }
-
-      const snapshot = await getDocs(q);
-      const fetchedProducts: Product[] = [];
-      
-      snapshot.forEach(doc => {
-        fetchedProducts.push({ id: doc.id, ...doc.data() } as Product);
-      });
-
-      setProducts(fetchedProducts);
-      setHasMore(snapshot.docs.length === PAGE_SIZE);
-
-      if (snapshot.docs.length > 0) {
-        const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-        if (isNextPage) {
-          setLastVisibleDocs(prev => [...prev, currentLastDoc]);
-          setPageIndex(prev => prev + 1);
-        } else if (isPrevPage) {
-          setLastVisibleDocs(prev => prev.slice(0, -1));
-          setPageIndex(prev => prev - 1);
-        } else {
-          setLastVisibleDocs([]);
-          setPageIndex(0);
-        }
-        setCurrentLastDoc(lastDoc);
-      } else if (!isNextPage && !isPrevPage) {
-         setCurrentLastDoc(null);
-         setLastVisibleDocs([]);
-         setPageIndex(0);
-      }
-    } catch (err: any) {
-      console.error('Failed to fetch catalog:', err);
-      if (err.message?.includes('index')) {
-        setError('A Firestore index is currently building. Please try again in a few minutes. If it persists, click the link in the console to create it.');
-      } else {
-        setError(err.message || 'Failed to load catalog');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Reset pageIndex when search query changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchProducts();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchQuery, firestore]);
+    setPageIndex(0);
+  }, [searchQuery]);
 
   return (
     <div className="p-4 md:p-6 lg:p-8 min-h-[calc(100vh-140px)] flex flex-col space-y-6 animate-in fade-in zoom-in duration-300">
@@ -334,7 +273,7 @@ export default function CatalogPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {isLoading ? (
+              {isLoadingMetrics ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
@@ -343,7 +282,7 @@ export default function CatalogPage() {
                     </div>
                   </td>
                 </tr>
-              ) : products.length === 0 ? (
+              ) : displayedProducts.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
@@ -353,7 +292,7 @@ export default function CatalogPage() {
                   </td>
                 </tr>
               ) : (
-                products.map((product) => {
+                displayedProducts.map((product) => {
                   const stock = Math.max(0, Number(product.stock) || 0);
                   const price = Math.max(0, Number(product.price) || 0);
                   const totalVal = stock * price;
@@ -410,14 +349,14 @@ export default function CatalogPage() {
           isDarkMode ? 'bg-slate-900/50' : 'bg-slate-50/50'
         )}>
           <span className="text-xs text-muted-foreground font-medium">
-            Showing Page {pageIndex + 1}
+            Showing Page {pageIndex + 1} of {totalPages} ({filteredProducts.length.toLocaleString()} {filteredProducts.length === 1 ? 'product' : 'products'})
           </span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={pageIndex === 0 || isLoading}
-              onClick={() => fetchProducts(false, true)}
+              disabled={pageIndex === 0 || isLoadingMetrics}
+              onClick={() => setPageIndex(prev => Math.max(0, prev - 1))}
               className="h-8 bg-background"
             >
               <ChevronLeft className="w-4 h-4 mr-1" /> Prev
@@ -425,8 +364,8 @@ export default function CatalogPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={!hasMore || isLoading}
-              onClick={() => fetchProducts(true, false)}
+              disabled={pageIndex >= totalPages - 1 || isLoadingMetrics}
+              onClick={() => setPageIndex(prev => prev + 1)}
               className="h-8 bg-background"
             >
               Next <ChevronRight className="w-4 h-4 ml-1" />

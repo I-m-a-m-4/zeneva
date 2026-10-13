@@ -183,8 +183,20 @@ export interface BusinessRatingView extends BusinessRating {
 }
 
 export function useBusinessRating(): BusinessRatingView {
-  const { business, products, receipts, customers, isLoading } = usePOS();
+  const { business, products, receipts, customers, currentUserProfile, isLoading } = usePOS();
   const businessId = business?.id;
+
+  // ── Role gating: Owner or Admin only ──────────────────────────────────────
+  // The business rating (score, pillars, benchmark, badges) is reserved strictly
+  // for the business owner or admin. Managers, cashiers, and vendor operators must
+  // not see or access the business rating.
+  const isOwnerOrAdmin = Boolean(
+    currentUserProfile && (
+      currentUserProfile.role === 'admin' ||
+      (currentUserProfile.role as string) === 'owner' ||
+      (business?.ownerId && currentUserProfile.id === business.ownerId)
+    )
+  );
 
   // ── The opt-in ────────────────────────────────────────────────────────────
   // Three states, and the middle one is the reason this is not a plain boolean:
@@ -197,8 +209,8 @@ export function useBusinessRating(): BusinessRatingView {
   // that opted in months ago gets the invitation flashed at it on every cold open
   // of Reports — the one state this feature exists to keep out of their way.
   const preference = business?.settings?.ratingEnabled;
-  const enabled = preference === true;
-  const neverAsked = !!business && preference === undefined;
+  const enabled = isOwnerOrAdmin && preference === true;
+  const neverAsked = isOwnerOrAdmin && !!business && preference === undefined;
 
   // A date, not a timestamp: the rating only needs day resolution, and a fresh
   // `new Date()` on every render would recompute the memo forever.

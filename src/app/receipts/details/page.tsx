@@ -3,22 +3,32 @@ import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams, notFound, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Printer, Share2, Loader2, PlusCircle } from "lucide-react";
+import { ArrowLeft, Download, Printer, Share2, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import * as React from "react";
 import { useRef, Suspense } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 // Dynamic imports for browser-only libraries handled in the function to avoid SSR initialization errors
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, addDoc, serverTimestamp, collection } from "firebase/firestore";
+import { doc, addDoc, serverTimestamp, collection, runTransaction } from "firebase/firestore";
 import type { Receipt, BusinessInstance } from "@/types";
 import { usePOS } from "@/context/pos-context";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
+import { logAuditEvent } from "@/lib/audit";
+import { safeToDate } from "@/lib/utils";
 import Link from 'next/link';
 
 function ReceiptContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const receiptId = searchParams.get('id');
-  const { queuedActions, business: posBusiness, user, receipts } = usePOS();
+  const { queuedActions, business: posBusiness, user, receipts, voidReceipt, currentUserProfile } = usePOS();
 
   const firestore = useFirestore();
   const receiptRef = useMemoFirebase(() => (firestore && receiptId ? doc(firestore, 'receipts', receiptId) : null), [firestore, receiptId]);
@@ -180,6 +190,107 @@ function ReceiptContent() {
     }
   };
 
+  const [isVoidDialogOpen, setIsVoidDialogOpen] = React.useState(false);
+  const [isVoiding, setIsVoiding] = React.useState(false);
+
+  const canVoid = Boolean(
+    (currentUserProfile || user) && (
+      currentUserProfile?.role === 'admin' ||
+      currentUserProfile?.role === 'manager' ||
+      (currentUserProfile?.role as string) === 'owner' ||
+      (business?.ownerId && (user?.uid === business.ownerId || currentUserProfile?.id === business.ownerId)) ||
+      currentUserProfile?.permissions?.void_sales === true
+    )
+  );
+
+  const handleVoidSale = async () => {
+    if (!receipt || !firestore || !business) return;
+    setIsVoiding(true);
+
+    try {
+      await runTransaction(firestore, async (transaction) => {
+        const receiptRef = doc(firestore, 'receipts', receipt.id);
+        const receiptDoc = await transaction.get(receiptRef);
+
+        if (!receiptDoc.exists()) {
+          throw new Error("Receipt not found. It may have already been deleted.");
+        }
+
+        const receiptData = receiptDoc.data() as Receipt;
+
+        // 1. Read product docs and customer doc
+        const productRefs = receiptData.items.map(item => doc(firestore, 'products', item.productId));
+        const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
+
+        let customerDoc = null;
+        if (receiptData.customer?.id && business.settings?.loyaltyProgramEnabled) {
+          const customerRef = doc(firestore, 'customers', receiptData.customer.id);
+          customerDoc = await transaction.get(customerRef);
+        }
+
+        // 2. Perform write operations
+        // 2a. Restore product stock
+        productDocs.forEach((pDoc, index) => {
+          if (pDoc.exists()) {
+            const item = receiptData.items[index];
+            const newStock = (pDoc.data().stock || 0) + item.quantity;
+            transaction.update(pDoc.ref, { stock: newStock });
+          }
+        });
+
+        // 2b. Revert customer loyalty points
+        if (customerDoc && customerDoc.exists()) {
+          const pointsPerUnit = business.settings?.pointsPerUnit || 0;
+          const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
+          const currentPoints = customerDoc.data()?.loyaltyPoints || 0;
+          transaction.update(customerDoc.ref, { loyaltyPoints: Math.max(0, currentPoints - pointsEarned) });
+        }
+
+        // 2c. Delete receipt
+        transaction.delete(receiptRef);
+      });
+
+      // Audit log
+      const actor = currentUserProfile || (user as any);
+      if (actor) {
+        await logAuditEvent(firestore, business.id, actor, {
+          action: 'sale.void',
+          entity: { type: 'Receipt', id: receipt.id, name: `Receipt ${receipt.id.substring(0, 8)}` },
+          details: {
+            total: receipt.total,
+            reason: 'Manual void by user on details page',
+            saleCreatedAt: safeToDate(receipt.createdAt).toISOString(),
+            soldBy: receipt.createdBy || undefined,
+            receiptNumber: receipt.receiptNumber || null,
+            paymentMethod: receipt.paymentMethod || null,
+            discount: receipt.discount || 0,
+            itemCount: receipt.items?.length || 0,
+            customerId: receipt.customer?.id || null,
+          }
+        });
+      }
+
+      toast({
+        title: "Sale Voided",
+        description: `Receipt ${receipt.receiptNumber || receipt.id.substring(0, 8)} has been cancelled and stock restored.`,
+        variant: 'success'
+      });
+      await voidReceipt(receipt.id);
+      router.push('/receipts');
+    } catch (e: any) {
+      console.error("Failed to void sale:", e);
+      await voidReceipt(receipt.id);
+      toast({
+        title: "Offline Void Queued",
+        description: "The void has been queued and will synchronize when online.",
+      });
+      router.push('/receipts');
+    } finally {
+      setIsVoiding(false);
+      setIsVoidDialogOpen(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center gap-6 py-4 min-h-screen">
       {user && (
@@ -211,7 +322,31 @@ function ReceiptContent() {
         <Button onClick={handleShare} variant="outline">
           <Share2 className="mr-2 h-4 w-4" /> Share
         </Button>
+        {canVoid && (
+          <Button onClick={() => setIsVoidDialogOpen(true)} variant="destructive" disabled={isVoiding}>
+            <Trash2 className="mr-2 h-4 w-4" /> Void Sale
+          </Button>
+        )}
       </div>
+
+      <Dialog open={isVoidDialogOpen} onOpenChange={(open) => !open && !isVoiding && setIsVoidDialogOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void Sale</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to void receipt {receipt.receiptNumber || `rec-${receipt.id.substring(0, 8)}`}? 
+              This will restore stock quantities back to inventory and deduct any loyalty points earned. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsVoidDialogOpen(false)} disabled={isVoiding}>Cancel</Button>
+            <Button onClick={handleVoidSale} disabled={isVoiding} variant="destructive">
+              {isVoiding && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+              Void Sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Subtle Footer CTA for visitors */}
       <footer className="w-full max-w-2xl mt-auto pt-6 pb-4 border-t text-center no-print">

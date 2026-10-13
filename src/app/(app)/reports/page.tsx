@@ -463,7 +463,14 @@ function DataInsightModalContent({
 }
 
 export default function ReportsDashboard() {
-    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange, users, firestore } = usePOS();
+    const { currencySymbol, business, products, customers, isLoading: isPosLoading, receipts: allReceipts, stats, fetchReceiptsInRange, users, firestore, currentUserProfile } = usePOS();
+    const isOwnerOrAdmin = Boolean(
+        currentUserProfile && (
+            currentUserProfile.role === 'admin' ||
+            (currentUserProfile.role as string) === 'owner' ||
+            (business?.ownerId && currentUserProfile.id === business.ownerId)
+        )
+    );
     const { activeBranchId } = useBranch();
     const { t } = useI18n();
     const dashboardRef = React.useRef<HTMLDivElement>(null);
@@ -752,11 +759,17 @@ export default function ReportsDashboard() {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tab = params.get('tab');
-            if (tab && (tab === 'analytics' || tab === 'daily-sales' || tab === 'profit-loss' || tab === 'business-rating')) {
+            if (tab && (tab === 'analytics' || tab === 'daily-sales' || tab === 'profit-loss' || (tab === 'business-rating' && isOwnerOrAdmin))) {
                 setActiveTab(tab);
             }
         }
-    }, []);
+    }, [isOwnerOrAdmin]);
+
+    React.useEffect(() => {
+        if (activeTab === 'business-rating' && !isOwnerOrAdmin) {
+            setActiveTab('analytics');
+        }
+    }, [activeTab, isOwnerOrAdmin]);
 
     const dateFromTime = date?.from ? safeToDate(date.from).getTime() : 0;
     const dateToTime = date?.to ? safeToDate(date.to).getTime() : 0;
@@ -1143,7 +1156,9 @@ export default function ReportsDashboard() {
                         <TabsTrigger value="analytics" className="text-sm font-semibold w-full">{t('reports.tabAnalytics')}</TabsTrigger>
                         <TabsTrigger value="profit-loss" className="text-sm font-semibold w-full">{t('reports.tabProfitLoss')}</TabsTrigger>
                         <TabsTrigger value="daily-sales" className="text-sm font-semibold w-full">{t('reports.tabDailySales')}</TabsTrigger>
-                        <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">{t('reports.tabBusinessRating')}</TabsTrigger>
+                        {isOwnerOrAdmin && (
+                            <TabsTrigger value="business-rating" className="text-sm font-semibold w-full">{t('reports.tabBusinessRating')}</TabsTrigger>
+                        )}
                     </TabsList>
                     <div className="flex flex-wrap items-center gap-4">
                         {(activeTab === 'analytics' || activeTab === 'profit-loss') && (
@@ -1506,9 +1521,11 @@ export default function ReportsDashboard() {
                                 <DailySalesItemsTable receipts={widestReceipts} products={products || []} currencySymbol={currencySymbol} />
                             </FeatureGate>
                         </TabsContent>
-                        <TabsContent value="business-rating" className="mt-0">
-                            <BusinessRatingPanel />
-                        </TabsContent>
+                        {isOwnerOrAdmin && (
+                            <TabsContent value="business-rating" className="mt-0">
+                                <BusinessRatingPanel />
+                            </TabsContent>
+                        )}
                     </>
                 )}
             </Tabs>

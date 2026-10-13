@@ -623,6 +623,13 @@ export default function AchievementsPage() {
   const { business, triggerConfetti, currencySymbol, currentUserProfile } = usePOS();
   const { set } = useAchievements();
   const isCashier = currentUserProfile?.role === 'cashier';
+  const isOwnerOrAdmin = Boolean(
+    currentUserProfile && (
+      currentUserProfile.role === 'admin' ||
+      (currentUserProfile.role as string) === 'owner' ||
+      (business?.ownerId && currentUserProfile.id === business.ownerId)
+    )
+  );
   const searchParams = useSearchParams();
   const formatFigure = useFigureFormatter();
 
@@ -687,8 +694,8 @@ export default function AchievementsPage() {
       {!isCashier && <NextMilestoneHero set={set} formatFigure={formatFigure} />}
 
       {/* Rating badges: the only section here whose progress moves every day, so it
-          is what makes the page worth reopening. */}
-      {!isCashier && <RatingBadges />}
+          is what makes the page worth reopening. Visible strictly to owner or admin. */}
+      {isOwnerOrAdmin && <RatingBadges />}
 
       {!isCashier && (
       <Card>

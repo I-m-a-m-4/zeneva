@@ -77,7 +77,16 @@ function BadgeTile({ badge }: { badge: Badge }) {
 }
 
 export default function RatingBadges() {
+  const { business, currentUserProfile } = usePOS();
   const { score, best, longestStreak, tier, enabled } = useBusinessRating();
+
+  const isOwnerOrAdmin = Boolean(
+    currentUserProfile && (
+      currentUserProfile.role === 'admin' ||
+      (currentUserProfile.role as string) === 'owner' ||
+      (business?.ownerId && currentUserProfile.id === business.ownerId)
+    )
+  );
 
   const badges = React.useMemo<Badge[]>(() => {
     // The highest tier the best-ever score reached. Null best means the shop has
@@ -123,8 +132,8 @@ export default function RatingBadges() {
   //
   // Every badge here is a tier or a streak derived from the score, and the header
   // states the score outright, so there is no partial version of this card worth
-  // showing to someone who has not opted in.
-  if (!enabled) return null;
+  // showing to someone who has not opted in or who is not the owner/admin.
+  if (!isOwnerOrAdmin || !enabled) return null;
 
   return (
     <Card>

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip } from 'recharts';
+import { ResponsiveContainer, LineChart as ReLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip } from 'recharts';
 import { Activity } from 'lucide-react';
 import { TimeframePicker, type Timeframe } from '@/components/reports/timeframe-picker';
 import { subDays, startOfDay, format, eachDayOfInterval } from 'date-fns';
@@ -57,21 +57,24 @@ export default function RevenueGrowthIndexChart({ purchases }: RevenueGrowthInde
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={chartData}>
-            <defs>
-              <linearGradient id="revenueColor" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4}/>
-                <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
+          <ReLineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.15} />
             <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-            <YAxis tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 11 }} />
+            <YAxis tickFormatter={(val) => `₦${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} tick={{ fontSize: 11 }} />
             <ReTooltip 
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                formatter={(val: number) => [`₦${val.toLocaleString()}`, 'Revenue']}
             />
-            <Area type="monotone" dataKey="Revenue" stroke="#ec4899" strokeWidth={2} fillOpacity={1} fill="url(#revenueColor)" />
-          </AreaChart>
+            <Line 
+              name="Revenue" 
+              type="monotone" 
+              dataKey="Revenue" 
+              stroke="#ec4899" 
+              strokeWidth={3} 
+              dot={timeframe === '7d'} 
+              activeDot={{ r: 6, fill: '#ec4899' }} 
+            />
+          </ReLineChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

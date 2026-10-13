@@ -17,7 +17,7 @@ import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfile } from '@/types';
-import { Loader2, Shield, Layout, Package, Users, Tag, History, ShoppingBag, Lock, ShoppingCart } from 'lucide-react';
+import { Loader2, Shield, Layout, Package, Users, Tag, History, ShoppingBag, Lock, ShoppingCart, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface PermissionItem {
@@ -65,6 +65,12 @@ const PERMISSIONS: PermissionItem[] = [
         icon: <Lock className="h-4 w-4" />
     },
     {
+        id: 'void_sales',
+        label: 'Void Sales',
+        description: 'Ability to cancel completed sales, restore inventory, and void receipts.',
+        icon: <Trash2 className="h-4 w-4" />
+    },
+    {
         id: 'view_audit_logs',
         label: 'View Audit Logs',
         description: 'See detailed history of all staff actions and system changes.',
@@ -102,6 +108,7 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
             manage_online_orders: ['admin', 'manager'],
             apply_discounts: ['admin', 'manager'],
             override_prices: ['admin', 'manager'],
+            void_sales: ['admin', 'manager'],
         };
         
         return (defaults[permissionId] || []).includes(role);

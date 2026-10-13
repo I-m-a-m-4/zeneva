@@ -45,15 +45,21 @@ function money(symbol: string, value: number): string {
 const STREAK_URGENCY_FLOOR = 3;
 
 export default function TodaysFocus() {
-  const { currencySymbol } = usePOS();
+  const { currencySymbol, business, currentUserProfile } = usePOS();
   const { score, topOpportunity, streak, streakAtRisk, enabled } = useBusinessRating();
+
+  const isOwnerOrAdmin = Boolean(
+    currentUserProfile && (
+      currentUserProfile.role === 'admin' ||
+      (currentUserProfile.role as string) === 'owner' ||
+      (business?.ownerId && currentUserProfile.id === business.ownerId)
+    )
+  );
 
   const streakUrgent = streakAtRisk && streak >= STREAK_URGENCY_FLOOR;
 
-  // Not opted in to the rating. This card is built entirely out of rating output —
-  // the top opportunity and the streak — so there is nothing here to show that does
-  // not come from the score. Checked before `score === null`, which is a different
-  // state: that one means "no sales to score yet" and is not a reason to hide.
+  // Not owner/admin, or not opted in to the rating.
+  if (!isOwnerOrAdmin) return null;
   if (!enabled) return null;
   if (score === null) return null;
   if (!streakUrgent && !topOpportunity) return null;

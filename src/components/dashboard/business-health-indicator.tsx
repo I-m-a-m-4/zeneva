@@ -46,12 +46,26 @@ import { Progress } from '../ui/progress';
 import { Skeleton } from '../ui/skeleton';
 
 export default function BusinessHealthIndicator() {
-  const { business, currencySymbol, isLoading } = usePOS();
+  const { business, currencySymbol, currentUserProfile, isLoading } = usePOS();
   const { score, grade, tier, delta, movers, streak, streakAtRisk, topOpportunity, leveledUpTo, enabled } =
     useBusinessRating();
 
+  const isOwnerOrAdmin = Boolean(
+    currentUserProfile && (
+      currentUserProfile.role === 'admin' ||
+      (currentUserProfile.role as string) === 'owner' ||
+      (business?.ownerId && currentUserProfile.id === business.ownerId)
+    )
+  );
+
   if (isLoading) {
     return <Skeleton className="h-10 w-48 rounded-lg" />;
+  }
+
+  // Managers, vendor operators, and staff without ownership or admin role
+  // must never see the business rating indicator or its off-state toggle.
+  if (!isOwnerOrAdmin) {
+    return null;
   }
 
   // Opted out, or never opted in. This badge is mounted on every authenticated

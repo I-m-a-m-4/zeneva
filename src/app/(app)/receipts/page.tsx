@@ -102,6 +102,16 @@ function ReceiptsContent() {
   const [isFetchingMore, setIsFetchingMore] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(receipts ? receipts.length >= 50 : true);
 
+  const canVoid = Boolean(
+    currentUser && (
+      currentUser.role === 'admin' ||
+      currentUser.role === 'manager' ||
+      (currentUser.role as string) === 'owner' ||
+      (business?.ownerId && currentUser.id === business.ownerId) ||
+      currentUser.permissions?.void_sales === true
+    )
+  );
+
   // Clear selection if receipts change
   React.useEffect(() => {
     setSelectedReceipts(new Set());
@@ -393,7 +403,7 @@ function ReceiptsContent() {
                 <CardTitle>{t('receipts.historyTitle')}</CardTitle>
                 <CardDescription>{t('receipts.historyDesc')}</CardDescription>
               </div>
-              {selectedReceipts.size > 0 && (currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+              {selectedReceipts.size > 0 && canVoid && (
                 <Button 
                   variant="destructive" 
                   size="sm" 
@@ -470,7 +480,7 @@ function ReceiptsContent() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                    {canVoid && (
                       <TableHead className="w-12">
                         <Checkbox 
                           checked={displayedReceipts.length > 0 && selectedReceipts.size === displayedReceipts.length}
@@ -495,7 +505,7 @@ function ReceiptsContent() {
                       className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedReceipts.has(receipt.id) ? 'bg-muted/30' : ''}`}
                       onClick={() => router.push(`/receipts/details?id=${receipt.id}`)}
                     >
-                      {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                      {canVoid && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox 
                             checked={selectedReceipts.has(receipt.id)}
@@ -540,7 +550,7 @@ function ReceiptsContent() {
                             }}>
                               <Share2 className="me-2 h-4 w-4" /> Share receipt
                             </DropdownMenuItem>
-                            {(currentUser?.role === 'admin' || currentUser?.role === 'manager') && (
+                            {canVoid && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setReceiptToDelete(receipt); }}>

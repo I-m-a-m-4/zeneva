@@ -469,7 +469,14 @@ function RatingOptInCard({
 
 export default function BusinessRatingPanel() {
   const { t } = useI18n();
-  const { currencySymbol, triggerConfetti, business } = usePOS();
+  const { currencySymbol, triggerConfetti, business, currentUserProfile } = usePOS();
+  const isOwnerOrAdmin = Boolean(
+    currentUserProfile && (
+      currentUserProfile.role === 'admin' ||
+      (currentUserProfile.role as string) === 'owner' ||
+      (business?.ownerId && currentUserProfile.id === business.ownerId)
+    )
+  );
   const rating = useBusinessRating();
   const benchmark = useRatingBenchmark(rating.enabled);
   const { setRatingEnabled, isSaving } = useRatingOptIn();
@@ -530,6 +537,10 @@ export default function BusinessRatingPanel() {
     () => insightOfTheDay(rating, benchmark, today),
     [rating, benchmark, today],
   );
+
+  // Managers, vendors, and other non-owner/non-admin roles must never see
+  // the business rating panel or the opt-in invitation card.
+  if (!isOwnerOrAdmin) return null;
 
   // ── The opt-in ────────────────────────────────────────────────────────────
   // Everything above is a hook, so this gate sits below all of them: the flag

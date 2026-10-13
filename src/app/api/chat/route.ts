@@ -611,10 +611,10 @@ export async function POST(req: Request) {
   const currency = businessData?.settings?.currency || 'NGN';
   const activePageContext = pathname ? `\n\n## PAGE CONTEXT\nThe user is currently on the following page: ${pathname}. \nIf they ask "how do I do this" or "what is on this page", explain the purpose of this page. If they want to filter the current page or do an action, use tools if available.` : '';
 
-  // The business rating is opt-in, and Zen is one of its surfaces. Strictly
-  // `=== true`: `undefined` means the owner has never been asked, which is not
-  // consent. Free — the reservation already had this document in hand.
-  const ratingEnabled = businessData?.settings?.ratingEnabled === true;
+  // The business rating is opt-in, strictly for business owners or admins.
+  // Managers, vendors, and other roles must not have the rating surfaced in Zen AI.
+  const isOwnerOrAdmin = caller?.role === 'admin' || caller?.role === 'owner' || businessData?.ownerId === userId;
+  const ratingEnabled = isOwnerOrAdmin && businessData?.settings?.ratingEnabled === true;
 
   /*
    * A turn is billed exactly once.

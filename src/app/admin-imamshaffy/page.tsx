@@ -14,6 +14,7 @@ import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessC
 import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersChart';
 import OperationsAdoptionPanel from '@/components/admin/charts/OperationsAdoptionPanel';
 import UserActivityDotPlot from '@/components/admin/charts/UserActivityDotPlot';
+import { AdminCatalogTab } from './components/admin-catalog-tab';
 import {
     Card,
     CardContent,
@@ -4294,6 +4295,10 @@ function AdminDashboardContent({
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList className="no-capture flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
                     <TabsTrigger value="overview" className="snap-start shrink-0">Overview</TabsTrigger>
+                    <TabsTrigger value="catalog" className="gap-2 snap-start shrink-0">
+                        <Package className="h-4 w-4" />
+                        Platform Catalog
+                    </TabsTrigger>
                     <TabsTrigger value="invoicing" className="gap-2 snap-start shrink-0">
                         <FileDigit className="h-4 w-4 text-primary" />
                         Invoicing & Operations ({invoiceMetrics.totalInvoicesCount})
@@ -5100,6 +5105,11 @@ function AdminDashboardContent({
 
                     </div>
                  </TabsContent>
+
+                {/* Platform Catalog Tab */}
+                <TabsContent value="catalog" className="space-y-6">
+                    <AdminCatalogTab products={products || []} businesses={businesses || []} />
+                </TabsContent>
 
                 {/* Zeneva Invoicing & Financial Operations Tab */}
                 <TabsContent value="invoicing" className="space-y-6">
