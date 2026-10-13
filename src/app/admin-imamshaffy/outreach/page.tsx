@@ -106,6 +106,7 @@ function StrategicOutreachConsole() {
 
   const [activeTab, setActiveTab] = React.useState<'automation' | 'campaigns' | 'history'>('automation');
   const [selectedPreviewTrack, setSelectedPreviewTrack] = React.useState<AutomationTrackId>('weekly_performance');
+  const [selectedCampaignTrack, setSelectedCampaignTrack] = React.useState<string | null>(null);
 
   // Automation Tracks State
   const [isAutomationLoading, setIsAutomationLoading] = React.useState(true);
@@ -810,6 +811,7 @@ function StrategicOutreachConsole() {
                             <button
                               type="button"
                               onClick={() => {
+                                setSelectedCampaignTrack(run.trackId || 'weekly_performance');
                                 setActiveTab('campaigns');
                                 loadLogs();
                               }}
@@ -845,7 +847,7 @@ function StrategicOutreachConsole() {
                 Campaign Delivery Logs & Analytics
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Review every merchant who received campaign emails, verify whether they opened them, and track delivery open rates.
+                Review every merchant who received campaign emails, verify whether they opened them, and filter analytics down to specific campaigns or all-time.
               </p>
             </div>
             <Button
@@ -864,6 +866,7 @@ function StrategicOutreachConsole() {
             logs={logs}
             isLoading={isLoadingLogs}
             onRefresh={loadLogs}
+            initialTrack={selectedCampaignTrack}
           />
         </div>
       )}
@@ -1252,8 +1255,10 @@ function StrategicOutreachConsole() {
                     </Button>
                     <Button
                       onClick={() => {
+                        const targetTrack = confirmRunTrack;
                         setConfirmRunTrack(null);
                         setRunBatchResult(null);
+                        setSelectedCampaignTrack(targetTrack);
                         setActiveTab('campaigns');
                         loadLogs();
                       }}

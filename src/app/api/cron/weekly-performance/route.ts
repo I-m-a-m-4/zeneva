@@ -23,9 +23,18 @@ function verifyCronAuth(req: Request): boolean {
   return false;
 }
 
+const ALL_AUTOMATION_TRACKS: AutomationTrackId[] = [
+  'weekly_performance',
+  'win_back',
+  'cheer_on',
+  'onboarding',
+];
+
 /**
  * GET /api/cron/weekly-performance
- * Supports automated cron dispatch for any track (defaults to weekly_performance).
+ * Automated cloud cron runner.
+ * When called by Vercel Cron without a track parameter (or track=all),
+ * executes all 4 automated marketing tracks sequentially according to admin configuration.
  */
 export async function GET(req: Request) {
   if (!verifyCronAuth(req)) {
@@ -34,10 +43,33 @@ export async function GET(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const track = (searchParams.get('track') as AutomationTrackId) || 'weekly_performance';
+    const trackParam = searchParams.get('track');
 
-    const result = await runAutomationTrack(track, { trigger: 'cron' });
-    return NextResponse.json(result);
+    if (trackParam && trackParam !== 'all') {
+      const track = trackParam as AutomationTrackId;
+      const result = await runAutomationTrack(track, { trigger: 'cron' });
+      return NextResponse.json(result);
+    }
+
+    // Default cron behavior: execute all enabled tracks sequentially in the background
+    const results: Record<string, any> = {};
+    for (const trackId of ALL_AUTOMATION_TRACKS) {
+      try {
+        results[trackId] = await runAutomationTrack(trackId, { trigger: 'cron' });
+      } catch (err: any) {
+        results[trackId] = {
+          success: false,
+          error: err?.message || String(err),
+        };
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      tracksExecuted: ALL_AUTOMATION_TRACKS,
+      results,
+    });
   } catch (error: any) {
     console.error('[WeeklyPerformance Cron] Execution failed:', error);
     return NextResponse.json(
@@ -49,7 +81,7 @@ export async function GET(req: Request) {
 
 /**
  * POST /api/cron/weekly-performance
- * Supports forced webhook execution for a track.
+ * Supports forced webhook execution for a track or all tracks.
  */
 export async function POST(req: Request) {
   if (!verifyCronAuth(req)) {
@@ -58,10 +90,32 @@ export async function POST(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const track = (searchParams.get('track') as AutomationTrackId) || 'weekly_performance';
+    const trackParam = searchParams.get('track');
+    const forceFlag = searchParams.get('forced') === 'true';
 
-    const result = await runAutomationTrack(track, { trigger: 'cron', forced: true });
-    return NextResponse.json(result);
+    if (trackParam && trackParam !== 'all') {
+      const track = trackParam as AutomationTrackId;
+      const result = await runAutomationTrack(track, { trigger: 'cron', forced: forceFlag });
+      return NextResponse.json(result);
+    }
+
+    const results: Record<string, any> = {};
+    for (const trackId of ALL_AUTOMATION_TRACKS) {
+      try {
+        results[trackId] = await runAutomationTrack(trackId, { trigger: 'cron', forced: forceFlag });
+      } catch (err: any) {
+        results[trackId] = {
+          success: false,
+          error: err?.message || String(err),
+        };
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      results,
+    });
   } catch (error: any) {
     console.error('[WeeklyPerformance Cron] Execution failed:', error);
     return NextResponse.json(
