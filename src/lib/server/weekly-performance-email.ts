@@ -2,9 +2,49 @@ import {
   formatCurrencyNumber,
   type WeeklyBusinessStats,
 } from './weekly-performance-stats';
-import { UNSUBSCRIBE_TOKEN } from '@/lib/email-templates';
+import {
+  escapeHtml,
+  UNSUBSCRIBE_TOKEN,
+  SOCIAL_LINKS,
+} from '@/lib/email-templates';
 
 const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://zeneva.space').replace(/\/+$/, '');
+
+const BRAND = {
+  orange: '#ea580c',
+  orangeDeep: '#c2410c',
+  orangeSoft: '#fff7ed',
+  ink: '#1c1917',
+  body: '#44403c',
+  muted: '#78716c',
+  faint: '#a8a29e',
+  page: '#f5f5f4',
+  card: '#ffffff',
+  panel: '#fafaf9',
+  line: '#e7e5e4',
+};
+
+const FONT_DISPLAY =
+  "'Bricolage Grotesque','DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+const FONT_BODY =
+  "'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+
+const GOOGLE_FONTS_HREF =
+  'https://fonts.googleapis.com/css2'
+  + '?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800'
+  + '&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700'
+  + '&display=swap';
+
+function buildSocialRow(): string {
+  return SOCIAL_LINKS
+    .map(
+      (s) =>
+        `<td style="padding:0 8px;">
+          <a href="${s.href}" style="color:#94a3b8;text-decoration:none;font-family:${FONT_BODY};font-size:12px;font-weight:600;letter-spacing:0.02em;">${s.label}</a>
+        </td>`,
+    )
+    .join('');
+}
 
 /**
  * Generates sample statistics for instant admin previewing and test emails.
@@ -38,15 +78,20 @@ export function getSampleWeeklyStats(): WeeklyBusinessStats {
       { productId: '4', name: 'Devon King Vegetable Oil 1L', quantity: 18, revenue: 52200 },
     ],
     strategyTip:
-      '🚀 <strong>Momentum Alert:</strong> Your store revenue grew by <strong>+17.8%</strong> this week! Stock up early on <strong>Golden Penny Semovita</strong> to avoid stockouts, and test offering small snack cross-sells at checkout to maintain high basket value.',
+      '🚀 <strong>Momentum Alert:</strong> Your store revenue grew by <strong>+17.8%</strong> this week. Stock up early on <strong>Golden Penny Semovita</strong> to avoid stockouts, and test offering small snack cross-sells at checkout to maintain high basket value.',
     hasSales: true,
   };
 }
 
 /**
- * Renders the weekly performance email as an email-client proof HTML document.
+ * Renders the weekly performance email adhering strictly to the official Zeneva design system:
+ * Bricolage Grotesque, DM Sans, warm neutral palette, 3D milestone hero, callout panel,
+ * bulletproof pill button, founder sign-off, and social links footer.
  */
-export function renderWeeklyPerformanceEmail(stats: WeeklyBusinessStats): {
+export function renderWeeklyPerformanceEmail(
+  stats: WeeklyBusinessStats,
+  options: { unsubscribeUrl?: string; isLocalPreview?: boolean } = {}
+): {
   subject: string;
   html: string;
 } {
@@ -65,43 +110,58 @@ export function renderWeeklyPerformanceEmail(stats: WeeklyBusinessStats): {
     strategyTip,
   } = stats;
 
-  const subject = `📊 Weekly Performance for ${businessName}: ${currencySymbol}${formatCurrencyNumber(revenue)} in sales`;
+  const unsubscribeUrl = options.unsubscribeUrl ?? UNSUBSCRIBE_TOKEN;
+  const firstName = (ownerName || '').trim().split(/\s+/)[0] || 'there';
+  const cleanBizName = escapeHtml(businessName || 'Your Store');
+  const year = new Date().getFullYear();
 
-  const revenueGrowthBadge = revenueGrowthPct !== null
-    ? revenueGrowthPct >= 0
-      ? `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background-color:#ecfdf5;color:#047857;font-size:12px;font-weight:700;">+${revenueGrowthPct.toFixed(1)}% vs last wk</span>`
-      : `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background-color:#fef2f2;color:#b91c1c;font-size:12px;font-weight:700;">${revenueGrowthPct.toFixed(1)}% vs last wk</span>`
-    : '';
+  // Subject line matching founder-to-merchant tonality: clean, direct, no spam triggers
+  const subject = `Weekly performance for ${businessName}`;
+  const preheader = `${cleanBizName} generated ${currencySymbol}${formatCurrencyNumber(revenue)} in sales across ${salesCount} transactions over the past 7 days.`;
 
-  const salesGrowthBadge = salesGrowthPct !== null
-    ? salesGrowthPct >= 0
-      ? `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background-color:#ecfdf5;color:#047857;font-size:11px;font-weight:700;">+${salesGrowthPct.toFixed(1)}%</span>`
-      : `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background-color:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;">${salesGrowthPct.toFixed(1)}%</span>`
-    : '';
+  // Hero 3D illustration asset
+  const heroImgUrl = options.isLocalPreview
+    ? '/emails/3d-milestone.jpg'
+    : `${BASE_URL}/emails/3d-milestone.jpg`;
 
-  // Top products rows
-  const topProductsHtml = topProducts.length > 0
-    ? topProducts.map((p, idx) => `
-      <tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;font-weight:600;">
-          <span style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background-color:#ffedd5;color:#ea580c;font-size:11px;font-weight:800;margin-right:8px;">${idx + 1}</span>
-          ${p.name}
-        </td>
-        <td align="center" style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#475569;font-weight:600;">
-          ${p.quantity} units
-        </td>
-        <td align="right" style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#0f172a;font-weight:700;">
-          ${currencySymbol}${formatCurrencyNumber(p.revenue)}
-        </td>
-      </tr>
-    `).join('')
-    : `
-      <tr>
-        <td colspan="3" align="center" style="padding:16px;color:#94a3b8;font-size:13px;">
-          No itemized sales recorded this week.
-        </td>
-      </tr>
-    `;
+  // Growth badge for the callout panel
+  const growthBadge =
+    revenueGrowthPct !== null
+      ? revenueGrowthPct >= 0
+        ? `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;background-color:#dcfce7;color:#15803d;font-size:12px;font-weight:700;margin-left:8px;vertical-align:middle;">+${revenueGrowthPct.toFixed(1)}% vs last week</span>`
+        : `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;background-color:#fee2e2;color:#b91c1c;font-size:12px;font-weight:700;margin-left:8px;vertical-align:middle;">${revenueGrowthPct.toFixed(1)}% vs last week</span>`
+      : '';
+
+  // Top products table markup
+  const topProductsMarkup =
+    topProducts.length > 0
+      ? topProducts
+          .map(
+            (p, idx) => `
+            <tr>
+              <td style="padding:10px 8px;border-bottom:1px solid ${BRAND.line};font-family:${FONT_BODY};font-size:13px;color:${BRAND.ink};font-weight:600;">
+                <span style="display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:50%;background-color:${BRAND.orangeSoft};color:${BRAND.orangeDeep};font-size:11px;font-weight:700;margin-right:6px;">${idx + 1}</span>
+                ${escapeHtml(p.name)}
+              </td>
+              <td align="center" style="padding:10px 8px;border-bottom:1px solid ${BRAND.line};font-family:${FONT_BODY};font-size:13px;color:${BRAND.body};">
+                ${p.quantity} units
+              </td>
+              <td align="right" style="padding:10px 8px;border-bottom:1px solid ${BRAND.line};font-family:${FONT_DISPLAY};font-size:13px;font-weight:700;color:${BRAND.ink};">
+                ${currencySymbol}${formatCurrencyNumber(p.revenue)}
+              </td>
+            </tr>
+          `,
+          )
+          .join('')
+      : `
+        <tr>
+          <td colspan="3" align="center" style="padding:14px;font-family:${FONT_BODY};color:${BRAND.muted};font-size:13px;">
+            No item breakdown available for this period.
+          </td>
+        </tr>
+      `;
+
+  const socialRow = buildSocialRow();
 
   const html = `<!doctype html>
 <html lang="en" style="margin:0;padding:0;">
@@ -111,169 +171,198 @@ export function renderWeeklyPerformanceEmail(stats: WeeklyBusinessStats): {
 <meta name="color-scheme" content="light" />
 <meta name="supported-color-schemes" content="light" />
 <title>${subject}</title>
+<!--[if !mso]><!-->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="${GOOGLE_FONTS_HREF}" rel="stylesheet" />
+<!--<![endif]-->
 <style type="text/css">
-  body, table, td, p, h1, h2, h3, a { -webkit-font-smoothing:antialiased; }
+  @import url('${GOOGLE_FONTS_HREF}');
+  body, table, td, p, h1, a { -webkit-font-smoothing:antialiased; }
   a { text-decoration:none; }
-  @media only screen and (max-width: 600px) {
-    .container-table { width: 100% !important; border-radius: 0 !important; }
-    .col-half { display: block !important; width: 100% !important; padding: 0 0 12px 0 !important; }
-    .header-pad { padding: 24px 16px !important; }
-    .body-pad { padding: 16px !important; }
+  @media only screen and (max-width:620px) {
+    .z-pad { padding-left:22px !important; padding-right:22px !important; }
+    .z-h1 { font-size:24px !important; }
   }
 </style>
+<!--[if mso]>
+<style type="text/css">
+  body, table, td, p, h1, a { font-family:'Segoe UI',Arial,sans-serif !important; }
+</style>
+<![endif]-->
 </head>
-<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" style="background-color:#f8fafc;margin:0;padding:0;">
-<tr>
-<td align="center" style="padding:24px 8px;">
+<body style="margin:0;padding:0;background-color:${BRAND.page};font-family:${FONT_BODY};">
 
-  <table role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" class="container-table" style="width:580px;max-width:100%;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;box-shadow:0 6px 24px rgba(15,23,42,0.04);">
-    
-    <!-- Top Brand Header Bar -->
+<!-- Preheader -->
+<div style="display:none;font-size:1px;color:${BRAND.page};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  ${preheader}&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.page}" style="background-color:${BRAND.page};margin:0;padding:0;">
+<tr>
+<td align="center" style="padding:36px 12px;">
+
+  <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:100%;background-color:${BRAND.card};border:1px solid ${BRAND.line};border-radius:24px;overflow:hidden;font-family:${FONT_BODY};box-shadow:0 4px 24px rgba(0,0,0,0.03);">
+
+    <!-- Header / Brand Logo with Wordmark -->
     <tr>
-      <td bgcolor="#0f172a" style="background-color:#0f172a;padding:28px 32px;text-align:left;" class="header-pad">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <td class="z-pad" align="center" style="padding:32px 32px 14px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td valign="middle">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td valign="middle" style="padding-right:12px;">
-                    <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="36" height="36" style="width:36px;height:36px;display:block;border:0;" />
-                  </td>
-                  <td valign="middle">
-                    <span style="font-size:24px;font-weight:900;letter-spacing:-0.5px;color:#ffffff;line-height:1;">zeneva</span>
-                  </td>
-                </tr>
-              </table>
+            <td align="center" valign="middle" style="padding-right:10px;">
+              <img src="https://i.ibb.co/tMp65gRP/5c1014423d18.png" alt="Zeneva" width="44" height="44"
+                   style="width:44px;height:44px;display:block;border:0;outline:none;text-decoration:none;object-fit:contain;" />
             </td>
-            <td align="right" valign="middle">
-              <span style="display:inline-block;padding:6px 12px;border-radius:20px;background-color:#1e293b;border:1px solid #334155;color:#f97316;font-size:12px;font-weight:700;letter-spacing:0.3px;">
-                ${dateRangeLabel}
-              </span>
+            <td align="left" valign="middle">
+              <span style="font-family:${FONT_DISPLAY};font-size:32px;font-weight:800;letter-spacing:-0.8px;color:${BRAND.orangeDeep};line-height:1;display:inline-block;">zeneva</span>
             </td>
           </tr>
         </table>
       </td>
     </tr>
 
-    <!-- Body Container -->
+    <!-- Eyebrow & Headline -->
     <tr>
-      <td style="padding:32px;" class="body-pad">
-        
-        <!-- Greeting -->
-        <h1 style="margin:0 0 6px 0;font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-0.3px;">
-          Weekly Performance Digest
-        </h1>
-        <p style="margin:0 0 24px 0;font-size:14px;color:#64748b;line-height:1.5;">
-          Hello <strong>${ownerName}</strong>, here is how <strong>${businessName}</strong> performed over the last 7 days.
+      <td class="z-pad" align="center" style="padding:0 32px 4px;text-align:center;">
+        <p style="margin:0 0 8px;font-family:${FONT_BODY};font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:${BRAND.orangeDeep};">
+          WEEKLY DIGEST &middot; ${dateRangeLabel}
         </p>
+        <h1 class="z-h1" style="margin:0;font-family:${FONT_DISPLAY};font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-0.7px;color:${BRAND.ink};">
+          Your week in numbers.
+        </h1>
+      </td>
+    </tr>
 
-        <!-- Big Highlight Revenue Box -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff7ed;border:1px solid #fed7aa;border-radius:16px;margin-bottom:20px;">
+    <!-- 3D Hero Illustration -->
+    <tr>
+      <td align="center" style="padding:18px 32px 14px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td style="padding:22px 24px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <span style="font-size:11px;font-weight:800;text-transform:uppercase;color:#ea580c;letter-spacing:0.8px;">Total Weekly Revenue</span>
-                    <div style="font-size:32px;font-weight:900;color:#0f172a;margin-top:6px;letter-spacing:-0.5px;">
-                      ${currencySymbol}${formatCurrencyNumber(revenue)}
-                    </div>
-                  </td>
-                  <td align="right" valign="middle">
-                    ${revenueGrowthBadge}
-                  </td>
-                </tr>
-              </table>
+            <td align="center">
+              <img src="${heroImgUrl}" alt="Weekly Performance Milestone" width="240" height="240"
+                   style="display:block;width:100%;max-width:240px;height:auto;border-radius:20px;margin:0 auto;border:0;outline:none;" />
             </td>
           </tr>
         </table>
+      </td>
+    </tr>
 
-        <!-- Metric Grid (Sales, Units, Average Basket) -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
-          <tr>
-            <!-- Orders -->
-            <td width="32%" valign="top" style="padding:14px;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;" class="col-half">
-              <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Sales Completed</span>
-              <div style="font-size:20px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${salesCount}</div>
-              ${salesGrowthBadge}
-            </td>
-            <td width="2%">&nbsp;</td>
-            <!-- Units Sold -->
-            <td width="32%" valign="top" style="padding:14px;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;" class="col-half">
-              <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Units Sold</span>
-              <div style="font-size:20px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${unitsSold}</div>
-              <span style="font-size:11px;color:#94a3b8;font-weight:600;">items ringing up</span>
-            </td>
-            <td width="2%">&nbsp;</td>
-            <!-- Avg Basket -->
-            <td width="32%" valign="top" style="padding:14px;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;" class="col-half">
-              <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Average Basket</span>
-              <div style="font-size:20px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${currencySymbol}${formatCurrencyNumber(averageOrderValue)}</div>
-              <span style="font-size:11px;color:#94a3b8;font-weight:600;">per customer</span>
-            </td>
-          </tr>
-        </table>
+    <!-- Intro Prose -->
+    <tr>
+      <td class="z-pad" align="center" style="padding:6px 32px 0;font-family:${FONT_BODY};text-align:center;">
+        <div style="max-width:460px;margin:0 auto;text-align:left;">
+          <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:${BRAND.body};">
+            Hi ${firstName}, here is a summary of how <strong>${cleanBizName}</strong> performed over the past 7 days.
+          </p>
+        </div>
+      </td>
+    </tr>
 
-        <!-- Strategy & Reach Advice Box -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;margin-bottom:26px;">
-          <tr>
-            <td style="padding:16px 20px;">
-              <span style="font-size:11px;font-weight:800;text-transform:uppercase;color:#15803d;letter-spacing:0.6px;display:block;margin-bottom:6px;">Strategic Tip &amp; Growth Reach</span>
-              <p style="margin:0;font-size:13px;line-height:1.6;color:#166534;">
-                ${strategyTip}
-              </p>
-            </td>
-          </tr>
-        </table>
+    <!-- The Proof-You-Looked Callout Panel (Zeneva Design System) -->
+    <tr>
+      <td class="z-pad" align="center" style="padding:6px 32px 4px;text-align:center;">
+        <div style="max-width:460px;margin:0 auto;text-align:left;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border:1px solid ${BRAND.line};border-left:3px solid ${BRAND.orange};border-radius:0 12px 12px 0;">
+            <tr>
+              <td style="padding:16px 20px;font-family:${FONT_BODY};">
+                
+                <!-- Main KPI: Revenue -->
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:${BRAND.muted};margin-bottom:6px;">
+                  Gross Revenue (7 Days)
+                </div>
+                <div style="font-family:${FONT_DISPLAY};font-size:32px;font-weight:800;letter-spacing:-0.8px;color:${BRAND.ink};line-height:1;margin-bottom:14px;">
+                  ${currencySymbol}${formatCurrencyNumber(revenue)}
+                  ${growthBadge}
+                </div>
 
-        <!-- Top Selling Products Table -->
-        <h2 style="margin:0 0 12px 0;font-size:15px;font-weight:800;color:#0f172a;">
-          Top Performing Products
-        </h2>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:28px;">
-          <thead>
-            <tr bgcolor="#f8fafc">
-              <th align="left" style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0;">Product</th>
-              <th align="center" style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0;">Quantity</th>
-              <th align="right" style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0;">Revenue</th>
+                <!-- Secondary Metric Tiles -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px;border-top:1px solid ${BRAND.line};padding-top:12px;">
+                  <tr>
+                    <td width="50%" valign="top" style="padding-right:8px;">
+                      <div style="font-size:11px;color:${BRAND.muted};font-weight:600;margin-bottom:2px;">Sales Transactions</div>
+                      <div style="font-family:${FONT_DISPLAY};font-size:18px;font-weight:700;color:${BRAND.ink};">
+                        ${salesCount} receipts
+                      </div>
+                      <div style="font-size:11px;color:${BRAND.muted};">Avg order: ${currencySymbol}${formatCurrencyNumber(averageOrderValue)}</div>
+                    </td>
+                    <td width="50%" valign="top" style="padding-left:8px;">
+                      <div style="font-size:11px;color:${BRAND.muted};font-weight:600;margin-bottom:2px;">Total Units Sold</div>
+                      <div style="font-family:${FONT_DISPLAY};font-size:18px;font-weight:700;color:${BRAND.ink};">
+                        ${unitsSold} items
+                      </div>
+                      <div style="font-size:11px;color:${BRAND.muted};">Recorded across all sales</div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Top Products Ranking -->
+                <div style="border-top:1px solid ${BRAND.line};padding-top:12px;margin-bottom:6px;">
+                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:${BRAND.muted};margin-bottom:8px;">
+                    Best-Selling Products
+                  </div>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    ${topProductsMarkup}
+                  </table>
+                </div>
+
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            ${topProductsHtml}
-          </tbody>
-        </table>
+          </table>
+        </div>
+      </td>
+    </tr>
 
-        <!-- Primary Call to Action Button -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;">
+    <!-- Strategic Tip Box (Zeneva Accent) -->
+    <tr>
+      <td class="z-pad" align="center" style="padding:14px 32px 0;font-family:${FONT_BODY};text-align:center;">
+        <div style="max-width:460px;margin:0 auto;text-align:left;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND.orangeSoft}" style="background-color:${BRAND.orangeSoft};border:1px solid #fed7aa;border-left:3px solid ${BRAND.orange};border-radius:0 10px 10px 0;">
+            <tr>
+              <td style="padding:14px 18px;font-family:${FONT_BODY};font-size:13px;line-height:1.6;color:${BRAND.body};">
+                ${strategyTip}
+              </td>
+            </tr>
+          </table>
+        </div>
+      </td>
+    </tr>
+
+    <!-- Bulletproof Orange Pill CTA Button -->
+    <tr>
+      <td class="z-pad" align="center" style="padding:24px 32px 18px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td align="center" bgcolor="#f47125" style="background-color:#f47125;border-radius:12px;text-align:center;">
-              <a href="${BASE_URL}/reports" style="display:block;padding:14px 24px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;letter-spacing:0.3px;">
-                Open Workspace &amp; View Full Analytics &rarr;
+            <td align="center" bgcolor="${BRAND.orange}" style="background-color:${BRAND.orange};border-radius:9999px;">
+              <a href="${BASE_URL}/reports" style="display:inline-block;padding:14px 36px;font-family:${FONT_DISPLAY};font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:9999px;letter-spacing:-0.2px;">
+                Open Full Reports &rarr;
               </a>
             </td>
           </tr>
         </table>
-
-        <p style="text-align:center;margin:8px 0 0;font-size:12px;color:#94a3b8;">
-          Track inventory stock levels, profit margins, and peak shopping hours on your dashboard.
-        </p>
-
       </td>
     </tr>
 
-    <!-- Footer -->
+    <!-- Founder Sign-off -->
     <tr>
-      <td bgcolor="#f8fafc" style="background-color:#f8fafc;padding:24px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:12px;color:#94a3b8;line-height:1.6;">
-        <p style="margin:0 0 6px;">
-          Sent to <strong>${stats.ownerEmail}</strong> for <strong>${businessName}</strong>.
+      <td class="z-pad" align="center" style="padding:4px 32px 28px;text-align:center;">
+        <p style="margin:0 0 2px;font-family:${FONT_BODY};font-size:14px;color:${BRAND.body};">Thanks for reading,</p>
+        <p style="margin:0;font-family:${FONT_DISPLAY};font-size:15px;font-weight:700;color:${BRAND.ink};">Imam Shaffy</p>
+        <p style="margin:2px 0 0;font-family:${FONT_BODY};font-size:12px;color:${BRAND.muted};">Founder, Zeneva</p>
+      </td>
+    </tr>
+
+    <!-- Footer with Text Social Links and Unsubscribe -->
+    <tr>
+      <td bgcolor="${BRAND.panel}" style="background-color:${BRAND.panel};border-top:1px solid ${BRAND.line};padding:22px 32px 24px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 14px;">
+          <tr>${socialRow}</tr>
+        </table>
+        <p style="margin:0 0 6px;font-family:${FONT_BODY};font-size:12px;line-height:1.5;color:${BRAND.muted};">
+          <a href="${BASE_URL}" style="color:${BRAND.orangeDeep};font-weight:600;text-decoration:none;">zeneva.space</a>
+          &nbsp;&middot;&nbsp;
+          <a href="${unsubscribeUrl}" style="color:${BRAND.muted};text-decoration:underline;">Unsubscribe</a>
         </p>
-        <p style="margin:0 0 10px;">
-          Weekly automated performance report dispatched by Zeneva Industrial Retail OS.
-        </p>
-        <p style="margin:0;">
-          <a href="${BASE_URL}/settings" style="color:#64748b;text-decoration:underline;margin-right:12px;">Notification Settings</a>
-          <a href="${UNSUBSCRIBE_TOKEN}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a>
+        <p style="margin:0;font-family:${FONT_BODY};font-size:11px;color:${BRAND.faint};">
+          &copy; ${year} Zeneva POS &amp; Inventory. All rights reserved.
         </p>
       </td>
     </tr>

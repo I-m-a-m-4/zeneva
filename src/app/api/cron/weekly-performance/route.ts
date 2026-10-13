@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
-import { runWeeklyPerformanceBatch } from '@/lib/server/weekly-performance-runner';
+import {
+  runAutomationTrack,
+  type AutomationTrackId,
+} from '@/lib/server/weekly-performance-runner';
 
 export const dynamic = 'force-dynamic';
 
 function verifyCronAuth(req: Request): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  // If no secret configured in environment, allow call (or Vercel local dev)
   if (!cronSecret) return true;
 
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
@@ -23,9 +25,7 @@ function verifyCronAuth(req: Request): boolean {
 
 /**
  * GET /api/cron/weekly-performance
- *
- * Triggered automatically by Vercel Cron or an external cron scheduler.
- * Executes the weekly performance marketing email batch dispatch.
+ * Supports automated cron dispatch for any track (defaults to weekly_performance).
  */
 export async function GET(req: Request) {
   if (!verifyCronAuth(req)) {
@@ -33,20 +33,23 @@ export async function GET(req: Request) {
   }
 
   try {
-    const result = await runWeeklyPerformanceBatch({ trigger: 'cron' });
+    const { searchParams } = new URL(req.url);
+    const track = (searchParams.get('track') as AutomationTrackId) || 'weekly_performance';
+
+    const result = await runAutomationTrack(track, { trigger: 'cron' });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('[WeeklyPerformance Cron] Execution failed:', error);
     return NextResponse.json(
       { error: 'Internal Server Error', message: error?.message || String(error) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 /**
  * POST /api/cron/weekly-performance
- * Supports forced execution via webhook / scheduler.
+ * Supports forced webhook execution for a track.
  */
 export async function POST(req: Request) {
   if (!verifyCronAuth(req)) {
@@ -54,13 +57,16 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await runWeeklyPerformanceBatch({ trigger: 'cron', forced: true });
+    const { searchParams } = new URL(req.url);
+    const track = (searchParams.get('track') as AutomationTrackId) || 'weekly_performance';
+
+    const result = await runAutomationTrack(track, { trigger: 'cron', forced: true });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('[WeeklyPerformance Cron] Execution failed:', error);
     return NextResponse.json(
       { error: 'Internal Server Error', message: error?.message || String(error) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

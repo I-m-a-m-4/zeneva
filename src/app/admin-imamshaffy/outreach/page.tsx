@@ -24,6 +24,10 @@ import {
   Calendar,
   Activity,
   History,
+  TrendingUp,
+  UserCheck,
+  Award,
+  Zap,
 } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { withFirestoreRetry } from '@/firebase/retry';
@@ -39,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { format, isToday, isYesterday } from 'date-fns';
+import type { AutomationTrackId, AutomationTrackMeta } from '@/lib/server/weekly-performance-runner';
 
 const LOG_LIMIT = 1000;
 
@@ -62,6 +67,13 @@ function safeFormatTime(val: any): string {
   }
 }
 
+const TRACK_ICONS: Record<AutomationTrackId, any> = {
+  weekly_performance: TrendingUp,
+  win_back: UserCheck,
+  cheer_on: Award,
+  onboarding: Zap,
+};
+
 export default function OutreachPage() {
   return (
     <React.Suspense
@@ -83,27 +95,60 @@ function StrategicOutreachConsole() {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = React.useState<'automation' | 'history'>('automation');
+  const [selectedPreviewTrack, setSelectedPreviewTrack] = React.useState<AutomationTrackId>('weekly_performance');
 
-  // Automation State
+  // Automation Tracks State
   const [isAutomationLoading, setIsAutomationLoading] = React.useState(true);
-  const [isAutomationToggling, setIsAutomationToggling] = React.useState(false);
-  const [automationConfig, setAutomationConfig] = React.useState<{
-    enabled: boolean;
-    schedule: string;
-    lastRunAt: string | null;
-    totalSentCount: number;
-    lastRunSummary?: any;
-  }>({
-    enabled: true,
-    schedule: 'Mondays at 08:00 UTC',
-    lastRunAt: null,
-    totalSentCount: 0,
+  const [togglingTrack, setTogglingTrack] = React.useState<AutomationTrackId | null>(null);
+  const [tracks, setTracks] = React.useState<Record<AutomationTrackId, AutomationTrackMeta>>({
+    weekly_performance: {
+      id: 'weekly_performance',
+      name: 'Weekly Performance Digest',
+      badge: 'Sales & Growth',
+      description: 'Personalized sales digest with revenue, % growth, units sold, top products, and strategic advice.',
+      schedule: 'Every Monday at 08:00 UTC',
+      enabled: true,
+      lastRunAt: null,
+      totalSent: 0,
+    },
+    win_back: {
+      id: 'win_back',
+      name: 'Win-Back / Re-engagement',
+      badge: 'Retention',
+      description: 'Detects merchants whose activity slowed or who haven’t returned, cheering them on and offering help.',
+      schedule: 'Weekly check (Wednesdays at 10:00 UTC)',
+      enabled: true,
+      lastRunAt: null,
+      totalSent: 0,
+    },
+    cheer_on: {
+      id: 'cheer_on',
+      name: 'Cheer-On / Champions',
+      badge: 'Loyalty & Milestones',
+      description: 'Celebrates high-performing merchants and active sellers with a personal thank you and cheer from the founder.',
+      schedule: 'Bi-weekly (Fridays at 14:00 UTC)',
+      enabled: true,
+      lastRunAt: null,
+      totalSent: 0,
+    },
+    onboarding: {
+      id: 'onboarding',
+      name: 'Stalled Onboarding Nudge',
+      badge: 'Activation',
+      description: 'Encourages new signups who haven’t rung up their first sale after 3 days, guiding them to start selling.',
+      schedule: 'Twice weekly (Tuesdays & Thursdays)',
+      enabled: true,
+      lastRunAt: null,
+      totalSent: 0,
+    },
   });
+
   const [recentRuns, setRecentRuns] = React.useState<any[]>([]);
   const [previewHtml, setPreviewHtml] = React.useState<string>('');
+  const [previewSubject, setPreviewSubject] = React.useState<string>('');
   const [testEmail, setTestEmail] = React.useState('');
   const [isSendingTest, setIsSendingTest] = React.useState(false);
-  const [isRunningBatch, setIsRunningBatch] = React.useState(false);
+  const [runningTrack, setRunningTrack] = React.useState<AutomationTrackId | null>(null);
 
   // Merchant Logs State
   const [users, setUsers] = React.useState<UserProfile[]>([]);
@@ -115,14 +160,14 @@ function StrategicOutreachConsole() {
   const [emailStatusFilter, setEmailStatusFilter] = React.useState<string>('all');
   const [selectedUser, setSelectedUser] = React.useState<UserProfile | null>(null);
 
-  // Prefill test email with current logged-in user email if available
+  // Auto-populate test email with current user
   React.useEffect(() => {
     if (authUser?.email && !testEmail) {
       setTestEmail(authUser.email);
     }
   }, [authUser?.email, testEmail]);
 
-  // Auth helper for admin endpoints
+  // Auth helper
   const getAdminToken = React.useCallback(async () => {
     if (!authUser) return null;
     return await authUser.getIdToken();
@@ -138,21 +183,53 @@ function StrategicOutreachConsole() {
       const res = await fetch('/api/admin/weekly-performance', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error('Failed to fetch automation settings');
+      if (!res.ok) throw new Error('Failed to load automations');
       const data = await res.json();
-      if (data.config) setAutomationConfig(data.config);
-      if (data.recentRuns) setRecentRuns(data.recentRuns);
-      if (data.sampleHtml) setPreviewHtml(data.sampleHtml);
+      if (data.config?.tracks) {
+        setTracks(data.config.tracks);
+      }
+      if (data.recentRuns) {
+        setRecentRuns(data.recentRuns);
+      }
+      if (data.preview) {
+        setPreviewHtml(data.preview.html);
+        setPreviewSubject(data.preview.subject);
+      }
     } catch (err: any) {
-      console.error('Failed to load weekly performance data:', err);
+      console.error('Failed to load automations data:', err);
     } finally {
       setIsAutomationLoading(false);
     }
   }, [getAdminToken]);
 
-  // Toggle Automation On/Off
-  const handleToggleAutomation = async (enabled: boolean) => {
-    setIsAutomationToggling(true);
+  // Switch Preview Track
+  const handleSelectPreviewTrack = async (trackId: AutomationTrackId) => {
+    setSelectedPreviewTrack(trackId);
+    try {
+      const token = await getAdminToken();
+      if (!token) return;
+
+      const res = await fetch('/api/admin/weekly-performance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'preview', trackId }),
+      });
+      const data = await res.json();
+      if (data.preview) {
+        setPreviewHtml(data.preview.html);
+        setPreviewSubject(data.preview.subject);
+      }
+    } catch (err) {
+      console.error('Error switching preview:', err);
+    }
+  };
+
+  // Toggle Track On/Off
+  const handleToggleTrack = async (trackId: AutomationTrackId, enabled: boolean) => {
+    setTogglingTrack(trackId);
     try {
       const token = await getAdminToken();
       if (!token) throw new Error('Authentication required');
@@ -163,36 +240,36 @@ function StrategicOutreachConsole() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ action: 'toggle', enabled }),
+        body: JSON.stringify({ action: 'toggle', trackId, enabled }),
       });
 
-      if (!res.ok) throw new Error('Failed to update automation');
+      if (!res.ok) throw new Error('Failed to update automation track');
       const data = await res.json();
-      if (data.config) setAutomationConfig(data.config);
+      if (data.config?.tracks) setTracks(data.config.tracks);
 
       toast({
-        title: enabled ? 'Automation Activated' : 'Automation Paused',
+        title: enabled ? `${tracks[trackId]?.name} Activated` : `${tracks[trackId]?.name} Paused`,
         description: enabled
-          ? 'Weekly digests will dispatch automatically every Monday at 08:00 UTC.'
-          : 'Weekly performance emails have been stopped.',
+          ? `Dispatches automatically according to schedule: ${tracks[trackId]?.schedule}`
+          : 'Automation track has been safely paused.',
       });
     } catch (err: any) {
       toast({
         title: 'Update Failed',
-        description: err.message || 'Could not toggle automation.',
+        description: err.message || 'Could not toggle automation track.',
         variant: 'destructive',
       });
     } finally {
-      setIsAutomationToggling(false);
+      setTogglingTrack(null);
     }
   };
 
-  // Send Test Email
+  // Send Test Email to Gmail
   const handleSendTestEmail = async () => {
     if (!testEmail || !testEmail.includes('@')) {
       toast({
         title: 'Invalid Email',
-        description: 'Please enter a valid email address to send the preview to.',
+        description: 'Please enter a valid Gmail or destination address.',
         variant: 'destructive',
       });
       return;
@@ -209,17 +286,21 @@ function StrategicOutreachConsole() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ action: 'send_test', email: testEmail }),
+        body: JSON.stringify({
+          action: 'send_test',
+          trackId: selectedPreviewTrack,
+          email: testEmail.trim(),
+        }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.message || data.error || 'Failed to dispatch test email');
+        throw new Error(data.message || data.error || 'Failed to dispatch test');
       }
 
       toast({
-        title: 'Preview Email Dispatched!',
-        description: `Check your Gmail inbox (${testEmail}) for the weekly digest preview.`,
+        title: 'Test Email Delivered!',
+        description: `Dispatched preview for "${tracks[selectedPreviewTrack]?.name}" to ${testEmail}. Check your inbox!`,
       });
     } catch (err: any) {
       toast({
@@ -232,13 +313,14 @@ function StrategicOutreachConsole() {
     }
   };
 
-  // Run Weekly Batch Now
-  const handleRunBatchNow = async () => {
-    if (!confirm('Are you sure you want to trigger the weekly email digest batch for all active merchants right now?')) {
+  // Run Specific Track Batch Now
+  const handleRunTrackBatch = async (trackId: AutomationTrackId) => {
+    const trackName = tracks[trackId]?.name || trackId;
+    if (!confirm(`Are you sure you want to run the "${trackName}" automation batch across all eligible merchants right now?`)) {
       return;
     }
 
-    setIsRunningBatch(true);
+    setRunningTrack(trackId);
     try {
       const token = await getAdminToken();
       if (!token) throw new Error('Authentication required');
@@ -249,7 +331,7 @@ function StrategicOutreachConsole() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ action: 'run_batch' }),
+        body: JSON.stringify({ action: 'run_track', trackId }),
       });
 
       const data = await res.json();
@@ -257,25 +339,25 @@ function StrategicOutreachConsole() {
         throw new Error(data.message || data.error || 'Batch dispatch failed');
       }
 
-      if (data.config) setAutomationConfig(data.config);
+      if (data.config?.tracks) setTracks(data.config.tracks);
       if (data.recentRuns) setRecentRuns(data.recentRuns);
 
       toast({
-        title: 'Weekly Batch Completed',
-        description: `Successfully delivered ${data.result?.sentCount || 0} performance digests. (${data.result?.skippedCount || 0} skipped, ${data.result?.failedCount || 0} failed).`,
+        title: `${trackName} Completed`,
+        description: `Delivered ${data.result?.sentCount || 0} emails (${data.result?.skippedCount || 0} skipped, ${data.result?.failedCount || 0} failed).`,
       });
     } catch (err: any) {
       toast({
         title: 'Batch Error',
-        description: err.message || 'Failed to execute weekly batch.',
+        description: err.message || 'Failed to execute batch run.',
         variant: 'destructive',
       });
     } finally {
-      setIsRunningBatch(false);
+      setRunningTrack(null);
     }
   };
 
-  // Load Merchant Audience and Logs
+  // Load Merchant Audience & Logs
   const loadUsers = React.useCallback(async () => {
     if (!firestore) return;
     setIsLoadingUsers(true);
@@ -388,30 +470,25 @@ function StrategicOutreachConsole() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight">Strategic Outreach & Email Marketing</h1>
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight">Email Marketing & Automations</h1>
             <Badge
               variant="outline"
-              className={cn(
-                'text-xs font-medium px-2 py-0.5',
-                automationConfig.enabled
-                  ? 'border-emerald-500/30 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20'
-                  : 'border-amber-500/30 text-amber-600 bg-amber-50 dark:bg-amber-950/20',
-              )}
+              className="text-xs font-semibold px-2.5 py-0.5 border-orange-500/40 text-orange-600 bg-orange-50 dark:bg-orange-950/20"
             >
-              {automationConfig.enabled ? 'Automation Active' : 'Automation Paused'}
+              Zeneva Growth Engine
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Automate weekly performance reports to merchants' Gmail and track delivery metrics.
+            Automate weekly sales performance, re-engagement win-backs, milestone cheers, and onboarding nudges.
           </p>
         </div>
 
         {/* Global Tab Switcher */}
         <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)}>
-          <TabsList className="grid grid-cols-2 w-full sm:w-[320px]">
+          <TabsList className="grid grid-cols-2 w-full sm:w-[340px]">
             <TabsTrigger value="automation" className="flex items-center gap-1.5 text-xs font-medium">
               <Sparkles className="h-3.5 w-3.5" />
-              Weekly Automation
+              Automations Center
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-1.5 text-xs font-medium">
               <Mail className="h-3.5 w-3.5" />
@@ -421,150 +498,152 @@ function StrategicOutreachConsole() {
         </Tabs>
       </div>
 
-      {/* TAB 1: WEEKLY PERFORMANCE AUTOMATION */}
+      {/* TAB 1: AUTOMATIONS CONTROL CENTER */}
       {activeTab === 'automation' && (
         <div className="flex flex-col gap-6">
-          {/* Top Control Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1: Master Switch */}
-            <Card className="border border-slate-200 dark:border-slate-800 shadow-sm">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-emerald-600" />
-                    Automation Status
-                  </CardTitle>
-                  <Switch
-                    checked={automationConfig.enabled}
-                    disabled={isAutomationToggling}
-                    onCheckedChange={handleToggleAutomation}
-                  />
-                </div>
-                <CardDescription className="text-xs">
-                  Controls whether automated weekly digests trigger on schedule.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-0">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">State:</span>
-                  <span
-                    className={cn(
-                      'font-semibold',
-                      automationConfig.enabled ? 'text-emerald-600' : 'text-amber-600',
-                    )}
-                  >
-                    {automationConfig.enabled ? 'RUNNING (Every Monday)' : 'STOPPED / PAUSED'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Schedule:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
-                    {automationConfig.schedule}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Total Sent:</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
-                    {automationConfig.totalSentCount || 0} digests
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs pt-2 border-t">
-                  <span className="text-muted-foreground">Last Run:</span>
-                  <span className="text-slate-600 dark:text-slate-400">
-                    {safeFormatTime(automationConfig.lastRunAt)}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+          {/* 4 Automation Tracks Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {(Object.keys(tracks) as AutomationTrackId[]).map((trackId) => {
+              const track = tracks[trackId];
+              const Icon = TRACK_ICONS[trackId] || Sparkles;
+              const isToggling = togglingTrack === trackId;
+              const isRunning = runningTrack === trackId;
+              const isSelectedPreview = selectedPreviewTrack === trackId;
 
-            {/* Card 2: Send Test Preview to Gmail */}
-            <Card className="border border-slate-200 dark:border-slate-800 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Send className="h-4 w-4 text-sky-600" />
-                  Send Test to Gmail
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Test Resend delivery & preview formatting directly in your inbox.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-0">
-                <div className="space-y-1.5">
-                  <Input
-                    placeholder="Enter recipient email (e.g. you@gmail.com)"
-                    value={testEmail}
-                    onChange={(e) => setTestEmail(e.target.value)}
-                    className="h-9 text-xs"
-                  />
+              return (
+                <Card
+                  key={trackId}
+                  className={cn(
+                    'border transition-all shadow-sm flex flex-col justify-between',
+                    isSelectedPreview
+                      ? 'border-orange-500 ring-1 ring-orange-500/40 bg-orange-50/10'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300',
+                  )}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0">
+                        {track.badge}
+                      </Badge>
+                      <Switch
+                        checked={track.enabled}
+                        disabled={isToggling}
+                        onCheckedChange={(checked) => handleToggleTrack(trackId, checked)}
+                      />
+                    </div>
+                    <CardTitle className="text-sm font-bold flex items-center gap-1.5">
+                      <Icon className="h-4 w-4 text-orange-600 shrink-0" />
+                      <span className="truncate">{track.name}</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs leading-relaxed min-h-[36px]">
+                      {track.description}
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="space-y-1.5 text-[11px] pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className={cn('font-semibold', track.enabled ? 'text-emerald-600' : 'text-amber-600')}>
+                          {track.enabled ? 'Active / Automated' : 'Paused'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Schedule:</span>
+                        <span className="font-mono text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
+                          {track.schedule}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Delivered:</span>
+                        <span className="font-bold text-slate-900 dark:text-slate-100">
+                          {track.totalSent} emails
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>Last Run:</span>
+                        <span>{safeFormatTime(track.lastRunAt)}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      <Button
+                        size="sm"
+                        variant={isSelectedPreview ? 'default' : 'outline'}
+                        className="h-7 text-xs font-medium gap-1"
+                        onClick={() => handleSelectPreviewTrack(trackId)}
+                      >
+                        <Eye className="h-3 w-3" />
+                        Preview
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={isRunning}
+                        className="h-7 text-xs font-semibold gap-1"
+                        onClick={() => handleRunTrackBatch(trackId)}
+                      >
+                        {isRunning ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Play className="h-3 w-3 text-orange-600" />
+                        )}
+                        Run Now
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Quick Actions Bar: Send Test directly to Gmail */}
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-gradient-to-r from-orange-50/40 via-white to-amber-50/30 dark:from-slate-950 dark:to-slate-900">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-950/60 flex items-center justify-center shrink-0">
+                  <Send className="h-5 w-5 text-orange-600" />
                 </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    Test Delivery to Gmail
+                    <Badge variant="outline" className="text-[10px] font-mono border-orange-300 text-orange-700">
+                      Active Preview: {tracks[selectedPreviewTrack]?.name}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Send this exact template and founder copy to your inbox via Resend to verify fonts, layout, and rendering.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Input
+                  placeholder="Enter your Gmail (you@gmail.com)"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  className="h-9 text-xs w-full sm:w-[260px] bg-white dark:bg-slate-900"
+                />
                 <Button
                   onClick={handleSendTestEmail}
                   disabled={isSendingTest || !testEmail}
-                  className="w-full h-9 text-xs font-semibold gap-1.5"
-                  variant="default"
+                  className="h-9 text-xs font-semibold shrink-0 gap-1.5 bg-orange-600 hover:bg-orange-700 text-white"
                 >
                   {isSendingTest ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Dispatching to Gmail...
+                      Dispatching...
                     </>
                   ) : (
                     <>
                       <Send className="h-3.5 w-3.5" />
-                      Send Test Digest
+                      Send Test
                     </>
                   )}
                 </Button>
-                <p className="text-[11px] text-muted-foreground text-center">
-                  Uses realistic sample performance stats and growth tips.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Card 3: Batch Trigger & Quick Stats */}
-            <Card className="border border-slate-200 dark:border-slate-800 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Play className="h-4 w-4 text-purple-600" />
-                  Manual Batch Dispatch
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Run the weekly digest batch immediately across all active merchants.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-0">
-                <Button
-                  onClick={handleRunBatchNow}
-                  disabled={isRunningBatch}
-                  className="w-full h-9 text-xs font-semibold gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  {isRunningBatch ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Processing Weekly Digests...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-3.5 w-3.5" />
-                      Run Weekly Batch Now
-                    </>
-                  )}
-                </Button>
-
-                <div className="rounded-md bg-slate-50 dark:bg-slate-900/50 p-2.5 text-[11px] text-muted-foreground space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    Built-in Safe Delivery:
-                  </div>
-                  <ul className="list-disc pl-4 space-y-0.5 text-[10px]">
-                    <li>Honors individual merchant marketing opt-outs</li>
-                    <li>Rate limited at ~600ms per send to protect Resend quota</li>
-                    <li>Injects pixel open tracking and 1-click unsubscribe</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Email Preview & Execution Logs Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -572,8 +651,11 @@ function StrategicOutreachConsole() {
             <div className="lg:col-span-7 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Eye className="h-4 w-4 text-slate-600" />
-                  <h3 className="text-sm font-bold">Live Email Template Preview</h3>
+                  <Eye className="h-4 w-4 text-orange-600" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Live Email Template Preview &middot;{' '}
+                    <span className="text-orange-600 font-semibold">{tracks[selectedPreviewTrack]?.name}</span>
+                  </h3>
                 </div>
                 <Button
                   variant="ghost"
@@ -588,33 +670,33 @@ function StrategicOutreachConsole() {
               </div>
 
               <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-950 p-2 shadow-sm">
-                <div className="bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-t border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-muted-foreground font-mono">
-                  <span>From: Zeneva Performance &lt;growth@zeneva.space&gt;</span>
-                  <span>Subject: 📊 Weekly Performance: Coffee & Bakery</span>
+                <div className="bg-slate-100 dark:bg-slate-900 px-3 py-2 rounded-t border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-muted-foreground font-mono">
+                  <span>From: Imam Shaffy &lt;hello@zeneva.space&gt;</span>
+                  <span className="truncate max-w-[280px]">Subject: {previewSubject || 'Email Subject'}</span>
                 </div>
                 {previewHtml ? (
                   <iframe
                     srcDoc={previewHtml}
-                    title="Weekly Performance Email Preview"
+                    title="Marketing Email Preview"
                     className="w-full h-[680px] border-0 bg-white rounded-b-md shadow-inner"
                   />
                 ) : (
                   <div className="h-[400px] flex items-center justify-center text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Rendering email template preview...
+                    <Loader2 className="h-4 w-4 animate-spin mr-2 text-orange-600" />
+                    Rendering Zeneva email template preview...
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Recent Execution Runs (5 cols) */}
+            {/* Execution History (5 cols) */}
             <div className="lg:col-span-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <History className="h-4 w-4 text-slate-600" />
-                  <h3 className="text-sm font-bold">Recent Execution History</h3>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Automation Run History</h3>
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground font-mono">
                   {recentRuns.length} runs recorded
                 </span>
               </div>
@@ -625,9 +707,9 @@ function StrategicOutreachConsole() {
                     {recentRuns.length === 0 ? (
                       <div className="py-12 text-center text-xs text-muted-foreground">
                         <Calendar className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-                        No batch executions recorded yet.
+                        No automated batch runs recorded yet.
                         <br />
-                        Runs will appear here once triggered by cron or manually.
+                        Runs will log here as scheduled crons and manual dispatches execute.
                       </div>
                     ) : (
                       recentRuns.map((run) => (
@@ -643,12 +725,14 @@ function StrategicOutreachConsole() {
                                   'text-[10px] uppercase font-bold tracking-wider px-1.5 py-0',
                                   run.trigger === 'cron'
                                     ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
-                                    : 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300',
+                                    : 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
                                 )}
                               >
                                 {run.trigger}
                               </Badge>
-                              <span>{safeFormatTime(run.startedAt)}</span>
+                              <span className="truncate max-w-[160px]">
+                                {tracks[run.trackId as AutomationTrackId]?.name || run.trackId || 'Automation'}
+                              </span>
                             </div>
                             <Badge
                               variant="outline"
@@ -682,11 +766,10 @@ function StrategicOutreachConsole() {
                             </div>
                           </div>
 
-                          {run.durationMs && (
-                            <div className="text-[10px] text-muted-foreground text-right font-mono">
-                              Duration: {(run.durationMs / 1000).toFixed(1)}s
-                            </div>
-                          )}
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+                            <span>{safeFormatTime(run.startedAt)}</span>
+                            {run.durationMs && <span>{(run.durationMs / 1000).toFixed(1)}s</span>}
+                          </div>
 
                           {run.error && (
                             <div className="text-[10px] text-rose-500 font-mono bg-rose-50 dark:bg-rose-950/20 p-1.5 rounded">
@@ -704,7 +787,7 @@ function StrategicOutreachConsole() {
         </div>
       )}
 
-      {/* TAB 2: AUDIENCE & MERCHANT LOGS (Existing Functionality) */}
+      {/* TAB 2: AUDIENCE & MERCHANT LOGS */}
       {activeTab === 'history' && (
         <div className="h-[calc(100vh_-_14rem)] flex flex-col">
           <div className="flex-1 min-h-0 flex flex-col">
@@ -838,7 +921,7 @@ function StrategicOutreachConsole() {
                     <Mail className="h-8 w-8 mb-2 opacity-50" />
                     <p className="text-sm font-medium">Select a merchant to view their outreach history</p>
                     <p className="text-xs mt-1">
-                      You can view every email sent to them, along with read receipts and delivery statuses.
+                      View all sent emails, read receipts, and delivery logs.
                     </p>
                   </div>
                 ) : (
@@ -891,7 +974,7 @@ function StrategicOutreachConsole() {
                                   <div className="flex flex-col gap-0.5">
                                     <span className="font-semibold text-sm">{log.subject || 'No Subject'}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      From: {log.from || 'growth@zeneva.space'}
+                                      From: {log.from || 'hello@zeneva.space'}
                                     </span>
                                   </div>
                                   <Badge
