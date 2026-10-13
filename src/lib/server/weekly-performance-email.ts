@@ -55,7 +55,7 @@ export function getSampleWeeklyStats(): WeeklyBusinessStats {
 
   return {
     businessId: 'sample_store_id',
-    businessName: 'Apex Supermarket & Retail',
+    businessName: 'Apex Supermarket (Sample Store)',
     ownerName: 'Emmanuel Adeyemi',
     ownerEmail: 'emmanuel@example.com',
     currencySymbol: '₦',

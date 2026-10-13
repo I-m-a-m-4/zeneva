@@ -28,6 +28,7 @@ import {
   UserCheck,
   Award,
   Zap,
+  BarChart3,
 } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { withFirestoreRetry } from '@/firebase/retry';
@@ -41,9 +42,18 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { AutomationTrackId, AutomationTrackMeta } from '@/lib/server/weekly-performance-runner';
+import CampaignResults from '@/components/admin/email-marketing/campaign-results';
 
 const LOG_LIMIT = 1000;
 
@@ -94,7 +104,7 @@ function StrategicOutreachConsole() {
   const { user: authUser } = useUser();
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = React.useState<'automation' | 'history'>('automation');
+  const [activeTab, setActiveTab] = React.useState<'automation' | 'campaigns' | 'history'>('automation');
   const [selectedPreviewTrack, setSelectedPreviewTrack] = React.useState<AutomationTrackId>('weekly_performance');
 
   // Automation Tracks State
@@ -149,6 +159,12 @@ function StrategicOutreachConsole() {
   const [testEmail, setTestEmail] = React.useState('');
   const [isSendingTest, setIsSendingTest] = React.useState(false);
   const [runningTrack, setRunningTrack] = React.useState<AutomationTrackId | null>(null);
+  const [confirmRunTrack, setConfirmRunTrack] = React.useState<AutomationTrackId | null>(null);
+  const [runBatchResult, setRunBatchResult] = React.useState<{
+    sentCount: number;
+    skippedCount: number;
+    failedCount: number;
+  } | null>(null);
 
   // Merchant Logs State
   const [users, setUsers] = React.useState<UserProfile[]>([]);
@@ -313,12 +329,17 @@ function StrategicOutreachConsole() {
     }
   };
 
-  // Run Specific Track Batch Now
-  const handleRunTrackBatch = async (trackId: AutomationTrackId) => {
+  // Open Custom Modal for Track Batch Run
+  const handleOpenRunModal = (trackId: AutomationTrackId) => {
+    setConfirmRunTrack(trackId);
+    setRunBatchResult(null);
+  };
+
+  // Execute Batch Run from Modal
+  const executeRunTrackBatch = async () => {
+    if (!confirmRunTrack) return;
+    const trackId = confirmRunTrack;
     const trackName = tracks[trackId]?.name || trackId;
-    if (!confirm(`Are you sure you want to run the "${trackName}" automation batch across all eligible merchants right now?`)) {
-      return;
-    }
 
     setRunningTrack(trackId);
     try {
@@ -341,6 +362,12 @@ function StrategicOutreachConsole() {
 
       if (data.config?.tracks) setTracks(data.config.tracks);
       if (data.recentRuns) setRecentRuns(data.recentRuns);
+
+      setRunBatchResult({
+        sentCount: data.result?.sentCount || 0,
+        skippedCount: data.result?.skippedCount || 0,
+        failedCount: data.result?.failedCount || 0,
+      });
 
       toast({
         title: `${trackName} Completed`,
@@ -402,7 +429,7 @@ function StrategicOutreachConsole() {
   }, [loadAutomationData]);
 
   React.useEffect(() => {
-    if (activeTab === 'history') {
+    if (activeTab === 'history' || activeTab === 'campaigns') {
       loadUsers();
       loadLogs();
     }
@@ -465,7 +492,7 @@ function StrategicOutreachConsole() {
   }, [logs, selectedUser]);
 
   return (
-    <div className="flex flex-col gap-4 p-2 md:p-6 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
         <div>
@@ -485,12 +512,16 @@ function StrategicOutreachConsole() {
 
         {/* Global Tab Switcher */}
         <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)}>
-          <TabsList className="grid grid-cols-2 w-full sm:w-[340px]">
-            <TabsTrigger value="automation" className="flex items-center gap-1.5 text-xs font-medium">
+          <TabsList className="grid grid-cols-3 w-full sm:w-[500px]">
+            <TabsTrigger value="automation" className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
               <Sparkles className="h-3.5 w-3.5" />
               Automations Center
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-1.5 text-xs font-medium">
+            <TabsTrigger value="campaigns" className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+              <BarChart3 className="h-3.5 w-3.5 text-orange-600" />
+              Campaign Analytics
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
               <Mail className="h-3.5 w-3.5" />
               Merchant Logs
             </TabsTrigger>
@@ -500,9 +531,9 @@ function StrategicOutreachConsole() {
 
       {/* TAB 1: AUTOMATIONS CONTROL CENTER */}
       {activeTab === 'automation' && (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 w-full">
           {/* 4 Automation Tracks Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
             {(Object.keys(tracks) as AutomationTrackId[]).map((trackId) => {
               const track = tracks[trackId];
               const Icon = TRACK_ICONS[trackId] || Sparkles;
@@ -528,6 +559,7 @@ function StrategicOutreachConsole() {
                       <Switch
                         checked={track.enabled}
                         disabled={isToggling}
+                        className="cursor-pointer"
                         onCheckedChange={(checked) => handleToggleTrack(trackId, checked)}
                       />
                     </div>
@@ -570,7 +602,7 @@ function StrategicOutreachConsole() {
                       <Button
                         size="sm"
                         variant={isSelectedPreview ? 'default' : 'outline'}
-                        className="h-7 text-xs font-medium gap-1"
+                        className="h-7 text-xs font-medium gap-1 cursor-pointer"
                         onClick={() => handleSelectPreviewTrack(trackId)}
                       >
                         <Eye className="h-3 w-3" />
@@ -580,13 +612,13 @@ function StrategicOutreachConsole() {
                         size="sm"
                         variant="secondary"
                         disabled={isRunning}
-                        className="h-7 text-xs font-semibold gap-1"
-                        onClick={() => handleRunTrackBatch(trackId)}
+                        className="h-7 text-xs font-semibold gap-1 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800"
+                        onClick={() => handleOpenRunModal(trackId)}
                       >
                         {isRunning ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <Play className="h-3 w-3 text-orange-600" />
+                          <Play className="h-3 w-3 text-orange-600 fill-orange-600" />
                         )}
                         Run Now
                       </Button>
@@ -627,7 +659,7 @@ function StrategicOutreachConsole() {
                 <Button
                   onClick={handleSendTestEmail}
                   disabled={isSendingTest || !testEmail}
-                  className="h-9 text-xs font-semibold shrink-0 gap-1.5 bg-orange-600 hover:bg-orange-700 text-white"
+                  className="h-9 text-xs font-semibold shrink-0 gap-1.5 bg-orange-600 hover:bg-orange-700 text-white cursor-pointer"
                 >
                   {isSendingTest ? (
                     <>
@@ -646,9 +678,9 @@ function StrategicOutreachConsole() {
           </Card>
 
           {/* Email Preview & Execution Logs Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 w-full">
             {/* Live Template Preview (7 cols) */}
-            <div className="lg:col-span-7 flex flex-col gap-2">
+            <div className="xl:col-span-7 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Eye className="h-4 w-4 text-orange-600" />
@@ -660,13 +692,17 @@ function StrategicOutreachConsole() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs gap-1"
+                  className="h-7 text-xs gap-1 cursor-pointer"
                   onClick={loadAutomationData}
                   disabled={isAutomationLoading}
                 >
                   <RefreshCw className={cn('h-3 w-3', isAutomationLoading && 'animate-spin')} />
                   Refresh
                 </Button>
+              </div>
+
+              <div className="bg-orange-50/70 dark:bg-orange-950/20 border border-orange-200/80 dark:border-orange-800/40 rounded-md px-3 py-1.5 text-[11px] text-orange-800 dark:text-orange-300 flex items-center gap-2">
+                <span>💡 <strong>Dynamic Tokens:</strong> Store names (<code>{"{{businessName}}"}</code>), owner names, sales figures, and telemetry are 100% dynamically injected from each merchant&apos;s live Firestore record. The preview below uses a sample profile to demonstrate formatting.</span>
               </div>
 
               <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-950 p-2 shadow-sm">
@@ -690,7 +726,7 @@ function StrategicOutreachConsole() {
             </div>
 
             {/* Execution History (5 cols) */}
-            <div className="lg:col-span-5 flex flex-col gap-2">
+            <div className="xl:col-span-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <History className="h-4 w-4 text-slate-600" />
@@ -766,9 +802,21 @@ function StrategicOutreachConsole() {
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-                            <span>{safeFormatTime(run.startedAt)}</span>
-                            {run.durationMs && <span>{(run.durationMs / 1000).toFixed(1)}s</span>}
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                            <span>
+                              {safeFormatTime(run.startedAt)}{' '}
+                              {run.durationMs ? `• ${(run.durationMs / 1000).toFixed(1)}s` : ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveTab('campaigns');
+                                loadLogs();
+                              }}
+                              className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 dark:text-orange-400 flex items-center gap-1 cursor-pointer"
+                            >
+                              View Delivered &rarr;
+                            </button>
                           </div>
 
                           {run.error && (
@@ -787,7 +835,40 @@ function StrategicOutreachConsole() {
         </div>
       )}
 
-      {/* TAB 2: AUDIENCE & MERCHANT LOGS */}
+      {/* TAB 2: CAMPAIGN DELIVERY LOGS & OPEN ANALYTICS */}
+      {activeTab === 'campaigns' && (
+        <div className="w-full space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-orange-600" />
+                Campaign Delivery Logs & Analytics
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Review every merchant who received campaign emails, verify whether they opened them, and track delivery open rates.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5 cursor-pointer"
+              onClick={loadLogs}
+              disabled={isLoadingLogs}
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', isLoadingLogs && 'animate-spin')} />
+              Refresh Logs
+            </Button>
+          </div>
+
+          <CampaignResults
+            logs={logs}
+            isLoading={isLoadingLogs}
+            onRefresh={loadLogs}
+          />
+        </div>
+      )}
+
+      {/* TAB 3: AUDIENCE & MERCHANT CRM LOGS */}
       {activeTab === 'history' && (
         <div className="h-[calc(100vh_-_14rem)] flex flex-col">
           <div className="flex-1 min-h-0 flex flex-col">
@@ -1053,6 +1134,169 @@ function StrategicOutreachConsole() {
           </div>
         </div>
       )}
+      {/* Custom Batch Run Confirmation & Results Modal */}
+      <Dialog
+        open={!!confirmRunTrack}
+        onOpenChange={(open) => {
+          if (!open && !runningTrack) {
+            setConfirmRunTrack(null);
+            setRunBatchResult(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          {confirmRunTrack && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-950/60 flex items-center justify-center shrink-0">
+                    <Play className="h-5 w-5 text-orange-600 fill-orange-600" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      Execute {tracks[confirmRunTrack]?.name}
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                      Manual Automation Trigger &middot; {tracks[confirmRunTrack]?.badge}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              {runningTrack === confirmRunTrack ? (
+                <div className="py-8 flex flex-col items-center justify-center gap-3 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      Dispatching Batch via Resend...
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                      Evaluating merchant behavioral telemetry and sending dynamically personalized emails.
+                    </p>
+                  </div>
+                </div>
+              ) : runBatchResult ? (
+                <div className="py-4 space-y-4">
+                  <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-lg p-3.5">
+                    <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                        Batch Run Completed!
+                      </h4>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                        Delivered <strong>{runBatchResult.sentCount}</strong> emails successfully.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-900">
+                      <div className="text-muted-foreground text-[10px] uppercase font-bold">Delivered</div>
+                      <div className="text-base font-bold text-emerald-600">{runBatchResult.sentCount}</div>
+                    </div>
+                    <div className="p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-900">
+                      <div className="text-muted-foreground text-[10px] uppercase font-bold">Skipped</div>
+                      <div className="text-base font-bold text-slate-600">{runBatchResult.skippedCount}</div>
+                    </div>
+                    <div className="p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-900">
+                      <div className="text-muted-foreground text-[10px] uppercase font-bold">Failed</div>
+                      <div className="text-base font-bold text-rose-600">{runBatchResult.failedCount}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3.5 py-2 text-xs text-slate-600 dark:text-slate-400">
+                  <p>
+                    Are you sure you want to run the{' '}
+                    <strong className="text-slate-900 dark:text-slate-100">
+                      {tracks[confirmRunTrack]?.name}
+                    </strong>{' '}
+                    campaign across all qualifying merchants right now?
+                  </p>
+
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-2">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 text-xs">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      Audience Safeguards & Dynamic Personalization:
+                    </div>
+                    <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] text-muted-foreground leading-relaxed">
+                      <li>
+                        <strong>Dynamic Data:</strong> Recipient names, store names (<code>{"{{businessName}}"}</code>), sales figures, and telemetry are merged from live Firestore profiles.
+                      </li>
+                      <li>
+                        <strong>Decision-Makers Only:</strong> Cashiers and staff are excluded; only store owners and admins are contacted.
+                      </li>
+                      <li>
+                        <strong>Anti-Fatigue Guard:</strong> Merchants emailed within the cooldown period are automatically skipped.
+                      </li>
+                      <li>
+                        <strong>Opt-Out Protection:</strong> Accounts with marketing opt-out are omitted.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                {runBatchResult ? (
+                  <div className="flex flex-col sm:flex-row items-center justify-end gap-2 w-full">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setConfirmRunTrack(null);
+                        setRunBatchResult(null);
+                      }}
+                      className="w-full sm:w-auto text-xs cursor-pointer"
+                    >
+                      Done
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setConfirmRunTrack(null);
+                        setRunBatchResult(null);
+                        setActiveTab('campaigns');
+                        loadLogs();
+                      }}
+                      className="w-full sm:w-auto text-xs font-semibold gap-1.5 cursor-pointer bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      View Delivered Emails ({runBatchResult.sentCount})
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      disabled={runningTrack === confirmRunTrack}
+                      onClick={() => setConfirmRunTrack(null)}
+                      className="text-xs cursor-pointer"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      disabled={runningTrack === confirmRunTrack}
+                      onClick={executeRunTrackBatch}
+                      className="text-xs font-semibold gap-1.5 cursor-pointer bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      {runningTrack === confirmRunTrack ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Running Batch...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3.5 w-3.5 fill-white" />
+                          Confirm & Run Batch
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

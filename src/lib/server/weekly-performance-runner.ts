@@ -299,7 +299,7 @@ function getSampleProfile(): ReturnType<typeof profileUser> {
   };
   const sampleBiz: BehaviorBusinessLike = {
     id: 'sample_store_id',
-    name: 'Apex Supermarket & Retail',
+    name: 'Apex Supermarket (Sample Store)',
     plan: 'starter',
   };
   return profileUser(sampleUser, sampleBiz);
@@ -343,13 +343,34 @@ export async function sendTrackTestEmail(
   targetEmail: string,
 ): Promise<{ ok: boolean; messageId?: string; subject: string }> {
   const { subject, html } = renderTrackPreview(trackId, false);
-  const testSubject = `[Preview] ${subject}`;
+  const testSubject = `[TEST PREVIEW] ${subject}`;
+
+  // Prepend an admin preview explanation banner so recipients know live emails are 100% dynamic
+  const testNotice = `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px;">
+  <tr>
+    <td style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#92400e;line-height:1.5;">
+      <strong>⚠️ Admin Test Delivery:</strong> This is a layout & font verification email sent to <strong>${targetEmail}</strong>.<br />
+      In live automated production runs, all tokens (such as store name <em>{{businessName}}</em>, owner name, sales performance, and behavior telemetry) are 100% dynamically merged from each merchant's real business profile.
+    </td>
+  </tr>
+</table>`;
+
+  const closingBody = html.lastIndexOf('</body>');
+  let testHtml = html;
+  if (html.includes('<table class="card"')) {
+    testHtml = html.replace('<table class="card"', `${testNotice}<table class="card"`);
+  } else if (closingBody !== -1) {
+    testHtml = html.replace(/<body[^>]*>/, `$&${testNotice}`);
+  } else {
+    testHtml = testNotice + html;
+  }
 
   const trackIdRes = await sendEmail({
     to: targetEmail,
     name: 'Admin Preview Tester',
     subject: testSubject,
-    body: html,
+    body: testHtml,
     type: `${trackId}_test`,
     wrap: false,
     segment: trackId,
@@ -422,53 +443,123 @@ export async function runAutomationTrack(
     businesses.forEach((b: any) => bizMap.set(b.id, b));
 
     const emailDedupe = new Set<string>();
+    const businessDedupe = new Set<string>();
+    const now = Date.now();
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
     for (const uDoc of usersSnap.docs) {
-      const u = uDoc.data() as BehaviorUserLike;
+      const u = uDoc.data() as BehaviorUserLike & {
+        lastMarketingSentAt?: Record<string, string>;
+        lastMarketingEmailSentAt?: string;
+      };
       const email = u.email;
 
+      // 1. Basic Email Validation & Deduplication
       if (!email || !email.includes('@') || emailDedupe.has(email.toLowerCase())) {
         continue;
       }
+
+      // 2. Do not mail system super-admins or developer accounts
+      if (u.role === 'super-admin' || email.toLowerCase() === 'belloimam431@gmail.com') {
+        continue;
+      }
+
+      // 3. Respect explicit marketing opt-out
       if (u.marketingOptOut === true) {
         skippedCount++;
         continue;
       }
 
+      // 4. Drop suspended or deleted users
+      if (u.status === 'deleted' || u.status === 'suspended') {
+        continue;
+      }
+
+      // 5. Cashiers and staff do NOT make software buying/retention decisions
+      // Only store owners, managers, and admins receive store performance and marketing automations
+      if (u.role === 'cashier') {
+        skippedCount++;
+        continue;
+      }
+
       const biz = u.businessId ? bizMap.get(u.businessId) : undefined;
-      const profile = profileUser(u, biz);
+      if (biz && (biz.status === 'deleted' || biz.status === 'suspended')) {
+        continue;
+      }
+
+      // 6. Anti-fatigue cooldown check (prevent over-emailing active users)
+      const lastTrackSentStr = u.lastMarketingSentAt?.[trackId];
+      if (lastTrackSentStr && options.trigger === 'cron' && !options.forced) {
+        const lastTrackSentMs = new Date(lastTrackSentStr).getTime();
+        const cooldownMs = trackId === 'win_back' ? FOURTEEN_DAYS_MS : SEVEN_DAYS_MS;
+        if (!isNaN(lastTrackSentMs) && now - lastTrackSentMs < cooldownMs) {
+          skippedCount++;
+          continue;
+        }
+      }
+
+      // 7. Compute full Behavioral Intelligence Profile
+      const profile = profileUser(u, biz, now);
 
       // Track-specific qualification filter:
       let shouldSend = false;
       let emailPayload: { subject: string; html: string } | null = null;
 
       if (trackId === 'weekly_performance') {
-        // Runs for all active merchants with a business
-        if (u.businessId) {
+        // Must have an associated business and be owner/admin/manager
+        const isOwnerOrAdmin =
+          !u.businessId ||
+          !biz?.ownerId ||
+          biz.ownerId === u.id ||
+          u.role === 'admin' ||
+          u.role === 'owner' ||
+          u.role === 'manager';
+
+        if (u.businessId && isOwnerOrAdmin) {
+          // Send at most one digest per business instance
+          if (businessDedupe.has(u.businessId)) {
+            continue;
+          }
+          businessDedupe.add(u.businessId);
+
           const stats = await calculateWeeklyPerformanceStats(u.businessId);
-          if (stats) {
+          // Only send if the business has recorded sales, products, or active POS activity
+          if (stats && (stats.hasSales || stats.topProducts.length > 0 || profile.usageSeconds > 300)) {
             shouldSend = true;
             emailPayload = renderWeeklyPerformanceEmail(stats);
           }
         }
       } else if (trackId === 'win_back') {
-        // Target merchants who are slipping or invested then left
-        if (
-          profile.segment === 'invested_then_left' ||
-          profile.segment === 'slipping' ||
-          (profile.daysSinceSeen !== null && profile.daysSinceSeen >= 5 && profile.daysSinceSeen <= 45)
-        ) {
-          shouldSend = true;
-          const tokens = mergeTokensFor(profile);
-          const draft = CAMPAIGN_DRAFTS.invested_then_left;
-          emailPayload = {
-            subject: draft.subject.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key) => tokens[key] || ''),
-            html: renderCampaignEmail(draft, tokens),
-          };
+        // High-precision win-back targeting:
+        // Must be in 'invested_then_left' or 'slipping'
+        // 'invested_then_left': put in real setup work (inventory, catalog, usage) but inactive for 4-45 days.
+        // 'slipping': past active user who hasn't opened app in 7-30 days.
+        // HARD EXCLUSION: If seen within last 3 days, DO NOT send win-back (they haven't left!).
+        const isSeenRecently = profile.daysSinceSeen !== null && profile.daysSinceSeen < 4;
+        if (!isSeenRecently) {
+          if (
+            profile.segment === 'invested_then_left' ||
+            profile.segment === 'slipping' ||
+            (profile.usageSeconds >= 1200 &&
+              profile.daysSinceSeen !== null &&
+              profile.daysSinceSeen >= 5 &&
+              profile.daysSinceSeen <= 45)
+          ) {
+            shouldSend = true;
+            const tokens = mergeTokensFor(profile);
+            const draft = CAMPAIGN_DRAFTS.invested_then_left;
+            emailPayload = {
+              subject: draft.subject.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key) => tokens[key] || ''),
+              html: renderCampaignEmail(draft, tokens),
+            };
+          }
         }
       } else if (trackId === 'cheer_on') {
-        // Target champions or highly active stores
-        if (profile.segment === 'champion' || profile.usageSeconds > 3600) {
+        // High-performing champions celebration:
+        // Must be recently active (within 7 days) and a deep user
+        const isRecent = profile.daysSinceSeen !== null && profile.daysSinceSeen <= 7;
+        if (isRecent && (profile.segment === 'champion' || profile.usageSeconds > 3600)) {
           shouldSend = true;
           const tokens = mergeTokensFor(profile);
           const draft = CAMPAIGN_DRAFTS.champion;
@@ -478,11 +569,17 @@ export async function runAutomationTrack(
           };
         }
       } else if (trackId === 'onboarding') {
-        // Target stalled setup or never activated
+        // Stalled onboarding nudge:
+        // Must have signed up at least 3 days ago, but has not completed sales / stalled setup
+        const hasSignedUpAtLeast3Days = profile.daysSinceSignup !== null && profile.daysSinceSignup >= 3;
+        const hasNotSold = (profile.familyMix.find((m) => m.family === 'selling')?.views ?? 0) === 0;
+
         if (
-          profile.segment === 'onboarding_stalled' ||
-          profile.segment === 'never_activated' ||
-          (profile.daysSinceSignup !== null && profile.daysSinceSignup >= 3 && profile.usageSeconds < 600)
+          hasSignedUpAtLeast3Days &&
+          hasNotSold &&
+          (profile.segment === 'onboarding_stalled' ||
+            profile.segment === 'never_activated' ||
+            profile.usageSeconds < 600)
         ) {
           shouldSend = true;
           const tokens = mergeTokensFor(profile);
@@ -511,6 +608,23 @@ export async function runAutomationTrack(
           wrap: false,
           segment: trackId,
         });
+
+        // Record cooldown timestamp on user document
+        if (uDoc.id) {
+          await adminFirestore
+            .collection('users')
+            .doc(uDoc.id)
+            .set(
+              {
+                lastMarketingSentAt: {
+                  [trackId]: new Date().toISOString(),
+                },
+                lastMarketingEmailSentAt: new Date().toISOString(),
+              },
+              { merge: true },
+            )
+            .catch(() => {});
+        }
 
         sentCount++;
         await sleep(600); // 600ms rate-limit gap

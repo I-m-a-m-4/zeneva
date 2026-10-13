@@ -73,6 +73,22 @@ export interface FollowUpLog {
   error?: string;
 }
 
+export const CAMPAIGN_TRACK_META: Record<string, { label: string; tone: string }> = {
+  weekly_performance: { label: 'Weekly Performance Digest', tone: 'good' },
+  win_back: { label: 'Win-Back / Re-engagement', tone: 'danger' },
+  cheer_on: { label: 'Cheer-On / Champions', tone: 'good' },
+  onboarding: { label: 'Stalled Onboarding Nudge', tone: 'warn' },
+};
+
+export function resolveSegmentMeta(segment?: string | null): { label: string; tone: string } {
+  if (!segment) return { label: 'General Broadcast', tone: 'neutral' };
+  if (CAMPAIGN_TRACK_META[segment]) return CAMPAIGN_TRACK_META[segment];
+  if (BEHAVIOR_SEGMENT_META[segment as BehaviorSegment]) {
+    return BEHAVIOR_SEGMENT_META[segment as BehaviorSegment];
+  }
+  return { label: segment.replace(/_/g, ' '), tone: 'neutral' };
+}
+
 /** A log row counts as opened on either signal — status, or a non-zero count. */
 function wasOpened(log: FollowUpLog): boolean {
   return log.status === 'opened' || (log.openCount ?? 0) > 0;
@@ -81,7 +97,7 @@ function wasOpened(log: FollowUpLog): boolean {
 type Campaign = {
   key: string;
   subject: string;
-  segment: BehaviorSegment | null;
+  segment: BehaviorSegment | string | null;
   logs: FollowUpLog[];
   sent: number;
   opened: number;
@@ -221,13 +237,16 @@ export default function CampaignResults({
       bySegment.set(key, acc);
     }
     return [...bySegment.entries()]
-      .map(([key, v]) => ({
-        key,
-        label: BEHAVIOR_SEGMENT_META[key as BehaviorSegment]?.label ?? 'Unlabelled',
-        tone: BEHAVIOR_SEGMENT_META[key as BehaviorSegment]?.tone ?? 'neutral',
-        ...v,
-        openRate: v.sent > 0 ? (v.opened / v.sent) * 100 : 0,
-      }))
+      .map(([key, v]) => {
+        const meta = resolveSegmentMeta(key);
+        return {
+          key,
+          label: meta.label,
+          tone: meta.tone,
+          ...v,
+          openRate: v.sent > 0 ? (v.opened / v.sent) * 100 : 0,
+        };
+      })
       .sort((a, b) => b.openRate - a.openRate);
   }, [logs]);
 
@@ -513,15 +532,15 @@ export default function CampaignResults({
                   >
                     <p className="truncate text-sm font-semibold">{campaign.subject}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      {campaign.segment && BEHAVIOR_SEGMENT_META[campaign.segment] && (
+                      {campaign.segment && (
                         <Badge
                           variant="outline"
                           className={cn(
                             'text-[9px]',
-                            TONE_CLASSES[BEHAVIOR_SEGMENT_META[campaign.segment].tone],
+                            TONE_CLASSES[resolveSegmentMeta(campaign.segment).tone as keyof typeof TONE_CLASSES] || 'border-border text-muted-foreground',
                           )}
                         >
-                          {BEHAVIOR_SEGMENT_META[campaign.segment].label}
+                          {resolveSegmentMeta(campaign.segment).label}
                         </Badge>
                       )}
                       <span className="text-[10px] tabular-nums text-muted-foreground">
