@@ -15,6 +15,7 @@ import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersCha
 import IndustryDiversityCard, { formatIndustryName } from '@/components/admin/charts/IndustryDiversityCard';
 import OperationsAdoptionPanel from '@/components/admin/charts/OperationsAdoptionPanel';
 import UserActivityDotPlot from '@/components/admin/charts/UserActivityDotPlot';
+import ReferralAnalyticsTab from '@/components/admin/referrals/ReferralAnalyticsTab';
 import { AdminCatalogTab } from './components/admin-catalog-tab';
 import {
     Card,
@@ -52,6 +53,8 @@ import {
     ShoppingCart,
     PieChart as PieChartIcon,
     Crown,
+    Gift,
+    Award,
     Calendar as CalendarIcon,
     Clock,
     XCircle,
@@ -193,7 +196,7 @@ import { safeToDate } from '@/lib/utils';
 import DevicePlatformAdoptionSection, { classifyUserPlatform, isVersionLatest, isVersionOutdated } from '@/components/admin/device-platform-section';
 import { AppConfig } from '@/lib/config';
 import { LOCALES, resolveLocale, getLocaleDefinition } from '@/lib/i18n/config';
-import type { BusinessInstance, UserProfile, Purchase, Receipt, Product } from '@/types';
+import type { BusinessInstance, UserProfile, Purchase, Receipt, Product, ReferralRecord } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
 import { Switch } from '@/components/ui/switch';
@@ -2700,7 +2703,7 @@ function BusinessIntelDialog({
 
 function AdminDashboardContent({
     users, businesses, products, receipts, purchases, applications, downloadClicks, grants, checkoutAttempts, branches,
-    storefrontShares = [], receiptShares = [], onlineOrders = [], importAttempts = [],
+    storefrontShares = [], receiptShares = [], onlineOrders = [], importAttempts = [], referrals = [],
     invoices = [], expenses = [], bills = [], estimates = [], recurringInvoices = [], paymentsReceived = [], creditNotes = [], vendors = [], services = []
 }: {
     users: any[];
@@ -2717,6 +2720,7 @@ function AdminDashboardContent({
     receiptShares?: any[];
     onlineOrders?: any[];
     importAttempts?: any[];
+    referrals?: any[];
     invoices?: any[];
     expenses?: any[];
     bills?: any[];
@@ -2837,6 +2841,22 @@ function AdminDashboardContent({
         };
     }, [invoices, expenses, bills, estimates, recurringInvoices, paymentsReceived, creditNotes, vendors, services, businesses]);
 
+    const referralOverviewMetrics = useMemo(() => {
+        const total = (referrals || []).length;
+        const completed = (referrals || []).filter(r => r.status === 'completed' || r.completedPhases?.includes('first_sale_completed')).length;
+        const convRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+        const totalRewardDays = (referrals || []).reduce((sum, r) => sum + (r.status === 'completed' || r.completedPhases?.includes('first_sale_completed') ? (r.rewardDays || 30) : 0), 0);
+        const uniqueReferrers = new Set((referrals || []).map(r => r.referrerBusinessId).filter(Boolean)).size;
+        return {
+            total,
+            completed,
+            pending: total - completed,
+            convRate,
+            totalRewardDays,
+            uniqueReferrers,
+        };
+    }, [referrals]);
+
     // Platform totals for the tab headings. The listeners feeding these tables
     // are capped at ADMIN_LOG_LIMIT rows, so the headings are counted on the
     // server; each falls back to the loaded row count until it resolves.
@@ -2884,6 +2904,16 @@ function AdminDashboardContent({
     // no pagination, and every broadcast ever sent accumulates here.
     const systemBroadcastsQuery = useMemoFirebase(() => query(collection(firestore, 'system_broadcasts'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const { data: systemBroadcasts } = useCollection<any>(systemBroadcastsQuery);
+
+    const [adminActiveTab, setAdminActiveTab] = useState<string>('overview');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const tab = params.get('tab');
+            if (tab) setAdminActiveTab(tab);
+        }
+    }, []);
 
     const [grantEmail, setGrantEmail] = useState('');
     const [grantDate, setGrantDate] = useState<Date>();
@@ -4332,7 +4362,7 @@ function AdminDashboardContent({
                 </div>
             </div>
 
-            <Tabs defaultValue="overview" className="space-y-4">
+            <Tabs value={adminActiveTab} onValueChange={setAdminActiveTab} className="space-y-4">
                 <TabsList className="no-capture flex w-full justify-start overflow-x-auto overflow-y-hidden snap-x h-auto py-2 scrollbar-hide">
                     <TabsTrigger value="overview" className="snap-start shrink-0">Overview</TabsTrigger>
                     <TabsTrigger value="catalog" className="gap-2 snap-start shrink-0">
@@ -4346,6 +4376,10 @@ function AdminDashboardContent({
                     <TabsTrigger value="acquisition" className="gap-2 snap-start shrink-0">
                         <DoorOpen className="h-4 w-4" />
                         Acquisition
+                    </TabsTrigger>
+                    <TabsTrigger value="referrals" className="gap-2 snap-start shrink-0">
+                        <Gift className="h-4 w-4 text-emerald-500" />
+                        Referral Program ({referrals.length})
                     </TabsTrigger>
                     <TabsTrigger value="users" className="snap-start shrink-0">User Management</TabsTrigger>
                     <TabsTrigger value="broadcasts" className="snap-start shrink-0">Comms Center</TabsTrigger>
@@ -4619,6 +4653,104 @@ function AdminDashboardContent({
                                     </div>
                                     <p className="text-[11px] text-muted-foreground">
                                         Collections minus expenses
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Merchant Referral Engine & Virality Network Quick Banner */}
+                    <Card className="border-emerald-500/20 bg-gradient-to-br from-background via-background to-emerald-500/5">
+                        <CardHeader className="pb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                                            <Gift className="h-5 w-5 text-emerald-500" />
+                                            Merchant Referral Engine & Virality Network
+                                        </CardTitle>
+                                        <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                                            {referralOverviewMetrics.convRate}% Conversion
+                                        </Badge>
+                                    </div>
+                                    <CardDescription>
+                                        Real-time peer-to-peer merchant acquisition network, milestone funnels, and advocate rewards.
+                                    </CardDescription>
+                                </div>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => setAdminActiveTab('referrals')}
+                                    className="w-fit border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1.5 font-medium shrink-0"
+                                >
+                                    <span>Open In-Depth Referral Hub</span>
+                                    <ArrowRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-2">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div 
+                                    onClick={() => setAdminActiveTab('referrals')}
+                                    className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1 cursor-pointer transition hover:border-emerald-500/40 hover:bg-emerald-500/5"
+                                >
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Total Invites Logged</span>
+                                        <Gift className="h-4 w-4 text-emerald-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold font-mono">
+                                        {referralOverviewMetrics.total}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {referralOverviewMetrics.uniqueReferrers} champion merchants sharing codes
+                                    </p>
+                                </div>
+
+                                <div 
+                                    onClick={() => setAdminActiveTab('referrals')}
+                                    className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1 cursor-pointer transition hover:border-emerald-500/40 hover:bg-emerald-500/5"
+                                >
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Successfully Converted</span>
+                                        <CheckCircle className="h-4 w-4 text-emerald-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                                        {referralOverviewMetrics.completed}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Completed first sale & unlocked rewards
+                                    </p>
+                                </div>
+
+                                <div 
+                                    onClick={() => setAdminActiveTab('referrals')}
+                                    className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1 cursor-pointer transition hover:border-emerald-500/40 hover:bg-emerald-500/5"
+                                >
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>In-Flight Funnel</span>
+                                        <Clock className="h-4 w-4 text-amber-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
+                                        {referralOverviewMetrics.pending}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Claimed code; onboarding in progress
+                                    </p>
+                                </div>
+
+                                <div 
+                                    onClick={() => setAdminActiveTab('referrals')}
+                                    className="p-4 rounded-xl border bg-card/60 backdrop-blur space-y-1 cursor-pointer transition hover:border-emerald-500/40 hover:bg-emerald-500/5"
+                                >
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                                        <span>Pro Days Granted</span>
+                                        <Award className="h-4 w-4 text-purple-500" />
+                                    </div>
+                                    <div className="text-2xl font-bold font-mono text-purple-600 dark:text-purple-400">
+                                        +{referralOverviewMetrics.totalRewardDays}d
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        30 free Pro days per converted referee
                                     </p>
                                 </div>
                             </div>
@@ -5443,7 +5575,10 @@ function AdminDashboardContent({
                     <LaunchFunnel />
                 </TabsContent>
 
-
+                {/* Referral Program Intelligence, Virality Funnel, and Ledger */}
+                <TabsContent value="referrals" className="space-y-6">
+                    <ReferralAnalyticsTab referrals={referrals} businesses={businesses} users={users} />
+                </TabsContent>
 
                 <TabsContent value="users" className="space-y-6">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -6715,6 +6850,7 @@ export default function AdminDashboardPage() {
     const storefrontSharesQuery = useMemoFirebase(() => query(collection(firestore, 'storefront_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const receiptSharesQuery = useMemoFirebase(() => query(collection(firestore, 'receipt_shares'), orderBy('timestamp', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const onlineOrdersQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'onlineOrders'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const referralsQuery = useMemoFirebase(() => query(collection(firestore, 'referrals'), orderBy('createdAt', 'desc')), [firestore]);
 
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
     const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
@@ -6730,8 +6866,9 @@ export default function AdminDashboardPage() {
     const { data: storefrontShares, isLoading: storefrontSharesLoading } = useCollection<any>(storefrontSharesQuery);
     const { data: receiptShares, isLoading: receiptSharesLoading } = useCollection<any>(receiptSharesQuery);
     const { data: onlineOrders, isLoading: onlineOrdersLoading } = useCollection<any>(onlineOrdersQuery);
+    const { data: referrals, isLoading: referralsLoading } = useCollection<ReferralRecord>(referralsQuery);
 
-    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading || branchesLoading || checkoutAttemptsLoading || importAttemptsLoading || storefrontSharesLoading || receiptSharesLoading || onlineOrdersLoading;
+    const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading || branchesLoading || checkoutAttemptsLoading || importAttemptsLoading || storefrontSharesLoading || receiptSharesLoading || onlineOrdersLoading || referralsLoading;
 
     if (isLoading) {
         return (
@@ -6757,5 +6894,6 @@ export default function AdminDashboardPage() {
         storefrontShares={storefrontShares || []}
         receiptShares={receiptShares || []}
         onlineOrders={onlineOrders || []}
+        referrals={referrals || []}
     />
 }
