@@ -12,6 +12,7 @@ import PlanDistributionChart from '@/components/admin/charts/PlanDistributionCha
 import RetentionCohortChart from '@/components/admin/charts/RetentionCohortChart';
 import FeatureStickinessChart from '@/components/admin/charts/FeatureStickinessChart';
 import DailyActiveUsersChart from '@/components/admin/charts/DailyActiveUsersChart';
+import IndustryDiversityCard, { formatIndustryName } from '@/components/admin/charts/IndustryDiversityCard';
 import OperationsAdoptionPanel from '@/components/admin/charts/OperationsAdoptionPanel';
 import UserActivityDotPlot from '@/components/admin/charts/UserActivityDotPlot';
 import { AdminCatalogTab } from './components/admin-catalog-tab';
@@ -242,7 +243,7 @@ const CustomTooltip = (props: any) => {
     return <CustomTooltipContent {...props} />;
 };
 
-const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description?: string }) => (
+const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number | React.ReactNode, icon: React.ElementType, description?: string }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -3320,11 +3321,21 @@ function AdminDashboardContent({
             return acc;
         }, {} as Record<string, number>);
 
-        const industryCounts = activeBusinesses.reduce((acc, b) => {
-            const industry = b.settings?.industry || 'Pending Onboarding';
-            acc[industry] = (acc[industry] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
+        const totalActiveBizCount = activeBusinesses.length;
+        const industryGroups = new Map<string, {
+            meta: ReturnType<typeof formatIndustryName>;
+            businesses: typeof activeBusinesses;
+        }>();
+
+        activeBusinesses.forEach(b => {
+            const raw = b.settings?.industry || 'Pending Onboarding';
+            const meta = formatIndustryName(raw);
+            const key = meta.displayName;
+            if (!industryGroups.has(key)) {
+                industryGroups.set(key, { meta, businesses: [] });
+            }
+            industryGroups.get(key)!.businesses.push(b);
+        });
 
         const topLocations = Object.entries(locationCounts)
             .map(([name, value]) => ({ name, value }))
@@ -3378,13 +3389,19 @@ function AdminDashboardContent({
             }))
             .sort((a, b) => b.value - a.value);
 
-        const industryData = Object.entries(industryCounts)
-            .map(([name, value]) => ({ 
-                name, 
-                value,
-                fill: `hsl(${(Object.keys(industryCounts).indexOf(name) * 137.5) % 360}, 70%, 50%)`
-            }))
-            .sort((a, b) => b.value - a.value);
+        const industryData = Array.from(industryGroups.entries()).map(([name, group]) => ({
+            name,
+            displayName: group.meta.displayName,
+            subLabel: group.meta.subLabel,
+            icon: group.meta.icon,
+            color: group.meta.color,
+            badgeBg: group.meta.badgeBg,
+            badgeText: group.meta.badgeText,
+            value: group.businesses.length,
+            share: totalActiveBizCount > 0 ? Math.round((group.businesses.length / totalActiveBizCount) * 100) : 0,
+            fill: group.meta.color,
+            businesses: group.businesses,
+        })).sort((a, b) => b.value - a.value);
 
         const businessesWithProductsList = activeBusinesses.filter(b => (productsByBusiness[b.id] || []).length > 0);
         const businessesWithSalesList = activeBusinesses.filter(b => (receiptsByBusiness[b.id] || []).length > 0);
@@ -3446,10 +3463,7 @@ function AdminDashboardContent({
             })),
             languageData,
             languageTrackedUsers: languageUsers.length,
-            industryData: industryData.map(i => ({
-                ...i,
-                businesses: activeBusinesses.filter(b => (b.settings?.industry || 'Pending Onboarding') === i.name)
-            })),
+            industryData,
             businessesWithProducts: businessesWithProductsList.length,
             businessesWithSales: businessesWithSalesList.length,
             businessesWithProductsList,
@@ -3820,6 +3834,22 @@ function AdminDashboardContent({
             ? Math.round((retainedInCohort.length / eligibleCohort.length) * 100)
             : 0;
 
+        const nowMs = Date.now();
+        const startOfToday = startOfDay(new Date());
+
+        const onlineNowUsers = (allUsers || []).filter(u => {
+            const seen = toDate(u.lastSeen);
+            if (!seen) return false;
+            const diffMs = Math.max(0, nowMs - seen.getTime());
+            const isMinimizedOrIdle = u.status === 'minimized' || u.status === 'idle' || u.status === 'away';
+            return diffMs < 5 * 60 * 1000 && !isMinimizedOrIdle;
+        });
+
+        const onlineTodayUsers = (allUsers || []).filter(u => {
+            const seen = toDate(u.lastSeen);
+            return seen && seen >= startOfToday;
+        });
+
         return {
             totalUsers, totalBusinesses, totalProducts, platformGmv, totalProductsSold,
             totalReceipts, platformAOV, mrr, arr, mrrDescription, arrDescription, annualSubsCount, monthlySubsCount, annualMrr, monthlyMrr, ltv, activeUsers, inactiveUsers,
@@ -3834,16 +3864,26 @@ function AdminDashboardContent({
             validPurchases,
             revenueGeneratingBusinessesCount,
             averageUsageSeconds,
-            weeklyRetentionRate
+            weeklyRetentionRate,
+            onlineNowUsers,
+            onlineTodayUsers
         };
     }, [users, businesses, products, convertedReceipts, purchases, downloadClicks, velocityFilter]);
 
 
-    const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying' | 'totalBusinesses' | 'inventoryActive' | 'generatingSales' | 'totalUsers') => {
+    const handleOpenDetailModal = (type: 'active' | 'activated' | 'atRisk' | 'paying' | 'totalBusinesses' | 'inventoryActive' | 'generatingSales' | 'totalUsers' | 'onlineUsers') => {
         let modalData = { open: true, title: '', description: '', businesses: [] as BusinessInstance[] };
         const activeBusinesses = businesses?.filter(b => b.status !== 'deleted') || [];
 
         switch (type) {
+            case 'onlineUsers':
+                setUserListModalState({
+                    open: true,
+                    title: 'Users Online & Active Today',
+                    description: `${analyticsData.onlineNowUsers.length} user${analyticsData.onlineNowUsers.length === 1 ? '' : 's'} online now (< 5 min), ${analyticsData.onlineTodayUsers.length} active account${analyticsData.onlineTodayUsers.length === 1 ? '' : 's'} today.`,
+                    users: analyticsData.onlineTodayUsers.length > 0 ? analyticsData.onlineTodayUsers : analyticsData.onlineNowUsers
+                });
+                return;
             case 'active':
             case 'totalBusinesses':
                 modalData.title = 'All Registered Businesses';
@@ -4345,6 +4385,22 @@ function AdminDashboardContent({
                             </CardTitle>
                         </CardHeader>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4">
+                        <button onClick={() => handleOpenDetailModal('onlineUsers')} className="text-left w-full h-full transition-transform active:scale-95">
+                            <StatCard 
+                                title="Users Online Now" 
+                                value={
+                                    <span className="flex items-center gap-2">
+                                        <span className="relative flex h-3 w-3">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"></span>
+                                        </span>
+                                        <span>{analyticsData.onlineNowUsers.length}</span>
+                                    </span>
+                                } 
+                                icon={Activity} 
+                                description={`${analyticsData.onlineTodayUsers.length} active today · Click to view`}
+                            />
+                        </button>
                         <button onClick={() => handleOpenDetailModal('totalUsers')} className="text-left w-full h-full transition-transform active:scale-95">
                             <StatCard 
                                 title="Total Users" 
@@ -4813,56 +4869,18 @@ function AdminDashboardContent({
                     
                     {/* New Industry & Country Analytics */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <Card className="hover:shadow-md transition-shadow">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Briefcase className="h-5 w-5 text-blue-500" />
-                                    Industry Diversity
-                                </CardTitle>
-                                <CardDescription>Numbers of businesses categorized by industry.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="h-[250px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <ReBarChart
-                                            data={platformAnalytics.industryData}
-                                            layout="vertical"
-                                            margin={{ left: 40, right: 40 }}
-                                            onClick={(data) => {
-                                                if (data && data.activePayload) {
-                                                    const d = data.activePayload[0].payload;
-                                                    setDetailModalState({
-                                                        open: true,
-                                                        title: `${d.name} Businesses`,
-                                                        description: `List of all businesses in the ${d.name} sector.`,
-                                                        businesses: d.businesses,
-                                                    });
-                                                }
-                                            }}
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
-                                            <XAxis type="number" hide />
-                                            <YAxis
-                                                dataKey="name"
-                                                type="category"
-                                                tick={{ fontSize: 11, fontWeight: 500 }}
-                                                width={100}
-                                            />
-                                            <ReTooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
-                                            <Bar
-                                                dataKey="value"
-                                                radius={[0, 4, 4, 0]}
-                                                className="cursor-pointer"
-                                            >
-                                                {platformAnalytics.industryData.map((entry: any, index: number) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                                                ))}
-                                            </Bar>
-                                        </ReBarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <IndustryDiversityCard
+                            industryData={platformAnalytics.industryData}
+                            totalBusinesses={platformAnalytics.totalActiveBusinesses}
+                            onSelectIndustry={(d) => {
+                                setDetailModalState({
+                                    open: true,
+                                    title: `${d.displayName} Businesses`,
+                                    description: `List of all businesses in the ${d.displayName} sector.`,
+                                    businesses: d.businesses,
+                                });
+                            }}
+                        />
 
                         <Card className="hover:shadow-md transition-shadow">
                             <CardHeader>
@@ -5054,7 +5072,21 @@ function AdminDashboardContent({
                     {/* Usage & Engagement Metrics */}
                     <div className="lg:col-span-2 mt-4">
                         <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><UserCheck className="h-6 w-6 text-primary"/> Usage & Engagement Metrics</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                            <StatCard 
+                                title="Users Online Now" 
+                                value={
+                                    <span className="flex items-center gap-2">
+                                        <span className="relative flex h-3 w-3">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"></span>
+                                        </span>
+                                        <span>{analyticsData.onlineNowUsers.length}</span>
+                                    </span>
+                                } 
+                                icon={Activity} 
+                                description={`${analyticsData.onlineTodayUsers.length} active today`} 
+                            />
                             <StatCard 
                                 title="Total Zeneva Users" 
                                 value={analyticsData.totalUsers.toLocaleString()} 
@@ -5082,7 +5114,13 @@ function AdminDashboardContent({
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <UserGrowthChart users={users || []} />
-                            <DailyActiveUsersChart users={users || []} receipts={convertedReceipts || []} />
+                            <DailyActiveUsersChart 
+                                users={users || []} 
+                                receipts={convertedReceipts || []} 
+                                invoices={invoices || []}
+                                expenses={expenses || []}
+                                businesses={businesses || []}
+                            />
                             <FeatureStickinessChart 
                                 businesses={businesses || []} 
                                 products={products || []} 

@@ -171,6 +171,15 @@ const stubs = [
         path: 'src/actions/subscription.ts',
         content: `export type UpgradeResult = { ok: true; plan: string; expiresAt: string } | { ok: false; error: string };\n\nexport async function activateSubscription(): Promise<UpgradeResult> {\n  return { ok: false, error: 'Please complete your upgrade at zeneva.space.' };\n}\n`,
     },
+
+    // src/actions/referral.ts
+    // Imported by signup, POS review, referral dashboard, and pos-context.
+    // In native desktop builds, server-side actions cannot run directly; stubs
+    // provide safe fallbacks, preventing module-not-found webpack compile errors.
+    {
+        path: 'src/actions/referral.ts',
+        content: `export type ReferralProgramDetails = {\n  ok: true;\n  referralCode: string;\n  referralLink: string;\n  stats: {\n    totalReferred: number;\n    completedReferrals: number;\n    rewardDaysEarned: number;\n  };\n  referrals: any[];\n  referredBy?: {\n    code: string;\n    referrerBusinessName?: string;\n    rewardClaimed: boolean;\n  } | null;\n  currentPlan?: string;\n  trialExpiresAt?: string | null;\n} | {\n  ok: false;\n  error: string;\n};\n\nexport async function getReferralProgramDetails(_params?: any): Promise<ReferralProgramDetails> {\n  return {\n    ok: true,\n    referralCode: 'ZEN-APP',\n    referralLink: 'https://zeneva.space/signup',\n    stats: { totalReferred: 0, completedReferrals: 0, rewardDaysEarned: 0 },\n    referrals: [],\n    referredBy: null,\n    currentPlan: 'starter',\n    trialExpiresAt: null,\n  };\n}\n\nexport async function validateReferralCode(_code: string): Promise<{ ok: boolean; valid: boolean; referrerName?: string; error?: string }> {\n  return { ok: true, valid: false };\n}\n\nexport async function applyReferralCode(_params: { idToken?: string; code: string }): Promise<{ ok: boolean; error?: string; referrerName?: string }> {\n  return { ok: false, error: 'Please apply referral codes via the web portal at zeneva.space.' };\n}\n\nexport async function qualifyReferral(_params?: any): Promise<{ ok: boolean; rewarded: boolean; days?: number; error?: string }> {\n  return { ok: true, rewarded: false };\n}\n\nexport async function qualifyReferralOnSale(_params?: any): Promise<{ ok: boolean; rewarded: boolean; days?: number; error?: string }> {\n  return { ok: true, rewarded: false };\n}\n\nexport async function claimReferralDirect(_params: { idToken?: string; code: string }): Promise<{ ok: boolean; rewarded: boolean; error?: string; referrerName?: string }> {\n  return { ok: false, rewarded: false, error: 'Please claim referral codes via the web portal at zeneva.space.' };\n}\n\nexport async function advanceReferralPhase(_params?: any): Promise<{ ok: boolean; updated?: boolean; error?: string }> {\n  return { ok: true, updated: false };\n}\n`,
+    },
 ];
 
 stubs.forEach(s => {
@@ -180,6 +189,44 @@ stubs.forEach(s => {
     fs.writeFileSync(fullPath, s.content);
     console.log(`Created stub: ${s.path}`);
 });
+
+/**
+ * Fail the build if any surviving client code imports a wiped module without a stub.
+ */
+const survivingSources = walkSources(path.resolve(process.cwd(), 'src')).filter(f => {
+  const rel = path.relative(process.cwd(), f).split(path.sep).join('/');
+  return !pathsToDelete.some(p => rel === p || rel.startsWith(p + '/')) &&
+         !foldersToClear.some(p => rel === p || rel.startsWith(p + '/'));
+});
+
+const importRegex = /(?:from\s+['"]|import\s*\(\s*['"])(@\/(?:actions|ai)\/[^'"]+)['"]/g;
+const unstubbed = new Map();
+
+for (const file of survivingSources) {
+  const content = fs.readFileSync(file, 'utf8');
+  let match;
+  while ((match = importRegex.exec(content)) !== null) {
+    const importPath = match[1];
+    const targetRel = 'src/' + importPath.slice(2);
+    const hasStub = stubs.some(s => s.path === targetRel || s.path === `${targetRel}.ts` || s.path.startsWith(`${targetRel}/`));
+    if (!hasStub) {
+      const relCaller = path.relative(process.cwd(), file).split(path.sep).join('/');
+      if (!unstubbed.has(importPath)) unstubbed.set(importPath, []);
+      unstubbed.get(importPath).push(relCaller);
+    }
+  }
+}
+
+if (unstubbed.size > 0) {
+  console.error('\n--- UNSTUBBED CLIENT IMPORTS DETECTED ---');
+  for (const [imp, callers] of unstubbed) {
+    console.error(`  ${imp} is imported by:`);
+    callers.slice(0, 5).forEach(c => console.error(`    - ${c}`));
+    if (callers.length > 5) console.error(`    ... and ${callers.length - 5} more files`);
+  }
+  console.error('\nPlease define a stub in \`stubs\` inside scripts/prepare-tauri.mjs to resolve these imports.\n');
+  process.exit(1);
+}
 
 /**
  * Fail the build if a stub exports fewer names than the module it replaced.
