@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/firebase';
+import { usePos } from '@/context/pos-context';
 import {
   Gift,
   Copy,
@@ -96,6 +97,7 @@ function ReferralPhaseTracker({ referral }: { referral: ReferralRecord }) {
 
 export default function ReferralDashboard() {
   const { user } = useUser();
+  const { business } = usePos();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -107,6 +109,20 @@ export default function ReferralDashboard() {
   const [friendCode, setFriendCode] = useState('');
   const [claiming, setClaiming] = useState(false);
 
+  // Determine active referral code and link, prioritizing valid server response, then live business profile in pos-context
+  const rawCode = data?.referralCode;
+  const activeCode = (rawCode && rawCode !== 'ZEN-APP' && rawCode !== 'ZEN-XXXXXX')
+    ? rawCode
+    : (business?.referralCode && business.referralCode !== 'ZEN-APP' && business.referralCode !== 'ZEN-XXXXXX' ? business.referralCode : null);
+
+  const referralCode = activeCode || 'ZEN-XXXXXX';
+  const referralLink = referralCode !== 'ZEN-XXXXXX'
+    ? `https://zeneva.space/signup?ref=${referralCode}`
+    : (data?.referralLink && !data.referralLink.endsWith('/signup') ? data.referralLink : 'https://zeneva.space/signup');
+  const stats = data?.stats || business?.referralStats || { totalReferred: 0, completedReferrals: 0, rewardDaysEarned: 0 };
+  const referrals = data?.referrals || [];
+  const referredBy = data?.referredBy;
+
   const loadDetails = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -115,52 +131,54 @@ export default function ReferralDashboard() {
       const res = await getReferralProgramDetails({ idToken: token });
       if (res.ok) {
         setData(res);
-      } else {
+      } else if (!business?.referralCode || business.referralCode === 'ZEN-APP') {
         toast({ variant: 'destructive', title: 'Error', description: res.error });
       }
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message || 'Failed to load referral details' });
+      if (!business?.referralCode || business.referralCode === 'ZEN-APP') {
+        toast({ variant: 'destructive', title: 'Error', description: e.message || 'Failed to load referral details' });
+      }
     } finally {
       setLoading(false);
     }
-  }, [user, toast]);
+  }, [user, business?.referralCode, toast]);
 
   useEffect(() => {
     loadDetails();
   }, [loadDetails]);
 
   const handleCopyCode = () => {
-    if (!data?.referralCode) return;
-    navigator.clipboard.writeText(data.referralCode);
+    if (!referralCode || referralCode === 'ZEN-XXXXXX') return;
+    navigator.clipboard.writeText(referralCode);
     setCopiedCode(true);
-    toast({ variant: 'success', title: 'Code Copied!', description: `Referral code ${data.referralCode} copied to clipboard.` });
+    toast({ variant: 'success', title: 'Code Copied!', description: `Referral code ${referralCode} copied to clipboard.` });
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleCopyLink = () => {
-    if (!data?.referralLink) return;
-    navigator.clipboard.writeText(data.referralLink);
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink);
     setCopiedLink(true);
     toast({ variant: 'success', title: 'Link Copied!', description: 'Your unique invite link has been copied.' });
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleShareWhatsApp = () => {
-    if (!data?.referralLink || !data?.referralCode) return;
+    if (!referralLink || !referralCode || referralCode === 'ZEN-XXXXXX') return;
     const message = encodeURIComponent(
-      `Hey! I'm using Zeneva to manage my retail store. Use my referral link or code "${data.referralCode}" to get 30 days of free Pro access: ${data.referralLink}`
+      `Hey! I'm using Zeneva to manage my retail store. Use my referral link or code "${referralCode}" to get 30 days of free Pro access: ${referralLink}`
     );
     window.open(`https://wa.me/?text=${message}`, '_blank');
   };
 
   const handleNativeShare = async () => {
-    if (!data?.referralLink) return;
+    if (!referralLink || !referralCode || referralCode === 'ZEN-XXXXXX') return;
     if (navigator.share) {
       try {
         await navigator.share({
           title: 'Join Zeneva Retail OS',
-          text: `Manage your retail store with Zeneva. Sign up with my code ${data.referralCode} and get 30 days of Pro free!`,
-          url: data.referralLink,
+          text: `Manage your retail store with Zeneva. Sign up with my code ${referralCode} and get 30 days of Pro free!`,
+          url: referralLink,
         });
       } catch (err) {
         // User cancelled share
@@ -194,7 +212,7 @@ export default function ReferralDashboard() {
     }
   };
 
-  if (loading) {
+  if (loading && !activeCode) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
         <Loader2 className="h-7 w-7 animate-spin text-primary" />
@@ -202,15 +220,6 @@ export default function ReferralDashboard() {
       </div>
     );
   }
-
-  const rawCode = data?.referralCode;
-  const referralCode = (rawCode && rawCode !== 'ZEN-APP') ? rawCode : 'ZEN-XXXXXX';
-  const referralLink = referralCode !== 'ZEN-XXXXXX'
-    ? `https://zeneva.space/signup?ref=${referralCode}`
-    : (data?.referralLink && !data.referralLink.endsWith('/signup') ? data.referralLink : 'https://zeneva.space/signup');
-  const stats = data?.stats || { totalReferred: 0, completedReferrals: 0, rewardDaysEarned: 0 };
-  const referrals = data?.referrals || [];
-  const referredBy = data?.referredBy;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
