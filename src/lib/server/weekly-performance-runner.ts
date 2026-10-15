@@ -18,23 +18,8 @@ import {
   type BehaviorUserLike,
   type BehaviorBusinessLike,
 } from '@/lib/behavior-segments';
-
-export type AutomationTrackId =
-  | 'weekly_performance'
-  | 'win_back'
-  | 'cheer_on'
-  | 'onboarding';
-
-export interface AutomationTrackMeta {
-  id: AutomationTrackId;
-  name: string;
-  badge: string;
-  description: string;
-  schedule: string;
-  enabled: boolean;
-  lastRunAt: string | null;
-  totalSent: number;
-}
+import type { AutomationTrackId, AutomationTrackMeta } from '@/types';
+export type { AutomationTrackId, AutomationTrackMeta };
 
 export interface MarketingAutomationsConfig {
   tracks: Record<AutomationTrackId, AutomationTrackMeta>;

@@ -1005,3 +1005,21 @@ export interface ReferralRecord {
     createdAt: any;
     completedAt?: any;
 }
+
+export type AutomationTrackId =
+  | 'weekly_performance'
+  | 'win_back'
+  | 'cheer_on'
+  | 'onboarding';
+
+export interface AutomationTrackMeta {
+  id: AutomationTrackId;
+  name: string;
+  badge: string;
+  description: string;
+  schedule: string;
+  enabled: boolean;
+  lastRunAt: string | null;
+  totalSent: number;
+}
+

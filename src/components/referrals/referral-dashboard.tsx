@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/firebase';
-import { usePos } from '@/context/pos-context';
+import { usePOS } from '@/context/pos-context';
 import {
   Gift,
   Copy,
@@ -97,7 +97,7 @@ function ReferralPhaseTracker({ referral }: { referral: ReferralRecord }) {
 
 export default function ReferralDashboard() {
   const { user } = useUser();
-  const { business } = usePos();
+  const { business } = usePOS();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);

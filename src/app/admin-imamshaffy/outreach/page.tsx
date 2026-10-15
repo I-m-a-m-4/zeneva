@@ -52,7 +52,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { format, isToday, isYesterday } from 'date-fns';
-import type { AutomationTrackId, AutomationTrackMeta } from '@/lib/server/weekly-performance-runner';
+import type { AutomationTrackId, AutomationTrackMeta } from '@/types';
 import CampaignResults from '@/components/admin/email-marketing/campaign-results';
 
 const LOG_LIMIT = 1000;
