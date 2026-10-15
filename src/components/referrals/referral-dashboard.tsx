@@ -203,8 +203,11 @@ export default function ReferralDashboard() {
     );
   }
 
-  const referralCode = data?.referralCode || 'ZEN-XXXXXX';
-  const referralLink = data?.referralLink || (data?.referralCode ? `https://zeneva.space/signup?ref=${data.referralCode}` : 'https://zeneva.space/signup');
+  const rawCode = data?.referralCode;
+  const referralCode = (rawCode && rawCode !== 'ZEN-APP') ? rawCode : 'ZEN-XXXXXX';
+  const referralLink = referralCode !== 'ZEN-XXXXXX'
+    ? `https://zeneva.space/signup?ref=${referralCode}`
+    : (data?.referralLink && !data.referralLink.endsWith('/signup') ? data.referralLink : 'https://zeneva.space/signup');
   const stats = data?.stats || { totalReferred: 0, completedReferrals: 0, rewardDaysEarned: 0 };
   const referrals = data?.referrals || [];
   const referredBy = data?.referredBy;

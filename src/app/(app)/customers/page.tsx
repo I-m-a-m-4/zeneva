@@ -590,6 +590,34 @@ export default function CustomersPage() {
     toast({ variant: 'success', title: 'Customers exported', description: `${filtered.length} rows saved.` });
   };
 
+  // AI Co-Pilot Page Action Listener & Auto-Export
+  React.useEffect(() => {
+    const handlePageAction = (e: any) => {
+      const { action, payload } = e.detail || {};
+      if (!action) return;
+
+      if (action === 'export_current_view' || action === 'export_customers') {
+        handleExportCsv();
+      } else if (action === 'search_customer' && payload) {
+        setSearchTerm(payload);
+      }
+    };
+
+    window.addEventListener('zen-page-action', handlePageAction);
+    return () => window.removeEventListener('zen-page-action', handlePageAction);
+  }, [handleExportCsv]);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autoExport') === 'true' && isDataLoaded && displayCustomers && displayCustomers.length > 0) {
+      handleExportCsv();
+      const url = new URL(window.location.href);
+      url.searchParams.delete('autoExport');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [isDataLoaded, displayCustomers, handleExportCsv]);
+
   /**
    * Bulk delete, routed through the offline queue.
    *

@@ -37,13 +37,13 @@ function add30Days(currentExpiryDate: Date | null): Date {
  * Fetches or initializes a unique referral code for a business.
  */
 async function ensureBusinessReferralCode(businessId: string, existingCode?: string): Promise<string> {
-  if (existingCode) return existingCode;
+  if (existingCode && existingCode !== 'ZEN-APP') return existingCode;
   if (!adminFirestore) throw new Error('Database connection unavailable');
 
   const businessRef = adminFirestore.collection('businessInstances').doc(businessId);
   const snap = await businessRef.get();
   const current = snap.data()?.referralCode;
-  if (current) return current;
+  if (current && current !== 'ZEN-APP') return current;
 
   // Generate unique code with collision check
   let attempts = 0;

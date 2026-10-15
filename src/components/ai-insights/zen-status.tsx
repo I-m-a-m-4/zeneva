@@ -63,6 +63,10 @@ const TOOL_LINES: Record<string, string> = {
   proposeRestock: 'Drafting restock order',
   proposeLowStockThreshold: 'Drafting threshold change',
   proposeSale: 'Ringing up the sale',
+  searchWebForImages: 'Searching web for images',
+  getProductStockHistory: 'Reading stock history',
+  setPageTimeRange: 'Setting date filter',
+  executePageAction: 'Executing page action',
   reportUnanswered: 'Logging unanswered query',
 };
 

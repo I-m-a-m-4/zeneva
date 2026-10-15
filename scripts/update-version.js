@@ -54,11 +54,16 @@ if (fs.existsSync(cargoPath)) {
 }
 
 // Update AppxManifest.xml
-const appxManifestPath = 'C:\\Users\\Bello Imam\\Downloads\\ZenevaPack\\AppxManifest.xml';
-if (fs.existsSync(appxManifestPath)) {
-  let manifest = fs.readFileSync(appxManifestPath, 'utf8');
-  manifest = manifest.replace(/(<Identity\b[^>]*?\bVersion=")[^"]*(")/, `$1${newVersion}.0$2`);
-  manifest = manifest.replace(/(<TargetDeviceFamily\b[^>]*?\bMinVersion=")[^"]*(")/, '$110.0.17763.0$2');
-  fs.writeFileSync(appxManifestPath, manifest);
-  console.log(`Updated AppxManifest.xml to ${newVersion}.0 (TargetDeviceFamily MinVersion: 10.0.17763.0)`);
-}
+const appxManifestPaths = [
+  'C:\\Users\\Bello Imam\\Downloads\\ZenevaPack\\AppxManifest.xml',
+  path.join(__dirname, '..', 'AppxManifest.xml')
+];
+appxManifestPaths.forEach((appxManifestPath) => {
+  if (fs.existsSync(appxManifestPath)) {
+    let manifest = fs.readFileSync(appxManifestPath, 'utf8');
+    manifest = manifest.replace(/(<Identity\b[^>]*?\bVersion=")[^"]*(")/, `$1${newVersion}.0$2`);
+    manifest = manifest.replace(/(<TargetDeviceFamily\b[^>]*?\bMinVersion=")[^"]*(")/, '$110.0.17763.0$2');
+    fs.writeFileSync(appxManifestPath, manifest);
+    console.log(`Updated ${appxManifestPath} to ${newVersion}.0 (TargetDeviceFamily MinVersion: 10.0.17763.0)`);
+  }
+});

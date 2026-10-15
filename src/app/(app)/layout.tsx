@@ -418,6 +418,10 @@ export default function AuthenticatedLayout({
         router.push('/settings?tab=support');
       } else if (action === 'open_visual_stock_take') {
         router.push('/inventory/stock-take');
+      } else if (action === 'open_bulk_image_editor') {
+        router.push('/inventory?action=bulk_image_editor');
+      } else if (action === 'export_customers' || (action === 'export_current_view' && payload === 'customers')) {
+        router.push('/customers?autoExport=true');
       }
     };
     window.addEventListener('zen-page-action', handlePageAction);

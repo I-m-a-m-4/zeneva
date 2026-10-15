@@ -289,7 +289,7 @@ export function groupForTool(name: string): string {
   // fallback: neither has an inventory word in it, so both used to be filed under
   // Inventory — a loss sweep is operational, and a logged miss is a help gap.
   if (/Branch|Staff|Audit|Overview|LossPrevention/i.test(name)) return 'operations';
-  if (/linkToPage|explainHowTo|Unanswered/i.test(name)) return 'navigation';
+  if (/linkToPage|explainHowTo|Unanswered|setPageTimeRange|executePageAction/i.test(name)) return 'navigation';
   if (/Sales|Daily|Transactions|Peak|Selling|Margin|Rating/i.test(name)) return 'sales';
   return 'inventory';
 }

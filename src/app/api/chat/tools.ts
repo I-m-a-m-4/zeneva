@@ -2867,6 +2867,8 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 - 'search_customer': Look up a specific customer (pass name in payload)
 - 'filter_receipts_by_status': Filter sales history (pass status in payload)
 - 'export_current_view': Trigger CSV/PDF export for the current table
+- 'export_customers': Export and download all customers and their contact info as a CSV
+- 'open_bulk_image_editor': Open the Bulk Image Finder to fetch and populate product images in bulk
 - 'switch_report_tab': Switch between Analytics/Profit&Loss (pass tab name in payload)
 - 'contact_support': Open the live chat/support modal
 - 'show_tutorial': Trigger a guided tour for the current page
@@ -2875,7 +2877,8 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
         action: z.enum([
           'open_create_product', 'open_create_expense', 'open_point_of_sale', 'open_settings_tab',
           'search_inventory', 'filter_low_stock', 'search_customer', 'filter_receipts_by_status',
-          'export_current_view', 'switch_report_tab', 'contact_support', 'show_tutorial', 'open_visual_stock_take'
+          'export_current_view', 'export_customers', 'open_bulk_image_editor', 'switch_report_tab',
+          'contact_support', 'show_tutorial', 'open_visual_stock_take'
         ]).describe('The exact action identifier to trigger.'),
         payload: z.string().optional().describe('Optional payload for the action, such as a search query.'),
         message: z.string().describe('A friendly message to show the user confirming the action.'),

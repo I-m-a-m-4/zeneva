@@ -416,6 +416,13 @@ function InventoryPageContent() {
 
   // AI Co-Pilot Page Action Listener
   React.useEffect(() => {
+    if (searchParams.get('action') === 'bulk_image_editor') {
+      setBulkImageEditorMode('missing');
+      setIsBulkImageEditorOpen(true);
+    }
+  }, [searchParams]);
+
+  React.useEffect(() => {
     const handlePageAction = (e: any) => {
       const { action, payload } = e.detail || {};
       if (!action) return;
@@ -428,6 +435,9 @@ function InventoryPageContent() {
         setStockFilter('low-stock');
       } else if (action === 'open_create_product') {
         setIsImportOpen(true);
+      } else if (action === 'open_bulk_image_editor') {
+        setBulkImageEditorMode(payload === 'all' ? 'all' : 'missing');
+        setIsBulkImageEditorOpen(true);
       }
     };
     window.addEventListener('zen-page-action', handlePageAction);
