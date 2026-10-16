@@ -82,12 +82,24 @@ export const createUserProfileDocument = async (
           console.warn("Could not determine local timezone, defaulting to Africa/Lagos");
       }
 
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let initReferralCode = 'ZEN-';
+      for (let i = 0; i < 6; i++) {
+        initReferralCode += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
       const newBusiness: Omit<BusinessInstance, 'id'> = {
         name: displayName,
         createdAt: serverTimestamp(),
         ownerId: user.uid,
         plan: 'starter',
         status: 'active',
+        referralCode: initReferralCode,
+        referralStats: {
+          totalReferred: 0,
+          completedReferrals: 0,
+          rewardDaysEarned: 0,
+        },
         settings: { currency: 'NGN', timezone: localTimezone, defaultTaxRate: 0, productCategories: [] }
       };
       batch.set(businessDocRef, newBusiness);

@@ -80,30 +80,44 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             );
         };
 
-        // Separate true operating overheads (rent, salaries, utilities) from inventory purchases
+        // Separate true operating overheads (rent, salaries, utilities) from inventory purchases,
+        // and distinguish revenue-funded deductions from profit reinvestments.
         let totalPurchases = 0;
+        let purchasesFromProfit = 0;
         let totalOperatingExpenses = 0;
+        let expensesFromProfit = 0;
         const expenseCategoryTotals: Record<string, number> = {};
 
         expenses.forEach(exp => {
             if (exp?.status === 'pending') return; // only count realized outflows
             const amt = Number(exp.amount) || 0;
             const cat = String(exp.category || 'miscellaneous');
+            const isProfitDeduction = (exp as any).deductionSource === 'net_profit';
+
             if (isPurchaseExpense(exp)) {
-                totalPurchases += amt;
+                if (isProfitDeduction) {
+                    purchasesFromProfit += amt;
+                } else {
+                    totalPurchases += amt;
+                }
             } else {
-                totalOperatingExpenses += amt;
+                if (isProfitDeduction) {
+                    expensesFromProfit += amt;
+                } else {
+                    totalOperatingExpenses += amt;
+                }
                 expenseCategoryTotals[cat] = (expenseCategoryTotals[cat] || 0) + amt;
             }
         });
 
         // Effective Cost of Goods Sold:
-        // Direct unit COGS on sold items + supplier purchases offset directly against revenue under COGS.
-        // Supplier purchases subtract from Revenue under COGS, NEVER from Net Profit as an operating expense.
+        // Direct unit COGS on sold items + revenue-funded supplier purchases offset directly against revenue under COGS.
         const effectiveCogs = totalCogs + totalPurchases;
         const netSales = Math.max(0, grossRevenue - totalDiscounts);
         const grossProfit = netSales - effectiveCogs;
-        const netProfit = grossProfit - totalOperatingExpenses;
+        const operatingNetProfit = grossProfit - totalOperatingExpenses;
+        const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
+        const netProfit = operatingNetProfit - totalProfitReinvested;
         const grossMarginPct = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
         const netMarginPct = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
 
@@ -124,11 +138,15 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             grossRevenue,
             totalCogs,
             totalPurchases,
+            purchasesFromProfit,
             effectiveCogs,
             netSales,
             grossProfit,
             totalDiscounts,
             totalOperatingExpenses,
+            expensesFromProfit,
+            totalProfitReinvested,
+            operatingNetProfit,
             expenseCategoryTotals,
             netProfit,
             grossMarginPct,
@@ -410,7 +428,13 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             ]),
             ["  Total Operating Expenses", `(${formatCurrencyForPDF(financialSummary.totalOperatingExpenses)})`, `${financialSummary.grossRevenue > 0 ? ((financialSummary.totalOperatingExpenses / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
             ["", "", ""],
-            ["Net Operating Profit", formatCurrencyForPDF(financialSummary.netProfit), `${financialSummary.netMarginPct.toFixed(1)}%`]
+            ...(financialSummary.totalProfitReinvested > 0 ? [
+                ["Operating Net Profit", formatCurrencyForPDF(financialSummary.operatingNetProfit), `${financialSummary.grossRevenue > 0 ? ((financialSummary.operatingNetProfit / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
+                ["Profit Reinvestments (Capital/Expansion)", `(${formatCurrencyForPDF(financialSummary.totalProfitReinvested)})`, `${financialSummary.grossRevenue > 0 ? ((financialSummary.totalProfitReinvested / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
+                ["Retained Net Profit", formatCurrencyForPDF(financialSummary.netProfit), `${financialSummary.netMarginPct.toFixed(1)}%`]
+            ] : [
+                ["Net Operating Profit", formatCurrencyForPDF(financialSummary.netProfit), `${financialSummary.netMarginPct.toFixed(1)}%`]
+            ])
         ];
 
         autoTable(doc, {
@@ -422,14 +446,15 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [250, 250, 250] },
             didParseCell: function(data) {
-                if (data.row.raw[0] === "Revenue" || data.row.raw[0] === "Cost of Goods Sold (COGS)" || data.row.raw[0] === "Operating Expenses") {
+                const rowLabel = (data.row.raw as any)?.[0];
+                if (rowLabel === "Revenue" || rowLabel === "Cost of Goods Sold (COGS)" || rowLabel === "Operating Expenses" || rowLabel === "Profit Reinvestments (Capital/Expansion)") {
                     data.cell.styles.fontStyle = 'bold';
                     data.cell.styles.fillColor = [240, 240, 240];
                 }
-                if (data.row.raw[0] === "Net Sales Revenue" || data.row.raw[0] === "Gross Profit" || data.row.raw[0] === "Net Operating Profit") {
+                if (rowLabel === "Net Sales Revenue" || rowLabel === "Gross Profit" || rowLabel === "Net Operating Profit" || rowLabel === "Retained Net Profit") {
                     data.cell.styles.fontStyle = 'bold';
                     data.cell.styles.textColor = [15, 23, 42];
-                    if (data.row.raw[0] === "Net Operating Profit") {
+                    if (rowLabel === "Net Operating Profit" || rowLabel === "Retained Net Profit") {
                         data.cell.styles.fillColor = [230, 245, 230];
                     }
                 }
@@ -799,11 +824,42 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             </TableRow>
                             
                             {/* Net Profit Section */}
-                            <TableRow className="font-black text-base border-t-2 border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20">
-                                <TableCell className="font-black text-emerald-700 dark:text-emerald-400 py-4">{t('reports.plsNetOperatingProfit')}</TableCell>
-                                <TableCell className="text-right font-black text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                                <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
-                            </TableRow>
+                            {financialSummary.totalProfitReinvested > 0 ? (
+                                <>
+                                    <TableRow className="font-semibold text-sm border-t border-border/60 bg-muted/10">
+                                        <TableCell className="ps-8 font-semibold text-foreground py-3">Operating Net Profit (Trading Profit)</TableCell>
+                                        <TableCell className="text-right font-bold text-foreground py-3">
+                                            {financialSummary.operatingNetProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono font-medium text-muted-foreground py-3">
+                                            {financialSummary.grossRevenue > 0 ? ((financialSummary.operatingNetProfit / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="font-medium text-sm text-purple-700 dark:text-purple-300 bg-purple-500/5">
+                                        <TableCell className="ps-8 py-2.5 flex items-center gap-2">
+                                            <span>Less: Profit Reinvestments (Capital & Expansion Outflows)</span>
+                                            <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300">Reinvestment</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold text-purple-700 dark:text-purple-300 py-2.5">
+                                            ({financialSummary.totalProfitReinvested.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono text-purple-600/80 dark:text-purple-400/80 py-2.5">
+                                            {financialSummary.grossRevenue > 0 ? ((financialSummary.totalProfitReinvested / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="font-black text-base border-t-2 border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20">
+                                        <TableCell className="font-black text-emerald-700 dark:text-emerald-400 py-4">Retained Net Profit (Final Surplus)</TableCell>
+                                        <TableCell className="text-right font-black text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                        <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
+                                    </TableRow>
+                                </>
+                            ) : (
+                                <TableRow className="font-black text-base border-t-2 border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20">
+                                    <TableCell className="font-black text-emerald-700 dark:text-emerald-400 py-4">{t('reports.plsNetOperatingProfit')}</TableCell>
+                                    <TableCell className="text-right font-black text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                    <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>

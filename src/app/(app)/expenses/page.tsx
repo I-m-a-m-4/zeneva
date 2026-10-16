@@ -90,6 +90,7 @@ import {
   CreditCard,
   ArrowDownRight,
   Boxes,
+  Sparkles,
 } from "lucide-react";
 import { usePOS } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
@@ -103,7 +104,7 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { PieChart as PieChartIcon } from 'lucide-react';
-import type { Expense, ExpenseCategory, ExpensePaymentMethod } from '@/types';
+import type { Expense, ExpenseCategory, ExpensePaymentMethod, ExpenseDeductionSource } from '@/types';
 import { Combobox } from '@/components/ui/combobox';
 import {
   collection,
@@ -147,6 +148,21 @@ export const PAYMENT_METHODS: { id: ExpensePaymentMethod; label: string }[] = [
   { id: 'other', label: 'Other' },
 ];
 
+export const DEDUCTION_SOURCES: { id: ExpenseDeductionSource; label: string; shortLabel: string; description: string }[] = [
+  {
+    id: 'revenue',
+    label: 'Operational Revenue (Standard)',
+    shortLabel: 'Revenue',
+    description: 'Deducted from sales revenue and standard operational cash flow.'
+  },
+  {
+    id: 'net_profit',
+    label: 'Net Profit / Reinvestment',
+    shortLabel: 'Net Profit',
+    description: 'Funded from business net profit / retained earnings reinvested into the business.'
+  }
+];
+
 // ======================== PURCHASE & SUPPLIER TYPES ========================
 
 export interface PurchaseOrderItem {
@@ -173,6 +189,7 @@ export interface SupplierPurchase {
   amountPaid: number;
   balanceDue: number;
   paymentMethod?: ExpensePaymentMethod;
+  deductionSource?: ExpenseDeductionSource;
   notes?: string;
   autoRestock?: boolean;
   autoUpdateCost?: boolean;
@@ -234,6 +251,7 @@ function ExpensesAndPurchasesContent() {
   const [expenseSearch, setExpenseSearch] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState<string>('all');
   const [selectedMethod, setSelectedMethod] = React.useState<string>('all');
+  const [expenseSourceFilter, setExpenseSourceFilter] = React.useState<string>('all');
   const [timeRange, setTimeRange] = React.useState<'today' | 'week' | 'month' | 'year' | 'all'>('month');
   const [drawerOnly, setDrawerOnly] = React.useState(false);
 
@@ -255,6 +273,7 @@ function ExpensesAndPurchasesContent() {
   const [searchOrders, setSearchOrders] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
   const [paymentFilter, setPaymentFilter] = React.useState<string>('all');
+  const [purchaseSourceFilter, setPurchaseSourceFilter] = React.useState<string>('all');
   const [searchSuppliers, setSearchSuppliers] = React.useState('');
 
   // Purchase Dialogs
@@ -284,6 +303,7 @@ function ExpensesAndPurchasesContent() {
   const [expenseAmount, setExpenseAmount] = React.useState('');
   const [expenseCategory, setExpenseCategory] = React.useState<ExpenseCategory>('miscellaneous');
   const [expenseMethod, setExpenseMethod] = React.useState<ExpensePaymentMethod>('cash');
+  const [expenseDeductionSource, setExpenseDeductionSource] = React.useState<ExpenseDeductionSource>('revenue');
   const [expenseDate, setExpenseDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [expenseRecipient, setExpenseRecipient] = React.useState('');
   const [expenseNotes, setExpenseNotes] = React.useState('');
@@ -298,6 +318,7 @@ function ExpensesAndPurchasesContent() {
   ]);
   const [orderAmountPaid, setOrderAmountPaid] = React.useState('0');
   const [orderPaymentMethod, setOrderPaymentMethod] = React.useState<ExpensePaymentMethod>('bank_transfer');
+  const [orderDeductionSource, setOrderDeductionSource] = React.useState<ExpenseDeductionSource>('revenue');
   const [orderNotes, setOrderNotes] = React.useState('');
   const [autoRestock, setAutoRestock] = React.useState(true);
   const [autoUpdateCost, setAutoUpdateCost] = React.useState(true);
@@ -314,6 +335,7 @@ function ExpensesAndPurchasesContent() {
   // Form State: Record Payment
   const [payAmount, setPayAmount] = React.useState('');
   const [payMethod, setPayMethod] = React.useState<ExpensePaymentMethod>('bank_transfer');
+  const [payDeductionSource, setPayDeductionSource] = React.useState<ExpenseDeductionSource>('revenue');
 
   // -------------------------------------------------------------
   // REALTIME LISTENERS
@@ -411,6 +433,16 @@ function ExpensesAndPurchasesContent() {
     const totalPurchasesPaid = purchases.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
     const totalSupplierDebt = purchases.reduce((sum, p) => sum + (Number(p.balanceDue) || 0), 0);
 
+    // Source Breakdown: Revenue vs Net Profit Reinvestment
+    const expensesFromProfit = operatingExpensesList.filter(e => e.deductionSource === 'net_profit').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const expensesFromRevenue = operatingExpensesList.filter(e => !e.deductionSource || e.deductionSource === 'revenue').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const purchasesFromProfit = purchases.filter(p => p.deductionSource === 'net_profit').reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+    const purchasesFromRevenue = purchases.filter(p => !p.deductionSource || p.deductionSource === 'revenue').reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+
+    const totalProfitReinvested = expensesFromProfit + purchasesFromProfit;
+    const totalFromRevenue = expensesFromRevenue + purchasesFromRevenue;
+
     // Combined Cash Outflow (Operating Expenses + Paid Restock Procurement)
     const combinedOutflow = totalOperatingExpenses + totalPurchasesPaid;
 
@@ -423,6 +455,12 @@ function ExpensesAndPurchasesContent() {
       totalPurchasesPaid,
       totalSupplierDebt,
       combinedOutflow,
+      expensesFromProfit,
+      expensesFromRevenue,
+      purchasesFromProfit,
+      purchasesFromRevenue,
+      totalProfitReinvested,
+      totalFromRevenue,
     };
   }, [expenses, purchases]);
 
@@ -434,6 +472,11 @@ function ExpensesAndPurchasesContent() {
       if (selectedCategory !== 'all' && exp.category !== selectedCategory) return false;
       if (selectedMethod !== 'all' && exp.paymentMethod !== selectedMethod) return false;
       if (drawerOnly && !exp.deductFromCashDrawer) return false;
+
+      if (expenseSourceFilter !== 'all') {
+        const source = exp.deductionSource || 'revenue';
+        if (source !== expenseSourceFilter) return false;
+      }
 
       if (timeRange !== 'all') {
         const expDate = safeToDate(exp.date);
@@ -463,7 +506,7 @@ function ExpensesAndPurchasesContent() {
 
       return true;
     });
-  }, [expenses, selectedCategory, selectedMethod, timeRange, drawerOnly, expenseSearch]);
+  }, [expenses, selectedCategory, selectedMethod, expenseSourceFilter, timeRange, drawerOnly, expenseSearch]);
 
   const handleExportExpenseReport = async () => {
     toast({
@@ -490,7 +533,7 @@ function ExpensesAndPurchasesContent() {
       doc.text(`Time Period: ${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}`, 14, 36);
     }
 
-    const tableColumn = ["Date", "Title", "Category", "Payment Method", "Recipient", "Amount"];
+    const tableColumn = ["Date", "Title", "Category", "Funding Source", "Payment Method", "Recipient", "Amount"];
     
     const tableRows = filteredExpenses.map(exp => {
       const dateObj = safeToDate(exp.date);
@@ -501,11 +544,13 @@ function ExpensesAndPurchasesContent() {
       
       const methodStr = exp.paymentMethod.replace('_', ' ');
       const methodCap = methodStr.charAt(0).toUpperCase() + methodStr.slice(1);
+      const sourceStr = exp.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue';
       
       return [
         formattedDate,
         exp.title,
         catName,
+        sourceStr,
         `${methodCap}${exp.deductFromCashDrawer ? ' (Drawer)' : ''}`,
         exp.recipient || '-',
         `${currencySymbol}${exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
@@ -515,6 +560,7 @@ function ExpensesAndPurchasesContent() {
     const totalFiltered = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
     tableRows.push([
       "Total", 
+      "", 
       "", 
       "", 
       "", 
@@ -549,6 +595,11 @@ function ExpensesAndPurchasesContent() {
       if (statusFilter !== 'all' && p.status !== statusFilter) return false;
       if (paymentFilter !== 'all' && p.paymentStatus !== paymentFilter) return false;
 
+      if (purchaseSourceFilter !== 'all') {
+        const source = p.deductionSource || 'revenue';
+        if (source !== purchaseSourceFilter) return false;
+      }
+
       if (searchOrders.trim()) {
         const q = searchOrders.toLowerCase();
         const matchesPo = (p.poNumber || '').toLowerCase().includes(q);
@@ -558,7 +609,7 @@ function ExpensesAndPurchasesContent() {
       }
       return true;
     });
-  }, [purchases, statusFilter, paymentFilter, searchOrders]);
+  }, [purchases, statusFilter, paymentFilter, purchaseSourceFilter, searchOrders]);
 
   // -------------------------------------------------------------
   // FILTERED SUPPLIERS
@@ -642,6 +693,7 @@ function ExpensesAndPurchasesContent() {
     setExpenseAmount('');
     setExpenseCategory('miscellaneous');
     setExpenseMethod('cash');
+    setExpenseDeductionSource('revenue');
     setExpenseDate(new Date().toISOString().split('T')[0]);
     setExpenseRecipient('');
     setExpenseNotes('');
@@ -665,6 +717,7 @@ function ExpensesAndPurchasesContent() {
         amount: amt,
         category: expenseCategory,
         paymentMethod: expenseMethod,
+        deductionSource: expenseDeductionSource,
         date: Timestamp.fromDate(new Date(expenseDate)),
         recipient: expenseRecipient.trim() || undefined,
         notes: expenseNotes.trim() || undefined,
@@ -681,6 +734,7 @@ function ExpensesAndPurchasesContent() {
           amount: payload.amount,
           category: payload.category,
           paymentMethod: payload.paymentMethod,
+          deductionSource: payload.deductionSource,
           date: payload.date,
           recipient: payload.recipient || null,
           notes: payload.notes || null,
@@ -736,6 +790,7 @@ function ExpensesAndPurchasesContent() {
     setOrderItems([{ productId: '', productName: '', quantityOrdered: 1, quantityReceived: 0, unitCost: 0, totalCost: 0 }]);
     setOrderAmountPaid('0');
     setOrderPaymentMethod('bank_transfer');
+    setOrderDeductionSource('revenue');
     setOrderNotes('');
     setAutoRestock(true);
     setAutoUpdateCost(true);
@@ -821,6 +876,7 @@ function ExpensesAndPurchasesContent() {
         amountPaid: amtPaid,
         balanceDue: balDue,
         paymentMethod: orderPaymentMethod,
+        deductionSource: orderDeductionSource,
         notes: orderNotes.trim() || undefined,
         autoRestock,
         autoUpdateCost,
@@ -840,6 +896,7 @@ function ExpensesAndPurchasesContent() {
           amount: amtPaid,
           category: 'supplier_payment',
           paymentMethod: (orderPaymentMethod as any) || 'bank_transfer',
+          deductionSource: orderDeductionSource,
           description: `Payment for Purchase Order ${poNum} to ${supplier?.name || 'Supplier'}`,
           date: Timestamp.fromDate(new Date(orderDate)),
           recipient: supplier?.name || 'Supplier',
@@ -952,6 +1009,7 @@ function ExpensesAndPurchasesContent() {
         amountPaid: newPaid,
         balanceDue: newBalance,
         paymentStatus: newPaymentStatus,
+        deductionSource: payDeductionSource,
         updatedAt: serverTimestamp(),
       });
 
@@ -963,6 +1021,7 @@ function ExpensesAndPurchasesContent() {
           amount: payActual,
           category: 'supplier_payment',
           paymentMethod: (payMethod as any) || 'bank_transfer',
+          deductionSource: payDeductionSource,
           description: `Payment towards Purchase Order ${purchase.poNumber} (${purchase.supplierName})`,
           date: serverTimestamp(),
           recipient: purchase.supplierName,
@@ -1040,13 +1099,14 @@ function ExpensesAndPurchasesContent() {
   const handleExportExpensesCsv = () => {
     if (filteredExpenses.length === 0) return;
     const rows: (string | number)[][] = [
-      ['Date', 'Title', 'Category', 'Amount', 'Payment Method', 'Paid From Till', 'Recipient', 'Logged By', 'Notes']
+      ['Date', 'Title', 'Category', 'Funding Source', 'Amount', 'Payment Method', 'Paid From Till', 'Recipient', 'Logged By', 'Notes']
     ];
     filteredExpenses.forEach(e => {
       rows.push([
         safeToDate(e.date)?.toISOString().split('T')[0] || '',
         e.title,
         e.category,
+        e.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue',
         e.amount,
         e.paymentMethod,
         e.deductFromCashDrawer ? 'Yes' : 'No',
@@ -1063,13 +1123,14 @@ function ExpensesAndPurchasesContent() {
   const handleExportPurchasesCsv = () => {
     if (filteredPurchases.length === 0) return;
     const rows: (string | number)[][] = [
-      ['PO Number', 'Date', 'Supplier', 'Items Count', 'Total Amount', 'Amount Paid', 'Balance Due', 'Order Status', 'Payment Status', 'Notes']
+      ['PO Number', 'Date', 'Supplier', 'Funding Source', 'Items Count', 'Total Amount', 'Amount Paid', 'Balance Due', 'Order Status', 'Payment Status', 'Notes']
     ];
     filteredPurchases.forEach(p => {
       rows.push([
         p.poNumber,
         safeToDate(p.orderDate)?.toISOString().split('T')[0] || '',
         p.supplierName,
+        p.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue',
         p.items?.length || 0,
         p.totalAmount,
         p.amountPaid,
@@ -1146,10 +1207,16 @@ function ExpensesAndPurchasesContent() {
               {currencySymbol}{metrics.combinedOutflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-1">
             <p className="text-xs text-muted-foreground">
               Operating ({currencySymbol}{metrics.totalOperatingExpenses.toLocaleString()}) + Restock ({currencySymbol}{metrics.totalPurchasesPaid.toLocaleString()})
             </p>
+            {metrics.totalProfitReinvested > 0 && (
+              <div className="flex items-center gap-1.5 pt-1 border-t text-[11px] text-purple-600 dark:text-purple-400 font-medium">
+                <Sparkles className="h-3 w-3 shrink-0" />
+                <span>Reinvested from Profit: {currencySymbol}{metrics.totalProfitReinvested.toLocaleString()}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1492,7 +1559,7 @@ function ExpensesAndPurchasesContent() {
           {/* Filters Bar */}
           <Card>
             <CardContent className="p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1528,6 +1595,20 @@ function ExpensesAndPurchasesContent() {
                   </SelectContent>
                 </Select>
 
+                <Select value={expenseSourceFilter} onValueChange={setExpenseSourceFilter}>
+                  <SelectTrigger>
+                    <div className="flex items-center gap-2 truncate">
+                      <Coins className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Funding Source" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Funding Sources</SelectItem>
+                    <SelectItem value="revenue">Operational Revenue</SelectItem>
+                    <SelectItem value="net_profit">Net Profit Reinvestment</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Select value={timeRange} onValueChange={(v: any) => setTimeRange(v)}>
                   <SelectTrigger>
                     <div className="flex items-center gap-2 truncate">
@@ -1554,7 +1635,7 @@ function ExpensesAndPurchasesContent() {
                     onCheckedChange={setDrawerOnly}
                   />
                 </div>
-                <div className="flex items-center sm:col-span-2 md:col-span-4 justify-end">
+                <div className="flex items-center sm:col-span-2 md:col-span-5 justify-end">
                   <Button variant="outline" className="w-full sm:w-auto" onClick={handleExportExpenseReport}>
                     <Download className="mr-2 h-4 w-4" />
                     Export PDF
@@ -1590,6 +1671,7 @@ function ExpensesAndPurchasesContent() {
                       <TableHead>Date</TableHead>
                       <TableHead>Title</TableHead>
                       <TableHead>Category</TableHead>
+                      <TableHead>Funding Source</TableHead>
                       <TableHead>Payment Method</TableHead>
                       <TableHead>Paid To / Recipient</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
@@ -1617,6 +1699,18 @@ function ExpensesAndPurchasesContent() {
                               <CategoryIcon className="h-3 w-3" />
                               <span>{catInfo?.label.split('(')[0].trim() || exp.category}</span>
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {exp.deductionSource === 'net_profit' ? (
+                              <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
+                                <Sparkles className="h-3 w-3" />
+                                <span>Net Profit</span>
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
+                                <span>Revenue</span>
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1648,6 +1742,7 @@ function ExpensesAndPurchasesContent() {
                                   setExpenseAmount(exp.amount.toString());
                                   setExpenseCategory(exp.category);
                                   setExpenseMethod(exp.paymentMethod);
+                                  setExpenseDeductionSource(exp.deductionSource || 'revenue');
                                   setExpenseDate(safeToDate(exp.date)?.toISOString().split('T')[0] || '');
                                   setExpenseRecipient(exp.recipient || '');
                                   setExpenseNotes(exp.notes || '');
@@ -1681,7 +1776,7 @@ function ExpensesAndPurchasesContent() {
           {/* Purchase Filters Bar */}
           <Card>
             <CardContent className="p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1713,6 +1808,20 @@ function ExpensesAndPurchasesContent() {
                     <SelectItem value="paid">Fully Paid</SelectItem>
                     <SelectItem value="partial">Partially Paid</SelectItem>
                     <SelectItem value="pending">Pending / Debt</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={purchaseSourceFilter} onValueChange={setPurchaseSourceFilter}>
+                  <SelectTrigger>
+                    <div className="flex items-center gap-2 truncate">
+                      <Coins className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Funding Source" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Funding Sources</SelectItem>
+                    <SelectItem value="revenue">Operational Revenue</SelectItem>
+                    <SelectItem value="net_profit">Net Profit Reinvestment</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1748,6 +1857,7 @@ function ExpensesAndPurchasesContent() {
                       <TableHead>Items</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment</TableHead>
+                      <TableHead>Funding Source</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Balance Due</TableHead>
                       <TableHead className="w-[80px]"></TableHead>
@@ -1806,6 +1916,18 @@ function ExpensesAndPurchasesContent() {
                               </Badge>
                             )}
                           </TableCell>
+                          <TableCell>
+                            {purchase.deductionSource === 'net_profit' ? (
+                              <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
+                                <Sparkles className="h-3 w-3" />
+                                <span>Net Profit</span>
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
+                                <span>Revenue</span>
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right font-bold text-foreground font-mono">
                             {currencySymbol}{purchase.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
@@ -1842,6 +1964,7 @@ function ExpensesAndPurchasesContent() {
                                   <DropdownMenuItem onClick={() => {
                                     setPayingPurchase(purchase);
                                     setPayAmount(purchase.balanceDue.toString());
+                                    setPayDeductionSource(purchase.deductionSource || 'revenue');
                                   }}>
                                     <CreditCard className="h-4 w-4 mr-2" />
                                     Record Payment
@@ -2097,6 +2220,61 @@ function ExpensesAndPurchasesContent() {
                   </Select>
                 </div>
 
+                {/* Funding / Deduction Source */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-foreground/90 flex items-center gap-1.5">
+                      <Coins className="h-3.5 w-3.5 text-primary" />
+                      Funding & Deduction Source
+                    </Label>
+                    <span className="text-[11px] text-muted-foreground">Accounting treatment</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div
+                      onClick={() => setExpenseDeductionSource('revenue')}
+                      className={cn(
+                        "cursor-pointer p-3 rounded-lg border text-left transition-all",
+                        expenseDeductionSource === 'revenue'
+                          ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30"
+                          : "bg-muted/20 border-border hover:bg-muted/40"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={cn("h-3.5 w-3.5 rounded-full border flex items-center justify-center", expenseDeductionSource === 'revenue' ? "border-primary bg-primary" : "border-muted-foreground")}>
+                          {expenseDeductionSource === 'revenue' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </div>
+                        <span className="text-xs font-semibold text-foreground">Operational Revenue (Standard)</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1.5 pl-5.5 leading-relaxed">
+                        Deducted directly from daily/monthly sales revenue as standard operating overhead.
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setExpenseDeductionSource('net_profit')}
+                      className={cn(
+                        "cursor-pointer p-3 rounded-lg border text-left transition-all",
+                        expenseDeductionSource === 'net_profit'
+                          ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30 dark:bg-purple-950/30"
+                          : "bg-muted/20 border-border hover:bg-muted/40"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={cn("h-3.5 w-3.5 rounded-full border flex items-center justify-center", expenseDeductionSource === 'net_profit' ? "border-purple-600 bg-purple-600" : "border-muted-foreground")}>
+                          {expenseDeductionSource === 'net_profit' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </div>
+                        <span className="text-xs font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          Net Profit Reinvestment
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1.5 pl-5.5 leading-relaxed">
+                        Funded by reinvesting retained business earnings when sales revenue is low or for business reinvestments.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Recipient */}
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="recipient" className="text-xs font-semibold text-foreground/90">
@@ -2350,6 +2528,61 @@ function ExpensesAndPurchasesContent() {
                 </div>
               </div>
 
+              {/* Deduction / Funding Source Selection */}
+              <div className="space-y-1.5 p-3 border rounded-lg bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Coins className="h-3.5 w-3.5 text-primary" />
+                    Funding & Deduction Source
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">Accounting source</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div
+                    onClick={() => setOrderDeductionSource('revenue')}
+                    className={cn(
+                      "cursor-pointer p-2.5 rounded-md border text-left transition-all",
+                      orderDeductionSource === 'revenue'
+                        ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30"
+                        : "bg-background border-border hover:bg-muted/40"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className={cn("h-3 w-3 rounded-full border flex items-center justify-center", orderDeductionSource === 'revenue' ? "border-primary bg-primary" : "border-muted-foreground")}>
+                        {orderDeductionSource === 'revenue' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </div>
+                      <span className="text-xs font-medium text-foreground">Operational Revenue (COGS)</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 pl-4.5 leading-relaxed">
+                      Standard inventory purchase deducted from operating revenue.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setOrderDeductionSource('net_profit')}
+                    className={cn(
+                      "cursor-pointer p-2.5 rounded-md border text-left transition-all",
+                      orderDeductionSource === 'net_profit'
+                        ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30 dark:bg-purple-950/30"
+                        : "bg-background border-border hover:bg-muted/40"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className={cn("h-3 w-3 rounded-full border flex items-center justify-center", orderDeductionSource === 'net_profit' ? "border-purple-600 bg-purple-600" : "border-muted-foreground")}>
+                        {orderDeductionSource === 'net_profit' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </div>
+                      <span className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        Net Profit Reinvestment
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 pl-4.5 leading-relaxed">
+                      Funded from retained profit without reducing operational gross margin.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 text-xs">
                 <div>
                   <p className="font-semibold text-foreground">Auto-Restock on Receipt</p>
@@ -2479,9 +2712,21 @@ function ExpensesAndPurchasesContent() {
                   <ReceiptText className="h-5 w-5 text-primary" />
                   Order {viewingPurchase.poNumber}
                 </span>
-                <Badge variant="outline" className="capitalize">
-                  {viewingPurchase.status}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className="capitalize">
+                    {viewingPurchase.status}
+                  </Badge>
+                  {viewingPurchase.deductionSource === 'net_profit' ? (
+                    <Badge variant="outline" className="bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 text-xs flex items-center gap-1 font-medium">
+                      <Sparkles className="h-3 w-3" />
+                      <span>Net Profit</span>
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 text-xs">
+                      <span>Revenue</span>
+                    </Badge>
+                  )}
+                </div>
               </DialogTitle>
               <DialogDescription>
                 Supplier: {viewingPurchase.supplierName} • Ordered on {safeToDate(viewingPurchase.orderDate)?.toLocaleDateString()}
@@ -2586,6 +2831,22 @@ function ExpensesAndPurchasesContent() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="pay-source">Deduction / Funding Source</Label>
+                <Select value={payDeductionSource} onValueChange={(v: any) => setPayDeductionSource(v)}>
+                  <SelectTrigger id="pay-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="revenue">Operational Revenue (Standard)</SelectItem>
+                    <SelectItem value="net_profit">Net Profit Reinvestment</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">
+                  Choose whether this payment is deducted from operational revenue or reinvested from net profit.
+                </p>
+              </div>
             </div>
 
             <DialogFooter>
@@ -2676,7 +2937,7 @@ function ExpensesAndPurchasesContent() {
 
                   if (selectedKpiModal.id === 'total_outflow') {
                     // Unified timeline of expenses + purchases
-                    const combinedList: { id: string; date: Date | null; type: 'expense' | 'purchase'; title: string; subtitle: string; amount: number; badge: string; raw: any }[] = [];
+                    const combinedList: { id: string; date: Date | null; type: 'expense' | 'purchase'; title: string; subtitle: string; amount: number; badge: string; deductionSource: ExpenseDeductionSource; raw: any }[] = [];
                     
                     expenses.forEach(e => {
                       combinedList.push({
@@ -2687,6 +2948,7 @@ function ExpensesAndPurchasesContent() {
                         subtitle: `Category: ${EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label.split('(')[0].trim() || e.category}`,
                         amount: Number(e.amount) || 0,
                         badge: e.paymentMethod.replace('_', ' '),
+                        deductionSource: e.deductionSource || 'revenue',
                         raw: e,
                       });
                     });
@@ -2700,6 +2962,7 @@ function ExpensesAndPurchasesContent() {
                         subtitle: `Supplier: ${p.supplierName} (${p.items?.length || 0} items)`,
                         amount: Number(p.totalAmount) || 0,
                         badge: p.status,
+                        deductionSource: p.deductionSource || 'revenue',
                         raw: p,
                       });
                     });
@@ -2721,6 +2984,7 @@ function ExpensesAndPurchasesContent() {
                             <TableHead className="text-xs">Type</TableHead>
                             <TableHead className="text-xs">Date</TableHead>
                             <TableHead className="text-xs">Description</TableHead>
+                            <TableHead className="text-xs">Funding Source</TableHead>
                             <TableHead className="text-xs">Details</TableHead>
                             <TableHead className="text-xs text-right">Amount</TableHead>
                           </TableRow>
@@ -2737,6 +3001,18 @@ function ExpensesAndPurchasesContent() {
                                 {item.date ? format(item.date, 'MMM d, yyyy') : 'N/A'}
                               </TableCell>
                               <TableCell className="font-medium text-xs">{item.title}</TableCell>
+                              <TableCell>
+                                {item.deductionSource === 'net_profit' ? (
+                                  <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
+                                    <Sparkles className="h-2.5 w-2.5" />
+                                    <span>Net Profit</span>
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
+                                    <span>Revenue</span>
+                                  </Badge>
+                                )}
+                              </TableCell>
                               <TableCell className="text-xs text-muted-foreground">{item.subtitle}</TableCell>
                               <TableCell className="text-xs text-right font-bold font-mono">
                                 {currencySymbol}{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -2775,6 +3051,7 @@ function ExpensesAndPurchasesContent() {
                             <TableHead className="text-xs">Date</TableHead>
                             <TableHead className="text-xs">Expense Title</TableHead>
                             <TableHead className="text-xs">Category</TableHead>
+                            <TableHead className="text-xs">Funding Source</TableHead>
                             <TableHead className="text-xs">Payment Method</TableHead>
                             <TableHead className="text-xs">Recipient</TableHead>
                             <TableHead className="text-xs text-right">Amount</TableHead>
@@ -2792,6 +3069,18 @@ function ExpensesAndPurchasesContent() {
                                 <TableCell className="font-medium text-xs">{e.title}</TableCell>
                                 <TableCell className="text-xs">
                                   <Badge variant="secondary" className="font-normal text-[11px]">{catLabel}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {e.deductionSource === 'net_profit' ? (
+                                    <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
+                                      <Sparkles className="h-2.5 w-2.5" />
+                                      <span>Net Profit</span>
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
+                                      <span>Revenue</span>
+                                    </Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-xs capitalize">
                                   {e.paymentMethod.replace('_', ' ')}
@@ -2833,6 +3122,7 @@ function ExpensesAndPurchasesContent() {
                             <TableHead className="text-xs">Order Date</TableHead>
                             <TableHead className="text-xs">Supplier</TableHead>
                             <TableHead className="text-xs">Status</TableHead>
+                            <TableHead className="text-xs">Funding Source</TableHead>
                             <TableHead className="text-xs text-right">Total Bill</TableHead>
                             <TableHead className="text-xs text-right">Amount Paid</TableHead>
                             <TableHead className="text-xs text-right">Balance Due</TableHead>
@@ -2860,6 +3150,18 @@ function ExpensesAndPurchasesContent() {
                                   >
                                     {p.status}
                                   </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {p.deductionSource === 'net_profit' ? (
+                                    <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
+                                      <Sparkles className="h-2.5 w-2.5" />
+                                      <span>Net Profit</span>
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
+                                      <span>Revenue</span>
+                                    </Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-xs text-right font-mono font-medium">
                                   {currencySymbol}{Number(p.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}

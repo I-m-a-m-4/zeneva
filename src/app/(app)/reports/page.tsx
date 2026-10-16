@@ -625,20 +625,30 @@ export default function ReportsDashboard() {
 
         const realizedExpenses = reportBatchExpenses.filter(e => (e as any)?.status !== 'pending');
 
-        const totalPurchases = realizedExpenses
-            .filter(isPurchaseExpense)
-            .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        let totalPurchases = 0;
+        let purchasesFromProfit = 0;
+        let totalOperatingExpenses = 0;
+        let expensesFromProfit = 0;
 
-        const totalOperatingExpenses = realizedExpenses
-            .filter(e => !isPurchaseExpense(e))
-            .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        for (const e of realizedExpenses) {
+            const amt = Number(e.amount) || 0;
+            const isProfit = (e as any).deductionSource === 'net_profit';
+            if (isPurchaseExpense(e)) {
+                if (isProfit) purchasesFromProfit += amt;
+                else totalPurchases += amt;
+            } else {
+                if (isProfit) expensesFromProfit += amt;
+                else totalOperatingExpenses += amt;
+            }
+        }
 
         // Effective Cost of Goods Sold:
-        // Direct unit COGS on sold items + supplier purchases / restock offset directly against Revenue under COGS.
-        // Supplier purchases subtract from Revenue under COGS, NEVER from Net Profit as an operating expense.
+        // Direct unit COGS on sold items + revenue-funded supplier purchases offset directly against Revenue under COGS.
         const effectiveCost = receiptCost + totalPurchases;
         const grossProfit = totalRevenue - effectiveCost;
-        const totalProfit = grossProfit - totalOperatingExpenses;
+        const operatingProfit = grossProfit - totalOperatingExpenses;
+        const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
+        const totalProfit = operatingProfit - totalProfitReinvested;
 
         return {
             totalRevenue,
@@ -683,6 +693,10 @@ export default function ReportsDashboard() {
             dailyAverageSales: activeDays > 0 ? totalSales / activeDays : 0,
             dailyAverageRevenue: activeDays > 0 ? totalRevenue / activeDays : 0,
             totalProfit,
+            operatingProfit,
+            totalProfitReinvested,
+            purchasesFromProfit,
+            expensesFromProfit,
             totalCost: effectiveCost,
             totalPurchases,
             totalOperatingExpenses,

@@ -878,6 +878,8 @@ export type ExpenseCategory =
 
 export type ExpensePaymentMethod = 'cash' | 'bank_transfer' | 'pos_card' | 'personal_funds' | 'other';
 
+export type ExpenseDeductionSource = 'revenue' | 'net_profit';
+
 export interface Expense {
     id: string;
     businessId: string;
@@ -889,6 +891,7 @@ export interface Expense {
     paidBy?: string; // User display name or ID
     receiptUrl?: string; // Optional bill/receipt reference or URL
     isPaidFromDrawer?: boolean; // Whether cash was deducted from daily till / register
+    deductionSource?: ExpenseDeductionSource; // 'revenue' (operational) or 'net_profit' (reinvestment)
     status?: 'paid' | 'pending';
     branchId?: string;
     createdAt?: any;
@@ -937,6 +940,7 @@ export interface SupplierPurchase {
     status: PurchaseOrderStatus;
     paymentStatus: PurchasePaymentStatus;
     paymentMethod?: ExpensePaymentMethod;
+    deductionSource?: ExpenseDeductionSource; // 'revenue' (COGS) or 'net_profit' (reinvestment)
     items: PurchaseOrderItem[];
     totalAmount: number;
     amountPaid: number;

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { usePOS } from '@/context/pos-context';
 import {
   Gift,
@@ -123,6 +124,8 @@ export default function ReferralDashboard() {
   const referrals = data?.referrals || [];
   const referredBy = data?.referredBy;
 
+  const firestore = useFirestore();
+
   const loadDetails = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -131,17 +134,39 @@ export default function ReferralDashboard() {
       const res = await getReferralProgramDetails({ idToken: token });
       if (res.ok) {
         setData(res);
-      } else if (!business?.referralCode || business.referralCode === 'ZEN-APP') {
-        toast({ variant: 'destructive', title: 'Error', description: res.error });
+      } else {
+        // Fallback for desktop/static builds if server action cannot run
+        if ((!business?.referralCode || business.referralCode === 'ZEN-APP' || business.referralCode === 'ZEN-XXXXXX') && business?.id && firestore) {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          let genCode = 'ZEN-';
+          for (let i = 0; i < 6; i++) {
+            genCode += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          await updateDoc(doc(firestore, 'businessInstances', business.id), {
+            referralCode: genCode,
+            referralStats: { totalReferred: 0, completedReferrals: 0, rewardDaysEarned: 0 },
+          });
+        }
       }
     } catch (e: any) {
-      if (!business?.referralCode || business.referralCode === 'ZEN-APP') {
-        toast({ variant: 'destructive', title: 'Error', description: e.message || 'Failed to load referral details' });
+      // If server action fails on desktop, provision code directly via Firestore client if needed
+      if ((!business?.referralCode || business.referralCode === 'ZEN-APP' || business.referralCode === 'ZEN-XXXXXX') && business?.id && firestore) {
+        try {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          let genCode = 'ZEN-';
+          for (let i = 0; i < 6; i++) {
+            genCode += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          await updateDoc(doc(firestore, 'businessInstances', business.id), {
+            referralCode: genCode,
+            referralStats: { totalReferred: 0, completedReferrals: 0, rewardDaysEarned: 0 },
+          });
+        } catch (_) {}
       }
     } finally {
       setLoading(false);
     }
-  }, [user, business?.referralCode, toast]);
+  }, [user, business?.id, business?.referralCode, firestore]);
 
   useEffect(() => {
     loadDetails();

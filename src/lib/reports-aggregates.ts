@@ -656,6 +656,9 @@ export type PeriodSummary = {
   receiptCount: number;
   totalExpenses: number;
   netProfit: number;
+  totalProfitReinvested?: number;
+  purchasesFromProfit?: number;
+  expensesFromProfit?: number;
 };
 
 /** Roll a set of receipts into the figures the KPI row compares. */
@@ -708,19 +711,31 @@ export function summarisePeriod(
 
   let totalExpenses = 0;
   let totalPurchases = 0;
+  let purchasesFromProfit = 0;
+  let expensesFromProfit = 0;
+
   for (const exp of expenses || []) {
     if (exp?.status !== 'pending') { // Only count actual spent money (paid)
       const amt = num(exp?.amount);
+      const isProfitDeduction = (exp as any)?.deductionSource === 'net_profit';
       if (isPurchase(exp)) {
-        totalPurchases += amt;
+        if (isProfitDeduction) {
+          purchasesFromProfit += amt;
+        } else {
+          totalPurchases += amt;
+        }
       } else {
-        totalExpenses += amt;
+        if (isProfitDeduction) {
+          expensesFromProfit += amt;
+        } else {
+          totalExpenses += amt;
+        }
       }
     }
   }
 
   const sales = list.length;
-  // Effective Cost of Goods Sold includes unit cost of sold goods plus supplier inventory purchases.
+  // Effective Cost of Goods Sold includes unit cost of sold goods plus supplier inventory purchases paid from revenue.
   // Both subtract directly from revenue to determine Gross Profit.
   // Operating expenses (rent, utilities, etc.) subtract from Gross Profit to determine Net Profit.
   const grossProfit = anyCost
@@ -728,8 +743,12 @@ export function summarisePeriod(
     : (revenue - totalPurchases);
   const profit = anyCost || totalPurchases > 0 ? grossProfit : null;
 
-  // Net Profit = Gross Profit - Operating Expenses (purchases subtract from revenue, never from net profit)
-  const netProfit = grossProfit - totalExpenses;
+  // Operating Net Profit = Gross Profit - Operating Expenses (funded from revenue)
+  const operatingNetProfit = grossProfit - totalExpenses;
+  // Profit Reinvestments = Outflows funded from accumulated net profit
+  const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
+  // Retained Net Profit = Operating Net Profit - Profit Reinvestments
+  const netProfit = operatingNetProfit - totalProfitReinvested;
 
   return {
     revenue,
@@ -741,7 +760,10 @@ export function summarisePeriod(
     buyers: buyers.size,
     receiptCount: sales,
     totalExpenses,
-    netProfit
+    netProfit,
+    totalProfitReinvested,
+    purchasesFromProfit,
+    expensesFromProfit
   };
 }
 
