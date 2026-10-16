@@ -177,7 +177,143 @@ const stubs = [
     // this stub proxies all referral operations over HTTPS to the hosted API.
     {
         path: 'src/actions/referral.ts',
-        content: `import { apiBase } from '@/lib/platform';\n\nexport type ReferralProgramDetails = {\n  ok: true;\n  referralCode: string;\n  referralLink: string;\n  stats: {\n    totalReferred: number;\n    completedReferrals: number;\n    rewardDaysEarned: number;\n  };\n  referrals: any[];\n  referredBy?: {\n    code: string;\n    referrerBusinessName?: string;\n    rewardClaimed: boolean;\n  } | null;\n  currentPlan?: string;\n  trialExpiresAt?: string | null;\n} | {\n  ok: false;\n  error: string;\n};\n\nexport async function getReferralProgramDetails(params?: any): Promise<ReferralProgramDetails> {\n  try {\n    const base = apiBase();\n    const url = (base || '') + '/api/referrals';\n    const res = await fetch(url, {\n      method: 'GET',\n      headers: {\n        'Content-Type': 'application/json',\n        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})\n      }\n    });\n    if (!res.ok) {\n      const err = await res.json().catch(() => ({}));\n      return { ok: false, error: err.error || ('Referral service error: ' + res.status) };\n    }\n    return await res.json();\n  } catch (e: any) {\n    return { ok: false, error: e?.message || 'Failed to fetch referral details' };\n  }\n}\n\nexport async function validateReferralCode(code: string): Promise<{ ok: boolean; valid: boolean; referrerName?: string; error?: string }> {\n  try {\n    const base = apiBase();\n    const url = (base || '') + '/api/referrals';\n    const res = await fetch(url, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ action: 'validate', code })\n    });\n    return await res.json();\n  } catch (e: any) {\n    return { ok: false, valid: false, error: e?.message };\n  }\n}\n\nexport async function applyReferralCode(params: { idToken?: string; code: string }): Promise<{ ok: boolean; error?: string; referrerName?: string }> {\n  try {\n    const base = apiBase();\n    const url = (base || '') + '/api/referrals';\n    const res = await fetch(url, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})\n      },\n      body: JSON.stringify({ action: 'apply', code: params?.code })\n    });\n    return await res.json();\n  } catch (e: any) {\n    return { ok: false, error: e?.message || 'Failed to apply referral code' };\n  }\n}\n\nexport async function qualifyReferral(_params?: any): Promise<{ ok: boolean; rewarded: boolean; days?: number; error?: string }> {\n  return { ok: true, rewarded: false };\n}\n\nexport async function qualifyReferralOnSale(params?: any): Promise<{ ok: boolean; rewarded: boolean; days?: number; error?: string }> {\n  try {\n    const base = apiBase();\n    const url = (base || '') + '/api/referrals';\n    const res = await fetch(url, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})\n      },\n      body: JSON.stringify({ action: 'qualify' })\n    });\n    return await res.json();\n  } catch (e: any) {\n    return { ok: false, rewarded: false, error: e?.message };\n  }\n}\n\nexport async function claimReferralDirect(params: { idToken?: string; code: string }): Promise<{ ok: boolean; rewarded: boolean; error?: string; referrerName?: string }> {\n  try {\n    const base = apiBase();\n    const url = (base || '') + '/api/referrals';\n    const res = await fetch(url, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})\n      },\n      body: JSON.stringify({ action: 'claim', code: params?.code })\n    });\n    return await res.json();\n  } catch (e: any) {\n    return { ok: false, rewarded: false, error: e?.message || 'Failed to claim referral code' };\n  }\n}\n\nexport async function advanceReferralPhase(params?: any): Promise<{ ok: boolean; updated?: boolean; error?: string }> {\n  try {\n    const base = apiBase();\n    const url = (base || '') + '/api/referrals';\n    const res = await fetch(url, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})\n      },\n      body: JSON.stringify({ action: 'advance', phase: params?.phase, refereeBusinessId: params?.refereeBusinessId })\n    });\n    return await res.json();\n  } catch (e: any) {\n    return { ok: false, error: e?.message };\n  }\n}\n`,\n    },
+        content: `import { apiBase } from '@/lib/platform';
+
+export type ReferralProgramDetails = {
+  ok: true;
+  referralCode: string;
+  referralLink: string;
+  stats: {
+    totalReferred: number;
+    completedReferrals: number;
+    rewardDaysEarned: number;
+  };
+  referrals: any[];
+  referredBy?: {
+    code: string;
+    referrerBusinessName?: string;
+    rewardClaimed: boolean;
+  } | null;
+  currentPlan?: string;
+  trialExpiresAt?: string | null;
+} | {
+  ok: false;
+  error: string;
+};
+
+export async function getReferralProgramDetails(params?: any): Promise<ReferralProgramDetails> {
+  try {
+    const base = apiBase();
+    const url = (base || '') + '/api/referrals';
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { ok: false, error: err.error || ('Referral service error: ' + res.status) };
+    }
+    return await res.json();
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Failed to fetch referral details' };
+  }
+}
+
+export async function validateReferralCode(code: string): Promise<{ ok: boolean; valid: boolean; referrerName?: string; error?: string }> {
+  try {
+    const base = apiBase();
+    const url = (base || '') + '/api/referrals';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'validate', code })
+    });
+    return await res.json();
+  } catch (e: any) {
+    return { ok: false, valid: false, error: e?.message };
+  }
+}
+
+export async function applyReferralCode(params: { idToken?: string; code: string }): Promise<{ ok: boolean; error?: string; referrerName?: string }> {
+  try {
+    const base = apiBase();
+    const url = (base || '') + '/api/referrals';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})
+      },
+      body: JSON.stringify({ action: 'apply', code: params?.code })
+    });
+    return await res.json();
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Failed to apply referral code' };
+  }
+}
+
+export async function qualifyReferral(_params?: any): Promise<{ ok: boolean; rewarded: boolean; days?: number; error?: string }> {
+  return { ok: true, rewarded: false };
+}
+
+export async function qualifyReferralOnSale(params?: any): Promise<{ ok: boolean; rewarded: boolean; days?: number; error?: string }> {
+  try {
+    const base = apiBase();
+    const url = (base || '') + '/api/referrals';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})
+      },
+      body: JSON.stringify({ action: 'qualify' })
+    });
+    return await res.json();
+  } catch (e: any) {
+    return { ok: false, rewarded: false, error: e?.message };
+  }
+}
+
+export async function claimReferralDirect(params: { idToken?: string; code: string }): Promise<{ ok: boolean; rewarded: boolean; error?: string; referrerName?: string }> {
+  try {
+    const base = apiBase();
+    const url = (base || '') + '/api/referrals';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})
+      },
+      body: JSON.stringify({ action: 'claim', code: params?.code })
+    });
+    return await res.json();
+  } catch (e: any) {
+    return { ok: false, rewarded: false, error: e?.message || 'Failed to claim referral code' };
+  }
+}
+
+export async function advanceReferralPhase(params?: any): Promise<{ ok: boolean; updated?: boolean; error?: string }> {
+  try {
+    const base = apiBase();
+    const url = (base || '') + '/api/referrals';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {})
+      },
+      body: JSON.stringify({ action: 'advance', phase: params?.phase, refereeBusinessId: params?.refereeBusinessId })
+    });
+    return await res.json();
+  } catch (e: any) {
+    return { ok: false, error: e?.message };
+  }
+}
+`,
+    },
 ];
 
 stubs.forEach(s => {

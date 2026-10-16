@@ -577,7 +577,7 @@ const htmlContent = `<!DOCTYPE html>
           </div>
           <div class="card-body">
             <ul>
-              <li><strong>Local SQLite (`@tauri-apps/plugin-sql`):</strong> Mirrors catalog, customer, and receipt ledgers locally.</li>
+              <li><strong>Local SQLite (<code>@tauri-apps/plugin-sql</code>):</strong> Mirrors catalog, customer, and receipt ledgers locally.</li>
               <li><strong>Rust Stronghold Vault:</strong> Offline transaction tokens and business credentials encrypted in OS hardware-backed memory.</li>
               <li><strong>Cache Tenancy Seal:</strong> Multi-tenant isolation verified by <code>pos_cache_owner_business_id</code> to prevent cross-account cache leakage.</li>
             </ul>
