@@ -27,8 +27,12 @@ Whenever a new MSI installer for Zeneva (e.g., `zeneva_3.0.1_x64_en-US.msi`) is 
    Remove-Item -Path "C:\Users\Bello Imam\Downloads\ZenevaExtract" -Recurse -Force
    ```
 
-5. **Update Version in Manifest (Optional)**:
-   If the version has changed, update the version attribute in the `<Identity>` element within `C:\Users\Bello Imam\Downloads\ZenevaPack\AppxManifest.xml` (e.g. `Version="3.0.1.0"`).
+5. **Update Version & Identity in Manifest**:
+   Ensure `<Identity>` and `<Properties>` match the Store package identity:
+   - `Name="Zeneva.ZenevaPOSInventoryApp"`
+   - `DisplayName="Zeneva POS & Inventory App"`
+   - `Publisher="CN=FB9C471D-AB12-4486-AC75-1AA3579E4073"`
+   - `Version="VERSION.0"` (e.g. `Version="3.4.1.0"` in `C:\Users\Bello Imam\Downloads\ZenevaPack\AppxManifest.xml`).
 
 6. **Pack the Folder to MSIX**:
    Run MSIX Hero CLI to compile the package:
