@@ -204,13 +204,49 @@ function DataInsightModalContent({
         totalItems = dayList.length;
         const pageData = dayList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
-        tableHeaders = ['Day', 'Total Revenue'];
+        const gross = (finalReportData as any)?.grossRevenue ?? (finalReportData?.totalRevenue ?? 0);
+        const purchases = (finalReportData as any)?.totalPurchases ?? 0;
+        const net = finalReportData?.totalRevenue ?? 0;
+
+        tableHeaders = ['Day', 'Daily Sales'];
         tableRows = pageData.map(([day, total], idx) => (
             <TableRow key={idx}>
                 <TableCell className="font-medium text-xs">{format(new Date(day), 'EEEE, MMM do')}</TableCell>
                 <TableCell className="text-right text-xs font-medium text-primary">{formatCurrency(total)}</TableCell>
             </TableRow>
         ));
+
+        if (purchases > 0) {
+            tableContent = (
+                <div className="flex flex-col h-full gap-4">
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-muted/20 rounded-lg text-xs border border-border/60">
+                        <div>
+                            <span className="text-muted-foreground block text-[11px]">Gross Sales</span>
+                            <span className="font-semibold text-emerald-600">+{formatCurrency(gross)}</span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground block text-[11px]">Supplier Purchases</span>
+                            <span className="font-semibold text-amber-600">-{formatCurrency(purchases)}</span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground block text-[11px]">Net Revenue</span>
+                            <span className="font-bold text-foreground">={formatCurrency(net)}</span>
+                        </div>
+                    </div>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-xs">Day</TableHead>
+                                <TableHead className="text-right text-xs">Daily Sales</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {tableRows}
+                        </TableBody>
+                    </Table>
+                </div>
+            );
+        }
     } else if (insightModal?.id === 'net-cost') {
         const costMap = new Map<string, {name: string, totalCost: number}>();
         reportBatchReceipts.forEach(r => {
@@ -232,11 +268,14 @@ function DataInsightModalContent({
             </TableRow>
         ));
     } else if (insightModal?.id === 'net-profit') {
-        const rev = finalReportData?.totalRevenue ?? 0;
-        const cogs = finalReportData?.totalCost ?? 0;
+        const grossRev = (finalReportData as any)?.grossRevenue ?? (finalReportData?.totalRevenue ?? 0);
         const purchases = (finalReportData as any)?.totalPurchases ?? 0;
-        const unitCost = Math.max(0, cogs - purchases);
-        const opex = (finalReportData as any)?.totalOperatingExpenses ?? Math.max(0, rev - cogs - (finalReportData?.totalProfit ?? 0));
+        const netRev = finalReportData?.totalRevenue ?? 0;
+        const unitCost = finalReportData?.totalCost ?? 0;
+        const grossProfit = (finalReportData as any)?.grossProfit ?? (netRev - unitCost);
+        const opex = (finalReportData as any)?.totalOperatingExpenses ?? 0;
+        const operatingProfit = (finalReportData as any)?.operatingProfit ?? (grossProfit - opex);
+        const reinvested = (finalReportData as any)?.totalProfitReinvested ?? 0;
         const profit = finalReportData?.totalProfit ?? 0;
         
         tableContent = (
@@ -250,22 +289,25 @@ function DataInsightModalContent({
                     </TableHeader>
                     <TableBody>
                         <TableRow>
-                            <TableCell className="font-medium text-xs">Gross Revenue</TableCell>
-                            <TableCell className="text-right text-xs text-emerald-600">+{formatCurrency(rev)}</TableCell>
+                            <TableCell className="font-medium text-xs">Gross Sales Revenue</TableCell>
+                            <TableCell className="text-right text-xs text-emerald-600">+{formatCurrency(grossRev)}</TableCell>
                         </TableRow>
-                        {unitCost > 0 && (
+                        {purchases > 0 && (
+                            <TableRow>
+                                <TableCell className="font-medium text-xs">Less: Supplier Purchases (Paid from Revenue)</TableCell>
+                                <TableCell className="text-right text-xs text-amber-600">-{formatCurrency(purchases)}</TableCell>
+                            </TableRow>
+                        )}
+                        <TableRow className="border-t bg-muted/10 font-semibold">
+                            <TableCell className="text-xs text-foreground">Net Sales Revenue</TableCell>
+                            <TableCell className="text-right text-xs text-foreground">={formatCurrency(netRev)}</TableCell>
+                        </TableRow>
+                        {unitCost > 0 ? (
                             <TableRow>
                                 <TableCell className="font-medium text-xs">Cost of Goods Sold (Unit Costs)</TableCell>
                                 <TableCell className="text-right text-xs text-destructive">-{formatCurrency(unitCost)}</TableCell>
                             </TableRow>
-                        )}
-                        {purchases > 0 && (
-                            <TableRow>
-                                <TableCell className="font-medium text-xs">Supplier Purchases / Restock (COGS)</TableCell>
-                                <TableCell className="text-right text-xs text-amber-600">-{formatCurrency(purchases)}</TableCell>
-                            </TableRow>
-                        )}
-                        {unitCost === 0 && purchases === 0 && (
+                        ) : (
                             <TableRow>
                                 <TableCell className="font-medium text-xs">Cost of Goods Sold (COGS)</TableCell>
                                 <TableCell className="text-right text-xs text-muted-foreground">-{formatCurrency(0)}</TableCell>
@@ -273,16 +315,33 @@ function DataInsightModalContent({
                         )}
                         <TableRow className="border-t bg-muted/20">
                             <TableCell className="font-semibold text-xs text-foreground">Gross Profit</TableCell>
-                            <TableCell className="text-right text-xs font-semibold text-foreground">+{formatCurrency(rev - cogs)}</TableCell>
+                            <TableCell className="text-right text-xs font-semibold text-foreground">+{formatCurrency(grossProfit)}</TableCell>
                         </TableRow>
                         <TableRow>
                             <TableCell className="font-medium text-xs">Operating Expenses (Overheads)</TableCell>
                             <TableCell className="text-right text-xs text-destructive">-{formatCurrency(opex)}</TableCell>
                         </TableRow>
-                        <TableRow className="border-t-2 bg-primary/5">
-                            <TableCell className="font-bold text-xs">Net Profit</TableCell>
-                            <TableCell className="text-right text-xs font-bold text-primary">{formatCurrency(profit)}</TableCell>
-                        </TableRow>
+                        {reinvested > 0 ? (
+                            <>
+                                <TableRow className="border-t bg-muted/10">
+                                    <TableCell className="font-semibold text-xs text-foreground">Operating Net Profit</TableCell>
+                                    <TableCell className="text-right text-xs font-semibold text-foreground">+{formatCurrency(operatingProfit)}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-medium text-xs">Less: Profit Reinvestments (Capital Outflow)</TableCell>
+                                    <TableCell className="text-right text-xs text-purple-600">-{formatCurrency(reinvested)}</TableCell>
+                                </TableRow>
+                                <TableRow className="border-t-2 bg-primary/5">
+                                    <TableCell className="font-bold text-xs">Retained Net Profit</TableCell>
+                                    <TableCell className="text-right text-xs font-bold text-primary">{formatCurrency(profit)}</TableCell>
+                                </TableRow>
+                            </>
+                        ) : (
+                            <TableRow className="border-t-2 bg-primary/5">
+                                <TableCell className="font-bold text-xs">Net Operating Profit</TableCell>
+                                <TableCell className="text-right text-xs font-bold text-primary">{formatCurrency(profit)}</TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </div>
@@ -642,16 +701,20 @@ export default function ReportsDashboard() {
             }
         }
 
-        // Effective Cost of Goods Sold:
-        // Direct unit COGS on sold items + revenue-funded supplier purchases offset directly against Revenue under COGS.
-        const effectiveCost = receiptCost + totalPurchases;
-        const grossProfit = totalRevenue - effectiveCost;
+        const grossSalesRevenue = totalRevenue;
+        // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to determine Net Revenue.
+        const netRevenue = Math.max(0, grossSalesRevenue - totalPurchases);
+        // Cost of Goods Sold is strictly unit costs of sold inventory items
+        const effectiveCost = receiptCost;
+        const grossProfit = netRevenue - effectiveCost;
         const operatingProfit = grossProfit - totalOperatingExpenses;
         const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
         const totalProfit = operatingProfit - totalProfitReinvested;
 
         return {
-            totalRevenue,
+            totalRevenue: netRevenue,
+            grossRevenue: grossSalesRevenue,
+            netRevenue,
             totalSales,
             averageOrderValue,
             inventoryValue,
@@ -1043,7 +1106,7 @@ export default function ReportsDashboard() {
             .filter(e => (e as any)?.status !== 'pending')
             .filter(isPurchase)
             .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-        const effectivePriorCost = priorCost + priorPurchases;
+        const effectivePriorCost = priorCost;
 
         return {
             revenue: periodDelta(current.revenue, prior.revenue),
@@ -1241,13 +1304,19 @@ export default function ReportsDashboard() {
                                     title={t('reports.kpiRevenue')}
                                     value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
                                     icon={DollarSign}
-                                    description={t('reports.kpiRevenueHint')}
+                                    description={
+                                        finalReportData && finalReportData.totalPurchases > 0
+                                            ? `Gross: ${currencySymbol}${Math.round(finalReportData.grossRevenue).toLocaleString()} · Purchases: -${currencySymbol}${Math.round(finalReportData.totalPurchases).toLocaleString()}`
+                                            : t('reports.kpiRevenueHint')
+                                    }
                                     delta={comparison?.revenue}
                                     onClick={() => setInsightModal({
                                         id: 'revenue',
                                         title: t('reports.kpiRevenue'),
                                         value: `${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
-                                        description: t('reports.kpiRevenueHint')
+                                        description: finalReportData && finalReportData.totalPurchases > 0
+                                            ? `Net Revenue after deducting ${currencySymbol}${Math.round(finalReportData.totalPurchases).toLocaleString()} supplier purchases.`
+                                            : t('reports.kpiRevenueHint')
                                     })}
                                 />
                                 <ReportStatCard

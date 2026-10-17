@@ -1774,6 +1774,7 @@ const pt: Messages = {
     plsColPctGross: '% da receita bruta',
     plsGrossSalesRevenue: 'Receita bruta de vendas',
     plsLessDiscounts: '(–) Descontos e reduções de preço',
+    plsLessPurchases: '(–) Compras a fornecedores (pagas pela receita)',
     plsNetSalesRevenue: 'Receita líquida de vendas',
     plsTotalCogs: 'Custo total das mercadorias vendidas',
     plsOperatingExpenses: 'Despesas operacionais',

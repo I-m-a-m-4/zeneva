@@ -628,6 +628,14 @@ export default function SelectProductsPage() {
         );
 
         if (exactMatch) {
+            if (exactMatch.isArchived) {
+                toast({
+                    variant: "destructive",
+                    title: "Product Discontinued / Archived",
+                    description: `${exactMatch.name} is archived. Restore it in Inventory to sell.`
+                });
+                return;
+            }
             addToCart(exactMatch);
             setSearchTerm('');
             toast({
@@ -639,7 +647,8 @@ export default function SelectProductsPage() {
 
 
     const filteredProducts = React.useMemo(() => {
-        let base = (products || []).filter(p => !p.parentId); // Hide child variants from main grid
+        // Hide child variants and archived/discontinued products from main selling grid
+        let base = (products || []).filter(p => !p.parentId && !p.isArchived);
 
         // Apply instant local substring filter with smart hyphen/space-tolerant search
         if (searchTerm.trim()) {
@@ -695,6 +704,14 @@ export default function SelectProductsPage() {
         const product = products?.find(p => p.sku === sku);
 
         if (product) {
+            if (product.isArchived) {
+                toast({
+                    variant: "destructive",
+                    title: "Product Discontinued / Archived",
+                    description: `${product.name} is archived. Restore it in Inventory to sell.`
+                });
+                return;
+            }
             addToCart(product);
             toast({
                 title: t('pos.productAdded'),

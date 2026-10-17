@@ -1773,6 +1773,7 @@ const it: Messages = {
     plsColPctGross: '% dei ricavi lordi',
     plsGrossSalesRevenue: 'Ricavi lordi delle vendite',
     plsLessDiscounts: '(–) Sconti e riduzioni di prezzo',
+    plsLessPurchases: '(–) Acquisti dai fornitori (pagati dalle entrate)',
     plsNetSalesRevenue: 'Ricavi netti delle vendite',
     plsTotalCogs: 'Costo totale della merce venduta',
     plsOperatingExpenses: 'Spese operative',

@@ -1747,6 +1747,7 @@ const ar: Messages = {
     plsColPctGross: '% من الإيراد الإجمالي',
     plsGrossSalesRevenue: 'إيراد المبيعات الإجمالي',
     plsLessDiscounts: '(–) الخصومات وتخفيضات الأسعار',
+    plsLessPurchases: '(–) مشتريات الموردين (مدفوعة من الإيرادات)',
     plsNetSalesRevenue: 'إيراد المبيعات الصافي',
     plsTotalCogs: 'إجمالي تكلفة البضاعة المُباعة',
     plsOperatingExpenses: 'المصروفات التشغيلية',

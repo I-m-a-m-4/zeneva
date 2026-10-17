@@ -1790,6 +1790,7 @@ const fr: Messages = {
     plsColPctGross: '% du CA brut',
     plsGrossSalesRevenue: 'Chiffre d’affaires brut des ventes',
     plsLessDiscounts: '(–) Remises et réductions de prix',
+    plsLessPurchases: '(–) Achats fournisseurs (payés sur les revenus)',
     plsNetSalesRevenue: 'Chiffre d’affaires net des ventes',
     plsTotalCogs: 'Coût total des marchandises vendues',
     plsOperatingExpenses: 'Charges d’exploitation',

@@ -1956,6 +1956,7 @@ const en = {
     plsColPctGross: '% of Gross Revenue',
     plsGrossSalesRevenue: 'Gross Sales Revenue',
     plsLessDiscounts: 'Less: Discounts & Price Markdowns',
+    plsLessPurchases: 'Less: Supplier Purchases (Paid from Revenue)',
     plsNetSalesRevenue: 'Net Sales Revenue',
     plsTotalCogs: 'Total Cost of Goods Sold',
     plsOperatingExpenses: 'Operating Expenses',

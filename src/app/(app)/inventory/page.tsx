@@ -36,7 +36,9 @@ import {
   ImageOff,
   LayoutGrid,
   List,
-  Camera
+  Camera,
+  Archive,
+  ArchiveRestore
 } from "lucide-react";
 import { ReorderInvoiceModal } from '@/components/inventory/reorder-invoice-modal';
 import InventoryDepletionCard from '@/components/reports/inventory-depletion-card';
@@ -380,6 +382,7 @@ function InventoryPageContent() {
 
   const [stockFilter, setStockFilter] = React.useState('all');
   const [categoryFilter, setCategoryFilter] = React.useState('all');
+  const [archiveFilter, setArchiveFilter] = React.useState<'active' | 'archived' | 'all'>('active');
   const [sortBy, setSortBy] = React.useState<'name' | 'stock-desc' | 'stock-asc' | 'newest'>((searchParams.get('sortBy') as any) || DEFAULT_SORT_BY);
 
   const isLoading = isPosLoading;
@@ -481,6 +484,13 @@ function InventoryPageContent() {
     // 2. Filter out queued deletions and child variants (child variants sit inside parent expandable sub-rows)
     let valid = combined.filter(p => !queuedDeletionIds.includes(p.id) && !p.parentId);
 
+    // Filter by catalog archive status (default 'active' hides archived/discontinued products)
+    if (archiveFilter === 'active') {
+      valid = valid.filter(p => !p.isArchived);
+    } else if (archiveFilter === 'archived') {
+      valid = valid.filter(p => !!p.isArchived);
+    }
+
   // 3. Category
     if (categoryFilter !== 'all') {
       valid = valid.filter(p => p.category === categoryFilter);
@@ -523,7 +533,7 @@ function InventoryPageContent() {
     });
 
     return valid;
-  }, [products, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, sortBy]);
+  }, [products, optimisticProducts, queuedDeletionIds, searchTerm, categoryFilter, stockFilter, archiveFilter, sortBy]);
 
   const healthMetrics = React.useMemo(() => {
     if (!products) return { missingImages: 0, outOfStock: 0, lowStock: 0, negativeStock: 0, missingCostPrice: 0, total: 0, score: 0, availabilityScore: 0, completenessScore: 0, accuracyScore: 0, costCompletenessScore: 0 };
@@ -950,7 +960,52 @@ function InventoryPageContent() {
     }
   };
 
-  const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== DEFAULT_SORT_BY ? 1 : 0);
+  const activeFilterCount = (stockFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (sortBy !== DEFAULT_SORT_BY ? 1 : 0) + (archiveFilter !== 'active' ? 1 : 0);
+
+  const handleToggleArchive = (product: Product) => {
+    if (!business || !currentUserProfile) return;
+    const newArchived = !product.isArchived;
+
+    addToQueue({
+      type: 'update-product',
+      payload: {
+        productId: product.id,
+        values: {
+          isArchived: newArchived,
+          archivedAt: newArchived ? new Date().toISOString() : null,
+          updatedAt: new Date().toISOString()
+        }
+      }
+    }, newArchived ? `Archiving ${product.name}...` : `Restoring ${product.name}...`);
+
+    addToQueue({
+      type: 'add-audit-log',
+      payload: {
+        businessId: business.id,
+        userId: currentUserProfile.id,
+        userName: currentUserProfile.name,
+        userEmail: currentUserProfile.email,
+        userRole: currentUserProfile.role,
+        action: newArchived ? 'product.archive' : 'product.restore',
+        entityType: 'Product',
+        entityId: product.id,
+        details: {
+          entityName: product.name,
+          stock: product.stock,
+          price: product.price,
+          reason: newArchived ? 'Product discontinued / archived' : 'Product restored to active'
+        }
+      }
+    });
+
+    toast({
+      variant: newArchived ? "default" : "success",
+      title: newArchived ? "Product Discontinued / Archived" : "Product Restored to Active",
+      description: newArchived
+        ? `${product.name} is now archived and hidden from active POS sales. Stock history and logs remain intact.`
+        : `${product.name} is now active and available for POS sales.`,
+    });
+  };
 
   if (!mounted) {
     return <InventoryBodySkeleton />;
@@ -1089,10 +1144,22 @@ function InventoryPageContent() {
                     </DropdownMenuRadioGroup>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    {archiveFilter === 'archived' ? 'Discontinued / Archived' : (archiveFilter === 'all' ? 'All (Active & Archived)' : 'Active Products')}
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup value={archiveFilter} onValueChange={(v) => setArchiveFilter(v as any)}>
+                      <DropdownMenuRadioItem value="active">Active Products Only</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="archived">Discontinued / Archived</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="all">All Items</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 {activeFilterCount > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setSortBy(DEFAULT_SORT_BY); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    <DropdownMenuItem onSelect={() => { setStockFilter('all'); setCategoryFilter('all'); setArchiveFilter('active'); setSortBy(DEFAULT_SORT_BY); }} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                       {t('inventory.clearFilters')}
                     </DropdownMenuItem>
                   </>
@@ -2098,6 +2165,11 @@ function InventoryPageContent() {
                               <Link href={(product as any).isOptimistic ? '#' : `/inventory/details?id=${product.id}`} className={cn("hover:underline font-medium", (product as any).isOptimistic && "pointer-events-none")}>
                                 {product.name}
                               </Link>
+                              {product.isArchived && (
+                                <Badge variant="outline" className="text-[9px] border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                  Archived
+                                </Badge>
+                              )}
                               {variantInfo.isVariantParent && (
                                 <Badge variant="secondary" className="text-[10px] h-4 cursor-pointer" onClick={() => toggleExpandParent(product.id)}>
                                   {variantInfo.variants.length} options
@@ -2166,6 +2238,21 @@ function InventoryPageContent() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => setStockHistoryProductId(product.id)}>
                                   <Activity className="me-2 h-4 w-4" /> View Stock History
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onSelect={() => handleToggleArchive(product)}
+                                  className={product.isArchived ? "text-primary" : "text-amber-600 focus:text-amber-600"}
+                                >
+                                  {product.isArchived ? (
+                                    <>
+                                      <ArchiveRestore className="me-2 h-4 w-4" /> Restore to Active
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Archive className="me-2 h-4 w-4" /> Archive / Discontinue
+                                    </>
+                                  )}
                                 </DropdownMenuItem>
                               </>
                             )}

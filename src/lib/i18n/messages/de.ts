@@ -1780,6 +1780,7 @@ const de: Messages = {
     plsColPctGross: '% des Bruttoumsatzes',
     plsGrossSalesRevenue: 'Bruttoumsatz aus Verkäufen',
     plsLessDiscounts: '(–) Rabatte und Preisnachlässe',
+    plsLessPurchases: '(–) Lieferanteneinkäufe (aus Einnahmen bezahlt)',
     plsNetSalesRevenue: 'Nettoumsatz aus Verkäufen',
     plsTotalCogs: 'Wareneinsatz insgesamt',
     plsOperatingExpenses: 'Betriebsaufwand',

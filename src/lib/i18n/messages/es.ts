@@ -1778,6 +1778,7 @@ const es: Messages = {
     plsColPctGross: '% de los ingresos brutos',
     plsGrossSalesRevenue: 'Ingresos brutos por ventas',
     plsLessDiscounts: '(–) Descuentos y rebajas de precio',
+    plsLessPurchases: '(–) Compras a proveedores (pagadas de ingresos)',
     plsNetSalesRevenue: 'Ingresos netos por ventas',
     plsTotalCogs: 'Costo total de las mercancías vendidas',
     plsOperatingExpenses: 'Gastos operativos',

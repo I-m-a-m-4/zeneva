@@ -24,7 +24,9 @@ import {
     ArrowUpRight,
     ArrowDownLeft,
     Search,
-    Camera
+    Camera,
+    Archive,
+    ArchiveRestore
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -751,6 +753,51 @@ function EditProductContent() {
         }
     };
 
+    const handleToggleArchive = async () => {
+        if (!productId || !business || !currentUserProfile || !product) return;
+        const newArchived = !product.isArchived;
+
+        addToQueue({
+            type: 'update-product',
+            payload: {
+                productId,
+                values: {
+                    isArchived: newArchived,
+                    archivedAt: newArchived ? new Date().toISOString() : null,
+                    updatedAt: new Date().toISOString()
+                }
+            }
+        }, newArchived ? `Archiving ${product.name}...` : `Restoring ${product.name}...`);
+
+        addToQueue({
+            type: 'add-audit-log',
+            payload: {
+                businessId: business.id,
+                userId: currentUserProfile.id,
+                userName: currentUserProfile.name,
+                userEmail: currentUserProfile.email,
+                userRole: currentUserProfile.role,
+                action: newArchived ? 'product.archive' : 'product.restore',
+                entityType: 'Product',
+                entityId: productId,
+                details: {
+                    entityName: product.name,
+                    stock: product.stock,
+                    price: product.price,
+                    reason: newArchived ? 'Product discontinued / archived' : 'Product restored to active'
+                }
+            }
+        });
+
+        toast({
+            variant: newArchived ? "default" : "success",
+            title: newArchived ? "Product Discontinued / Archived" : "Product Restored to Active",
+            description: newArchived
+                ? `${product.name} is now archived and hidden from active POS sales. Past stock and sales history are preserved.`
+                : `${product.name} is now active and available for POS sales.`,
+        });
+    };
+
     const handleDelete = async () => {
         if (!productId || !business || !currentUserProfile) return;
 
@@ -824,6 +871,28 @@ function EditProductContent() {
                             {t('common.discard')}
                         </Button>
                         {canManageProduct && (
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                type="button"
+                                onClick={handleToggleArchive}
+                                disabled={isSaving}
+                                className={product?.isArchived ? "border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10" : "border-amber-500/50 text-amber-600 hover:bg-amber-500/10"}
+                            >
+                                {product?.isArchived ? (
+                                    <>
+                                        <ArchiveRestore className="mr-2 h-4 w-4" />
+                                        Restore to Active
+                                    </>
+                                ) : (
+                                    <>
+                                        <Archive className="mr-2 h-4 w-4" />
+                                        Discontinue / Archive
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                        {canManageProduct && (
                             <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 {t('common.delete')}
@@ -837,6 +906,24 @@ function EditProductContent() {
                         )}
                     </div>
                 </div>
+                {product?.isArchived && (
+                    <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <Archive className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <div>
+                                <p className="font-semibold text-sm">Discontinued / Archived Product</p>
+                                <p className="text-xs text-muted-foreground">
+                                    This product is hidden from active POS sales and registers. All stock history, sales receipts, and audit logs are safely preserved.
+                                </p>
+                            </div>
+                        </div>
+                        {canManageProduct && (
+                            <Button size="sm" variant="outline" type="button" onClick={handleToggleArchive} className="shrink-0 bg-background border-amber-500/40 text-amber-700 dark:text-amber-300">
+                                <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> Restore Product
+                            </Button>
+                        )}
+                    </div>
+                )}
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList className="mb-4 grid w-full max-w-[400px] grid-cols-2">
                         <TabsTrigger value="details">Product Details</TabsTrigger>
@@ -1738,6 +1825,28 @@ function EditProductContent() {
                     <Button variant="outline" size="lg" type="button" onClick={() => router.push('/inventory')}>
                         {t('common.discard')}
                     </Button>
+                    {canManageProduct && (
+                        <Button
+                            variant="outline"
+                            size="lg"
+                            type="button"
+                            onClick={handleToggleArchive}
+                            disabled={isSaving}
+                            className={product?.isArchived ? "border-emerald-500/50 text-emerald-600" : "border-amber-500/50 text-amber-600"}
+                        >
+                            {product?.isArchived ? (
+                                <>
+                                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                                    Restore
+                                </>
+                            ) : (
+                                <>
+                                    <Archive className="mr-2 h-4 w-4" />
+                                    Archive
+                                </>
+                            )}
+                        </Button>
+                    )}
                     {canManageProduct && (
                         <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
                             <Trash2 className="mr-2 h-4 w-4" />

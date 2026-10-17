@@ -1720,6 +1720,7 @@ const ko: Messages = {
     plsColPctGross: '총매출 대비 %',
     plsGrossSalesRevenue: '총판매매출',
     plsLessDiscounts: '(–) 할인 및 가격 인하',
+    plsLessPurchases: '(–) 공급업체 구매 (매출에서 지출)',
     plsNetSalesRevenue: '순판매매출',
     plsTotalCogs: '매출원가 합계',
     plsOperatingExpenses: '영업비용',

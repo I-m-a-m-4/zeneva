@@ -1694,6 +1694,7 @@ const zh: Messages = {
     plsColPctGross: '占营收总额 %',
     plsGrossSalesRevenue: '销售营收总额',
     plsLessDiscounts: '（–）折扣与减价',
+    plsLessPurchases: '（–）供应商采购（由营业额支出）',
     plsNetSalesRevenue: '销售营收净额',
     plsTotalCogs: '销货成本合计',
     plsOperatingExpenses: '经营费用',

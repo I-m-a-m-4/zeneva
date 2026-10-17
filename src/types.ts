@@ -51,6 +51,11 @@ export interface Product {
     serialNumbers?: string[]; // Array of active serial numbers / IMEIs
     supplierId?: string;
     supplierName?: string;
+
+    // --- Archival / Discontinued Status ---
+    isArchived?: boolean;
+    archivedAt?: any;
+    archivedReason?: string;
 }
 export type InventoryItem = Product;
 export interface CartItem {

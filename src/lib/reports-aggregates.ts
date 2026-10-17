@@ -659,6 +659,9 @@ export type PeriodSummary = {
   totalProfitReinvested?: number;
   purchasesFromProfit?: number;
   expensesFromProfit?: number;
+  grossRevenue?: number;
+  netRevenue?: number;
+  totalPurchases?: number;
 };
 
 /** Roll a set of receipts into the figures the KPI row compares. */
@@ -735,12 +738,16 @@ export function summarisePeriod(
   }
 
   const sales = list.length;
-  // Effective Cost of Goods Sold includes unit cost of sold goods plus supplier inventory purchases paid from revenue.
-  // Both subtract directly from revenue to determine Gross Profit.
-  // Operating expenses (rent, utilities, etc.) subtract from Gross Profit to determine Net Profit.
+  const grossRevenue = revenue;
+  // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to yield Net Revenue.
+  const netRevenue = Math.max(0, grossRevenue - totalPurchases);
+  const costSumVal = anyCost ? costSum : 0;
+
+  // Gross Profit = Net Revenue (sales minus revenue-funded supplier purchases) minus direct unit cost of sold goods.
+  // When unit costs are not recorded, Gross Profit is the Net Revenue.
   const grossProfit = anyCost
-    ? (costedRevenue - costSum - totalPurchases)
-    : (revenue - totalPurchases);
+    ? (netRevenue - costSumVal)
+    : netRevenue;
   const profit = anyCost || totalPurchases > 0 ? grossProfit : null;
 
   // Operating Net Profit = Gross Profit - Operating Expenses (funded from revenue)
@@ -751,12 +758,15 @@ export function summarisePeriod(
   const netProfit = operatingNetProfit - totalProfitReinvested;
 
   return {
-    revenue,
+    revenue: netRevenue,
+    grossRevenue,
+    netRevenue,
+    totalPurchases,
     sales,
     units,
-    avgBasket: sales > 0 ? revenue / sales : 0,
+    avgBasket: sales > 0 ? netRevenue / sales : 0,
     profit,
-    marginPct: profit !== null && costedRevenue > 0 ? (profit / costedRevenue) * 100 : null,
+    marginPct: profit !== null && netRevenue > 0 ? (profit / netRevenue) * 100 : null,
     buyers: buyers.size,
     receiptCount: sales,
     totalExpenses,

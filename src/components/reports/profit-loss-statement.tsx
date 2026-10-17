@@ -110,10 +110,10 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             }
         });
 
-        // Effective Cost of Goods Sold:
-        // Direct unit COGS on sold items + revenue-funded supplier purchases offset directly against revenue under COGS.
-        const effectiveCogs = totalCogs + totalPurchases;
-        const netSales = Math.max(0, grossRevenue - totalDiscounts);
+        // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to determine Net Sales Revenue.
+        const netSales = Math.max(0, grossRevenue - totalDiscounts - totalPurchases);
+        // Cost of Goods Sold is strictly unit costs of sold inventory items
+        const effectiveCogs = totalCogs;
         const grossProfit = netSales - effectiveCogs;
         const operatingNetProfit = grossProfit - totalOperatingExpenses;
         const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
@@ -392,11 +392,18 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
          * translating them in place would silently lose the styling as well.
          */
         const tableColumn = ["Financial Line Item", "Amount", "% of Gross Revenue"];
-        const netSales = financialSummary.grossRevenue - financialSummary.totalDiscounts;
+        const netSales = financialSummary.netSales;
         const tableRows = [
             ["Revenue", "", ""],
             ["  Gross Sales Revenue", formatCurrencyForPDF(financialSummary.grossRevenue), "100.0%"],
             ["  Less: Discounts & Price Markdowns", `(${formatCurrencyForPDF(financialSummary.totalDiscounts)})`, `${financialSummary.grossRevenue > 0 ? ((financialSummary.totalDiscounts / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
+            ...(financialSummary.totalPurchases > 0 ? [
+                [
+                    "  Less: Supplier Purchases (Paid from Revenue)",
+                    `(${formatCurrencyForPDF(financialSummary.totalPurchases)})`,
+                    `${financialSummary.grossRevenue > 0 ? ((financialSummary.totalPurchases / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`
+                ]
+            ] : []),
             ["Net Sales Revenue", formatCurrencyForPDF(netSales), `${financialSummary.grossRevenue > 0 ? ((netSales / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
             ["", "", ""],
             ["Cost of Goods Sold (COGS)", "", ""],
@@ -406,17 +413,9 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     `(${formatCurrencyForPDF(financialSummary.totalCogs)})`,
                     `${financialSummary.grossRevenue > 0 ? ((financialSummary.totalCogs / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`
                 ]
-            ] : []),
-            ...(financialSummary.totalPurchases > 0 ? [
-                [
-                    financialSummary.totalCogs > 0 ? "  Supplier Purchases / Restock (Procurement)" : "  Supplier Purchases (COGS)",
-                    `(${formatCurrencyForPDF(financialSummary.totalPurchases)})`,
-                    `${financialSummary.grossRevenue > 0 ? ((financialSummary.totalPurchases / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`
-                ]
-            ] : []),
-            ...(financialSummary.totalCogs === 0 && financialSummary.totalPurchases === 0 ? [
+            ] : [
                 ["  Total Cost of Goods Sold", `(${formatCurrencyForPDF(0)})`, "0.0%"]
-            ] : []),
+            ]),
             ["", "", ""],
             ["Gross Profit", formatCurrencyForPDF(financialSummary.grossProfit), `${financialSummary.grossMarginPct.toFixed(1)}%`],
             ["", "", ""],
@@ -475,12 +474,18 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <Card className="border border-border/60 bg-gradient-to-br from-card to-muted/20">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-muted-foreground">{t('reports.plsGrossRevenue')}</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-muted-foreground">
+                            {financialSummary.totalPurchases > 0 ? t('reports.plsNetSalesRevenue') : t('reports.plsGrossRevenue')}
+                        </CardTitle>
                         <DollarSign className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-black">{currencySymbol}{financialSummary.grossRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                        <p className="text-xs text-muted-foreground mt-1">{t('reports.plsGrossRevenueHint')}</p>
+                        <div className="text-2xl font-black">{currencySymbol}{financialSummary.netSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {financialSummary.totalPurchases > 0
+                                ? `Gross: ${currencySymbol}${Math.round(financialSummary.grossRevenue).toLocaleString()} · Purchases: -${currencySymbol}${Math.round(financialSummary.totalPurchases).toLocaleString()}`
+                                : t('reports.plsGrossRevenueHint')}
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -492,9 +497,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     <CardContent>
                         <div className="text-2xl font-black">{currencySymbol}{financialSummary.effectiveCogs.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                         <p className="text-xs text-muted-foreground mt-1">
-                            {financialSummary.totalCogs > 0 && financialSummary.totalPurchases > 0
-                                ? 'Unit Costs + Supplier Purchases'
-                                : (financialSummary.totalPurchases > 0 ? 'Supplier Purchases / Restock' : t('reports.plsCogsHint'))}
+                            {t('reports.plsCogsHint')}
                         </p>
                     </CardContent>
                 </Card>
@@ -753,11 +756,20 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                     {financialSummary.grossRevenue > 0 ? ((financialSummary.totalDiscounts / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
                                 </TableCell>
                             </TableRow>
+                            {financialSummary.totalPurchases > 0 && (
+                                <TableRow className="hover:bg-muted/30">
+                                    <TableCell className="ps-8 text-muted-foreground">{t('reports.plsLessPurchases')}</TableCell>
+                                    <TableCell className="text-right font-medium text-amber-600">({financialSummary.totalPurchases.toLocaleString(undefined, { minimumFractionDigits: 2 })})</TableCell>
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                        {financialSummary.grossRevenue > 0 ? ((financialSummary.totalPurchases / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
+                                    </TableCell>
+                                </TableRow>
+                            )}
                             <TableRow className="font-semibold border-b border-muted">
                                 <TableCell className="ps-4">{t('reports.plsNetSalesRevenue')}</TableCell>
-                                <TableCell className="text-right">{((financialSummary.grossRevenue) - (financialSummary.totalDiscounts)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                <TableCell className="text-right">{financialSummary.netSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                                 <TableCell className="text-right font-mono text-muted-foreground">
-                                    {financialSummary.grossRevenue > 0 ? (((financialSummary.grossRevenue - financialSummary.totalDiscounts) / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
+                                    {financialSummary.grossRevenue > 0 ? ((financialSummary.netSales / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
                                 </TableCell>
                             </TableRow>
 
@@ -765,7 +777,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             <TableRow className="bg-muted/20">
                                 <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">{t('reports.plsCogs')}</TableCell>
                             </TableRow>
-                            {financialSummary.totalCogs > 0 && (
+                            {financialSummary.totalCogs > 0 ? (
                                 <TableRow className="hover:bg-muted/30">
                                     <TableCell className="ps-8 text-muted-foreground">{t('reports.plsTotalCogs')} (Unit Costs)</TableCell>
                                     <TableCell className="text-right font-medium text-amber-600">({financialSummary.totalCogs.toLocaleString(undefined, { minimumFractionDigits: 2 })})</TableCell>
@@ -773,19 +785,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                         {financialSummary.grossRevenue > 0 ? ((financialSummary.totalCogs / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
                                     </TableCell>
                                 </TableRow>
-                            )}
-                            {financialSummary.totalPurchases > 0 && (
-                                <TableRow className="hover:bg-muted/30">
-                                    <TableCell className="ps-8 text-muted-foreground">
-                                        {financialSummary.totalCogs > 0 ? 'Supplier Purchases / Restock (Procurement)' : 'Supplier Purchases (COGS)'}
-                                    </TableCell>
-                                    <TableCell className="text-right font-medium text-amber-600">({financialSummary.totalPurchases.toLocaleString(undefined, { minimumFractionDigits: 2 })})</TableCell>
-                                    <TableCell className="text-right font-mono text-muted-foreground">
-                                        {financialSummary.grossRevenue > 0 ? ((financialSummary.totalPurchases / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                            {financialSummary.totalCogs === 0 && financialSummary.totalPurchases === 0 && (
+                            ) : (
                                 <TableRow className="hover:bg-muted/30">
                                     <TableCell className="ps-8 text-muted-foreground">{t('reports.plsTotalCogs')}</TableCell>
                                     <TableCell className="text-right font-medium text-amber-600">(0.00)</TableCell>

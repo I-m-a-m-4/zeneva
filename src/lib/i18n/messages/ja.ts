@@ -1724,6 +1724,7 @@ const ja: Messages = {
     plsColPctGross: '総売上に対する %',
     plsGrossSalesRevenue: '総売上高',
     plsLessDiscounts: '（–）値引き・価格引き下げ',
+    plsLessPurchases: '（–）仕入先からの購入（売上から支出）',
     plsNetSalesRevenue: '純売上高',
     plsTotalCogs: '売上原価合計',
     plsOperatingExpenses: '営業費用',

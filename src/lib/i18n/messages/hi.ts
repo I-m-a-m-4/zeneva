@@ -1748,6 +1748,7 @@ const hi: Messages = {
     plsColPctGross: 'सकल आय का %',
     plsGrossSalesRevenue: 'सकल बिक्री आय',
     plsLessDiscounts: '(–) छूट और मूल्य कटौती',
+    plsLessPurchases: '(–) आपूर्तिकर्ता खरीद (राजस्व से भुगतान)',
     plsNetSalesRevenue: 'शुद्ध बिक्री आय',
     plsTotalCogs: 'बिके माल की कुल लागत',
     plsOperatingExpenses: 'परिचालन खर्च',
