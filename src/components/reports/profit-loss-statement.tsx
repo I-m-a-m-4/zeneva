@@ -112,9 +112,10 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
 
         // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to determine Net Sales Revenue.
         const netSales = Math.max(0, grossRevenue - totalDiscounts - totalPurchases);
-        // Cost of Goods Sold is strictly unit costs of sold inventory items
-        const effectiveCogs = totalCogs;
-        const grossProfit = netSales - effectiveCogs;
+        // Cost of Goods Sold is unit costs of sold inventory items when supplier purchases are not recorded.
+        // When supplier purchases are recorded and paid from revenue, they already account for inventory acquisition cost.
+        const effectiveCogs = totalPurchases > 0 ? 0 : totalCogs;
+        const grossProfit = totalPurchases > 0 ? netSales : Math.max(0, netSales - effectiveCogs);
         const operatingNetProfit = grossProfit - totalOperatingExpenses;
         const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
         const netProfit = operatingNetProfit - totalProfitReinvested;
@@ -360,7 +361,9 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
 
         const formatCurrencyForPDF = (amount: number) => {
             const prefix = hasCustomFont ? currencySymbol : (currencySymbol === '₦' ? 'NGN ' : currencySymbol);
-            return `${prefix}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const isNegative = amount < 0;
+            const abs = Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return isNegative ? `-${prefix}${abs}` : `${prefix}${abs}`;
         };
 
         doc.setTextColor(242, 242, 242);
@@ -407,7 +410,13 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             ["Net Sales Revenue", formatCurrencyForPDF(netSales), `${financialSummary.grossRevenue > 0 ? ((netSales / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%`],
             ["", "", ""],
             ["Cost of Goods Sold (COGS)", "", ""],
-            ...(financialSummary.totalCogs > 0 ? [
+            ...(financialSummary.totalPurchases > 0 ? [
+                [
+                    "  Cost of Goods Sold (Unit Costs)",
+                    `Covered by Supplier Purchases above (${formatCurrencyForPDF(financialSummary.totalCogs)})`,
+                    "0.0%"
+                ]
+            ] : financialSummary.totalCogs > 0 ? [
                 [
                     "  Cost of Goods Sold (Unit Costs)",
                     `(${formatCurrencyForPDF(financialSummary.totalCogs)})`,
@@ -468,6 +477,13 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
         });
     };
 
+    const formatCardAmount = (val: number | undefined | null) => {
+        const numVal = Number(val) || 0;
+        const isNegative = numVal < 0;
+        const absStr = Math.abs(numVal).toLocaleString(undefined, { maximumFractionDigits: 0 });
+        return isNegative ? `-${currencySymbol}${absStr}` : `${currencySymbol}${absStr}`;
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-300 px-2 lg:px-6">
             {/* Executive P&L Key Metrics */}
@@ -480,7 +496,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                         <DollarSign className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-black">{currencySymbol}{financialSummary.netSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                        <div className="text-2xl font-black">{formatCardAmount(financialSummary.netSales)}</div>
                         <p className="text-xs text-muted-foreground mt-1">
                             {financialSummary.totalPurchases > 0
                                 ? `Gross: ${currencySymbol}${Math.round(financialSummary.grossRevenue).toLocaleString()} · Purchases: -${currencySymbol}${Math.round(financialSummary.totalPurchases).toLocaleString()}`
@@ -495,9 +511,13 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                         <FileText className="h-4 w-4 text-amber-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-black">{currencySymbol}{financialSummary.effectiveCogs.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                        <div className="text-2xl font-black">
+                            {formatCardAmount(financialSummary.totalPurchases > 0 ? financialSummary.totalPurchases : financialSummary.effectiveCogs)}
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                            {t('reports.plsCogsHint')}
+                            {financialSummary.totalPurchases > 0
+                                ? `Covered via Supplier Purchases (Unit COGS: ${formatCardAmount(financialSummary.totalCogs)})`
+                                : t('reports.plsCogsHint')}
                         </p>
                     </CardContent>
                 </Card>
@@ -508,7 +528,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                         <Coins className="h-4 w-4 text-indigo-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-black">{currencySymbol}{financialSummary.grossProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                        <div className={`text-2xl font-black ${financialSummary.grossProfit < 0 ? 'text-destructive' : ''}`}>{formatCardAmount(financialSummary.grossProfit)}</div>
                         <div className="flex items-center gap-1.5 mt-1">
                             <Badge variant="secondary" className="text-[10px] font-bold px-1.5 py-0 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                                 {t('reports.plsMarginPct', {
@@ -526,7 +546,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
-                            {currencySymbol}{financialSummary.totalOperatingExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            {formatCardAmount(financialSummary.totalOperatingExpenses)}
                         </div>
                         <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-1 font-medium">
                             {financialSummary.grossRevenue > 0 ? ((financialSummary.totalOperatingExpenses / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}% of Revenue
@@ -540,8 +560,8 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                         <TrendingUp className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                            {currencySymbol}{financialSummary.netProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        <div className={`text-2xl font-black ${financialSummary.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                            {formatCardAmount(financialSummary.netProfit)}
                         </div>
                         <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">
                             {t('reports.plsNetMarginPct', {
@@ -777,7 +797,15 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             <TableRow className="bg-muted/20">
                                 <TableCell colSpan={3} className="font-bold text-foreground py-2 text-xs uppercase tracking-wider">{t('reports.plsCogs')}</TableCell>
                             </TableRow>
-                            {financialSummary.totalCogs > 0 ? (
+                            {financialSummary.totalPurchases > 0 ? (
+                                <TableRow className="hover:bg-muted/30">
+                                    <TableCell className="ps-8 text-muted-foreground">
+                                        {t('reports.plsTotalCogs')} (Unit Costs: {currencySymbol}{financialSummary.totalCogs.toLocaleString(undefined, { minimumFractionDigits: 2 })} - covered by Supplier Purchases above)
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium text-muted-foreground">—</TableCell>
+                                    <TableCell className="text-right font-mono text-muted-foreground">0.0%</TableCell>
+                                </TableRow>
+                            ) : financialSummary.totalCogs > 0 ? (
                                 <TableRow className="hover:bg-muted/30">
                                     <TableCell className="ps-8 text-muted-foreground">{t('reports.plsTotalCogs')} (Unit Costs)</TableCell>
                                     <TableCell className="text-right font-medium text-amber-600">({financialSummary.totalCogs.toLocaleString(undefined, { minimumFractionDigits: 2 })})</TableCell>
@@ -788,13 +816,17 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                             ) : (
                                 <TableRow className="hover:bg-muted/30">
                                     <TableCell className="ps-8 text-muted-foreground">{t('reports.plsTotalCogs')}</TableCell>
-                                    <TableCell className="text-right font-medium text-amber-600">(0.00)</TableCell>
+                                    <TableCell className="text-right font-medium text-muted-foreground">(0.00)</TableCell>
                                     <TableCell className="text-right font-mono text-muted-foreground">0.0%</TableCell>
                                 </TableRow>
                             )}
                             <TableRow className="font-bold border-y border-muted bg-indigo-50/30 dark:bg-indigo-950/10">
                                 <TableCell className="ps-4 text-indigo-700 dark:text-indigo-300">{t('reports.colGrossProfit')}</TableCell>
-                                <TableCell className="text-right text-indigo-700 dark:text-indigo-300">{financialSummary.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                <TableCell className={`text-right ${financialSummary.grossProfit < 0 ? 'text-destructive font-bold' : 'text-indigo-700 dark:text-indigo-300'}`}>
+                                    {financialSummary.grossProfit < 0 
+                                        ? `(${Math.abs(financialSummary.grossProfit).toLocaleString(undefined, { minimumFractionDigits: 2 })})`
+                                        : financialSummary.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </TableCell>
                                 <TableCell className="text-right font-mono text-indigo-700 dark:text-indigo-300">{financialSummary.grossMarginPct.toFixed(1)}%</TableCell>
                             </TableRow>
 
@@ -847,17 +879,25 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                             {financialSummary.grossRevenue > 0 ? ((financialSummary.totalProfitReinvested / financialSummary.grossRevenue) * 100).toFixed(1) : '0.0'}%
                                         </TableCell>
                                     </TableRow>
-                                    <TableRow className="font-black text-base border-t-2 border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20">
-                                        <TableCell className="font-black text-emerald-700 dark:text-emerald-400 py-4">Retained Net Profit (Final Surplus)</TableCell>
-                                        <TableCell className="text-right font-black text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                                        <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
+                                    <TableRow className={`font-black text-base border-t-2 ${financialSummary.netProfit >= 0 ? 'border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-destructive/20 bg-rose-50/50 dark:bg-rose-950/20'}`}>
+                                        <TableCell className={`font-black py-4 ${financialSummary.netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>Retained Net Profit (Final Surplus)</TableCell>
+                                        <TableCell className={`text-right font-black py-4 ${financialSummary.netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>
+                                            {financialSummary.netProfit < 0 
+                                                ? `(${Math.abs(financialSummary.netProfit).toLocaleString(undefined, { minimumFractionDigits: 2 })})`
+                                                : financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </TableCell>
+                                        <TableCell className={`text-right font-mono font-bold py-4 ${financialSummary.netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
                                     </TableRow>
                                 </>
                             ) : (
-                                <TableRow className="font-black text-base border-t-2 border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20">
-                                    <TableCell className="font-black text-emerald-700 dark:text-emerald-400 py-4">{t('reports.plsNetOperatingProfit')}</TableCell>
-                                    <TableCell className="text-right font-black text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                                    <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 py-4">{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
+                                <TableRow className={`font-black text-base border-t-2 ${financialSummary.netProfit >= 0 ? 'border-primary/20 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-destructive/20 bg-rose-50/50 dark:bg-rose-950/20'}`}>
+                                    <TableCell className={`font-black py-4 ${financialSummary.netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>{t('reports.plsNetOperatingProfit')}</TableCell>
+                                    <TableCell className={`text-right font-black py-4 ${financialSummary.netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>
+                                        {financialSummary.netProfit < 0 
+                                            ? `(${Math.abs(financialSummary.netProfit).toLocaleString(undefined, { minimumFractionDigits: 2 })})`
+                                            : financialSummary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </TableCell>
+                                    <TableCell className={`text-right font-mono font-bold py-4 ${financialSummary.netProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>{financialSummary.netMarginPct.toFixed(1)}%</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>

@@ -31,7 +31,8 @@ export const createUserProfileDocument = async (
   user: User,
   displayName: string,
   phone?: string,
-  invitationCode?: string | null
+  invitationCode?: string | null,
+  businessName?: string
 ) => {
   const userDocRef = doc(firestore, `users/${user.uid}`);
 
@@ -42,6 +43,8 @@ export const createUserProfileDocument = async (
     let userRole: UserRole;
     let branchId: string | undefined;
     let surveyCompleted = true; // Default for invited users
+
+    const finalBusinessName = (businessName || displayName || '').trim();
 
     if (invitationCode) {
       const invDocRef = doc(firestore, 'invitations', invitationCode);
@@ -89,7 +92,7 @@ export const createUserProfileDocument = async (
       }
 
       const newBusiness: Omit<BusinessInstance, 'id'> = {
-        name: displayName,
+        name: finalBusinessName,
         createdAt: serverTimestamp(),
         ownerId: user.uid,
         plan: 'starter',
@@ -107,7 +110,8 @@ export const createUserProfileDocument = async (
 
     const userProfile: Omit<UserProfile, 'id'> = {
       email: user.email!,
-      name: displayName,
+      name: displayName || finalBusinessName,
+      ...(finalBusinessName ? { businessName: finalBusinessName } : {}),
       phone: phone || '',
       createdAt: serverTimestamp(),
       businessId: businessId,

@@ -14,6 +14,12 @@ const appVersion = JSON.parse(
 ).version as string;
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
   },

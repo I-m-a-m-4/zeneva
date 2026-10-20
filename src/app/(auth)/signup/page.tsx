@@ -22,7 +22,10 @@ import Image from 'next/image';
 import { doc, getDoc } from 'firebase/firestore';
 import { applyReferralCode } from '@/actions/referral';
 
-const makeSignupSchema = (t: (key: string) => string) => z.object({
+const makeSignupSchema = (t: (key: string) => string, isInvitation = false) => z.object({
+  businessName: isInvitation
+    ? z.string().optional()
+    : z.string().trim().min(2, { message: t('auth.valBusinessNameMin') || 'Business name must be at least 2 characters.' }),
   email: z.string()
     .email({ message: t('auth.valInvalidEmail') })
     .refine((email) => {
@@ -41,7 +44,11 @@ const makeSignupSchema = (t: (key: string) => string) => z.object({
   password: z.string().min(6, { message: t('auth.valPasswordMin') }),
 });
 
-type SignupFormValues = z.infer<ReturnType<typeof makeSignupSchema>>;
+type SignupFormValues = {
+  businessName?: string;
+  email: string;
+  password: string;
+};
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -140,11 +147,11 @@ function SignupPageContent() {
 
   // `t` is referentially stable until the active catalog changes, so the resolver
   // is rebuilt exactly once per locale switch rather than on every render.
-  const signupSchema = React.useMemo(() => makeSignupSchema(t), [t]);
+  const signupSchema = React.useMemo(() => makeSignupSchema(t, !!invitationCode), [t, invitationCode]);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { businessName: '', email: '', password: '' },
   });
 
   useEffect(() => {
@@ -309,7 +316,8 @@ function SignupPageContent() {
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        await createUserProfileDocument(firestore, user, user.displayName || '', user.phoneNumber || '', invitationCode);
+        const formBizName = form.getValues('businessName')?.trim() || '';
+        await createUserProfileDocument(firestore, user, user.displayName || formBizName || '', user.phoneNumber || '', invitationCode, formBizName);
         await waitForUserProfile(firestore, user.uid);
         if (referralCode.trim()) {
           try {
@@ -328,7 +336,7 @@ function SignupPageContent() {
           body: JSON.stringify({
             email: user.email,
             firstName: user.displayName?.split(' ')[0] || '',
-            businessName: invitationDetails?.businessName || ''
+            businessName: formBizName || invitationDetails?.businessName || ''
           })
         }).catch(err => console.error('Failed to send welcome email:', err));
 
@@ -390,10 +398,11 @@ function SignupPageContent() {
       // `signup_succeeded` *and* a `signup_failed: profile:*` on the same install
       // reads as what it is: an account that exists but cannot be used.
       void trackLaunchStage('signup_succeeded', 'password');
-      await updateProfile(userCredential.user, { displayName: '' });
+      const bizName = data.businessName?.trim() || '';
+      await updateProfile(userCredential.user, { displayName: bizName });
 
-      // Pass invitation code to the creation function with empty strings for name and phone
-      await createUserProfileDocument(firestore, userCredential.user, '', '', invitationCode);
+      // Pass invitation code to the creation function with business name
+      await createUserProfileDocument(firestore, userCredential.user, bizName, '', invitationCode, bizName);
       await waitForUserProfile(firestore, userCredential.user.uid);
       if (referralCode.trim()) {
         try {
@@ -413,7 +422,7 @@ function SignupPageContent() {
         body: JSON.stringify({
           email: userCredential.user.email,
           firstName: '',
-          businessName: invitationDetails?.businessName || ''
+          businessName: bizName || invitationDetails?.businessName || ''
         })
       }).catch(err => console.error('Failed to send welcome email:', err));
 
@@ -525,6 +534,27 @@ function SignupPageContent() {
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+                {!invitationCode && (
+                  <FormField
+                    control={form.control}
+                    name="businessName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Label>{t('auth.businessNameLabel') || t('settings.businessName') || 'Business Name'}</Label>
+                        <FormControl>
+                          <Input
+                            type="text"
+                            placeholder={t('auth.businessNamePlaceholder') || 'e.g. Acme Stores or Glam Skincare'}
+                            {...field}
+                            disabled={isLoading || isGoogleLoading}
+                            autoComplete="organization"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="email"

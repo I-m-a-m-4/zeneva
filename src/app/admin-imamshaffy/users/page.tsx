@@ -374,6 +374,7 @@ export default function UsersPage() {
       const business = u.businessId ? bizIndex.get(u.businessId) : undefined;
       return (
         (u.name || '').toLowerCase().includes(term) ||
+        (u.businessName || '').toLowerCase().includes(term) ||
         (u.email || '').toLowerCase().includes(term) ||
         (u.phone || '').toLowerCase().includes(term) ||
         (business?.name || '').toLowerCase().includes(term) ||
@@ -617,8 +618,8 @@ export default function UsersPage() {
                         >
                           <TableCell>
                             <div className="font-medium flex items-center gap-1.5">
-                              {user.name || business?.name || <span className="text-amber-600 dark:text-amber-400 font-semibold">Incomplete Signup</span>}
-                              {!user.name && !business?.name && !user.email && (
+                              {user.name || business?.name || user.businessName || <span className="text-amber-600 dark:text-amber-400 font-semibold">Incomplete Signup</span>}
+                              {!user.name && !business?.name && !user.businessName && !user.email && (
                                 <Badge variant="outline" className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200">
                                   Visitor
                                 </Badge>
@@ -636,7 +637,7 @@ export default function UsersPage() {
                             {/* Columns that drop out by breakpoint are restated
                                 here so nothing is lost on a narrow screen. */}
                             <div className="mt-0.5 text-xs text-muted-foreground md:hidden">
-                              {business?.name || (user.onboardingStep ? `Onboarding (Step ${user.onboardingStep})` : (user.email ? 'No business' : 'Pending Signup'))}
+                              {business?.name || user.businessName || (user.onboardingStep ? `Onboarding (Step ${user.onboardingStep})` : (user.email ? 'No business' : 'Pending Signup'))}
                               <span> · {formatDuration(user.totalUsageSeconds ?? 0)}</span>
                               <span className="sm:hidden">
                                 {' · '}
@@ -647,7 +648,7 @@ export default function UsersPage() {
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            <span className="text-sm">{business?.name || <span className="text-muted-foreground">{user.onboardingStep ? `Onboarding (Step ${user.onboardingStep})` : (user.email ? '—' : 'Pending Signup')}</span>}</span>
+                            <span className="text-sm">{business?.name || user.businessName || <span className="text-muted-foreground">{user.onboardingStep ? `Onboarding (Step ${user.onboardingStep})` : (user.email ? '—' : 'Pending Signup')}</span>}</span>
                           </TableCell>
                           <TableCell>
                             <Badge variant={(user.role || 'vendor_operator') === 'admin' ? 'default' : 'secondary'} className="whitespace-nowrap capitalize">

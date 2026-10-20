@@ -743,11 +743,11 @@ export function summarisePeriod(
   const netRevenue = Math.max(0, grossRevenue - totalPurchases);
   const costSumVal = anyCost ? costSum : 0;
 
-  // Gross Profit = Net Revenue (sales minus revenue-funded supplier purchases) minus direct unit cost of sold goods.
-  // When unit costs are not recorded, Gross Profit is the Net Revenue.
-  const grossProfit = anyCost
-    ? (netRevenue - costSumVal)
-    : netRevenue;
+  // Gross Profit: when supplier purchases funded from revenue are recorded, they already represent inventory cost, so Gross Profit is netRevenue.
+  // When supplier purchases are not recorded, Gross Profit is Gross Revenue minus direct unit costs (costSumVal).
+  const grossProfit = totalPurchases > 0
+    ? netRevenue
+    : (anyCost ? Math.max(0, grossRevenue - costSumVal) : grossRevenue);
   const profit = anyCost || totalPurchases > 0 ? grossProfit : null;
 
   // Operating Net Profit = Gross Profit - Operating Expenses (funded from revenue)

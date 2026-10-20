@@ -173,7 +173,11 @@ export default function InvoicesPage() {
                             </TableHeader>
                             <TableBody>
                                 {invoices.map((invoice) => (
-                                    <TableRow key={invoice.id}>
+                                    <TableRow 
+                                        key={invoice.id}
+                                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                        onClick={() => router.push(`/invoice/details?id=${invoice.id}`)}
+                                    >
                                         <TableCell className="font-mono font-medium">#{invoice.receiptNumber || invoice.id.substring(0, 8).toUpperCase()}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-col">
@@ -243,9 +247,7 @@ export default function InvoicesPage() {
             </div>
 
             {/* Fixed / Pinned to footer of the invoice page */}
-            <div className="sticky bottom-0 z-20 pt-4 pb-1 bg-gradient-to-t from-background via-background/95 to-transparent">
-                <InvoicingPromoBanner />
-            </div>
+            <InvoicingPromoBanner />
         </div>
     );
 }

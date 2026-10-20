@@ -54,6 +54,8 @@ function ReceiptContent() {
   const router = useRouter();
   const receiptContentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = React.useState(false);
+  const [isVoidDialogOpen, setIsVoidDialogOpen] = React.useState(false);
+  const [isVoiding, setIsVoiding] = React.useState(false);
 
   React.useEffect(() => {
       setMounted(true);
@@ -189,9 +191,6 @@ function ReceiptContent() {
       copyToClipboard();
     }
   };
-
-  const [isVoidDialogOpen, setIsVoidDialogOpen] = React.useState(false);
-  const [isVoiding, setIsVoiding] = React.useState(false);
 
   const canVoid = Boolean(
     (currentUserProfile || user) && (

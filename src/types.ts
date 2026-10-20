@@ -92,7 +92,9 @@ export interface UserProfile {
     onboardingStep?: number;
     id: string;
     businessId: string;
+    branchId?: string;
     name: string;
+    businessName?: string;
     email: string;
     phone?: string;
     role: UserRole;
@@ -254,8 +256,13 @@ export interface Receipt {
          */
         priceOverridden?: boolean;
         listPrice?: number;
+        priceOverrideNote?: string;
     }[];
     customer?: { id: string, name: string, email: string } | null;
+    customerId?: string;
+    customerName?: string;
+    customerPhone?: string;
+    timestamp?: any;
     subtotal: number;
     tax: number;
     discount: number;
@@ -892,8 +899,13 @@ export interface Expense {
     category: ExpenseCategory | string;
     paymentMethod: ExpensePaymentMethod;
     description: string;
+    title?: string;
+    recipient?: string;
+    notes?: string;
+    deductFromCashDrawer?: boolean;
     date: any; // Timestamp or ISO string
     paidBy?: string; // User display name or ID
+    createdByName?: string;
     receiptUrl?: string; // Optional bill/receipt reference or URL
     isPaidFromDrawer?: boolean; // Whether cash was deducted from daily till / register
     deductionSource?: ExpenseDeductionSource; // 'revenue' (operational) or 'net_profit' (reinvestment)

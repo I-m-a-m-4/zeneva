@@ -37,7 +37,10 @@ export type UserRole = 'admin' | 'manager' | 'vendor_operator';
 export interface UserProfile {
     id: string;
     businessId: string;
+    branchId?: string;
+    invitationCode?: string;
     name: string;
+    businessName?: string;
     email: string;
     phone?: string;
     role: UserRole;
