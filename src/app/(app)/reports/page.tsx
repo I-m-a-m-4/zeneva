@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { usePOS } from '@/context/pos-context';
 import { useBranch } from '@/context/branch-context';
-import type { Receipt, Customer, Expense } from '@/types';
+import type { Receipt, Customer, Expense, Product } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Sparkles, AlertCircle, ArrowUp, ArrowDown, Minus } from 'lucide-react';
@@ -41,7 +41,6 @@ import ProfitLossStatement from '@/components/reports/profit-loss-statement';
 import RevenueForecastCard from '@/components/reports/revenue-forecast-card';
 import DailyCustomerRetentionChart from '@/components/reports/daily-customer-retention-chart';
 import BusinessRatingPanel from '@/components/reports/business-rating-panel';
-import { DeltaChip } from '@/components/reports/delta-chip';
 import StaffPerformance from '@/components/reports/staff-performance';
 import CategoryPerformance from '@/components/reports/category-performance';
 import MarginLeaksPanel from '@/components/reports/margin-leaks';
@@ -192,7 +191,31 @@ function DataInsightModalContent({
     let tableHeaders: string[] = [];
     let tableRows: React.ReactNode[] = [];
 
-    const formatCurrency = (val: number) => `${currencySymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formatCurrency = (val: number | undefined | null) => {
+        const numVal = Number(val) || 0;
+        const isNegative = numVal < 0;
+        const absStr = Math.abs(numVal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return isNegative ? `-${currencySymbol}${absStr}` : `${currencySymbol}${absStr}`;
+    };
+
+    const formatAmount = (val: number | undefined | null, options?: { isDeduction?: boolean }) => {
+        const numVal = Number(val) || 0;
+        const absStr = Math.abs(numVal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (options?.isDeduction) {
+            return `-${currencySymbol}${absStr}`;
+        }
+        if (numVal < 0) {
+            return `-${currencySymbol}${absStr}`;
+        }
+        return `${currencySymbol}${absStr}`;
+    };
+
+    const formatKpiCurrency = (val: number | undefined | null) => {
+        const numVal = Number(val) || 0;
+        const isNegative = numVal < 0;
+        const absStr = Math.abs(numVal).toLocaleString(undefined, { maximumFractionDigits: 0 });
+        return isNegative ? `-${currencySymbol}${absStr}` : `${currencySymbol}${absStr}`;
+    };
 
     if (insightModal?.id === 'revenue') {
         const dayMap = new Map<string, number>();
@@ -222,15 +245,15 @@ function DataInsightModalContent({
                     <div className="grid grid-cols-3 gap-2 p-3 bg-muted/20 rounded-lg text-xs border border-border/60">
                         <div>
                             <span className="text-muted-foreground block text-[11px]">Gross Sales</span>
-                            <span className="font-semibold text-emerald-600">+{formatCurrency(gross)}</span>
+                            <span className="font-semibold text-emerald-600">{formatAmount(gross)}</span>
                         </div>
                         <div>
                             <span className="text-muted-foreground block text-[11px]">Supplier Purchases</span>
-                            <span className="font-semibold text-amber-600">-{formatCurrency(purchases)}</span>
+                            <span className="font-semibold text-amber-600">{formatAmount(purchases, { isDeduction: true })}</span>
                         </div>
                         <div>
                             <span className="text-muted-foreground block text-[11px]">Net Revenue</span>
-                            <span className="font-bold text-foreground">={formatCurrency(net)}</span>
+                            <span className="font-bold text-foreground">{formatAmount(net)}</span>
                         </div>
                     </div>
                     <Table>
@@ -270,13 +293,13 @@ function DataInsightModalContent({
     } else if (insightModal?.id === 'net-profit') {
         const grossRev = (finalReportData as any)?.grossRevenue ?? (finalReportData?.totalRevenue ?? 0);
         const purchases = (finalReportData as any)?.totalPurchases ?? 0;
-        const netRev = finalReportData?.totalRevenue ?? 0;
-        const unitCost = finalReportData?.totalCost ?? 0;
-        const grossProfit = (finalReportData as any)?.grossProfit ?? (netRev - unitCost);
+        const netRev = (finalReportData as any)?.netRevenue ?? (finalReportData?.totalRevenue ?? 0);
+        const receiptCost = (finalReportData as any)?.receiptCost ?? 0;
+        const grossProfit = (finalReportData as any)?.grossProfit ?? (purchases > 0 ? netRev : Math.max(0, netRev - receiptCost));
         const opex = (finalReportData as any)?.totalOperatingExpenses ?? 0;
         const operatingProfit = (finalReportData as any)?.operatingProfit ?? (grossProfit - opex);
         const reinvested = (finalReportData as any)?.totalProfitReinvested ?? 0;
-        const profit = finalReportData?.totalProfit ?? 0;
+        const profit = finalReportData?.totalProfit ?? (operatingProfit - reinvested);
         
         tableContent = (
             <div className="flex flex-col h-full gap-4">
@@ -290,60 +313,63 @@ function DataInsightModalContent({
                     <TableBody>
                         <TableRow>
                             <TableCell className="font-medium text-xs">Gross Sales Revenue</TableCell>
-                            <TableCell className="text-right text-xs text-emerald-600">+{formatCurrency(grossRev)}</TableCell>
+                            <TableCell className="text-right text-xs font-semibold text-emerald-600">{formatAmount(grossRev)}</TableCell>
                         </TableRow>
-                        {purchases > 0 && (
-                            <TableRow>
-                                <TableCell className="font-medium text-xs">Less: Supplier Purchases (Paid from Revenue)</TableCell>
-                                <TableCell className="text-right text-xs text-amber-600">-{formatCurrency(purchases)}</TableCell>
-                            </TableRow>
-                        )}
-                        <TableRow className="border-t bg-muted/10 font-semibold">
-                            <TableCell className="text-xs text-foreground">Net Sales Revenue</TableCell>
-                            <TableCell className="text-right text-xs text-foreground">={formatCurrency(netRev)}</TableCell>
-                        </TableRow>
-                        {unitCost > 0 ? (
-                            <TableRow>
-                                <TableCell className="font-medium text-xs">Cost of Goods Sold (Unit Costs)</TableCell>
-                                <TableCell className="text-right text-xs text-destructive">-{formatCurrency(unitCost)}</TableCell>
-                            </TableRow>
+                        {purchases > 0 ? (
+                            <>
+                                <TableRow>
+                                    <TableCell className="font-medium text-xs">Less: Supplier Purchases (Paid from Revenue)</TableCell>
+                                    <TableCell className="text-right text-xs font-medium text-amber-600">{formatAmount(purchases, { isDeduction: true })}</TableCell>
+                                </TableRow>
+                                <TableRow className="border-t bg-muted/10 font-semibold">
+                                    <TableCell className="text-xs text-foreground">Net Sales Revenue</TableCell>
+                                    <TableCell className="text-right text-xs font-semibold text-foreground">{formatAmount(netRev)}</TableCell>
+                                </TableRow>
+                            </>
                         ) : (
-                            <TableRow>
-                                <TableCell className="font-medium text-xs">Cost of Goods Sold (COGS)</TableCell>
-                                <TableCell className="text-right text-xs text-muted-foreground">-{formatCurrency(0)}</TableCell>
-                            </TableRow>
+                            <>
+                                <TableRow>
+                                    <TableCell className="font-medium text-xs">Cost of Goods Sold (Unit Costs)</TableCell>
+                                    <TableCell className="text-right text-xs font-medium text-destructive">{formatAmount(receiptCost, { isDeduction: true })}</TableCell>
+                                </TableRow>
+                                <TableRow className="border-t bg-muted/10 font-semibold">
+                                    <TableCell className="text-xs text-foreground">Gross Profit</TableCell>
+                                    <TableCell className="text-right text-xs font-semibold text-foreground">{formatAmount(grossProfit)}</TableCell>
+                                </TableRow>
+                            </>
                         )}
-                        <TableRow className="border-t bg-muted/20">
-                            <TableCell className="font-semibold text-xs text-foreground">Gross Profit</TableCell>
-                            <TableCell className="text-right text-xs font-semibold text-foreground">+{formatCurrency(grossProfit)}</TableCell>
-                        </TableRow>
                         <TableRow>
                             <TableCell className="font-medium text-xs">Operating Expenses (Overheads)</TableCell>
-                            <TableCell className="text-right text-xs text-destructive">-{formatCurrency(opex)}</TableCell>
+                            <TableCell className="text-right text-xs font-medium text-destructive">{formatAmount(opex, { isDeduction: true })}</TableCell>
                         </TableRow>
                         {reinvested > 0 ? (
                             <>
                                 <TableRow className="border-t bg-muted/10">
                                     <TableCell className="font-semibold text-xs text-foreground">Operating Net Profit</TableCell>
-                                    <TableCell className="text-right text-xs font-semibold text-foreground">+{formatCurrency(operatingProfit)}</TableCell>
+                                    <TableCell className={`text-right text-xs font-semibold ${operatingProfit >= 0 ? 'text-foreground' : 'text-destructive'}`}>{formatAmount(operatingProfit)}</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell className="font-medium text-xs">Less: Profit Reinvestments (Capital Outflow)</TableCell>
-                                    <TableCell className="text-right text-xs text-purple-600">-{formatCurrency(reinvested)}</TableCell>
+                                    <TableCell className="text-right text-xs font-medium text-purple-600">{formatAmount(reinvested, { isDeduction: true })}</TableCell>
                                 </TableRow>
                                 <TableRow className="border-t-2 bg-primary/5">
                                     <TableCell className="font-bold text-xs">Retained Net Profit</TableCell>
-                                    <TableCell className="text-right text-xs font-bold text-primary">{formatCurrency(profit)}</TableCell>
+                                    <TableCell className={`text-right text-xs font-bold ${profit >= 0 ? 'text-primary' : 'text-destructive'}`}>{formatAmount(profit)}</TableCell>
                                 </TableRow>
                             </>
                         ) : (
                             <TableRow className="border-t-2 bg-primary/5">
                                 <TableCell className="font-bold text-xs">Net Operating Profit</TableCell>
-                                <TableCell className="text-right text-xs font-bold text-primary">{formatCurrency(profit)}</TableCell>
+                                <TableCell className={`text-right text-xs font-bold ${profit >= 0 ? 'text-primary' : 'text-destructive'}`}>{formatAmount(profit)}</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                 </Table>
+                {purchases > 0 && receiptCost > 0 && (
+                    <p className="text-[11px] text-muted-foreground px-1 italic">
+                        * Unit Cost of Goods Sold across sold items was {formatAmount(receiptCost)}, which is covered by your recorded supplier purchases.
+                    </p>
+                )}
             </div>
         );
         totalItems = 1; 
@@ -539,6 +565,14 @@ export default function ReportsDashboard() {
     const [previousExpenses, setPreviousExpenses] = React.useState<Expense[]>([]);
     const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
+    const formatKpiCurrency = React.useCallback((amount: number | null | undefined) => {
+        if (amount === undefined || amount === null || isNaN(amount)) return `${currencySymbol || '₦'}0`;
+        const isNegative = amount < 0;
+        const abs = Math.abs(amount);
+        const formatted = abs.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        return isNegative ? `-${currencySymbol || '₦'}${formatted}` : `${currencySymbol || '₦'}${formatted}`;
+    }, [currencySymbol]);
+
     const [date, setDate] = React.useState<DateRange | undefined>({
         from: subDays(new Date(), 365), // Fallback initial
         to: new Date(),
@@ -612,7 +646,7 @@ export default function ReportsDashboard() {
 
     const reportData = React.useMemo(() => {
         const targetReceipts = reportBatchReceipts.length > 0 ? reportBatchReceipts : (receipts || []);
-        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, buyersInRange: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0, totalCost: 0, totalPurchases: 0, totalOperatingExpenses: 0, grossProfit: 0 };
+        if (!targetReceipts || !products || !customers) return { totalRevenue: 0, totalSales: 0, averageOrderValue: 0, inventoryValue: 0, totalCustomers: 0, buyersInRange: 0, totalProductsSold: 0, totalServicesSold: 0, totalItemsSold: 0, totalProductRevenue: 0, totalServiceRevenue: 0, uniqueProductsSold: 0, catalogSize: 0, dailyAverageSales: 0, dailyAverageRevenue: 0, totalProfit: 0, totalCost: 0, receiptCost: 0, totalPurchases: 0, totalOperatingExpenses: 0, grossProfit: 0 };
 
         const totalRevenue = targetReceipts.reduce((sum, r) => sum + r.total, 0);
         const totalSales = targetReceipts.length;
@@ -704,9 +738,10 @@ export default function ReportsDashboard() {
         const grossSalesRevenue = totalRevenue;
         // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to determine Net Revenue.
         const netRevenue = Math.max(0, grossSalesRevenue - totalPurchases);
-        // Cost of Goods Sold is strictly unit costs of sold inventory items
-        const effectiveCost = receiptCost;
-        const grossProfit = netRevenue - effectiveCost;
+        // Cost of Goods Sold is unit costs of sold inventory items when supplier purchases are not recorded.
+        // When supplier purchases are recorded and paid from revenue, they already account for inventory acquisition cost.
+        const effectiveCost = totalPurchases > 0 ? 0 : receiptCost;
+        const grossProfit = totalPurchases > 0 ? netRevenue : Math.max(0, netRevenue - effectiveCost);
         const operatingProfit = grossProfit - totalOperatingExpenses;
         const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
         const totalProfit = operatingProfit - totalProfitReinvested;
@@ -760,7 +795,8 @@ export default function ReportsDashboard() {
             totalProfitReinvested,
             purchasesFromProfit,
             expensesFromProfit,
-            totalCost: effectiveCost,
+            receiptCost,
+            totalCost: totalPurchases > 0 ? totalPurchases : receiptCost,
             totalPurchases,
             totalOperatingExpenses,
             grossProfit
@@ -777,7 +813,7 @@ export default function ReportsDashboard() {
      * code: it was a read the owner paid for on every range change, for a figure
      * that never reached the screen.
      */
-    const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number }[] | null>(null);
+    const [monthlyStats, setMonthlyStats] = React.useState<{ month: string, sales: number, totalSales: number }[] | null>(null);
     const [activeTab, setActiveTab] = React.useState<string>('analytics');
 
     // AI Co-Pilot Page Action Listener
@@ -888,20 +924,23 @@ export default function ReportsDashboard() {
                         const snap = await getDocs(q);
                         const exps = snap.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
                         setReportBatchExpenses(exps);
-                    }
-                    
-                    if (prev) {
-                        const pExQuery = query(
-                            collection(firestore, 'expenses'),
-                            where('businessId', '==', business.id),
-                            where('date', '>=', Timestamp.fromDate(prev.from)),
-                            where('date', '<=', Timestamp.fromDate(prev.to)),
-                            limit(2000)
-                        );
-                        const pExDocs = await getDocs(pExQuery);
-                        const pExps = pExDocs.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
-                        setPreviousExpenses(pExps);
+
+                        if (prev) {
+                            const pExQuery = query(
+                                collection(firestore, 'expenses'),
+                                where('businessId', '==', business.id),
+                                where('date', '>=', Timestamp.fromDate(prev.from)),
+                                where('date', '<=', Timestamp.fromDate(prev.to)),
+                                limit(2000)
+                            );
+                            const pExDocs = await getDocs(pExQuery);
+                            const pExps = pExDocs.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+                            setPreviousExpenses(pExps);
+                        } else {
+                            setPreviousExpenses([]);
+                        }
                     } else {
+                        setReportBatchExpenses([]);
                         setPreviousExpenses([]);
                     }
                 } finally {
@@ -912,7 +951,7 @@ export default function ReportsDashboard() {
             fetchBatch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateFromTime, dateToTime, fetchReceiptsInRange]);
+    }, [dateFromTime, dateToTime, fetchReceiptsInRange, business?.id, firestore]);
 
     /**
      * The equivalent window immediately before the selected one, so every headline
@@ -1106,7 +1145,7 @@ export default function ReportsDashboard() {
             .filter(e => (e as any)?.status !== 'pending')
             .filter(isPurchase)
             .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-        const effectivePriorCost = priorCost;
+        const effectivePriorCost = priorPurchases > 0 ? priorPurchases : priorCost;
 
         return {
             revenue: periodDelta(current.revenue, prior.revenue),
@@ -1291,8 +1330,8 @@ export default function ReportsDashboard() {
                                     <DataInsightModalContent 
                                         insightModal={insightModal} 
                                         reportBatchReceipts={reportBatchReceipts}
-                                        customers={customers}
-                                        products={products}
+                                        customers={customers || []}
+                                        products={products || []}
                                         finalReportData={finalReportData}
                                         comparison={comparison}
                                         currencySymbol={currencySymbol || '$'}
@@ -1302,28 +1341,32 @@ export default function ReportsDashboard() {
                             <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                 <ReportStatCard
                                     title={t('reports.kpiRevenue')}
-                                    value={`${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    value={formatKpiCurrency(finalReportData?.totalRevenue)}
                                     icon={DollarSign}
                                     description={
                                         finalReportData && finalReportData.totalPurchases > 0
-                                            ? `Gross: ${currencySymbol}${Math.round(finalReportData.grossRevenue).toLocaleString()} · Purchases: -${currencySymbol}${Math.round(finalReportData.totalPurchases).toLocaleString()}`
+                                            ? `Gross: ${formatKpiCurrency(finalReportData.grossRevenue)} · Purchases: -${formatKpiCurrency(finalReportData.totalPurchases).replace('-', '')}`
                                             : t('reports.kpiRevenueHint')
                                     }
                                     delta={comparison?.revenue}
                                     onClick={() => setInsightModal({
                                         id: 'revenue',
                                         title: t('reports.kpiRevenue'),
-                                        value: `${currencySymbol}${finalReportData?.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        value: formatKpiCurrency(finalReportData?.totalRevenue),
                                         description: finalReportData && finalReportData.totalPurchases > 0
-                                            ? `Net Revenue after deducting ${currencySymbol}${Math.round(finalReportData.totalPurchases).toLocaleString()} supplier purchases.`
+                                            ? `Net Revenue after deducting ${formatKpiCurrency(finalReportData.totalPurchases)} supplier purchases.`
                                             : t('reports.kpiRevenueHint')
                                     })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiNetCost')}
-                                    value={`${currencySymbol}${finalReportData?.totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    value={formatKpiCurrency(finalReportData?.totalCost)}
                                     icon={FileText}
-                                    description={t('reports.kpiNetCostHint')}
+                                    description={
+                                        finalReportData && finalReportData.totalPurchases > 0
+                                            ? `Supplier purchases (Unit COGS: ${formatKpiCurrency(finalReportData.receiptCost)})`
+                                            : t('reports.kpiNetCostHint')
+                                    }
                                     delta={comparison?.cost}
                                     onClick={() => {
                                         setActiveTab('profit-loss');
@@ -1332,40 +1375,40 @@ export default function ReportsDashboard() {
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiNetProfit')}
-                                    value={`${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    value={formatKpiCurrency(finalReportData?.totalProfit)}
                                     icon={Coins}
                                     description={`${t('reports.kpiNetProfitHint')} (Click for analysis)`}
                                     delta={comparison?.profit}
                                     onClick={() => setInsightModal({
                                         id: 'net-profit',
                                         title: t('reports.kpiNetProfit'),
-                                        value: `${currencySymbol}${finalReportData?.totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        value: formatKpiCurrency(finalReportData?.totalProfit),
                                         description: 'Breakdown of how your net profit is calculated.'
                                     })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiProductRevenue')}
-                                    value={`${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    value={formatKpiCurrency(finalReportData?.totalProductRevenue)}
                                     icon={Package}
                                     description={t('reports.kpiProductRevenueHint')}
                                     delta={comparison?.productRevenue}
                                     onClick={() => setInsightModal({
                                         id: 'product-revenue',
                                         title: t('reports.kpiProductRevenue'),
-                                        value: `${currencySymbol}${finalReportData?.totalProductRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        value: formatKpiCurrency(finalReportData?.totalProductRevenue),
                                         description: t('reports.kpiProductRevenueHint')
                                     })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiServiceRevenue')}
-                                    value={`${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    value={formatKpiCurrency(finalReportData?.totalServiceRevenue)}
                                     icon={TrendingUp}
                                     description={t('reports.kpiServiceRevenueHint')}
                                     delta={comparison?.serviceRevenue}
                                     onClick={() => setInsightModal({
                                         id: 'service-revenue',
                                         title: t('reports.kpiServiceRevenue'),
-                                        value: `${currencySymbol}${finalReportData?.totalServiceRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        value: formatKpiCurrency(finalReportData?.totalServiceRevenue),
                                         description: t('reports.kpiServiceRevenueHint')
                                     })}
                                 />
@@ -1422,14 +1465,14 @@ export default function ReportsDashboard() {
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiDailyRevenue')}
-                                    value={`${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`}
+                                    value={formatKpiCurrency(finalReportData?.dailyAverageRevenue)}
                                     icon={DollarSign}
                                     description={t('reports.kpiDailyRevenueHint')}
                                     delta={comparison?.revenue}
                                     onClick={() => setInsightModal({
                                         id: 'daily-revenue',
                                         title: t('reports.kpiDailyRevenue'),
-                                        value: `${currencySymbol}${finalReportData?.dailyAverageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}`,
+                                        value: formatKpiCurrency(finalReportData?.dailyAverageRevenue),
                                         description: t('reports.kpiDailyRevenueHint')
                                     })}
                                 />

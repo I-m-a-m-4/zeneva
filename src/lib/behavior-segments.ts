@@ -305,6 +305,7 @@ export const LEFT_MAX_DAYS = 45;
 export type BehaviorUserLike = {
   id: string;
   businessId?: string | null;
+  businessName?: string | null;
   name?: string | null;
   email?: string | null;
   role?: string | null;
@@ -640,7 +641,7 @@ export function profileUser(
     name: user.name ?? null,
     firstName: firstNameOf(user.name),
     email,
-    businessName: business?.name || business?.businessName || 'your business',
+    businessName: business?.name || business?.businessName || user.businessName || 'your business',
     // `BusinessLike` accepts null/undefined and answers 'starter', so an
     // unresolvable business is handled by plan.ts rather than guessed at here.
     plan: effectivePlan(business),

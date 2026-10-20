@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  LayoutDashboard,
   Wallet,
   PlusCircle,
   Search,
@@ -82,7 +83,6 @@ import {
   Filter,
   CheckCircle2,
   Clock,
-  ExternalLink,
   Phone,
   Mail,
   MapPin,
@@ -91,6 +91,7 @@ import {
   ArrowDownRight,
   Boxes,
   Sparkles,
+  Printer,
 } from "lucide-react";
 import { usePOS } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
@@ -215,6 +216,70 @@ export interface Supplier {
   updatedAt: any;
 }
 
+// ======================== DATE RANGE HELPER ========================
+
+function isDateInRange(rawDate: any, range: string, startCustom?: string, endCustom?: string): boolean {
+  if (range === 'all') return true;
+  const d = safeToDate(rawDate);
+  if (!d) return false;
+  const now = new Date();
+
+  if (range === 'today') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return d >= start && d <= end;
+  }
+  if (range === 'yesterday') {
+    const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+    const endYest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+    return d >= yest && d <= endYest;
+  }
+  if (range === 'this_week') {
+    const day = now.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff, 0, 0, 0);
+    return d >= monday;
+  }
+  if (range === 'last_7_days' || range === 'week') {
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return d >= sevenDaysAgo;
+  }
+  if (range === 'this_month') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    return d >= startOfMonth;
+  }
+  if (range === 'last_30_days' || range === 'month') {
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return d >= thirtyDaysAgo;
+  }
+  if (range === 'last_month') {
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    return d >= startOfLastMonth && d <= endOfLastMonth;
+  }
+  if (range === 'this_quarter') {
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const startOfQuarter = new Date(now.getFullYear(), currentQuarter * 3, 1, 0, 0, 0);
+    return d >= startOfQuarter;
+  }
+  if (range === 'this_year' || range === 'year') {
+    const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+    return d >= startOfYear;
+  }
+  if (range === 'custom') {
+    if (startCustom) {
+      const s = new Date(startCustom + 'T00:00:00');
+      if (d < s) return false;
+    }
+    if (endCustom) {
+      const e = new Date(endCustom + 'T23:59:59.999');
+      if (d > e) return false;
+    }
+    return true;
+  }
+  return true;
+}
+
 // ======================== MAIN UNIFIED HUB ========================
 
 function ExpensesAndPurchasesContent() {
@@ -229,17 +294,28 @@ function ExpensesAndPurchasesContent() {
 
   const currencySymbol = business?.currency ? (CURRENCY_SYMBOLS[business.currency] || business.currency) : '₦';
 
-  // Active Main Tab: 'expenses' | 'purchases' | 'suppliers'
-  const [activeTab, setActiveTab] = React.useState<'expenses' | 'purchases' | 'suppliers'>(
-    initialTabParam === 'purchases' || initialTabParam === 'suppliers' ? initialTabParam : 'expenses'
+  // Active Main Tab: 'dashboard' | 'expenses' | 'purchases' | 'suppliers'
+  const [activeTab, setActiveTab] = React.useState<'dashboard' | 'expenses' | 'purchases' | 'suppliers'>(
+    initialTabParam === 'purchases' || initialTabParam === 'suppliers' || initialTabParam === 'expenses'
+      ? initialTabParam
+      : 'dashboard'
   );
 
   React.useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'purchases' || tab === 'suppliers' || tab === 'expenses') {
+    if (tab === 'purchases' || tab === 'suppliers' || tab === 'expenses' || tab === 'dashboard') {
       setActiveTab(tab);
     }
   }, [searchParams]);
+
+  const handleTabChange = (val: 'dashboard' | 'expenses' | 'purchases' | 'suppliers') => {
+    setActiveTab(val);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', val);
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
 
   // -------------------------------------------------------------
   // DATA STATES: EXPENSES
@@ -252,8 +328,13 @@ function ExpensesAndPurchasesContent() {
   const [selectedCategory, setSelectedCategory] = React.useState<string>('all');
   const [selectedMethod, setSelectedMethod] = React.useState<string>('all');
   const [expenseSourceFilter, setExpenseSourceFilter] = React.useState<string>('all');
-  const [timeRange, setTimeRange] = React.useState<'today' | 'week' | 'month' | 'year' | 'all'>('month');
+  const [timeRange, setTimeRange] = React.useState<string>('this_month');
+  const [customStartDate, setCustomStartDate] = React.useState<string>('');
+  const [customEndDate, setCustomEndDate] = React.useState<string>('');
   const [drawerOnly, setDrawerOnly] = React.useState(false);
+
+  // Selected Expense Detail Modal State
+  const [selectedExpenseDetail, setSelectedExpenseDetail] = React.useState<Expense | null>(null);
 
   // Expense Dialogs
   const [isAddExpenseOpen, setIsAddExpenseOpen] = React.useState(false);
@@ -274,6 +355,9 @@ function ExpensesAndPurchasesContent() {
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
   const [paymentFilter, setPaymentFilter] = React.useState<string>('all');
   const [purchaseSourceFilter, setPurchaseSourceFilter] = React.useState<string>('all');
+  const [purchaseTimeRange, setPurchaseTimeRange] = React.useState<string>('all');
+  const [purchaseCustomStartDate, setPurchaseCustomStartDate] = React.useState<string>('');
+  const [purchaseCustomEndDate, setPurchaseCustomEndDate] = React.useState<string>('');
   const [searchSuppliers, setSearchSuppliers] = React.useState('');
 
   // Purchase Dialogs
@@ -478,27 +562,13 @@ function ExpensesAndPurchasesContent() {
         if (source !== expenseSourceFilter) return false;
       }
 
-      if (timeRange !== 'all') {
-        const expDate = safeToDate(exp.date);
-        const now = new Date();
-        if (timeRange === 'today') {
-          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          if (expDate < startOfToday) return false;
-        } else if (timeRange === 'week') {
-          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          if (expDate < sevenDaysAgo) return false;
-        } else if (timeRange === 'month') {
-          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          if (expDate < thirtyDaysAgo) return false;
-        } else if (timeRange === 'year') {
-          const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-          if (expDate < oneYearAgo) return false;
-        }
+      if (!isDateInRange(exp.date, timeRange, customStartDate, customEndDate)) {
+        return false;
       }
 
       if (expenseSearch.trim()) {
         const q = expenseSearch.toLowerCase();
-        const matchesTitle = exp.title.toLowerCase().includes(q);
+        const matchesTitle = (exp.title || '').toLowerCase().includes(q);
         const matchesRecipient = (exp.recipient || '').toLowerCase().includes(q);
         const matchesNotes = (exp.notes || '').toLowerCase().includes(q);
         if (!matchesTitle && !matchesRecipient && !matchesNotes) return false;
@@ -506,7 +576,7 @@ function ExpensesAndPurchasesContent() {
 
       return true;
     });
-  }, [expenses, selectedCategory, selectedMethod, expenseSourceFilter, timeRange, drawerOnly, expenseSearch]);
+  }, [expenses, selectedCategory, selectedMethod, expenseSourceFilter, timeRange, customStartDate, customEndDate, drawerOnly, expenseSearch]);
 
   const handleExportExpenseReport = async () => {
     toast({
@@ -530,7 +600,10 @@ function ExpensesAndPurchasesContent() {
     doc.text(`Generated: ${format(new Date(), 'EEEE, MMMM d, yyyy')}`, 14, 31);
     
     if (timeRange !== 'all') {
-      doc.text(`Time Period: ${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)}`, 14, 36);
+      const timeLabel = timeRange === 'custom' 
+        ? `Custom Range (${customStartDate || 'Start'} to ${customEndDate || 'Now'})` 
+        : timeRange.replace(/_/g, ' ');
+      doc.text(`Time Period: ${timeLabel.charAt(0).toUpperCase() + timeLabel.slice(1)}`, 14, 36);
     }
 
     const tableColumn = ["Date", "Title", "Category", "Funding Source", "Payment Method", "Recipient", "Amount"];
@@ -587,6 +660,151 @@ function ExpensesAndPurchasesContent() {
     doc.save(`zeneva-expenses-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
+  const handleDownloadExpenseVoucherPDF = (expense: Expense) => {
+    try {
+      const doc = new jsPDF();
+      const dateObj = safeToDate(expense.date);
+      const formattedDate = dateObj ? format(dateObj, 'EEEE, MMMM d, yyyy') : 'N/A';
+      const formattedTime = dateObj ? format(dateObj, 'h:mm a') : '';
+      const catInfo = EXPENSE_CATEGORIES.find(c => c.id === expense.category);
+      const catName = catInfo?.label.split('(')[0].trim() || expense.category;
+      const voucherNo = (expense.id ? expense.id.slice(-8) : 'EXP').toUpperCase();
+
+      // Top Brand Stripe
+      doc.setFillColor(249, 115, 22); // Orange primary
+      doc.rect(0, 0, 210, 6, 'F');
+
+      // Business Header
+      doc.setFontSize(18);
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'bold');
+      doc.text(business?.name || "Zeneva POS", 14, 20);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      if (business?.address) doc.text(business.address, 14, 26);
+      if (business?.phone) doc.text(`Phone: ${business.phone}`, 14, 31);
+
+      // Voucher Title & Reference (Right Aligned)
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(234, 88, 12);
+      doc.text("EXPENSE PAYMENT VOUCHER", 196, 20, { align: 'right' });
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Voucher Ref: #${voucherNo}`, 196, 26, { align: 'right' });
+      doc.text(`Date: ${formattedDate}`, 196, 31, { align: 'right' });
+      if (formattedTime) doc.text(`Time: ${formattedTime}`, 196, 36, { align: 'right' });
+
+      // Divider Line
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(14, 40, 196, 40);
+
+      // Total Amount Highlight Box
+      doc.setFillColor(255, 247, 237); // orange-50
+      doc.setDrawColor(254, 215, 170); // orange-200
+      doc.roundedRect(14, 45, 182, 22, 2, 2, 'FD');
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(194, 65, 12);
+      doc.text("TOTAL AMOUNT DISBURSED", 20, 52);
+
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${currencySymbol}${Number(expense.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 20, 62);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(16, 185, 129);
+      doc.text("DISBURSED / SETTLED", 190, 58, { align: 'right' });
+
+      // Breakdown Table
+      const tableData = [
+        ["Expense Title / Description", expense.title || expense.description || "Operational Expense"],
+        ["Category", catName],
+        ["Paid To / Beneficiary", expense.recipient || "— (Internal / Operations)"],
+        ["Payment Method", expense.paymentMethod.replace('_', ' ').toUpperCase()],
+        ["Funding & Deduction Source", expense.deductionSource === 'net_profit' ? "Net Profit Reinvestment (Profit / Equity)" : "Operational Gross Revenue (Day-to-day Sales Revenue)"],
+        ["Cash Drawer / Till Outflow", expense.deductFromCashDrawer ? "Yes (Deducted directly from daily POS register)" : "No (External bank account / card)"],
+        ["Recorded By / Staff", expense.createdByName || expense.paidBy || "Staff / Administrator"],
+      ];
+
+      if (expense.notes) {
+        tableData.push(["Notes / Remarks", expense.notes]);
+      }
+
+      autoTable(doc, {
+        startY: 72,
+        head: [["Disbursement Field", "Record Details"]],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontSize: 8.5,
+          fontStyle: 'bold',
+          cellPadding: 3,
+        },
+        columnStyles: {
+          0: { cellWidth: 55, fontStyle: 'bold', textColor: [51, 65, 85] },
+          1: { textColor: [15, 23, 42] },
+        },
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 3.5,
+          valign: 'middle',
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+      });
+
+      const finalY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 18 : 170;
+
+      // Signatures Section
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(71, 85, 105);
+
+      doc.setDrawColor(203, 213, 225);
+      doc.line(14, finalY + 18, 75, finalY + 18);
+      doc.text("Disbursed / Prepared By", 14, finalY + 23);
+
+      doc.line(135, finalY + 18, 196, finalY + 18);
+      doc.text("Received / Authorized By", 135, finalY + 23);
+
+      // Footer note
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(148, 163, 184);
+      doc.text(
+        `Generated by Zeneva Business Suite on ${format(new Date(), 'PPpp')}. Official payment disbursement voucher.`,
+        105,
+        285,
+        { align: 'center' }
+      );
+
+      doc.save(`expense-voucher-${voucherNo}.pdf`);
+      toast({
+        title: "Voucher Downloaded",
+        description: `Expense voucher #${voucherNo} saved successfully.`,
+      });
+    } catch (err: any) {
+      console.error("Failed to generate voucher PDF", err);
+      toast({
+        title: "Export Failed",
+        description: "Could not generate voucher PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // -------------------------------------------------------------
   // FILTERED PURCHASES
   // -------------------------------------------------------------
@@ -600,6 +818,10 @@ function ExpensesAndPurchasesContent() {
         if (source !== purchaseSourceFilter) return false;
       }
 
+      if (!isDateInRange(p.orderDate, purchaseTimeRange, purchaseCustomStartDate, purchaseCustomEndDate)) {
+        return false;
+      }
+
       if (searchOrders.trim()) {
         const q = searchOrders.toLowerCase();
         const matchesPo = (p.poNumber || '').toLowerCase().includes(q);
@@ -609,7 +831,7 @@ function ExpensesAndPurchasesContent() {
       }
       return true;
     });
-  }, [purchases, statusFilter, paymentFilter, purchaseSourceFilter, searchOrders]);
+  }, [purchases, statusFilter, paymentFilter, purchaseSourceFilter, purchaseTimeRange, purchaseCustomStartDate, purchaseCustomEndDate, searchOrders]);
 
   // -------------------------------------------------------------
   // FILTERED SUPPLIERS
@@ -1144,6 +1366,266 @@ function ExpensesAndPurchasesContent() {
     toast({ title: 'Purchases Exported' });
   };
 
+  // Modal Data Export (PDF & CSV)
+  const getModalExportData = React.useCallback(() => {
+    if (!selectedKpiModal) return { title: '', columns: [] as string[], rows: [] as (string | number)[][], count: 0, totalAmount: 0 };
+    const q = kpiModalSearch.toLowerCase().trim();
+    const startOfThisMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+    if (selectedKpiModal.id === 'total_outflow') {
+      const combinedList: {
+        id: string;
+        date: Date | null;
+        type: 'Expense' | 'Procurement';
+        title: string;
+        details: string;
+        fundingSource: string;
+        amount: number;
+      }[] = [];
+
+      expenses.forEach(e => {
+        const cat = EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label.split('(')[0].trim() || e.category;
+        combinedList.push({
+          id: `exp-${e.id}`,
+          date: safeToDate(e.date),
+          type: 'Expense',
+          title: e.title || e.description,
+          details: `Category: ${cat}`,
+          fundingSource: e.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue',
+          amount: Number(e.amount) || 0,
+        });
+      });
+
+      purchases.forEach(p => {
+        combinedList.push({
+          id: `pur-${p.id}`,
+          date: safeToDate(p.orderDate),
+          type: 'Procurement',
+          title: `Stock Procurement (${p.poNumber})`,
+          details: `Supplier: ${p.supplierName} (${p.items?.length || 0} items)`,
+          fundingSource: p.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue',
+          amount: Number(p.totalAmount) || 0,
+        });
+      });
+
+      combinedList.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+
+      const filtered = combinedList.filter(item =>
+        !q || item.title.toLowerCase().includes(q) || item.details.toLowerCase().includes(q) || item.type.toLowerCase().includes(q)
+      );
+
+      const columns = ['Type', 'Date', 'Description', 'Funding Source', 'Details', 'Amount'];
+      const rows = filtered.map(item => [
+        item.type,
+        item.date ? format(item.date, 'yyyy-MM-dd') : 'N/A',
+        item.title,
+        item.fundingSource,
+        item.details,
+        item.amount,
+      ]);
+
+      return {
+        title: selectedKpiModal.title,
+        columns,
+        rows,
+        count: filtered.length,
+        totalAmount: filtered.reduce((sum, item) => sum + item.amount, 0),
+      };
+    }
+
+    if (selectedKpiModal.id === 'operating_overheads' || selectedKpiModal.id === 'month_expenses' || selectedKpiModal.id === 'drawer_outflow') {
+      const isPurchase = (e: any) =>
+        e.category === 'supplier_payment' ||
+        e.category === 'procurement' ||
+        e.category === 'inventory_procurement';
+      let expList = expenses.filter(e => !isPurchase(e));
+      if (selectedKpiModal.id === 'month_expenses') {
+        expList = expList.filter(e => (safeToDate(e.date) || new Date(0)) >= startOfThisMonth);
+      } else if (selectedKpiModal.id === 'drawer_outflow') {
+        expList = expList.filter(e => e.deductFromCashDrawer);
+      }
+
+      const filtered = expList.filter(e =>
+        !q || (e.title || '').toLowerCase().includes(q) || (e.description || '').toLowerCase().includes(q) || (e.recipient || '').toLowerCase().includes(q) || (e.notes || '').toLowerCase().includes(q) || e.category.toLowerCase().includes(q)
+      );
+
+      const columns = ['Date', 'Expense Title', 'Category', 'Funding Source', 'Payment Method', 'Recipient', 'Amount'];
+      const rows = filtered.map(e => {
+        const d = safeToDate(e.date);
+        const cat = EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label.split('(')[0].trim() || e.category;
+        const methodStr = e.paymentMethod.replace('_', ' ');
+        return [
+          d ? format(d, 'yyyy-MM-dd') : 'N/A',
+          e.title || e.description,
+          cat,
+          e.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue',
+          `${methodStr}${e.deductFromCashDrawer ? ' (Drawer)' : ''}`,
+          e.recipient || '-',
+          Number(e.amount) || 0,
+        ];
+      });
+
+      return {
+        title: selectedKpiModal.title,
+        columns,
+        rows,
+        count: filtered.length,
+        totalAmount: filtered.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+      };
+    }
+
+    if (selectedKpiModal.id === 'stock_procurement' || selectedKpiModal.id === 'paid_suppliers' || selectedKpiModal.id === 'accounts_payable') {
+      let poList = purchases;
+      if (selectedKpiModal.id === 'paid_suppliers') {
+        poList = poList.filter(p => p.paymentStatus === 'paid' || p.amountPaid > 0);
+      } else if (selectedKpiModal.id === 'accounts_payable') {
+        poList = poList.filter(p => (p.balanceDue || 0) > 0);
+      }
+
+      const filtered = poList.filter(p =>
+        !q || p.poNumber.toLowerCase().includes(q) || p.supplierName.toLowerCase().includes(q) || p.items?.some(i => i.productName.toLowerCase().includes(q))
+      );
+
+      const columns = ['PO Number', 'Order Date', 'Supplier', 'Status', 'Funding Source', 'Total Bill', 'Amount Paid', 'Balance Due'];
+      const rows = filtered.map(p => {
+        const d = safeToDate(p.orderDate);
+        return [
+          p.poNumber,
+          d ? format(d, 'yyyy-MM-dd') : 'N/A',
+          p.supplierName,
+          p.status,
+          p.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue',
+          Number(p.totalAmount) || 0,
+          Number(p.amountPaid || 0),
+          Number(p.balanceDue || 0),
+        ];
+      });
+
+      return {
+        title: selectedKpiModal.title,
+        columns,
+        rows,
+        count: filtered.length,
+        totalAmount: filtered.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0),
+      };
+    }
+
+    if (selectedKpiModal.id === 'suppliers') {
+      const filtered = suppliers.filter(s =>
+        !q || s.name.toLowerCase().includes(q) || (s.contactPerson || '').toLowerCase().includes(q) || (s.phone || '').toLowerCase().includes(q)
+      );
+
+      const columns = ['Supplier Name', 'Contact Person', 'Phone / Email', 'Payment Terms', 'Total Purchased', 'Debt Owed'];
+      const rows = filtered.map(s => [
+        s.name,
+        s.contactPerson || '-',
+        s.phone || s.email || '-',
+        s.paymentTerms || 'Immediate',
+        Number(s.totalPurchased || 0),
+        Number(s.totalDebt || 0),
+      ]);
+
+      return {
+        title: selectedKpiModal.title,
+        columns,
+        rows,
+        count: filtered.length,
+        totalAmount: filtered.reduce((sum, s) => sum + (Number(s.totalPurchased) || 0), 0),
+      };
+    }
+
+    return { title: '', columns: [] as string[], rows: [] as (string | number)[][], count: 0, totalAmount: 0 };
+  }, [selectedKpiModal, kpiModalSearch, expenses, purchases, suppliers]);
+
+  const handleExportModalCSV = () => {
+    const data = getModalExportData();
+    if (!data || data.rows.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Data to Export',
+        description: 'There are no records matching the current view to export.',
+      });
+      return;
+    }
+
+    const csvRows: (string | number)[][] = [
+      data.columns,
+      ...data.rows,
+    ];
+
+    const slug = (selectedKpiModal?.id || 'breakdown').replace(/_/g, '-');
+    downloadCsv(`zeneva-${slug}-${format(new Date(), 'yyyy-MM-dd')}.csv`, csvRows);
+    toast({
+      variant: 'success',
+      title: 'Export Successful',
+      description: `Exported ${data.rows.length} record(s) to CSV.`,
+    });
+  };
+
+  const handleExportModalPDF = () => {
+    const data = getModalExportData();
+    if (!data || data.rows.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Data to Export',
+        description: 'There are no records matching the current view to export.',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Generating PDF',
+      description: 'Your breakdown report is being generated...',
+    });
+
+    const isWide = data.columns.length > 5;
+    const doc = new jsPDF({
+      orientation: isWide ? 'landscape' : 'portrait',
+    });
+
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(16);
+    doc.text(business?.name || "Zeneva POS", 14, 18);
+
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 60);
+    doc.text(data.title || "Breakdown Report", 14, 25);
+
+    doc.setFontSize(9);
+    doc.setTextColor(110, 110, 110);
+    doc.text(`Generated: ${format(new Date(), 'EEEE, MMMM d, yyyy')}`, 14, 31);
+    if (kpiModalSearch.trim()) {
+      doc.text(`Search Query: "${kpiModalSearch.trim()}"`, 14, 36);
+    }
+
+    const formattedRows = data.rows.map(row =>
+      row.map(cell => {
+        if (typeof cell === 'number') {
+          return `${currencySymbol}${cell.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+        return String(cell ?? '');
+      })
+    );
+
+    autoTable(doc, {
+      head: [data.columns],
+      body: formattedRows,
+      startY: kpiModalSearch.trim() ? 40 : 36,
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 3.5 },
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+    });
+
+    const slug = (selectedKpiModal?.id || 'breakdown').replace(/_/g, '-');
+    doc.save(`zeneva-${slug}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast({
+      variant: 'success',
+      title: 'Export Successful',
+      description: `Exported ${data.rows.length} record(s) to PDF.`,
+    });
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* ======================== UNIFIED HEADER ======================== */}
@@ -1171,21 +1653,80 @@ function ExpensesAndPurchasesContent() {
               Export CSV
             </Button>
           )}
+          {activeTab === 'suppliers' && (
+            <Button variant="outline" size="sm" onClick={() => setIsAddSupplierOpen(true)} className="group hover:bg-primary hover:text-white transition-colors">
+              <PlusCircle className="h-4 w-4 me-2 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
+              Add Supplier
+            </Button>
+          )}
 
-          <Button onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }} variant="outline" className="shadow-xs group hover:bg-primary hover:text-primary-foreground">
-            <PlusCircle className="h-4 w-4 me-2 text-primary group-hover:text-primary-foreground" />
+          <Button onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }} variant="outline" className="shadow-xs group hover:bg-primary hover:text-white transition-colors">
+            <PlusCircle className="h-4 w-4 me-2 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
             Record Expense
           </Button>
 
-          <Button onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }} className="shadow-sm group hover:bg-primary hover:text-primary-foreground">
-            <Truck className="h-4 w-4 me-2 group-hover:text-primary-foreground" />
-            New Purchase Order
-          </Button>
+          {canViewPurchasesAndSuppliers && (
+            <Button onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }} className="shadow-sm group bg-primary text-white hover:bg-primary/90 transition-colors">
+              <Truck className="h-4 w-4 me-2 text-white group-hover:text-white transition-colors" />
+              New Purchase Order
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* ======================== COMBINED OUTFLOW KPI CARDS ======================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ======================== UNIFIED TABS AT TOP ======================== */}
+      <Tabs value={activeTab} onValueChange={(v: any) => handleTabChange(v)} className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-3">
+          <TabsList className={`grid w-full ${canViewPurchasesAndSuppliers ? 'sm:w-[680px] grid-cols-4' : 'sm:w-[340px] grid-cols-2'} h-auto p-1 bg-muted/60 rounded-xl`}>
+            <TabsTrigger value="dashboard" className="flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-medium rounded-lg data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400">
+              <LayoutDashboard className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+              <span>Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-medium rounded-lg data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400">
+              <Wallet className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+              <span>Expenses</span>
+              <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 font-mono">
+                {expenses.length}
+              </Badge>
+            </TabsTrigger>
+            {canViewPurchasesAndSuppliers && (
+              <>
+                <TabsTrigger value="purchases" className="flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-medium rounded-lg data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400">
+                  <Truck className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                  <span>Purchases</span>
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 font-mono">
+                    {purchases.length}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="suppliers" className="flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-medium rounded-lg data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400">
+                  <Building2 className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                  <span>Suppliers</span>
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 h-4 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 font-mono">
+                    {suppliers.length}
+                  </Badge>
+                </TabsTrigger>
+              </>
+            )}
+          </TabsList>
+
+          <div className="hidden lg:flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />
+              Overheads: <strong className="text-foreground">{currencySymbol}{metrics.totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />
+              Procurement: <strong className="text-foreground">{currencySymbol}{metrics.totalProcurement.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* ============================================================= */}
+        {/* TAB 1: EXECUTIVE DASHBOARD / OVERVIEW */}
+        {/* ============================================================= */}
+        <TabsContent value="dashboard" className="space-y-6 pt-1">
+          {/* COMBINED OUTFLOW KPI CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* ROW 1 */}
         <Card 
           onClick={() => {
@@ -1196,12 +1737,11 @@ function ExpensesAndPurchasesContent() {
               description: 'Combined operational expenses and stock procurement payments.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-primary transition-colors flex items-center justify-between">
-              <span>Total Cash Outflow</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Total Cash Outflow
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
               {currencySymbol}{metrics.combinedOutflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1229,14 +1769,13 @@ function ExpensesAndPurchasesContent() {
               description: 'All-time shop operational costs categorized by utility, rent, staff, packaging, etc.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-amber-500/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors flex items-center justify-between">
-              <span>Operating Overheads</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Operating Overheads
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+            <CardTitle className="text-2xl font-bold text-foreground">
               {currencySymbol}{metrics.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
           </CardHeader>
@@ -1257,14 +1796,13 @@ function ExpensesAndPurchasesContent() {
               description: 'Operational costs incurred during the current calendar month.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-amber-500/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors flex items-center justify-between">
-              <span>Expenses This Month</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Expenses This Month
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+            <CardTitle className="text-2xl font-bold text-foreground">
               {currencySymbol}{metrics.monthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
           </CardHeader>
@@ -1285,14 +1823,13 @@ function ExpensesAndPurchasesContent() {
               description: 'Operating cash expenses deducted directly from the daily cash register till.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-emerald-500/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex items-center justify-between">
-              <span>Drawer / Till Outflow</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Drawer / Till Outflow
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <CardTitle className="text-2xl font-bold text-foreground">
               {currencySymbol}{metrics.expensesFromDrawer.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
           </CardHeader>
@@ -1314,14 +1851,13 @@ function ExpensesAndPurchasesContent() {
               description: 'Purchase orders issued to distributors and wholesalers for inventory restock.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-blue-500/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center justify-between">
-              <span>Stock Procurement</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Stock Procurement
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <CardTitle className="text-2xl font-bold text-foreground">
               {currencySymbol}{metrics.totalProcurement.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
           </CardHeader>
@@ -1342,14 +1878,13 @@ function ExpensesAndPurchasesContent() {
               description: 'Purchase bills fully or partially settled to suppliers.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-blue-500/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center justify-between">
-              <span>Paid to Suppliers</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Paid to Suppliers
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <CardTitle className="text-2xl font-bold text-foreground">
               {currencySymbol}{metrics.totalPurchasesPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </CardTitle>
           </CardHeader>
@@ -1370,12 +1905,11 @@ function ExpensesAndPurchasesContent() {
               description: 'Outstanding purchase bill balances owed to suppliers.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-rose-500/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors flex items-center justify-between">
-              <span>Accounts Payable (Debt)</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-rose-500" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Accounts Payable (Debt)
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-rose-600 dark:text-rose-400">
               {currencySymbol}{metrics.totalSupplierDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1398,12 +1932,11 @@ function ExpensesAndPurchasesContent() {
               description: 'Wholesalers, distributors, and vendors registered in your database.',
             });
           }}
-          className="shadow-xs cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
+          className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
         >
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase font-medium group-hover:text-primary transition-colors flex items-center justify-between">
-              <span>Active Suppliers</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+            <CardDescription className="text-xs uppercase font-medium">
+              Active Suppliers
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-foreground">
               {suppliers.length}
@@ -1531,31 +2064,258 @@ function ExpensesAndPurchasesContent() {
         </div>
       )}
 
-      {/* ======================== UNIFIED TABS ======================== */}
-      <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-        <TabsList className={`grid w-full ${canViewPurchasesAndSuppliers ? 'sm:w-[580px] grid-cols-3' : 'sm:w-[200px] grid-cols-1'}`}>
-          <TabsTrigger value="expenses" className="flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            Operating Expenses ({expenses.length})
-          </TabsTrigger>
-          {canViewPurchasesAndSuppliers && (
-            <>
-              <TabsTrigger value="purchases" className="flex items-center gap-2">
-                <Truck className="h-4 w-4" />
-                Stock Purchases ({purchases.length})
-              </TabsTrigger>
-              <TabsTrigger value="suppliers" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Suppliers ({suppliers.length})
-              </TabsTrigger>
-            </>
-          )}
-        </TabsList>
+          {/* ======================== DASHBOARD RECENT ACTIVITY ======================== */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent Operating Expenses */}
+            <Card className="shadow-xs">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-orange-500" />
+                    Recent Expenses
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Latest operational bills & overhead payments
+                  </CardDescription>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => handleTabChange('expenses')}
+                  className="inline-flex items-center text-xs text-orange-600 dark:text-orange-400 font-medium hover:underline bg-transparent p-0 cursor-pointer transition-colors"
+                >
+                  <span>View All ({expenses.length})</span>
+                  <ArrowDownRight className="h-3.5 w-3.5 ml-1 -rotate-90" />
+                </button>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {expenses.slice(0, 5).map((exp) => {
+                  const catInfo = EXPENSE_CATEGORIES.find(c => c.id === exp.category);
+                  const CatIcon = catInfo?.icon || Tag;
+                  const dateObj = safeToDate(exp.date);
+                  return (
+                    <div 
+                      key={exp.id} 
+                      onClick={() => setSelectedExpenseDetail(exp)}
+                      className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 shrink-0 border border-orange-500/20">
+                          <CatIcon className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">{exp.title}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {dateObj ? format(dateObj, 'MMM d, yyyy') : 'Recent'} {exp.recipient ? `• ${exp.recipient}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-xs text-foreground shrink-0 ml-2">
+                        {currencySymbol}{exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  );
+                })}
+                {expenses.length === 0 && (
+                  <div className="text-center py-6 text-xs text-muted-foreground">
+                    No operating expenses recorded yet.
+                  </div>
+                )}
+                <Button 
+                  onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }}
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-xs mt-2 group hover:bg-primary hover:text-white transition-colors"
+                >
+                  <PlusCircle className="h-3.5 w-3.5 mr-1.5 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
+                  Record New Expense
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Recent Purchase Orders */}
+            <Card className="shadow-xs">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-orange-500" />
+                    Recent Stock Purchases
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Latest wholesale procurement orders
+                  </CardDescription>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => handleTabChange('purchases')}
+                  className="inline-flex items-center text-xs text-orange-600 dark:text-orange-400 font-medium hover:underline bg-transparent p-0 cursor-pointer transition-colors"
+                >
+                  <span>View All ({purchases.length})</span>
+                  <ArrowDownRight className="h-3.5 w-3.5 ml-1 -rotate-90" />
+                </button>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {purchases.slice(0, 5).map((po) => {
+                  const dateObj = safeToDate(po.orderDate);
+                  return (
+                    <div key={po.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 shrink-0 border border-orange-500/20">
+                          <Truck className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-foreground truncate">{po.supplierName || 'Supplier'}</span>
+                            <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4 font-normal", 
+                              po.status === 'received' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-300' :
+                              po.status === 'cancelled' ? 'bg-rose-500/10 text-rose-600 border-rose-300' :
+                              'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30'
+                            )}>
+                              {po.status}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            PO: {po.poNumber} • {dateObj ? format(dateObj, 'MMM d, yyyy') : 'Recent'} • {po.items?.length || 0} items
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 ml-2">
+                        <span className="font-mono font-bold text-xs text-foreground block">
+                          {currencySymbol}{po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {po.balanceDue > 0 && (
+                          <span className="text-[10px] text-rose-500 font-mono">
+                            Due: {currencySymbol}{po.balanceDue.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {purchases.length === 0 && (
+                  <div className="text-center py-6 text-xs text-muted-foreground">
+                    No purchase orders recorded yet.
+                  </div>
+                )}
+                {canViewPurchasesAndSuppliers && (
+                  <Button 
+                    onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }}
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full text-xs mt-2 group hover:bg-primary hover:text-white transition-colors"
+                  >
+                    <Truck className="h-3.5 w-3.5 mr-1.5 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
+                    New Purchase Order
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         {/* ============================================================= */}
-        {/* TAB 1: OPERATING EXPENSES */}
+        {/* TAB 2: OPERATING EXPENSES */}
         {/* ============================================================= */}
-        <TabsContent value="expenses" className="space-y-4 pt-2">
+        <TabsContent value="expenses" className="space-y-4 pt-1">
+          {/* FOCUSED EXPENSES KPI STRIP */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'operating_overheads',
+                  title: 'Operating Overheads Breakdown',
+                  description: 'All-time shop operational costs categorized by utility, rent, staff, packaging, etc.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Operating Overheads
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {currencySymbol}{metrics.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <TrendingDown className="h-3 w-3" />
+                  All-time operational expenses
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'month_expenses',
+                  title: 'Expenses This Month Breakdown',
+                  description: 'Operational costs incurred during the current calendar month.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Expenses This Month
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {currencySymbol}{metrics.monthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Total expenses for current month
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'drawer_outflow',
+                  title: 'Drawer / Till Cash Outflow',
+                  description: 'Operating cash expenses deducted directly from the daily cash register till.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Drawer / Till Outflow
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {currencySymbol}{metrics.expensesFromDrawer.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Wallet className="h-3 w-3" />
+                  Cash deducted from daily till
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-xs">
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium flex items-center justify-between">
+                  <span>Profit Reinvestment</span>
+                  <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {currencySymbol}{metrics.totalProfitReinvested.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Funded from retained earnings
+                </p>
+              </CardContent>
+            </Card>
+          </div>
           {/* Filters Bar */}
           <Card>
             <CardContent className="p-4">
@@ -1610,17 +2370,23 @@ function ExpensesAndPurchasesContent() {
                 </Select>
 
                 <Select value={timeRange} onValueChange={(v: any) => setTimeRange(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <div className="flex items-center gap-2 truncate">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <Calendar className="h-4 w-4 text-orange-500 shrink-0" />
                       <SelectValue placeholder="Time Period" />
                     </div>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[300px]">
                     <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">Last 7 Days</SelectItem>
-                    <SelectItem value="month">Last 30 Days</SelectItem>
-                    <SelectItem value="year">This Year</SelectItem>
+                    <SelectItem value="yesterday">Yesterday</SelectItem>
+                    <SelectItem value="this_week">This Week</SelectItem>
+                    <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                    <SelectItem value="this_month">This Month</SelectItem>
+                    <SelectItem value="last_30_days">Last 30 Days</SelectItem>
+                    <SelectItem value="last_month">Last Month</SelectItem>
+                    <SelectItem value="this_quarter">This Quarter</SelectItem>
+                    <SelectItem value="this_year">This Year</SelectItem>
+                    <SelectItem value="custom">Custom Date Range...</SelectItem>
                     <SelectItem value="all">All Time</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1642,6 +2408,39 @@ function ExpensesAndPurchasesContent() {
                   </Button>
                 </div>
               </div>
+
+              {timeRange === 'custom' && (
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t mt-3 bg-muted/20 p-2.5 rounded-lg">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">From:</span>
+                    <Input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="h-8 text-xs w-full sm:w-[150px]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">To:</span>
+                    <Input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="h-8 text-xs w-full sm:w-[150px]"
+                    />
+                  </div>
+                  {(customStartDate || customEndDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setCustomStartDate(''); setCustomEndDate(''); }}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear Dates
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1659,8 +2458,8 @@ function ExpensesAndPurchasesContent() {
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                     Record operational shop costs like generator fuel, staff salaries, rent, and packaging to keep track of overheads.
                   </p>
-                  <Button onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }} size="sm">
-                    <PlusCircle className="h-4 w-4 me-2" />
+                  <Button onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }} size="sm" className="group bg-primary text-white hover:bg-primary/90">
+                    <PlusCircle className="h-4 w-4 me-2 text-white group-hover:text-white" />
                     Record First Expense
                   </Button>
                 </div>
@@ -1686,7 +2485,11 @@ function ExpensesAndPurchasesContent() {
                       const formattedDate = dateObj ? dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
 
                       return (
-                        <TableRow key={exp.id} className="hover:bg-muted/40">
+                        <TableRow 
+                          key={exp.id} 
+                          className="hover:bg-muted/40 cursor-pointer transition-colors"
+                          onClick={() => setSelectedExpenseDetail(exp)}
+                        >
                           <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                             {formattedDate}
                           </TableCell>
@@ -1728,7 +2531,7 @@ function ExpensesAndPurchasesContent() {
                           <TableCell className="text-right font-bold text-foreground font-mono">
                             {currencySymbol}{exp.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -1736,6 +2539,14 @@ function ExpensesAndPurchasesContent() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setSelectedExpenseDetail(exp)}>
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  View Details & Voucher
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadExpenseVoucherPDF(exp)}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download Voucher (PDF)
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
                                   setEditingExpense(exp);
                                   setExpenseTitle(exp.title);
@@ -1770,13 +2581,123 @@ function ExpensesAndPurchasesContent() {
         </TabsContent>
 
         {/* ============================================================= */}
-        {/* TAB 2: STOCK PURCHASES & PROCUREMENT */}
+        {/* TAB 3: STOCK PURCHASES & PROCUREMENT */}
         {/* ============================================================= */}
-        <TabsContent value="purchases" className="space-y-4 pt-2">
+        <TabsContent value="purchases" className="space-y-4 pt-1">
+          {/* FOCUSED PURCHASES KPI STRIP */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'stock_procurement',
+                  title: 'Stock Procurement Bills',
+                  description: 'Purchase orders issued to distributors and wholesalers for inventory restock.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Total Procurement
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {currencySymbol}{metrics.totalProcurement.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  {purchases.length} restock purchase bills
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'paid_suppliers',
+                  title: 'Settled Procurement Payments',
+                  description: 'Purchase bills fully or partially settled to suppliers.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Paid to Suppliers
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {currencySymbol}{metrics.totalPurchasesPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Total procurement bills settled
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'accounts_payable',
+                  title: 'Accounts Payable (Supplier Debt)',
+                  description: 'Outstanding purchase bill balances owed to suppliers.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Accounts Payable (Debt)
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                  {currencySymbol}{metrics.totalSupplierDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Outstanding bills owed to suppliers
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'suppliers',
+                  title: 'Active Suppliers Directory',
+                  description: 'Wholesalers, distributors, and vendors registered in your database.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Active Suppliers
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {suppliers.length}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Building2 className="h-3 w-3" />
+                  Vendors managing your inventory
+                </p>
+              </CardContent>
+            </Card>
+          </div>
           {/* Purchase Filters Bar */}
           <Card>
             <CardContent className="p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1824,7 +2745,62 @@ function ExpensesAndPurchasesContent() {
                     <SelectItem value="net_profit">Net Profit Reinvestment</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Select value={purchaseTimeRange} onValueChange={(v: any) => setPurchaseTimeRange(v)}>
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center gap-2 truncate">
+                      <Calendar className="h-4 w-4 text-orange-500 shrink-0" />
+                      <SelectValue placeholder="Order Period" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="all">All Dates</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="yesterday">Yesterday</SelectItem>
+                    <SelectItem value="this_week">This Week</SelectItem>
+                    <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                    <SelectItem value="this_month">This Month</SelectItem>
+                    <SelectItem value="last_30_days">Last 30 Days</SelectItem>
+                    <SelectItem value="last_month">Last Month</SelectItem>
+                    <SelectItem value="this_quarter">This Quarter</SelectItem>
+                    <SelectItem value="this_year">This Year</SelectItem>
+                    <SelectItem value="custom">Custom Date Range...</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {purchaseTimeRange === 'custom' && (
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t mt-3 bg-muted/20 p-2.5 rounded-lg">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">From:</span>
+                    <Input
+                      type="date"
+                      value={purchaseCustomStartDate}
+                      onChange={(e) => setPurchaseCustomStartDate(e.target.value)}
+                      className="h-8 text-xs w-full sm:w-[150px]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">To:</span>
+                    <Input
+                      type="date"
+                      value={purchaseCustomEndDate}
+                      onChange={(e) => setPurchaseCustomEndDate(e.target.value)}
+                      className="h-8 text-xs w-full sm:w-[150px]"
+                    />
+                  </div>
+                  {(purchaseCustomStartDate || purchaseCustomEndDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setPurchaseCustomStartDate(''); setPurchaseCustomEndDate(''); }}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear Dates
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1842,8 +2818,8 @@ function ExpensesAndPurchasesContent() {
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                     Create purchase orders when buying stock from distributors or wholesalers. Products will automatically restock into inventory when marked received.
                   </p>
-                  <Button onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }} size="sm">
-                    <PlusCircle className="h-4 w-4 me-2" />
+                  <Button onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }} size="sm" className="group bg-primary text-white hover:bg-primary/90">
+                    <Truck className="h-4 w-4 me-2 text-white group-hover:text-white" />
                     New Purchase Order
                   </Button>
                 </div>
@@ -1989,9 +2965,75 @@ function ExpensesAndPurchasesContent() {
         </TabsContent>
 
         {/* ============================================================= */}
-        {/* TAB 3: SUPPLIERS DIRECTORY */}
+        {/* TAB 4: SUPPLIERS DIRECTORY */}
         {/* ============================================================= */}
-        <TabsContent value="suppliers" className="space-y-4 pt-2">
+        <TabsContent value="suppliers" className="space-y-4 pt-1">
+          {/* FOCUSED SUPPLIERS KPI STRIP */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="shadow-xs">
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">Active Suppliers</CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">{suppliers.length}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Registered wholesalers and distributors</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'accounts_payable',
+                  title: 'Accounts Payable (Supplier Debt)',
+                  description: 'Outstanding purchase bill balances owed to suppliers.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Total Supplier Debt
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                  {currencySymbol}{metrics.totalSupplierDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Unsettled purchase orders owed to suppliers
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              onClick={() => {
+                setKpiModalSearch('');
+                setSelectedKpiModal({
+                  id: 'stock_procurement',
+                  title: 'Stock Procurement Bills',
+                  description: 'Purchase orders issued to distributors and wholesalers for inventory restock.',
+                });
+              }}
+              className="shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all"
+            >
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs uppercase font-medium">
+                  Total Procured from Suppliers
+                </CardDescription>
+                <CardTitle className="text-2xl font-bold text-foreground">
+                  {currencySymbol}{metrics.totalProcurement.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  Historical wholesale purchase orders
+                </p>
+              </CardContent>
+            </Card>
+          </div>
           {/* Top Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-md">
@@ -2003,8 +3045,8 @@ function ExpensesAndPurchasesContent() {
                 className="pl-9"
               />
             </div>
-            <Button onClick={() => setIsAddSupplierOpen(true)}>
-              <PlusCircle className="h-4 w-4 me-2" />
+            <Button onClick={() => setIsAddSupplierOpen(true)} className="group bg-primary text-white hover:bg-primary/90 transition-colors">
+              <PlusCircle className="h-4 w-4 me-2 text-white group-hover:text-white transition-colors" />
               Add New Supplier
             </Button>
           </div>
@@ -2022,8 +3064,8 @@ function ExpensesAndPurchasesContent() {
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                   Add wholesalers, distributors, and vendors you buy inventory from to track purchase histories and outstanding debt.
                 </p>
-                <Button onClick={() => setIsAddSupplierOpen(true)} size="sm">
-                  <PlusCircle className="h-4 w-4 me-2" />
+                <Button onClick={() => setIsAddSupplierOpen(true)} size="sm" className="group bg-primary text-white hover:bg-primary/90 transition-colors">
+                  <PlusCircle className="h-4 w-4 me-2 text-white group-hover:text-white transition-colors" />
                   Add First Supplier
                 </Button>
               </CardContent>
@@ -2412,8 +3454,8 @@ function ExpensesAndPurchasesContent() {
               <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
                 <div className="flex items-center justify-between">
                   <Label className="font-semibold text-sm">Product Line Items</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={handleAddOrderItem}>
-                    <PlusCircle className="h-3.5 w-3.5 mr-1 text-primary" />
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddOrderItem} className="group hover:bg-primary hover:text-white transition-colors">
+                    <PlusCircle className="h-3.5 w-3.5 mr-1 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
                     Add Item
                   </Button>
                 </div>
@@ -2908,8 +3950,8 @@ function ExpensesAndPurchasesContent() {
       {/* ======================== DRILL-DOWN KPI MODAL ======================== */}
       {selectedKpiModal && (
         <Dialog open={!!selectedKpiModal} onOpenChange={(open) => { if (!open) setSelectedKpiModal(null); }}>
-          <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] flex flex-col">
-            <DialogHeader>
+          <DialogContent className="max-w-6xl w-[96vw] max-h-[88vh] flex flex-col">
+            <DialogHeader className="pr-8">
               <DialogTitle className="flex items-center gap-2 text-xl">
                 <Wallet className="h-5 w-5 text-primary" />
                 {selectedKpiModal.title}
@@ -2920,14 +3962,34 @@ function ExpensesAndPurchasesContent() {
             </DialogHeader>
 
             <div className="py-2 space-y-3 flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="relative px-1 pt-1 pb-1">
-                <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search breakdown records..."
-                  className="pl-9 text-xs focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-0 shadow-xs"
-                  value={kpiModalSearch}
-                  onChange={(e) => setKpiModalSearch(e.target.value)}
-                />
+              <div className="flex items-center gap-2 px-1 pt-1 pb-1">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search breakdown records..."
+                    className="pl-9 h-9 text-xs focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-0 shadow-xs"
+                    value={kpiModalSearch}
+                    onChange={(e) => setKpiModalSearch(e.target.value)}
+                  />
+                </div>
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs font-medium shrink-0">
+                      <Download className="h-4 w-4" />
+                      <span>Export</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportModalPDF}>
+                      <Printer className="h-4 w-4 mr-2" />
+                      Export as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportModalCSV}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Export as CSV / Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="flex-1 overflow-y-auto border rounded-md">
@@ -2981,27 +4043,27 @@ function ExpensesAndPurchasesContent() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
-                            <TableHead className="text-xs">Type</TableHead>
-                            <TableHead className="text-xs">Date</TableHead>
-                            <TableHead className="text-xs">Description</TableHead>
-                            <TableHead className="text-xs">Funding Source</TableHead>
-                            <TableHead className="text-xs">Details</TableHead>
-                            <TableHead className="text-xs text-right">Amount</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Type</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
+                            <TableHead className="text-xs min-w-[160px]">Description</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Funding Source</TableHead>
+                            <TableHead className="text-xs min-w-[200px]">Details</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Amount</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filtered.map(item => (
                             <TableRow key={item.id}>
-                              <TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 <Badge variant="outline" className={item.type === 'expense' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'}>
                                   {item.type === 'expense' ? 'Expense' : 'Procurement'}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-xs font-mono text-muted-foreground">
+                              <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
                                 {item.date ? format(item.date, 'MMM d, yyyy') : 'N/A'}
                               </TableCell>
                               <TableCell className="font-medium text-xs">{item.title}</TableCell>
-                              <TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 {item.deductionSource === 'net_profit' ? (
                                   <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
                                     <Sparkles className="h-2.5 w-2.5" />
@@ -3014,7 +4076,7 @@ function ExpensesAndPurchasesContent() {
                                 )}
                               </TableCell>
                               <TableCell className="text-xs text-muted-foreground">{item.subtitle}</TableCell>
-                              <TableCell className="text-xs text-right font-bold font-mono">
+                              <TableCell className="text-xs text-right font-bold font-mono whitespace-nowrap">
                                 {currencySymbol}{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </TableCell>
                             </TableRow>
@@ -3048,13 +4110,13 @@ function ExpensesAndPurchasesContent() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
-                            <TableHead className="text-xs">Date</TableHead>
-                            <TableHead className="text-xs">Expense Title</TableHead>
-                            <TableHead className="text-xs">Category</TableHead>
-                            <TableHead className="text-xs">Funding Source</TableHead>
-                            <TableHead className="text-xs">Payment Method</TableHead>
-                            <TableHead className="text-xs">Recipient</TableHead>
-                            <TableHead className="text-xs text-right">Amount</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
+                            <TableHead className="text-xs min-w-[160px]">Expense Title</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Category</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Funding Source</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Payment Method</TableHead>
+                            <TableHead className="text-xs min-w-[120px]">Recipient</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Amount</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -3063,14 +4125,14 @@ function ExpensesAndPurchasesContent() {
                             const d = safeToDate(e.date);
                             return (
                               <TableRow key={e.id}>
-                                <TableCell className="text-xs font-mono text-muted-foreground">
+                                <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
                                   {d ? format(d, 'MMM d, yyyy') : 'N/A'}
                                 </TableCell>
-                                <TableCell className="font-medium text-xs">{e.title}</TableCell>
-                                <TableCell className="text-xs">
+                                <TableCell className="font-medium text-xs">{e.title || e.description}</TableCell>
+                                <TableCell className="text-xs whitespace-nowrap">
                                   <Badge variant="secondary" className="font-normal text-[11px]">{catLabel}</Badge>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="whitespace-nowrap">
                                   {e.deductionSource === 'net_profit' ? (
                                     <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
                                       <Sparkles className="h-2.5 w-2.5" />
@@ -3082,12 +4144,12 @@ function ExpensesAndPurchasesContent() {
                                     </Badge>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-xs capitalize">
+                                <TableCell className="text-xs capitalize whitespace-nowrap">
                                   {e.paymentMethod.replace('_', ' ')}
                                   {e.deductFromCashDrawer && <Badge variant="outline" className="ml-1 text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Drawer</Badge>}
                                 </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{e.recipient || '-'}</TableCell>
-                                <TableCell className="text-xs text-right font-bold font-mono text-amber-600 dark:text-amber-400">
+                                <TableCell className="text-xs text-right font-bold font-mono text-foreground whitespace-nowrap">
                                   {currencySymbol}{Number(e.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </TableCell>
                               </TableRow>
@@ -3118,14 +4180,14 @@ function ExpensesAndPurchasesContent() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
-                            <TableHead className="text-xs">PO Number</TableHead>
-                            <TableHead className="text-xs">Order Date</TableHead>
-                            <TableHead className="text-xs">Supplier</TableHead>
-                            <TableHead className="text-xs">Status</TableHead>
-                            <TableHead className="text-xs">Funding Source</TableHead>
-                            <TableHead className="text-xs text-right">Total Bill</TableHead>
-                            <TableHead className="text-xs text-right">Amount Paid</TableHead>
-                            <TableHead className="text-xs text-right">Balance Due</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">PO Number</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Order Date</TableHead>
+                            <TableHead className="text-xs min-w-[160px]">Supplier</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Status</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Funding Source</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Total Bill</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Amount Paid</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Balance Due</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -3133,12 +4195,12 @@ function ExpensesAndPurchasesContent() {
                             const d = safeToDate(p.orderDate);
                             return (
                               <TableRow key={p.id}>
-                                <TableCell className="font-mono text-xs font-semibold">{p.poNumber}</TableCell>
-                                <TableCell className="text-xs font-mono text-muted-foreground">
+                                <TableCell className="font-mono text-xs font-semibold whitespace-nowrap">{p.poNumber}</TableCell>
+                                <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
                                   {d ? format(d, 'MMM d, yyyy') : 'N/A'}
                                 </TableCell>
                                 <TableCell className="font-medium text-xs">{p.supplierName}</TableCell>
-                                <TableCell className="text-xs">
+                                <TableCell className="text-xs whitespace-nowrap">
                                   <Badge 
                                     variant="outline" 
                                     className={cn(
@@ -3151,7 +4213,7 @@ function ExpensesAndPurchasesContent() {
                                     {p.status}
                                   </Badge>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="whitespace-nowrap">
                                   {p.deductionSource === 'net_profit' ? (
                                     <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 w-fit font-medium">
                                       <Sparkles className="h-2.5 w-2.5" />
@@ -3163,13 +4225,13 @@ function ExpensesAndPurchasesContent() {
                                     </Badge>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-xs text-right font-mono font-medium">
+                                <TableCell className="text-xs text-right font-mono font-medium whitespace-nowrap">
                                   {currencySymbol}{Number(p.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </TableCell>
-                                <TableCell className="text-xs text-right font-mono text-emerald-600 dark:text-emerald-400">
+                                <TableCell className="text-xs text-right font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                                   {currencySymbol}{Number(p.amountPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </TableCell>
-                                <TableCell className="text-xs text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                                <TableCell className="text-xs text-right font-mono font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                                   {currencySymbol}{Number(p.balanceDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </TableCell>
                               </TableRow>
@@ -3193,12 +4255,12 @@ function ExpensesAndPurchasesContent() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
-                            <TableHead className="text-xs">Supplier Name</TableHead>
-                            <TableHead className="text-xs">Contact Person</TableHead>
-                            <TableHead className="text-xs">Phone / Email</TableHead>
-                            <TableHead className="text-xs">Payment Terms</TableHead>
-                            <TableHead className="text-xs text-right">Total Purchased</TableHead>
-                            <TableHead className="text-xs text-right">Debt Owed</TableHead>
+                            <TableHead className="text-xs min-w-[160px]">Supplier Name</TableHead>
+                            <TableHead className="text-xs min-w-[140px]">Contact Person</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Phone / Email</TableHead>
+                            <TableHead className="text-xs whitespace-nowrap">Payment Terms</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Total Purchased</TableHead>
+                            <TableHead className="text-xs text-right whitespace-nowrap">Debt Owed</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -3206,12 +4268,12 @@ function ExpensesAndPurchasesContent() {
                             <TableRow key={s.id}>
                               <TableCell className="font-medium text-xs">{s.name}</TableCell>
                               <TableCell className="text-xs text-muted-foreground">{s.contactPerson || '-'}</TableCell>
-                              <TableCell className="text-xs text-muted-foreground">{s.phone || s.email || '-'}</TableCell>
-                              <TableCell className="text-xs">{s.paymentTerms || 'Immediate'}</TableCell>
-                              <TableCell className="text-xs text-right font-mono font-medium">
+                              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{s.phone || s.email || '-'}</TableCell>
+                              <TableCell className="text-xs whitespace-nowrap">{s.paymentTerms || 'Immediate'}</TableCell>
+                              <TableCell className="text-xs text-right font-mono font-medium whitespace-nowrap">
                                 {currencySymbol}{Number(s.totalPurchased || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </TableCell>
-                              <TableCell className="text-xs text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                              <TableCell className="text-xs text-right font-mono font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                                 {currencySymbol}{Number(s.totalDebt || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </TableCell>
                             </TableRow>
@@ -3226,10 +4288,200 @@ function ExpensesAndPurchasesContent() {
               </div>
             </div>
 
-            <DialogFooter className="pt-2 border-t">
-              <Button variant="outline" onClick={() => setSelectedKpiModal(null)}>
-                Close
-              </Button>
+            {(() => {
+              const modalData = getModalExportData();
+              return (
+                <DialogFooter className="pt-2 border-t flex flex-row items-center justify-between sm:justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    Showing {modalData.count} record{modalData.count === 1 ? '' : 's'}
+                    {modalData.totalAmount > 0 && (
+                      <span className="ml-2 font-medium text-foreground">
+                        • Total: {currencySymbol}{modalData.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-medium">
+                          <Download className="h-3.5 w-3.5" />
+                          <span>Export</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleExportModalPDF}>
+                          <Printer className="h-4 w-4 mr-2" />
+                          Export as PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleExportModalCSV}>
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                          Export as CSV / Excel
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setSelectedKpiModal(null)}>
+                      Close
+                    </Button>
+                  </div>
+                </DialogFooter>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ======================== EXPENSE DETAIL & VOUCHER MODAL ======================== */}
+      {selectedExpenseDetail && (
+        <Dialog open={!!selectedExpenseDetail} onOpenChange={(open) => { if (!open) setSelectedExpenseDetail(null); }}>
+          <DialogContent className="max-w-2xl w-[95vw] p-0 overflow-hidden rounded-2xl border-border/80 shadow-2xl">
+            {/* Gradient Top Banner */}
+            <div className="bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-transparent p-6 border-b border-border/60">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="font-mono text-[11px] bg-background/80 text-foreground border-border px-2 py-0.5">
+                    #{selectedExpenseDetail.id ? selectedExpenseDetail.id.slice(-8).toUpperCase() : 'EXPENSE'}
+                  </Badge>
+                  {(() => {
+                    const cat = EXPENSE_CATEGORIES.find(c => c.id === selectedExpenseDetail.category);
+                    const CatIcon = cat?.icon || Tag;
+                    return (
+                      <Badge variant="outline" className={cn("text-xs font-normal flex items-center gap-1.5 px-2.5 py-0.5", cat?.color)}>
+                        <CatIcon className="h-3 w-3" />
+                        <span>{cat?.label.split('(')[0].trim() || selectedExpenseDetail.category}</span>
+                      </Badge>
+                    );
+                  })()}
+                  {selectedExpenseDetail.deductionSource === 'net_profit' ? (
+                    <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300/40 flex items-center gap-1 font-medium px-2 py-0.5">
+                      <Sparkles className="h-3 w-3" />
+                      <span>Net Profit Reinvestment</span>
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 px-2 py-0.5">
+                      <span>Operational Revenue</span>
+                    </Badge>
+                  )}
+                  {selectedExpenseDetail.deductFromCashDrawer && (
+                    <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300/50 px-2 py-0.5">
+                      Till Drawer Outflow
+                    </Badge>
+                  )}
+                </div>
+                <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
+                  {selectedExpenseDetail.title || selectedExpenseDetail.description || 'Expense Voucher'}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Disbursement recorded on {(() => {
+                    const d = safeToDate(selectedExpenseDetail.date);
+                    return d ? format(d, 'EEEE, MMMM d, yyyy • h:mm a') : 'N/A';
+                  })()}
+                </DialogDescription>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Amount Highlight Hero */}
+              <div className="p-5 rounded-xl border border-orange-500/20 bg-gradient-to-br from-orange-500/5 via-amber-500/5 to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Disbursed Amount
+                  </span>
+                  <div className="text-3xl font-extrabold font-mono text-foreground tracking-tight mt-0.5">
+                    {currencySymbol}{Number(selectedExpenseDetail.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 px-3 py-1 font-medium text-xs">
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                    Settled / Disbursed
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Particulars Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                  <span className="text-muted-foreground font-medium block">Paid To / Recipient</span>
+                  <p className="font-semibold text-foreground text-sm">
+                    {selectedExpenseDetail.recipient || '— (Internal / Shop Overhead)'}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                  <span className="text-muted-foreground font-medium block">Payment Method</span>
+                  <p className="font-semibold text-foreground text-sm capitalize">
+                    {selectedExpenseDetail.paymentMethod.replace('_', ' ')}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                  <span className="text-muted-foreground font-medium block">Funding / Accounting Source</span>
+                  <p className="font-semibold text-foreground text-sm">
+                    {selectedExpenseDetail.deductionSource === 'net_profit' ? 'Net Profit Reinvestment' : 'Operational Gross Revenue'}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                  <span className="text-muted-foreground font-medium block">Till / Register Cash Outflow</span>
+                  <p className="font-semibold text-foreground text-sm">
+                    {selectedExpenseDetail.deductFromCashDrawer ? 'Yes (Cash deducted from register till)' : 'No (Direct bank/card payment)'}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                  <span className="text-muted-foreground font-medium block">Recorded By</span>
+                  <p className="font-semibold text-foreground text-sm">
+                    {selectedExpenseDetail.createdByName || selectedExpenseDetail.paidBy || 'Administrator'}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                  <span className="text-muted-foreground font-medium block">Reference / Voucher ID</span>
+                  <p className="font-mono text-muted-foreground text-xs truncate select-all">
+                    {selectedExpenseDetail.id}
+                  </p>
+                </div>
+              </div>
+
+              {/* Notes & Remarks */}
+              {(selectedExpenseDetail.notes || selectedExpenseDetail.description) && (
+                <div className="p-4 rounded-xl border bg-muted/30 space-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5" />
+                    Notes & Remarks
+                  </span>
+                  <p className="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                    {selectedExpenseDetail.notes || selectedExpenseDetail.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <DialogFooter className="p-4 border-t bg-muted/10 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">
+                Zeneva Verified Payment Voucher
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={() => handleDownloadExpenseVoucherPDF(selectedExpenseDetail)}
+                  className="gap-1.5 text-xs font-semibold shadow-xs"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download Voucher (PDF)</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setSelectedExpenseDetail(null)}
+                  className="text-xs"
+                >
+                  Close
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -70,7 +70,10 @@ export default function LoginPage() {
     
     getRedirectResult(auth)
       .then(async (result) => {
-        if (!result || !isMounted) return;
+        if (!result || !isMounted) {
+          if (isMounted) setIsGoogleLoading(false);
+          return;
+        }
         
         const addlInfo = getAdditionalUserInfo(result);
         if (addlInfo?.isNewUser) {
@@ -106,6 +109,11 @@ export default function LoginPage() {
             title: t('auth.authFailedTitle'),
             description: error.message || t('auth.redirectSignInFailed'),
           });
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsGoogleLoading(false);
         }
       });
 

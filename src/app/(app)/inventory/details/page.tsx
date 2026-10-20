@@ -877,7 +877,9 @@ function EditProductContent() {
                                 type="button"
                                 onClick={handleToggleArchive}
                                 disabled={isSaving}
-                                className={product?.isArchived ? "border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10" : "border-amber-500/50 text-amber-600 hover:bg-amber-500/10"}
+                                className={product?.isArchived 
+                                    ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors" 
+                                    : "border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"}
                             >
                                 {product?.isArchived ? (
                                     <>
@@ -918,7 +920,7 @@ function EditProductContent() {
                             </div>
                         </div>
                         {canManageProduct && (
-                            <Button size="sm" variant="outline" type="button" onClick={handleToggleArchive} className="shrink-0 bg-background border-amber-500/40 text-amber-700 dark:text-amber-300">
+                            <Button size="sm" variant="outline" type="button" onClick={handleToggleArchive} className="shrink-0 bg-background border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 hover:text-amber-800 dark:hover:text-amber-200 transition-colors">
                                 <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> Restore Product
                             </Button>
                         )}
@@ -1832,7 +1834,9 @@ function EditProductContent() {
                             type="button"
                             onClick={handleToggleArchive}
                             disabled={isSaving}
-                            className={product?.isArchived ? "border-emerald-500/50 text-emerald-600" : "border-amber-500/50 text-amber-600"}
+                            className={product?.isArchived 
+                                ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors" 
+                                : "border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"}
                         >
                             {product?.isArchived ? (
                                 <>

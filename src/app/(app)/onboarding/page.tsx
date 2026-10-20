@@ -773,6 +773,12 @@ export default function OnboardingPage() {
     }
   }, [selectedCountry, form]);
 
+  React.useEffect(() => {
+    if (business?.name && !form.getValues('organizationName')) {
+      form.setValue('organizationName', business.name, { shouldValidate: true });
+    }
+  }, [business?.name, form]);
+
   /*
    * Follow the provider's resolved locale until the owner touches the field.
    *
@@ -862,6 +868,7 @@ export default function OnboardingPage() {
       const userDocRef = doc(firestore, 'users', authUser.uid);
       batch.update(userDocRef, {
         surveyCompleted: true,
+        businessName: data.organizationName,
       });
 
       // 3. Create Welcome Notification
