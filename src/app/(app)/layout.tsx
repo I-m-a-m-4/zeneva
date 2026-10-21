@@ -18,7 +18,7 @@ import { ProductTour } from '@/components/ProductTour';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck, Bug, Wallet, Gift
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowRight, ShieldCheck, Bug, Wallet, Gift, Clock
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -38,7 +38,7 @@ import { GiftModal } from '@/components/shared/gift-modal';
 import { usePOS } from '@/context/pos-context';
 import { Badge } from '@/components/ui/badge';
 import { cn, safeToDate, getCountryFromIP } from '@/lib/utils';
-import { isPaidPlan, getTrialDaysRemaining, isPaidPlanExpired } from '@/lib/plan';
+import { isPaidPlan, getTrialDaysRemaining, isPaidPlanExpired, isCoreFeatureBlocked } from '@/lib/plan';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import NetworkStatusIndicator from '@/components/shared/network-status-indicator';
@@ -238,9 +238,9 @@ export default function AuthenticatedLayout({
   }, [pathname]);
 
   const isPremium = businessInstance?.plan === 'pro' || businessInstance?.plan === 'business';
-  
+  const isReadOnly = businessInstance ? isCoreFeatureBlocked(businessInstance) : false;
   const trialDaysRemaining = businessInstance ? getTrialDaysRemaining(businessInstance) : null;
-  const showTrialWarning = !isPremium && !isPaidPlanExpired(businessInstance) && trialDaysRemaining !== null && (trialDaysRemaining <= 7);
+  const showTrialWarning = !isPremium && !isReadOnly && trialDaysRemaining !== null && trialDaysRemaining > 0 && trialDaysRemaining <= 7;
 
   React.useEffect(() => {
     getCountryFromIP().then(country => {
@@ -1620,14 +1620,29 @@ export default function AuthenticatedLayout({
               </SidebarFooter>
             </Sidebar>
             <div className="flex-1 flex flex-col overflow-hidden bg-background relative">
-              {showTrialWarning && (
-                <div className="bg-orange-50 border-b border-orange-200 px-4 py-2 flex items-center justify-between z-20">
-                  <div className="flex items-center gap-2 text-orange-800 text-sm">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>Your trial expires in {trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'}. Upgrade your plan to continue using Zeneva.</span>
+              {isReadOnly && (
+                <div className="bg-red-500/10 border-b border-red-500/30 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 z-20 animate-in fade-in">
+                  <div className="flex items-center gap-2 text-red-700 dark:text-red-400 text-xs sm:text-sm font-medium min-w-0">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+                    <span className="truncate sm:whitespace-normal">
+                      <strong>Read-Only Mode:</strong> Your 30-day trial or plan has expired. Recording sales and managing data are disabled.
+                    </span>
                   </div>
-                  <Button variant="outline" size="sm" className="h-7 text-xs bg-orange-100 border-orange-200 text-orange-800 hover:bg-orange-200" asChild>
-                    <Link href="/settings/billing">Upgrade Now</Link>
+                  <Button size="sm" className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white shrink-0 shadow-sm" asChild>
+                    <Link href="/billing">Upgrade Plan</Link>
+                  </Button>
+                </div>
+              )}
+              {showTrialWarning && (
+                <div className="bg-orange-50 dark:bg-orange-950/20 border-b border-orange-200 dark:border-orange-800/40 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 z-20">
+                  <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300 text-xs sm:text-sm font-medium min-w-0">
+                    <Clock className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />
+                    <span className="truncate sm:whitespace-normal">
+                      Your trial expires in <strong>{trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'}</strong>. Upgrade your plan to maintain full trading access.
+                    </span>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-7 text-xs bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 dark:border-orange-700 shrink-0" asChild>
+                    <Link href="/billing">Upgrade Now</Link>
                   </Button>
                 </div>
               )}

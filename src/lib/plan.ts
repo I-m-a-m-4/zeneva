@@ -3,25 +3,14 @@ import { safeToDate } from '@/lib/utils';
 /**
  * Plan entitlements — the single source of truth.
  *
- * There is no free trial. Starter is free forever; the only thing a date can
- * ever mean is "what a paying customer paid through".
+ * New users start on a 30-day Starter trial.
  *
- * `trialExpiresAt` keeps its historical name because it is written by the
- * billing flow and read by the admin panel, but it is now purely a paid-period
- * deadline. What it means depends entirely on `plan`:
- *
- * - `starter` (the free plan) — never expires, so any date here is ignored.
- *   Older accounts still carry a leftover trial date from when signup wrote
- *   one; ignoring it is what keeps those users from being locked out. A free
- *   user keeps the base app (POS, inventory, customers, reports) forever,
- *   capped at 50 products.
- * - `pro` / `business` — the date is what the customer paid through. Once it
- *   passes they stop being a paying customer, so they fall back to `starter`:
- *   still fully able to run their shop, just without the paid features.
- * - `lifetime` access level — never expires, always Business.
- *
- * Nobody is locked out of the app for an expired date. Expiry downgrades; it
- * does not revoke.
+ * Once the 30-day trial finishes (or a paid Pro/Business subscription lapses):
+ * - The account switches to Read-Only mode (`isCoreFeatureBlocked` / `isAccountReadOnly` is true).
+ * - Sales recording (POS checkout) and data modifications (inventory/customer additions and edits) are blocked.
+ * - Merchants can still view all historical data (past sales, receipts, catalog, reports).
+ * - Upgrading to Pro or Business restores full trading operations and unlocks premium features.
+ * - Accounts with lifetime access level never expire.
  */
 
 export type PlanId = 'starter' | 'pro' | 'business';
@@ -135,10 +124,10 @@ export function isPaidPlanExpired(business: BusinessLike): boolean {
   if (!business) return false;
   if (business.accessLevel === 'lifetime') return false;
   if (!isPaidPlan(business)) return false;
-  if (!business.trialExpiresAt) return false;
+  if (!business.trialExpiresAt) return true;
 
   const expiry = safeToDate(business.trialExpiresAt);
-  if (!expiry || Number.isNaN(expiry.getTime())) return false;
+  if (!expiry || Number.isNaN(expiry.getTime())) return true;
   return expiry.getTime() <= Date.now();
 }
 
@@ -152,6 +141,14 @@ export function getTrialDaysRemaining(business: BusinessLike): number {
   if (isPaidPlan(business)) return 0;
   if (business.plan && business.plan !== 'starter') return 0;
 
+  if (business.trialExpiresAt) {
+    const expiry = safeToDate(business.trialExpiresAt);
+    if (expiry && !Number.isNaN(expiry.getTime())) {
+      const diffTime = expiry.getTime() - Date.now();
+      return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    }
+  }
+
   const created = safeToDate(business.createdAt);
   if (!created || Number.isNaN(created.getTime()) || created.getTime() === 0) return 0;
 
@@ -164,13 +161,20 @@ export function getTrialDaysRemaining(business: BusinessLike): number {
 }
 
 /**
- * True when a Starter plan is older than 30 days.
+ * True when a Starter plan is older than 30 days or past its trial expiry date.
  */
 export function isTrialExpired(business: BusinessLike): boolean {
   if (!business) return false;
   if (business.accessLevel === 'lifetime') return false;
   if (isPaidPlan(business)) return false;
   if (business.plan && business.plan !== 'starter') return false;
+
+  if (business.trialExpiresAt) {
+    const expiry = safeToDate(business.trialExpiresAt);
+    if (expiry && !Number.isNaN(expiry.getTime())) {
+      return expiry.getTime() <= Date.now();
+    }
+  }
 
   const created = safeToDate(business.createdAt);
   // If we have no createdAt, we assume it's an old account and the trial is expired.
@@ -183,16 +187,26 @@ export function isTrialExpired(business: BusinessLike): boolean {
 }
 
 /**
- * Core features (Checkout, Adding Products, etc) are available for all active businesses.
- * Lapsed paid plans downgrade to Starter rather than blocking POS sales.
+ * Core operations (recording sales, adding products, modifying stock or customer data)
+ * are blocked once a 30-day trial or paid subscription has expired, turning the
+ * store into Read-Only mode.
  */
 export function isCoreFeatureBlocked(business: BusinessLike): boolean {
   if (!business) return false;
   if (business.status === 'deleted' || business.status === 'blocked') return true;
   if (business.accessLevel === 'lifetime') return false;
-  // Paid plans or free starter plans are allowed to run core POS operations
-  return false;
+
+  // Lapsed paid plan (Pro/Business)
+  if (isPaidPlan(business)) {
+    return isPaidPlanExpired(business);
+  }
+
+  // Starter account past its 30-day trial
+  return isTrialExpired(business);
 }
+
+/** Explicit alias for isCoreFeatureBlocked to denote Read-Only state */
+export const isAccountReadOnly = isCoreFeatureBlocked;
 
 /**
  * The plan whose entitlements actually apply right now.

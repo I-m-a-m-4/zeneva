@@ -21,8 +21,8 @@ interface UpgradeOverlayProps {
 export function UpgradeOverlay({
   open,
   onOpenChange,
-  title = "Feature Locked",
-  description = "Your trial has expired or your plan has lapsed. Please upgrade to continue using this feature."
+  title = "Trial Expired (Read-Only Mode)",
+  description = "Your 30-day trial has finished or your plan has lapsed. Please upgrade to Pro or Business to record sales and manage your store."
 }: UpgradeOverlayProps) {
   const router = useRouter();
 
@@ -39,9 +39,9 @@ export function UpgradeOverlay({
           <AlertDialogCancel onClick={() => onOpenChange(false)}>Dismiss</AlertDialogCancel>
           <AlertDialogAction onClick={() => {
             onOpenChange(false);
-            router.push('/settings?tab=subscription');
+            router.push('/billing');
           }}>
-            View Plans
+            Upgrade Plan
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

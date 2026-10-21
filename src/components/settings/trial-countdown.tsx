@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { Clock, ShieldCheck, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { safeToDate } from '@/lib/utils';
-import { isPaidPlan, isPaidPlanExpired, effectivePlan } from '@/lib/plan';
+import { isPaidPlan, isPaidPlanExpired, effectivePlan, isTrialExpired, getTrialDaysRemaining } from '@/lib/plan';
 
 interface TrialCountdownProps {
   /** The business whose billing status is being shown. */
@@ -18,15 +18,18 @@ interface TrialCountdownProps {
 /**
  * Billing status for the current plan.
  *
- * There is no trial any more, so there are only three states worth showing:
- * a free plan that never expires, a paid plan counting down to its renewal,
- * and a paid plan that has lapsed back to free. None of them is an error —
- * a lapsed subscription still leaves a working shop on the Starter plan.
+ * Shows:
+ * - Paid plan counting down to renewal
+ * - Paid plan that has lapsed (Read-Only Mode)
+ * - 30-day trial countdown
+ * - 30-day trial ended (Read-Only Mode)
  */
 const TrialCountdown: React.FC<TrialCountdownProps> = ({ business, expiryDate }) => {
     const paid = isPaidPlan(business);
     const lapsed = isPaidPlanExpired(business);
     const plan = effectivePlan(business);
+    const trialExpired = isTrialExpired(business);
+    const trialDays = getTrialDaysRemaining(business);
 
     const renewalDate = React.useMemo(() => {
         if (business?.trialExpiresAt) return safeToDate(business.trialExpiresAt);
@@ -65,31 +68,45 @@ const TrialCountdown: React.FC<TrialCountdownProps> = ({ business, expiryDate })
         return () => clearInterval(id);
     }, [paid, lapsed, renewalDate]);
 
-    // A paid subscription that has run out. Not an error state — the shop keeps
-    // working on the free plan, so say that rather than raising an alarm.
+    // A paid subscription that has run out.
     if (lapsed) {
         return (
             <div className="flex items-center gap-3">
                 <RefreshCw className="h-8 w-8 text-amber-500" />
                 <div>
-                    <p className="text-lg font-semibold text-amber-600">Subscription ended — now on Starter</p>
+                    <p className="text-lg font-semibold text-amber-600">Subscription ended — Read-Only Mode</p>
                     <p className="text-xs text-muted-foreground">
-                        Your products and sales history are all still here. Renew to switch premium features back on.
+                        Your products and sales history are safely preserved. Renew to resume recording sales and managing stock.
                     </p>
                 </div>
             </div>
         );
     }
 
-    // Free plan. Nothing expires, so there is nothing to count down.
+    // Free trial that has finished.
+    if (!paid && trialExpired) {
+        return (
+            <div className="flex items-center gap-3">
+                <RefreshCw className="h-8 w-8 text-amber-500" />
+                <div>
+                    <p className="text-lg font-semibold text-amber-600">30-Day Free Trial Ended — Read-Only Mode</p>
+                    <p className="text-xs text-muted-foreground">
+                        Your products, receipts, and customers are safely preserved. Upgrade to Pro or Business to record sales and make changes.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // Active 30-day trial.
     if (!paid) {
         return (
             <div className="flex items-center gap-3">
-                <ShieldCheck className="h-8 w-8 text-emerald-500" />
+                <Clock className="h-8 w-8 text-orange-500" />
                 <div>
-                    <p className="text-lg font-semibold text-emerald-600">Starter plan — active</p>
+                    <p className="text-lg font-semibold text-orange-600">30-Day Free Trial — {trialDays} {trialDays === 1 ? 'day' : 'days'} remaining</p>
                     <p className="text-xs text-muted-foreground">
-                        Free forever. No trial, no expiry date.
+                        Full sales and register access enabled. Upgrade anytime to continue trading without interruption.
                     </p>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 {
   "name": "nextn",
-  "version": "3.4.3",
+  "version": "3.4.4",
   "private": true,
   "scripts": {
     "predev": "node scripts/clean-sw.mjs",
@@ -26,6 +26,7 @@
     "test:customer-import": "tsx scripts/check-customer-import.ts",
     "test:launch-funnel": "tsx scripts/check-launch-funnel.ts",
     "test:catalog-state": "tsx scripts/check-catalog-state.ts",
+    "test:plan": "tsx scripts/test-plan-expiry.ts",
     "test:i18n": "tsx scripts/check-i18n.ts",
     "validate:android": "node scripts/validate-android-bundle.mjs"
   },

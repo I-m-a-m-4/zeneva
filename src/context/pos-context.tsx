@@ -71,7 +71,7 @@ import {
   POS_HELD_SALES_KEY
 } from '@/lib/constants';
 import { safeToDate, smartSearchMatch } from '@/lib/utils';
-import { isSubscriptionActive as resolveSubscriptionActive } from '@/lib/plan';
+import { isSubscriptionActive as resolveSubscriptionActive, isCoreFeatureBlocked } from '@/lib/plan';
 import { trackFeature } from '@/lib/product-telemetry';
 import { useBranch } from './branch-context';
 
@@ -284,6 +284,7 @@ interface POSContextType {
   stopImpersonation: () => void;
   isImpersonating: boolean;
   isSubscriptionActive: boolean;
+  isReadOnly: boolean;
   firestore: any;
   heldSales: HeldSale[];
   holdCurrentSale: (notes?: string) => void;
@@ -2935,10 +2936,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
 
   const addToQueue = useCallback((action: any, description: string) => {
-    // Writes are never blocked by an expired date. The free plan does not
-    // expire, and a lapsed paid plan downgrades to it rather than locking the
-    // shop out mid-sale. Paid features are gated individually via effectivePlan.
-    if (!resolveSubscriptionActive(business)) { toast({ variant: 'destructive', title: 'Action Blocked', description: 'This business is no longer active.' }); return null; }
+    if (!resolveSubscriptionActive(business)) {
+      toast({ variant: 'destructive', title: 'Action Blocked', description: 'This business is no longer active.' });
+      return null;
+    }
+
+    if (isCoreFeatureBlocked(business)) {
+      toast({
+        variant: 'destructive',
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Please upgrade to a paid plan to record sales and make changes.',
+      });
+      return null;
+    }
     
     // --- RBAC Permission Check ---
     const effectiveProfile = currentUserProfile || offlineProfile;
@@ -4497,7 +4507,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isOnline: isRealOnline,
 
     stats, 
-    isSubscriptionActive: resolveSubscriptionActive(business)
+    isSubscriptionActive: resolveSubscriptionActive(business),
+    isReadOnly: isCoreFeatureBlocked(business)
   }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, isProductCatalogPending, productSyncError, isCatalogUnverified, retryProductSync, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
