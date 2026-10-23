@@ -731,6 +731,23 @@ export default function FollowUpCenter({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {lead.email && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-500/10 border-purple-500/30"
+                          title="View user session recordings in PostHog"
+                          onClick={() => {
+                            window.open(
+                              `https://us.posthog.com/replay?search=${encodeURIComponent(lead.email)}`,
+                              '_blank',
+                              'noopener,noreferrer'
+                            );
+                          }}
+                        >
+                          <Eye className="mr-1 h-3 w-3 text-purple-500" /> Replay
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"

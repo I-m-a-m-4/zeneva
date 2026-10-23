@@ -28,6 +28,7 @@ import { PushClickTracker } from '@/components/shared/push-click-tracker';
 import { NativeNotificationListener } from '@/components/shared/native-notification-listener';
 import { PWAProvider } from '@/context/pwa-context';
 import { SplashScreen } from '@/components/shared/splash-screen';
+import { PostHogClientProvider, PostHogUserIdentify } from '@/components/shared/posthog-provider';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { DM_Sans, Plus_Jakarta_Sans } from 'next/font/google';
@@ -318,45 +319,48 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased bg-background text-foreground')} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <I18nProvider>
-          <SplashScreen />
-          <ClientSideInitializer />
-          {/* Outside FirebaseClientProvider on purpose — it measures people who
-              never sign in, and it has to keep reporting on a build where the
-              Firebase config itself is the fault. */}
-          <LaunchTelemetry />
-          <ChunkErrorListener />
-          <FirestoreRecovery />
-          <FirebaseClientProvider>
-            <PWAProvider>
-              <UserActivityTracker />
-              {/* Inside the Firebase provider on purpose: attributing a tapped
-                  push needs the signed-in uid, and it has to cover every route
-                  because a notification can deep-link anywhere. */}
-              <PushClickTracker />
-              <NativeNotificationListener />
-              <GlobalAnnouncement />
-              <PromoToastWindow />
-              <Loader />
-              <InstallPrompt />
-              <TauriUpdater />
-              <UpdatePrompt />
-              <BranchProvider>
-                <POSProvider>
-                  <LocaleSync />
-                  <TauriLayoutWrapper>
-                     <DesktopTitleBar />
-                     <DesktopLauncher />
-                     <Suspense>
-                       <NavigationEvents />
-                     </Suspense>
-                     {children}
-                  </TauriLayoutWrapper>
-                </POSProvider>
-              </BranchProvider>
-            </PWAProvider>
-          </FirebaseClientProvider>
-          </I18nProvider>
+          <PostHogClientProvider>
+            <I18nProvider>
+            <SplashScreen />
+            <ClientSideInitializer />
+            {/* Outside FirebaseClientProvider on purpose — it measures people who
+                never sign in, and it has to keep reporting on a build where the
+                Firebase config itself is the fault. */}
+            <LaunchTelemetry />
+            <ChunkErrorListener />
+            <FirestoreRecovery />
+            <FirebaseClientProvider>
+              <PWAProvider>
+                <UserActivityTracker />
+                {/* Inside the Firebase provider on purpose: attributing a tapped
+                    push needs the signed-in uid, and it has to cover every route
+                    because a notification can deep-link anywhere. */}
+                <PushClickTracker />
+                <NativeNotificationListener />
+                <GlobalAnnouncement />
+                <PromoToastWindow />
+                <Loader />
+                <InstallPrompt />
+                <TauriUpdater />
+                <UpdatePrompt />
+                <BranchProvider>
+                  <POSProvider>
+                    <PostHogUserIdentify />
+                    <LocaleSync />
+                    <TauriLayoutWrapper>
+                       <DesktopTitleBar />
+                       <DesktopLauncher />
+                       <Suspense>
+                         <NavigationEvents />
+                       </Suspense>
+                       {children}
+                    </TauriLayoutWrapper>
+                  </POSProvider>
+                </BranchProvider>
+              </PWAProvider>
+            </FirebaseClientProvider>
+            </I18nProvider>
+          </PostHogClientProvider>
         </ThemeProvider>
         <Toaster />
         <script
