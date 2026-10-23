@@ -21,7 +21,6 @@ import { AppConfig } from '@/lib/config';
 import Image from 'next/image';
 import { doc, getDoc } from 'firebase/firestore';
 import { applyReferralCode } from '@/actions/referral';
-import { isNativeApp, isMobileApp } from '@/lib/platform';
 
 const makeSignupSchema = (t: (key: string) => string, isInvitation = false) => z.object({
   businessName: isInvitation
@@ -271,32 +270,17 @@ function SignupPageContent() {
 
   const handleGoogleSignup = async () => {
     if (!auth || !firestore) return;
-
     setIsGoogleLoading(true);
     void trackLaunchStage('signup_started', 'google');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      const isDesktopTauri = isNativeApp() && !isMobileApp();
-
+      // Always try popup first on web
       let result;
       try {
-        try {
-          result = await signInWithPopup(auth, provider);
-        } catch (initialErr: any) {
-          if (initialErr?.code === 'auth/internal-error') {
-            await new Promise((resolve) => setTimeout(resolve, 800));
-            result = await signInWithPopup(auth, provider);
-          } else {
-            throw initialErr;
-          }
-        }
+        result = await signInWithPopup(auth, provider);
       } catch (popupError: any) {
-        if (isDesktopTauri) {
-          throw popupError;
-        }
-
         const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
 
         if (
@@ -304,7 +288,8 @@ function SignupPageContent() {
           (popupError?.code === 'auth/popup-blocked' && !isDesktop) ||
           popupError?.code === 'auth/internal-error'
         ) {
-          // Browser blocked the popup — fall back to redirect silently on web/mobile only.
+          // Browser blocked the popup or Tauri environment failed — fall back to redirect silently.
+          // Recorded before the call, which navigates the whole shell away.
           void trackLaunchStage(
             'signup_failed',
             `popup-fallback:${popupError?.code ?? 'unknown'}`,

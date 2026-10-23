@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 import { trackLaunchStage } from "@/lib/launch-telemetry";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useI18n } from "@/context/i18n-context";
-import { isNativeApp, isMobileApp } from "@/lib/platform";
 
 // Titles and descriptions are keys resolved at render — the array is module-level
 // and cannot reach `t()`. The word-highlight below still matches on English, so
@@ -125,29 +124,15 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     if (!auth) return;
-
     setIsGoogleLoading(true);
     void trackLaunchStage('login_attempted', 'google');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      const isDesktopTauri = isNativeApp() && !isMobileApp();
 
       try {
-        let result;
-        try {
-          result = await signInWithPopup(auth, provider);
-        } catch (initialErr: any) {
-          // If transient internal error happens in WebView2, wait briefly and retry popup once
-          if (initialErr?.code === 'auth/internal-error') {
-            await new Promise((resolve) => setTimeout(resolve, 800));
-            result = await signInWithPopup(auth, provider);
-          } else {
-            throw initialErr;
-          }
-        }
-
+        const result = await signInWithPopup(auth, provider);
         const addlInfo = getAdditionalUserInfo(result);
         if (addlInfo?.isNewUser) {
            await result.user.delete().catch(() => {});
@@ -163,12 +148,6 @@ export default function LoginPage() {
         // AuthLayout handles the redirection once auth state changes
         void trackLaunchStage('login_succeeded', 'google-popup');
       } catch (popupError: any) {
-        // In desktop Tauri, NEVER call signInWithRedirect because navigating the desktop window away
-        // freezes the shell into a white screen.
-        if (isDesktopTauri) {
-          throw popupError;
-        }
-
         const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
         
         if (
@@ -177,8 +156,8 @@ export default function LoginPage() {
           (!isDesktop && popupError?.code === 'auth/network-request-failed') ||
           popupError?.code === 'auth/internal-error'
         ) {
-          // The webview cannot host a popup, or mobile browser blocked it.
-          // This branch navigates the whole shell away on web/mobile only.
+          // The webview cannot host a popup, or mobile browser blocked it, or Tauri internal error.
+          // This branch navigates the whole shell away.
           void trackLaunchStage(
             'login_failed',
             `popup-fallback:${popupError?.code ?? 'unknown'}`,
@@ -203,8 +182,12 @@ export default function LoginPage() {
         error?.code === 'auth/redirect-cancelled-by-user';
 
       if (!isCancellation) {
-        console.error("Google auth error:", error);
+          console.error("Google auth error:", error);
       }
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.code === 'auth/user-cancelled' ||
+        error?.code === 'auth/redirect-cancelled-by-user';
 
       void trackLaunchStage('login_failed', `google:${error?.code ?? 'unknown'}`);
 
