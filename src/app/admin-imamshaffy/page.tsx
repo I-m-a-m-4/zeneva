@@ -5423,8 +5423,8 @@ function AdminDashboardContent({
                                                             <TableCell className="text-xs font-medium max-w-[140px] truncate" title={biz?.name || inv.businessName || 'Merchant'}>
                                                                 {biz?.name || inv.businessName || 'Merchant'}
                                                             </TableCell>
-                                                            <TableCell className="text-xs max-w-[140px] truncate" title={inv.customerName || inv.clientName || 'Walk-in Customer'}>
-                                                                {inv.customerName || inv.clientName || 'Walk-in Customer'}
+                                                            <TableCell className="text-xs max-w-[140px] truncate" title={inv.customer?.name || inv.customerName || inv.clientName || 'Walk-in Customer'}>
+                                                                {inv.customer?.name || inv.customerName || inv.clientName || 'Walk-in Customer'}
                                                             </TableCell>
                                                             <TableCell>
                                                                 <Badge variant={statusVariant} className="text-[10px] uppercase font-mono">
@@ -6852,6 +6852,17 @@ export default function AdminDashboardPage() {
     const onlineOrdersQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'onlineOrders'), orderBy('createdAt', 'desc'), limit(ADMIN_LOG_LIMIT)), [firestore]);
     const referralsQuery = useMemoFirebase(() => query(collection(firestore, 'referrals'), orderBy('createdAt', 'desc')), [firestore]);
 
+    // Invoicing & Operations telemetry collections
+    const expensesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'expenses'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const billsQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'bills'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const estimatesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'estimates'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const recurringInvoicesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'recurring-invoices'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const paymentsReceivedQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'payment-received'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const creditNotesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'credit-notes'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const vendorsQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'vendors'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const servicesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'services'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+    const directInvoicesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'invoices'), limit(ADMIN_LOG_LIMIT)), [firestore]);
+
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
     const { data: businesses, isLoading: businessesLoading } = useCollection<BusinessInstance>(businessesQuery);
     const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
@@ -6867,6 +6878,32 @@ export default function AdminDashboardPage() {
     const { data: receiptShares, isLoading: receiptSharesLoading } = useCollection<any>(receiptSharesQuery);
     const { data: onlineOrders, isLoading: onlineOrdersLoading } = useCollection<any>(onlineOrdersQuery);
     const { data: referrals, isLoading: referralsLoading } = useCollection<ReferralRecord>(referralsQuery);
+
+    const { data: expenses } = useCollection<any>(expensesQuery);
+    const { data: bills } = useCollection<any>(billsQuery);
+    const { data: estimates } = useCollection<any>(estimatesQuery);
+    const { data: recurringInvoices } = useCollection<any>(recurringInvoicesQuery);
+    const { data: paymentsReceived } = useCollection<any>(paymentsReceivedQuery);
+    const { data: creditNotes } = useCollection<any>(creditNotesQuery);
+    const { data: vendors } = useCollection<any>(vendorsQuery);
+    const { data: services } = useCollection<any>(servicesQuery);
+    const { data: directInvoices } = useCollection<any>(directInvoicesQuery);
+
+    const invoices = React.useMemo(() => {
+        const fromReceipts = (receipts || []).filter((r: any) => 
+            r.type === 'invoice' || 
+            r.paymentMethod === 'Invoice' || 
+            (typeof r.receiptNumber === 'string' && (r.receiptNumber.toUpperCase().startsWith('INV') || r.receiptNumber.startsWith('rec-inv')))
+        );
+        const fromDirect = directInvoices || [];
+        const map = new Map<string, any>();
+        [...fromReceipts, ...fromDirect].forEach(item => {
+            if (item && item.id) {
+                map.set(item.id, item);
+            }
+        });
+        return Array.from(map.values());
+    }, [receipts, directInvoices]);
 
     const isLoading = usersLoading || businessesLoading || productsLoading || applicationsLoading || grantsLoading || receiptsLoading || purchasesLoading || downloadClicksLoading || branchesLoading || checkoutAttemptsLoading || importAttemptsLoading || storefrontSharesLoading || receiptSharesLoading || onlineOrdersLoading || referralsLoading;
 
@@ -6895,5 +6932,14 @@ export default function AdminDashboardPage() {
         receiptShares={receiptShares || []}
         onlineOrders={onlineOrders || []}
         referrals={referrals || []}
+        invoices={invoices || []}
+        expenses={expenses || []}
+        bills={bills || []}
+        estimates={estimates || []}
+        recurringInvoices={recurringInvoices || []}
+        paymentsReceived={paymentsReceived || []}
+        creditNotes={creditNotes || []}
+        vendors={vendors || []}
+        services={services || []}
     />
 }
