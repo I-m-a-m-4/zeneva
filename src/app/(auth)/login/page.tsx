@@ -126,27 +126,28 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     if (!auth) return;
 
-    // Google Sign-In is blocked in embedded desktop webviews (WebView2) by Google OAuth policies.
-    // Attempting redirect navigates the native shell away and freezes the window into a white screen.
-    const isDesktopTauri = isNativeApp() && !isMobileApp();
-    if (isDesktopTauri) {
-      toast({
-        variant: "destructive",
-        title: "Desktop Sign-In",
-        description: "Google Sign-In is not supported inside the desktop app. Please sign in with your email and password, or use 'Forgot your password?' to set a password for your account.",
-      });
-      return;
-    }
-
     setIsGoogleLoading(true);
     void trackLaunchStage('login_attempted', 'google');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
+      const isDesktopTauri = isNativeApp() && !isMobileApp();
 
       try {
-        const result = await signInWithPopup(auth, provider);
+        let result;
+        try {
+          result = await signInWithPopup(auth, provider);
+        } catch (initialErr: any) {
+          // If transient internal error happens in WebView2, wait briefly and retry popup once
+          if (initialErr?.code === 'auth/internal-error') {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            result = await signInWithPopup(auth, provider);
+          } else {
+            throw initialErr;
+          }
+        }
+
         const addlInfo = getAdditionalUserInfo(result);
         if (addlInfo?.isNewUser) {
            await result.user.delete().catch(() => {});
@@ -162,14 +163,10 @@ export default function LoginPage() {
         // AuthLayout handles the redirection once auth state changes
         void trackLaunchStage('login_succeeded', 'google-popup');
       } catch (popupError: any) {
+        // In desktop Tauri, NEVER call signInWithRedirect because navigating the desktop window away
+        // freezes the shell into a white screen.
         if (isDesktopTauri) {
-          toast({
-            variant: "destructive",
-            title: "Desktop Sign-In",
-            description: "Google Sign-In is not supported inside the desktop app. Please sign in with your email and password.",
-          });
-          setIsGoogleLoading(false);
-          return;
+          throw popupError;
         }
 
         const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
@@ -180,8 +177,8 @@ export default function LoginPage() {
           (!isDesktop && popupError?.code === 'auth/network-request-failed') ||
           popupError?.code === 'auth/internal-error'
         ) {
-          // The webview cannot host a popup, or mobile browser blocked it, or Tauri internal error.
-          // This branch navigates the whole shell away.
+          // The webview cannot host a popup, or mobile browser blocked it.
+          // This branch navigates the whole shell away on web/mobile only.
           void trackLaunchStage(
             'login_failed',
             `popup-fallback:${popupError?.code ?? 'unknown'}`,
@@ -206,12 +203,8 @@ export default function LoginPage() {
         error?.code === 'auth/redirect-cancelled-by-user';
 
       if (!isCancellation) {
-          console.error("Google auth error:", error);
+        console.error("Google auth error:", error);
       }
-        error?.code === 'auth/popup-closed-by-user' ||
-        error?.code === 'auth/cancelled-popup-request' ||
-        error?.code === 'auth/user-cancelled' ||
-        error?.code === 'auth/redirect-cancelled-by-user';
 
       void trackLaunchStage('login_failed', `google:${error?.code ?? 'unknown'}`);
 

@@ -272,37 +272,29 @@ function SignupPageContent() {
   const handleGoogleSignup = async () => {
     if (!auth || !firestore) return;
 
-    // Google Sign-Up is blocked in embedded desktop webviews (WebView2) by Google OAuth policies.
-    // Attempting redirect navigates the native shell away and freezes the window into a white screen.
-    const isDesktopTauri = isNativeApp() && !isMobileApp();
-    if (isDesktopTauri) {
-      toast({
-        variant: "destructive",
-        title: "Desktop Sign-Up",
-        description: "Google Sign-Up is not supported inside the desktop app. Please complete registration using your email and password below.",
-      });
-      return;
-    }
-
     setIsGoogleLoading(true);
     void trackLaunchStage('signup_started', 'google');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      // Always try popup first on web
+      const isDesktopTauri = isNativeApp() && !isMobileApp();
+
       let result;
       try {
-        result = await signInWithPopup(auth, provider);
+        try {
+          result = await signInWithPopup(auth, provider);
+        } catch (initialErr: any) {
+          if (initialErr?.code === 'auth/internal-error') {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            result = await signInWithPopup(auth, provider);
+          } else {
+            throw initialErr;
+          }
+        }
       } catch (popupError: any) {
         if (isDesktopTauri) {
-          toast({
-            variant: "destructive",
-            title: "Desktop Sign-Up",
-            description: "Google Sign-Up is not supported inside the desktop app. Please register with your email and password.",
-          });
-          setIsGoogleLoading(false);
-          return;
+          throw popupError;
         }
 
         const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
@@ -312,8 +304,7 @@ function SignupPageContent() {
           (popupError?.code === 'auth/popup-blocked' && !isDesktop) ||
           popupError?.code === 'auth/internal-error'
         ) {
-          // Browser blocked the popup or Tauri environment failed — fall back to redirect silently.
-          // Recorded before the call, which navigates the whole shell away.
+          // Browser blocked the popup — fall back to redirect silently on web/mobile only.
           void trackLaunchStage(
             'signup_failed',
             `popup-fallback:${popupError?.code ?? 'unknown'}`,
