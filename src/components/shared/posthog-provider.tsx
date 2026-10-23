@@ -11,7 +11,7 @@ let posthogInitialized = false;
 function initPostHog() {
   if (posthogInitialized || typeof window === 'undefined') return;
 
-  const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
+  const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || 'phc_sCh7vv7ptLAQm9SNXYmPZ73Pjp3eaMtSUTspRtffbnjn';
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
 
   if (!token) {
