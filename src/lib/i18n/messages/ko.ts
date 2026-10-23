@@ -2044,6 +2044,19 @@ const ko: Messages = {
     tacticalVaultLocked: '전술 금고 잠김',
     backgroundAlt: '전술 인텔리전스 배경',
   },
+  invoices: {
+    voidInvoice: "청구서 취소/삭제",
+    voidConfirmTitle: "이 청구서를 취소하시겠습니까?",
+    voidConfirmBody: "청구서 {invoice}을(를) 취소하시겠습니까? 청구서가 영구적으로 삭제되고 재고 수량이 복원됩니다.",
+    voidedTitle: "청구서 취소됨",
+    voidedDescription: "청구서 {invoice}이(가) 취소되고 재고가 복원되었습니다.",
+    offlineVoidTitle: "오프라인 취소 대기 중",
+    offlineVoidDescription: "로컬에서 취소되었으며 온라인 연결 시 동기화됩니다.",
+    voidSelected: "선택 항목 취소 ({count})",
+    voidMultipleTitle: "여러 청구서 취소",
+    voidMultipleBody: "선택한 {count}개의 청구서를 취소하시겠습니까? 재고 수량이 복원됩니다.",
+    voidAllSelected: "선택 항목 모두 취소",
+  },
 };
 
 export default ko;

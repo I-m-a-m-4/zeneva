@@ -2099,6 +2099,19 @@ const pt: Messages = {
     tacticalVaultLocked: 'Cofre tático bloqueado',
     backgroundAlt: 'Plano de fundo de inteligência tática',
   },
+  invoices: {
+    voidInvoice: "Anular fatura",
+    voidConfirmTitle: "Anular esta fatura?",
+    voidConfirmBody: "Tem certeza de que deseja anular a fatura {invoice}? Isso excluirá a fatura permanentemente, restaurará o estoque de produtos e deduzirá pontos de fidelidade.",
+    voidedTitle: "Fatura anulada",
+    voidedDescription: "A fatura {invoice} foi anulada permanentemente e o estoque foi restaurado.",
+    offlineVoidTitle: "Anulação offline em fila",
+    offlineVoidDescription: "A fatura foi cancelada localmente e será sincronizada assim que você estiver online.",
+    voidSelected: "Anular selecionadas ({count})",
+    voidMultipleTitle: "Anular várias faturas",
+    voidMultipleBody: "Tem certeza de que deseja anular as {count} faturas selecionadas? O estoque será restaurado e as faturas excluídas.",
+    voidAllSelected: "Anular todas as selecionadas",
+  },
 };
 
 export default pt;

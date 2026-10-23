@@ -2072,6 +2072,19 @@ const hi: Messages = {
     tacticalVaultLocked: 'टैक्टिकल वॉल्ट लॉक है',
     backgroundAlt: 'टैक्टिकल इंटेलिजेंस पृष्ठभूमि',
   },
+  invoices: {
+    voidInvoice: "चालान रद्द करें",
+    voidConfirmTitle: "क्या यह चालान रद्द करें?",
+    voidConfirmBody: "क्या आप वाकई चालान {invoice} रद्द करना चाहते हैं? इससे चालान स्थायी रूप से हट जाएगा और स्टॉक वापस जुड़ जाएगा।",
+    voidedTitle: "चालान रद्द किया गया",
+    voidedDescription: "चालान {invoice} सफलतापूर्वक रद्द किया गया और इन्वेंट्री बहाल की गई।",
+    offlineVoidTitle: "ऑफ़लाइन रद्दीकरण कतारबद्ध",
+    offlineVoidDescription: "चालान स्थानीय रूप से रद्द कर दिया गया है और ऑनलाइन होने पर सिंक हो जाएगा।",
+    voidSelected: "चयनित रद्द करें ({count})",
+    voidMultipleTitle: "एकाधिक चालान रद्द करें",
+    voidMultipleBody: "क्या आप वाकई {count} चयनित चालान रद्द करना चाहते हैं? इससे स्टॉक वापस आ जाएगा।",
+    voidAllSelected: "सभी चयनित रद्द करें",
+  },
 };
 
 export default hi;

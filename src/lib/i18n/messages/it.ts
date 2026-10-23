@@ -2099,6 +2099,19 @@ const it: Messages = {
     tacticalVaultLocked: 'Cassaforte tattica bloccata',
     backgroundAlt: 'Sfondo di intelligence tattica',
   },
+  invoices: {
+    voidInvoice: "Annulla fattura",
+    voidConfirmTitle: "Annullare questa fattura?",
+    voidConfirmBody: "Sei sicuro di voler annullare la fattura {invoice}? Questo eliminerà definitivamente la fattura, ripristinerà le scorte di magazzino e dedurrà i punti fedeltà.",
+    voidedTitle: "Fattura annullata",
+    voidedDescription: "La fattura {invoice} è stata annullata e le scorte sono state ripristinate.",
+    offlineVoidTitle: "Annullamento offline in coda",
+    offlineVoidDescription: "Fattura annullata localmente; la sincronizzazione avverrà non appena sarai online.",
+    voidSelected: "Annulla selezionate ({count})",
+    voidMultipleTitle: "Annulla più fatture",
+    voidMultipleBody: "Sei sicuro di voler annullare le {count} fatture selezionate? Questa operazione ripristinerà le scorte ed eliminerà le fatture.",
+    voidAllSelected: "Annulla tutte le selezionate",
+  },
 };
 
 export default it;

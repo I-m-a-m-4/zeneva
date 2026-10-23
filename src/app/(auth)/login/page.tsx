@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { trackLaunchStage } from "@/lib/launch-telemetry";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useI18n } from "@/context/i18n-context";
+import { isNativeApp, isMobileApp } from "@/lib/platform";
 
 // Titles and descriptions are keys resolved at render — the array is module-level
 // and cannot reach `t()`. The word-highlight below still matches on English, so
@@ -124,6 +125,19 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     if (!auth) return;
+
+    // Google Sign-In is blocked in embedded desktop webviews (WebView2) by Google OAuth policies.
+    // Attempting redirect navigates the native shell away and freezes the window into a white screen.
+    const isDesktopTauri = isNativeApp() && !isMobileApp();
+    if (isDesktopTauri) {
+      toast({
+        variant: "destructive",
+        title: "Desktop Sign-In",
+        description: "Google Sign-In is not supported inside the desktop app. Please sign in with your email and password, or use 'Forgot your password?' to set a password for your account.",
+      });
+      return;
+    }
+
     setIsGoogleLoading(true);
     void trackLaunchStage('login_attempted', 'google');
     try {
@@ -148,6 +162,16 @@ export default function LoginPage() {
         // AuthLayout handles the redirection once auth state changes
         void trackLaunchStage('login_succeeded', 'google-popup');
       } catch (popupError: any) {
+        if (isDesktopTauri) {
+          toast({
+            variant: "destructive",
+            title: "Desktop Sign-In",
+            description: "Google Sign-In is not supported inside the desktop app. Please sign in with your email and password.",
+          });
+          setIsGoogleLoading(false);
+          return;
+        }
+
         const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
         
         if (

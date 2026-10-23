@@ -2117,6 +2117,19 @@ const fr: Messages = {
     tacticalVaultLocked: 'Coffre tactique verrouillé',
     backgroundAlt: 'Arrière-plan Intelligence tactique',
   },
+  invoices: {
+    voidInvoice: "Annuler la facture",
+    voidConfirmTitle: "Annuler cette facture ?",
+    voidConfirmBody: "Êtes-vous sûr de vouloir annuler la facture {invoice} ? Cela supprimera définitivement la facture, restaurera le stock et déduira les points de fidélité.",
+    voidedTitle: "Facture annulée",
+    voidedDescription: "La facture {invoice} a été définitivement annulée et le stock a été restauré.",
+    offlineVoidTitle: "Annulation hors ligne en attente",
+    offlineVoidDescription: "Facture annulée localement ; synchronisation dès la reconnexion.",
+    voidSelected: "Annuler la sélection ({count})",
+    voidMultipleTitle: "Annuler plusieurs factures",
+    voidMultipleBody: "Êtes-vous sûr de vouloir annuler les {count} factures sélectionnées ? Cela restaurera le stock et supprimera les factures.",
+    voidAllSelected: "Tout annuler",
+  },
 };
 
 export default fr;

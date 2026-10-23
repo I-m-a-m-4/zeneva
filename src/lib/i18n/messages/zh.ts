@@ -2017,6 +2017,19 @@ const zh: Messages = {
     tacticalVaultLocked: '战术保险库已锁定',
     backgroundAlt: '战术情报背景',
   },
+  invoices: {
+    voidInvoice: "作废发票",
+    voidConfirmTitle: "作废此发票？",
+    voidConfirmBody: "您确定要作废发票 {invoice} 吗？这将永久删除该发票，恢复商品库存，并扣除所获得的积分。",
+    voidedTitle: "发票已作废",
+    voidedDescription: "发票 {invoice} 已成功作废并已恢复库存。",
+    offlineVoidTitle: "离线作废已排队",
+    offlineVoidDescription: "发票已在本地作废，恢复联机后将自动同步。",
+    voidSelected: "作废所选项 ({count})",
+    voidMultipleTitle: "作废多张发票",
+    voidMultipleBody: "您确定要作废所选的 {count} 张发票吗？库存将恢复且发票将被删除。",
+    voidAllSelected: "作废所有已选项",
+  },
 };
 
 export default zh;

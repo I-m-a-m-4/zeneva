@@ -39,10 +39,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { usePOS } from '@/context/pos-context';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc, updateDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, getDocs, where, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import type { Supplier, SupplierPurchase, PurchaseOrderItem, Product } from '@/types';
 
 export default function PurchaseOrdersPage() {
@@ -58,6 +68,8 @@ export default function PurchaseOrdersPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [orderToDelete, setOrderToDelete] = React.useState<SupplierPurchase | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   // Dialog State for New PO
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -262,6 +274,87 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete || !business?.id || !firestore) return;
+    setIsDeleting(true);
+
+    try {
+      // 1. Delete from purchaseOrders subcollection
+      const orderRef = doc(firestore, 'businessInstances', business.id, 'purchaseOrders', orderToDelete.id);
+      await deleteDoc(orderRef);
+
+      // Also delete from top-level supplier_purchases if it exists
+      try {
+        await deleteDoc(doc(firestore, 'supplier_purchases', orderToDelete.id));
+      } catch (e) {}
+
+      // 2. If it was already received and products exist, revert stock
+      if (orderToDelete.status === 'received' && orderToDelete.items?.length > 0 && products) {
+        orderToDelete.items.forEach(item => {
+          if (item.productId) {
+            const currentProd = products.find(p => p.id === item.productId);
+            if (currentProd) {
+              const newStock = Math.max(0, (currentProd.stock || 0) - (item.quantityOrdered || 0));
+              addToQueue({
+                type: 'update-product',
+                payload: {
+                  productId: item.productId,
+                  values: { stock: newStock }
+                }
+              }, `Reversal of deleted PO #${orderToDelete.purchaseNumber} for ${currentProd.name}`);
+
+              addToQueue({
+                type: 'add-inventory-transaction',
+                payload: {
+                  businessId: business.id,
+                  productId: item.productId,
+                  productName: currentProd.name,
+                  type: 'out',
+                  quantity: item.quantityOrdered || 0,
+                  closingStock: newStock,
+                  notes: `Reversal of deleted PO #${orderToDelete.purchaseNumber}`,
+                  referenceId: orderToDelete.id,
+                  createdBy: 'System',
+                  date: new Date()
+                }
+              }, `Logging stock reversal transaction for ${currentProd.name}`);
+            }
+          }
+        });
+      }
+
+      // 3. Delete any linked expenses matching this PO number
+      if (orderToDelete.purchaseNumber) {
+        try {
+          const expQuery = query(
+            collection(firestore, 'expenses'),
+            where('businessId', '==', business.id),
+            where('referenceId', '==', orderToDelete.purchaseNumber)
+          );
+          const expSnap = await getDocs(expQuery);
+          for (const d of expSnap.docs) {
+            await deleteDoc(d.ref);
+          }
+        } catch (e) {}
+      }
+
+      toast({
+        title: 'Purchase Order Deleted',
+        description: `Order ${orderToDelete.purchaseNumber} has been removed successfully.`
+      });
+      setOrderToDelete(null);
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: err?.message || 'Failed to delete purchase order.'
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const filteredOrders = orders.filter(o => {
     if (statusFilter !== 'all' && o.status !== statusFilter) return false;
     if (!searchTerm) return true;
@@ -354,11 +447,21 @@ export default function PurchaseOrdersPage() {
                     </p>
                   </div>
 
-                  {order.status !== 'received' && (
-                    <Button onClick={() => handleMarkAsReceived(order)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
-                      <CheckCircle2 className="h-4 w-4 mr-1.5" /> Receive & Restock
+                  <div className="flex items-center gap-2">
+                    {order.status !== 'received' && (
+                      <Button onClick={() => handleMarkAsReceived(order)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
+                        <CheckCircle2 className="h-4 w-4 mr-1.5" /> Receive & Restock
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOrderToDelete(order)}
+                      className="text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10 text-xs h-8"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                     </Button>
-                  )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -506,6 +609,38 @@ export default function PurchaseOrdersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog open={!!orderToDelete} onOpenChange={(open) => { if (!open && !isDeleting) setOrderToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Purchase Order?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span>
+                Are you sure you want to delete purchase order <span className="font-bold">{orderToDelete?.purchaseNumber}</span> from <span className="font-bold">{orderToDelete?.supplierName}</span>?
+              </span>
+              {orderToDelete?.status === 'received' && (
+                <span className="block text-rose-600 dark:text-rose-400 font-medium text-xs">
+                  ⚠️ Note: This order was marked as received. Deleting it will reverse the restocked quantities from your inventory.
+                </span>
+              )}
+              <span className="block text-xs text-muted-foreground">
+                This action cannot be undone.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOrder}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90 text-white"
+            >
+              {isDeleting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+              Delete Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

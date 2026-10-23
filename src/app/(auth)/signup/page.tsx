@@ -21,6 +21,7 @@ import { AppConfig } from '@/lib/config';
 import Image from 'next/image';
 import { doc, getDoc } from 'firebase/firestore';
 import { applyReferralCode } from '@/actions/referral';
+import { isNativeApp, isMobileApp } from '@/lib/platform';
 
 const makeSignupSchema = (t: (key: string) => string, isInvitation = false) => z.object({
   businessName: isInvitation
@@ -270,6 +271,19 @@ function SignupPageContent() {
 
   const handleGoogleSignup = async () => {
     if (!auth || !firestore) return;
+
+    // Google Sign-Up is blocked in embedded desktop webviews (WebView2) by Google OAuth policies.
+    // Attempting redirect navigates the native shell away and freezes the window into a white screen.
+    const isDesktopTauri = isNativeApp() && !isMobileApp();
+    if (isDesktopTauri) {
+      toast({
+        variant: "destructive",
+        title: "Desktop Sign-Up",
+        description: "Google Sign-Up is not supported inside the desktop app. Please complete registration using your email and password below.",
+      });
+      return;
+    }
+
     setIsGoogleLoading(true);
     void trackLaunchStage('signup_started', 'google');
     try {
@@ -281,6 +295,16 @@ function SignupPageContent() {
       try {
         result = await signInWithPopup(auth, provider);
       } catch (popupError: any) {
+        if (isDesktopTauri) {
+          toast({
+            variant: "destructive",
+            title: "Desktop Sign-Up",
+            description: "Google Sign-Up is not supported inside the desktop app. Please register with your email and password.",
+          });
+          setIsGoogleLoading(false);
+          return;
+        }
+
         const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768 && !/Mobi|Android/i.test(navigator.userAgent);
 
         if (

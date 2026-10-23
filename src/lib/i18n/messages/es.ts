@@ -2103,6 +2103,19 @@ const es: Messages = {
     tacticalVaultLocked: 'Bóveda táctica bloqueada',
     backgroundAlt: 'Fondo de inteligencia táctica',
   },
+  invoices: {
+    voidInvoice: "Anular factura",
+    voidConfirmTitle: "¿Anular esta factura?",
+    voidConfirmBody: "¿Está seguro de que desea anular la factura {invoice}? Esto eliminará permanentemente la factura, restaurará el stock en el inventario y deducirá los puntos de fidelidad.",
+    voidedTitle: "Factura anulada",
+    voidedDescription: "La factura {invoice} fue anulada permanentemente y el inventario fue restaurado.",
+    offlineVoidTitle: "Anulación en cola sin conexión",
+    offlineVoidDescription: "La factura se anuló localmente y se sincronizará cuando vuelva a conectarse.",
+    voidSelected: "Anular seleccionadas ({count})",
+    voidMultipleTitle: "Anular varias facturas",
+    voidMultipleBody: "¿Está seguro de que desea anular las {count} facturas seleccionadas? Esto eliminará las facturas y restaurará el inventario.",
+    voidAllSelected: "Anular todas las seleccionadas",
+  },
 };
 
 export default es;

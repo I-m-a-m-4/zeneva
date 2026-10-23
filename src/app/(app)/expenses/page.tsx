@@ -122,6 +122,7 @@ import {
   Timestamp,
   increment,
   writeBatch,
+  getDocs,
 } from 'firebase/firestore';
 
 // ======================== EXPENSE DEFINITIONS ========================
@@ -1270,6 +1271,123 @@ function ExpensesAndPurchasesContent() {
       setPayAmount('');
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Payment Failed', description: err?.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePurchaseOrder = async () => {
+    if (!firestore || !business?.id || !deletingPurchase) return;
+    setSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+
+      // 1. Delete purchase order doc
+      const purchaseRef = doc(firestore, 'supplier_purchases', deletingPurchase.id);
+      batch.delete(purchaseRef);
+
+      // 2. Also check if it exists in legacy purchaseOrders subcollection and delete it
+      try {
+        const legacyRef = doc(firestore, 'businessInstances', business.id, 'purchaseOrders', deletingPurchase.id);
+        batch.delete(legacyRef);
+      } catch (e) {
+        // ignore if not present
+      }
+
+      // 3. Rollback supplier totals (totalPurchased & totalDebt)
+      if (deletingPurchase.supplierId) {
+        const supplierRef = doc(firestore, 'suppliers', deletingPurchase.supplierId);
+        batch.update(supplierRef, {
+          totalPurchased: increment(-(deletingPurchase.totalAmount || 0)),
+          totalDebt: increment(-(deletingPurchase.balanceDue || 0)),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // 4. If the order was marked received and autoRestock was true, revert product stock
+      if (deletingPurchase.status === 'received' && deletingPurchase.autoRestock !== false && deletingPurchase.items?.length > 0) {
+        for (const item of deletingPurchase.items) {
+          if (item.productId) {
+            const productRef = doc(firestore, 'products', item.productId);
+            const qtyToRevert = item.quantityReceived || item.quantityOrdered || 0;
+            if (qtyToRevert > 0) {
+              batch.update(productRef, {
+                stock: increment(-qtyToRevert),
+                updatedAt: serverTimestamp(),
+              });
+
+              // Log reversal inventory transaction
+              const txRef = doc(collection(firestore, 'inventory_transactions'));
+              batch.set(txRef, {
+                businessId: business.id,
+                productId: item.productId,
+                productName: item.productName || 'Unknown',
+                type: 'out',
+                quantity: qtyToRevert,
+                date: serverTimestamp(),
+                notes: `Stock reversal for deleted PO #${deletingPurchase.poNumber || deletingPurchase.id.substring(0, 8)}`,
+                referenceId: deletingPurchase.id,
+                createdBy: currentUserProfile?.name || 'System'
+              });
+            }
+          }
+        }
+      }
+
+      // 5. Query and delete associated expenses that were auto-created for this purchase order
+      // (This directly fixes the issue where net profit in reports was deducting supplier payments!)
+      if (deletingPurchase.poNumber) {
+        const expQuery = query(
+          collection(firestore, 'expenses'),
+          where('businessId', '==', business.id),
+          where('referenceId', '==', deletingPurchase.poNumber)
+        );
+        const expSnap = await getDocs(expQuery);
+        expSnap.forEach(d => {
+          batch.delete(d.ref);
+        });
+      }
+
+      if (deletingPurchase.id && deletingPurchase.id !== deletingPurchase.poNumber) {
+        const expQuery2 = query(
+          collection(firestore, 'expenses'),
+          where('businessId', '==', business.id),
+          where('referenceId', '==', deletingPurchase.id)
+        );
+        const expSnap2 = await getDocs(expQuery2);
+        expSnap2.forEach(d => {
+          batch.delete(d.ref);
+        });
+      }
+
+      await batch.commit();
+
+      // Log audit event
+      await logAuditEvent(firestore, business.id, currentUserProfile, {
+        action: 'purchase.delete',
+        entity: { type: 'SupplierPurchase', id: deletingPurchase.id, name: deletingPurchase.poNumber || 'Purchase Order' },
+        details: {
+          poNumber: deletingPurchase.poNumber,
+          totalAmount: deletingPurchase.totalAmount,
+          supplierName: deletingPurchase.supplierName,
+          status: deletingPurchase.status,
+          itemsCount: deletingPurchase.items?.length || 0,
+        }
+      });
+
+      toast({
+        title: 'Purchase Order Deleted',
+        description: `Order ${deletingPurchase.poNumber} and related financial records removed successfully.`,
+        variant: 'success'
+      });
+      setDeletingPurchase(null);
+    } catch (err: any) {
+      console.error('Failed to delete purchase order:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to Delete',
+        description: err?.message || 'Could not delete purchase order.'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -3942,6 +4060,39 @@ function ExpensesAndPurchasesContent() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteExpense} className="bg-destructive hover:bg-destructive/90 text-white">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ======================== ALERT: DELETE PURCHASE ORDER ======================== */}
+      <AlertDialog open={!!deletingPurchase} onOpenChange={(open) => { if (!open && !submitting) setDeletingPurchase(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Purchase Order?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span>
+                Are you sure you want to delete purchase order <span className="font-bold">{deletingPurchase?.poNumber}</span> from <span className="font-bold">{deletingPurchase?.supplierName}</span>?
+              </span>
+              {deletingPurchase?.status === 'received' && (
+                <span className="block text-rose-600 dark:text-rose-400 font-medium">
+                  ⚠️ Note: This order was marked as received. Deleting it will reverse the restocked quantities from your inventory.
+                </span>
+              )}
+              <span className="block text-xs text-muted-foreground">
+                Associated payments will be removed from your expenses and net profit calculations. This action cannot be undone.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePurchaseOrder}
+              disabled={submitting}
+              className="bg-destructive hover:bg-destructive/90 text-white"
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Delete Order
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

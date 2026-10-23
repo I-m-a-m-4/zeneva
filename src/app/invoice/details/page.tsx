@@ -2,16 +2,19 @@
 import ReceiptDetails from "@/components/receipts/receipt-details";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Printer, Share2, Loader2, PlusCircle, CheckCircle, ArrowLeft } from "lucide-react";
+import { Download, Printer, Share2, Loader2, PlusCircle, CheckCircle, ArrowLeft, Trash2 } from "lucide-react";
 import { useSearchParams, notFound, useRouter } from "next/navigation";
 import * as React from "react";
 import { useRef, Suspense } from "react";
 // Dynamic imports for browser-only libraries handled in the function to avoid SSR initialization errors
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, runTransaction } from "firebase/firestore";
 import type { Receipt, BusinessInstance } from "@/types";
 import { usePOS } from "@/context/pos-context";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
+import { logAuditEvent } from "@/lib/audit";
+import { safeToDate } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Link from 'next/link';
 
 function InvoiceContent() {
@@ -19,11 +22,14 @@ function InvoiceContent() {
     const searchParams = useSearchParams();
     const invoiceId = searchParams.get('id');
     const router = useRouter();
-    const { business: posBusiness, user, receipts } = usePOS();
+    const { business: posBusiness, user, receipts, currentUserProfile, voidReceipt } = usePOS();
 
     const firestore = useFirestore();
     const invoiceRef = useMemoFirebase(() => (firestore && invoiceId ? doc(firestore, 'receipts', invoiceId) : null), [firestore, invoiceId]);
     const { data: firestoreInvoice, isLoading: isInvoiceLoading } = useDoc<Receipt>(invoiceRef);
+
+    const [isVoidDialogOpen, setIsVoidDialogOpen] = React.useState(false);
+    const [isVoiding, setIsVoiding] = React.useState(false);
 
     const invoice = React.useMemo(() => {
         if (firestoreInvoice) return firestoreInvoice;
@@ -44,6 +50,16 @@ function InvoiceContent() {
     React.useEffect(() => {
         setMounted(true);
     }, []);
+
+    const canVoid = Boolean(
+        (currentUserProfile || user) && (
+            currentUserProfile?.role === 'admin' ||
+            currentUserProfile?.role === 'manager' ||
+            (currentUserProfile?.role as string) === 'owner' ||
+            (business?.ownerId && (user?.uid === business.ownerId || currentUserProfile?.id === business.ownerId)) ||
+            currentUserProfile?.permissions?.void_sales === true
+        )
+    );
 
     const isLoading = isInvoiceLoading || (invoice && !business && isBusinessLoading);
 
@@ -124,6 +140,91 @@ function InvoiceContent() {
         }
     };
 
+    const handleVoidInvoice = async () => {
+        if (!invoice || !firestore || !business) return;
+        setIsVoiding(true);
+
+        try {
+            await runTransaction(firestore, async (transaction) => {
+                const receiptRef = doc(firestore, 'receipts', invoice.id);
+                const receiptDoc = await transaction.get(receiptRef);
+
+                if (!receiptDoc.exists()) {
+                    throw new Error("Invoice not found. It may have already been deleted.");
+                }
+
+                const receiptData = receiptDoc.data() as Receipt;
+
+                // 1. Read product docs and customer doc
+                const productRefs = (receiptData.items || []).map(item => doc(firestore, 'products', item.productId));
+                const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
+
+                let customerDoc = null;
+                if (receiptData.customer?.id && business.settings?.loyaltyProgramEnabled) {
+                    const customerRef = doc(firestore, 'customers', receiptData.customer.id);
+                    customerDoc = await transaction.get(customerRef);
+                }
+
+                // 2. Restore product stock
+                productDocs.forEach((pDoc, index) => {
+                    if (pDoc.exists()) {
+                        const item = receiptData.items[index];
+                        const newStock = (pDoc.data().stock || 0) + item.quantity;
+                        transaction.update(pDoc.ref, { stock: newStock });
+                    }
+                });
+
+                // 3. Revert loyalty points
+                if (customerDoc && customerDoc.exists()) {
+                    const pointsPerUnit = business.settings?.pointsPerUnit || 0;
+                    const pointsEarned = Math.floor(receiptData.total * pointsPerUnit);
+                    const currentPoints = customerDoc.data()?.loyaltyPoints || 0;
+                    transaction.update(customerDoc.ref, { loyaltyPoints: Math.max(0, currentPoints - pointsEarned) });
+                }
+
+                // 4. Delete invoice document
+                transaction.delete(receiptRef);
+            });
+
+            const actor = currentUserProfile || (user as any);
+            if (actor) {
+                await logAuditEvent(firestore, business.id, actor, {
+                    action: 'sale.void',
+                    entity: { type: 'Receipt', id: invoice.id, name: `Invoice ${invoice.id.substring(0, 8)}` },
+                    details: {
+                        total: invoice.total,
+                        reason: 'Manual void by user on invoice details page',
+                        saleCreatedAt: safeToDate(invoice.createdAt).toISOString(),
+                        soldBy: invoice.createdBy || undefined,
+                        receiptNumber: invoice.receiptNumber || null,
+                        paymentMethod: 'Invoice',
+                    }
+                });
+            }
+
+            toast({
+                title: "Invoice Voided",
+                description: `Invoice ${invoice.receiptNumber || invoice.id.substring(0, 8)} was voided and inventory was restored.`,
+                variant: 'success'
+            });
+
+            await voidReceipt(invoice.id);
+            router.push('/invoices');
+        } catch (e: any) {
+            console.error("Failed to void invoice:", e);
+            await voidReceipt(invoice.id);
+            toast({
+                title: "Void Queued",
+                description: "Invoice was removed locally and will sync once back online.",
+                variant: 'default'
+            });
+            router.push('/invoices');
+        } finally {
+            setIsVoiding(false);
+            setIsVoidDialogOpen(false);
+        }
+    };
+
     return (
         <div className="flex flex-col items-center gap-6 py-4 min-h-screen">
             {user && (
@@ -146,6 +247,11 @@ function InvoiceContent() {
                         <CheckCircle className="mr-2 h-4 w-4" /> Mark as Paid
                     </Button>
                 )}
+                {user && canVoid && (
+                    <Button onClick={() => setIsVoidDialogOpen(true)} variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                        <Trash2 className="mr-2 h-4 w-4" /> Void Invoice
+                    </Button>
+                )}
                 {user && (
                     <Button asChild variant="outline">
                         <Link href="/sales/pos/select-products"><PlusCircle className="mr-2 h-4 w-4" /> New Sale</Link>
@@ -161,6 +267,26 @@ function InvoiceContent() {
                     <Share2 className="mr-2 h-4 w-4" /> Share
                 </Button>
             </div>
+
+            {/* Void Invoice Confirmation Dialog */}
+            <Dialog open={isVoidDialogOpen} onOpenChange={(open) => !open && !isVoiding && setIsVoidDialogOpen(false)} modal={false}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Void this invoice?</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to void invoice #{invoice.receiptNumber || invoice.id.substring(0, 8)}? 
+                            This will permanently delete the invoice, restore product stock to your inventory, and deduct any earned loyalty points. This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsVoidDialogOpen(false)} disabled={isVoiding}>Cancel</Button>
+                        <Button onClick={handleVoidInvoice} disabled={isVoiding} variant="destructive">
+                            {isVoiding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Void Invoice
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Subtle Footer CTA for visitors */}
             <footer className="w-full max-w-2xl mt-auto pt-6 pb-4 border-t text-center no-print">

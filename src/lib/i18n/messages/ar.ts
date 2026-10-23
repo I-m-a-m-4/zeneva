@@ -2071,6 +2071,19 @@ const ar: Messages = {
     tacticalVaultLocked: 'الخزنة التكتيكية مُقفلة',
     backgroundAlt: 'خلفية الاستخبارات التكتيكية',
   },
+  invoices: {
+    voidInvoice: "إلغاء الفاتورة",
+    voidConfirmTitle: "هل تريد إلغاء هذه الفاتورة؟",
+    voidConfirmBody: "هل أنت متأكد من رغبتك في إلغاء الفاتورة {invoice}؟ سيؤدي هذا إلى حذف الفاتورة نهائياً واستعادة المخزون وخصم نقاط الولاء المكتسبة.",
+    voidedTitle: "تم إلغاء الفاتورة",
+    voidedDescription: "تم إلغاء الفاتورة {invoice} بنجاح واستعادة المخزون.",
+    offlineVoidTitle: "تمت جدولة الإلغاء دون اتصال",
+    offlineVoidDescription: "تم إلغاء الفاتورة محلياً وستتم المزامنة عند الاتصال بالإنترنت.",
+    voidSelected: "إلغاء المحددة ({count})",
+    voidMultipleTitle: "إلغاء فواتير متعددة",
+    voidMultipleBody: "هل أنت متأكد من رغبتك في إلغاء {count} فاتورة محددة؟ سيتم حذف الفواتير نهائياً واستعادة المخزون.",
+    voidAllSelected: "إلغاء كل المحدد",
+  },
 };
 
 export default ar;

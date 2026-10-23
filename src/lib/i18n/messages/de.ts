@@ -2106,6 +2106,19 @@ const de: Messages = {
     tacticalVaultLocked: 'Taktischer Tresor gesperrt',
     backgroundAlt: 'Hintergrund „Taktische Intelligenz"',
   },
+  invoices: {
+    voidInvoice: "Rechnung stornieren",
+    voidConfirmTitle: "Diese Rechnung stornieren?",
+    voidConfirmBody: "Sind Sie sicher, dass Sie die Rechnung {invoice} stornieren möchten? Dadurch wird die Rechnung dauerhaft gelöscht, der Lagerbestand wiederhergestellt und Treuepunkte abgezogen.",
+    voidedTitle: "Rechnung storniert",
+    voidedDescription: "Rechnung {invoice} wurde dauerhaft storniert und der Lagerbestand wiederhergestellt.",
+    offlineVoidTitle: "Stornierung offline vorgemerkt",
+    offlineVoidDescription: "Rechnung lokal storniert; Synchronisierung erfolgt, sobald Sie wieder online sind.",
+    voidSelected: "Ausgewählte stornieren ({count})",
+    voidMultipleTitle: "Mehrere Rechnungen stornieren",
+    voidMultipleBody: "Sind Sie sicher, dass Sie die {count} ausgewählten Rechnungen stornieren möchten? Dies stellt den Lagerbestand wieder her und löscht die Rechnungen.",
+    voidAllSelected: "Alle ausgewählten stornieren",
+  },
 };
 
 export default de;

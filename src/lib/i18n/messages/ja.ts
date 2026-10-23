@@ -2048,6 +2048,19 @@ const ja: Messages = {
     tacticalVaultLocked: '戦術金庫はロック中',
     backgroundAlt: '戦術インテリジェンスの背景',
   },
+  invoices: {
+    voidInvoice: "請求書を無効化",
+    voidConfirmTitle: "この請求書を無効化しますか？",
+    voidConfirmBody: "請求書 {invoice} を無効化してもよろしいですか？これにより請求書が完全に削除され、在庫数が復元されます。",
+    voidedTitle: "請求書が無効化されました",
+    voidedDescription: "請求書 {invoice} は無効化され、在庫が復元されました。",
+    offlineVoidTitle: "オフライン無効化を保留中",
+    offlineVoidDescription: "ローカルで無効化されました。オンライン復帰時に同期されます。",
+    voidSelected: "選択した項目を無効化 ({count})",
+    voidMultipleTitle: "複数の請求書を無効化",
+    voidMultipleBody: "選択された {count} 件の請求書を無効化してもよろしいですか？在庫が復元されます。",
+    voidAllSelected: "選択したすべてを無効化",
+  },
 };
 
 export default ja;
