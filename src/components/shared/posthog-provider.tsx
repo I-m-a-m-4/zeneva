@@ -33,8 +33,17 @@ function initPostHog() {
         maskTextSelector: '.sensitive-data',
       },
       loaded: (ph) => {
+        const isTauri = typeof window !== 'undefined' && (
+          !!(window as any).__TAURI_INTERNALS__ || 
+          window.location.protocol === 'tauri:' || 
+          window.location.hostname === 'tauri.localhost'
+        );
+        ph.register({
+          platform: isTauri ? 'desktop' : 'web',
+          app_type: isTauri ? 'windows_desktop' : 'web_browser',
+        });
         if (process.env.NODE_ENV === 'development') {
-          console.log('[PostHog] Initialized successfully with session replay.');
+          console.log('[PostHog] Initialized successfully. Platform:', isTauri ? 'desktop' : 'web');
         }
       },
     });
