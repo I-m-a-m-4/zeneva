@@ -114,7 +114,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import html2canvas from 'html2canvas';
 import Image from 'next/image';
 import {
@@ -6889,7 +6889,7 @@ export default function AdminDashboardPage() {
     const { data: services } = useCollection<any>(servicesQuery);
     const { data: directInvoices } = useCollection<any>(directInvoicesQuery);
 
-    const invoices = React.useMemo(() => {
+    const invoices = useMemo(() => {
         const fromReceipts = (receipts || []).filter((r: any) => 
             r.type === 'invoice' || 
             r.paymentMethod === 'Invoice' || 
