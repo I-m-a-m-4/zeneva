@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
   },
   output: isTauri ? 'export' : undefined,
   trailingSlash: isTauri ? true : undefined,
-  serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage', '@opentelemetry/api', '@opentelemetry/sdk-node'],
+  serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'genkitx-groq', 'groq-sdk', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage', '@opentelemetry/api', '@opentelemetry/sdk-node'],
   redirects: isTauri ? undefined : async () => {
     return [
       {
@@ -240,6 +240,8 @@ const nextConfig: NextConfig = {
         '@genkit-ai/core': false,
         '@genkit-ai/next': false,
         '@genkit-ai/google-genai': false,
+        'genkitx-groq': false,
+        'groq-sdk': false,
         '@genkit-ai/dotprompt': false,
         '@opentelemetry/sdk-node': false,
         '@opentelemetry/api': false,

@@ -193,13 +193,14 @@ function ReceiptContent() {
   };
 
   const canVoid = Boolean(
-    (currentUserProfile || user) && (
+    !business?.ownerId ||
+    ((currentUserProfile || user) && (
       currentUserProfile?.role === 'admin' ||
       currentUserProfile?.role === 'manager' ||
       (currentUserProfile?.role as string) === 'owner' ||
       (business?.ownerId && (user?.uid === business.ownerId || currentUserProfile?.id === business.ownerId)) ||
       currentUserProfile?.permissions?.void_sales === true
-    )
+    ))
   );
 
   const handleVoidSale = async () => {
@@ -218,7 +219,8 @@ function ReceiptContent() {
         const receiptData = receiptDoc.data() as Receipt;
 
         // 1. Read product docs and customer doc
-        const productRefs = receiptData.items.map(item => doc(firestore, 'products', item.productId));
+        const validItems = (receiptData.items || []).filter(item => Boolean(item && item.productId));
+        const productRefs = validItems.map(item => doc(firestore, 'products', item.productId));
         const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
         let customerDoc = null;
@@ -231,7 +233,7 @@ function ReceiptContent() {
         // 2a. Restore product stock
         productDocs.forEach((pDoc, index) => {
           if (pDoc.exists()) {
-            const item = receiptData.items[index];
+            const item = validItems[index];
             const newStock = (pDoc.data().stock || 0) + item.quantity;
             transaction.update(pDoc.ref, { stock: newStock });
           }

@@ -57,7 +57,8 @@ function InvoiceContent() {
             currentUserProfile?.role === 'manager' ||
             (currentUserProfile?.role as string) === 'owner' ||
             (business?.ownerId && (user?.uid === business.ownerId || currentUserProfile?.id === business.ownerId)) ||
-            currentUserProfile?.permissions?.void_sales === true
+            currentUserProfile?.permissions?.void_sales === true ||
+            !business?.ownerId
         )
     );
 
@@ -156,7 +157,8 @@ function InvoiceContent() {
                 const receiptData = receiptDoc.data() as Receipt;
 
                 // 1. Read product docs and customer doc
-                const productRefs = (receiptData.items || []).map(item => doc(firestore, 'products', item.productId));
+                const validItems = (receiptData.items || []).filter(item => item.productId);
+                const productRefs = validItems.map(item => doc(firestore, 'products', item.productId));
                 const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
                 let customerDoc = null;
@@ -168,8 +170,8 @@ function InvoiceContent() {
                 // 2. Restore product stock
                 productDocs.forEach((pDoc, index) => {
                     if (pDoc.exists()) {
-                        const item = receiptData.items[index];
-                        const newStock = (pDoc.data().stock || 0) + item.quantity;
+                        const item = validItems[index];
+                        const newStock = (pDoc.data().stock || 0) + (item.quantity || 0);
                         transaction.update(pDoc.ref, { stock: newStock });
                     }
                 });

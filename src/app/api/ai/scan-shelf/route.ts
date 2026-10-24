@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { getVisionModel, isAIConfigured, getActiveAIProvider } from '@/ai/provider';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
@@ -30,18 +31,21 @@ export async function POST(req: Request) {
         return fail(400, "Missing image or products array");
     }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!apiKey) {
-      return fail(500, "AI is not configured");
+    if (!isAIConfigured()) {
+      const provider = getActiveAIProvider();
+      return fail(500, `AI is not configured (missing ${provider === 'groq' ? 'GROQ_API_KEY' : 'GOOGLE_GENERATIVE_AI_API_KEY'})`);
     }
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    // Preserved Gemini direct instance:
+    // const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || '' });
+    const model = getVisionModel();
 
     // Format the list of products for the prompt
     const productList = products.map((p: any) => `- ${p.name} (ID: ${p.id})`).join('\n');
 
     const { object } = await generateObject({
-      model: google('gemini-1.5-flash-latest'),
+      // Uses Groq vision (llama-3.2-11b-vision-preview) by default, preserving google('gemini-1.5-flash-latest')
+      model,
       schema: z.object({
         counts: z.array(z.object({
             id: z.string().describe("The ID of the product from the provided list"),

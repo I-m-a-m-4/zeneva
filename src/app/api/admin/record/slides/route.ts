@@ -47,6 +47,8 @@ import {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+import { getActiveAIProvider, getActiveApiKey, isAIConfigured } from '@/ai/provider';
+
 const API_ROOT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
@@ -62,7 +64,7 @@ const TIMEOUT_MS = 45_000;
 const BRIEF_MAX = 400;
 
 function apiKey(): string | null {
-    return process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || null;
+    return getActiveApiKey() || null;
 }
 
 /**
@@ -161,9 +163,10 @@ export async function POST(req: Request) {
     }
 
     const key = apiKey();
+    const provider = getActiveAIProvider();
     if (!key) {
         return NextResponse.json({
-            error: 'No Gemini key on this machine. Use "Copy the prompt" instead and '
+            error: `No ${provider === 'groq' ? 'Groq' : 'Gemini'} key on this machine. Use "Copy the prompt" instead and `
                 + 'paste the reply back — that path needs no key.',
         }, { status: 409, headers: corsHeaders });
     }
@@ -179,38 +182,75 @@ export async function POST(req: Request) {
     const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
     let raw: unknown;
     try {
-        const res = await fetch(`${API_ROOT}/${MODEL}:generateContent`, {
-            method: 'POST',
-            signal: ctl.signal,
-            headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: buildPrompt(body) }] }],
-                generationConfig: {
-                    responseMimeType: 'application/json',
-                    responseSchema: SCHEMA,
-                    // Ad copy wants some spread; the schema keeps the shape fixed
-                    // regardless, so temperature only affects the words.
-                    temperature: 1,
+        let text = '';
+        if (provider === 'groq') {
+            const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                signal: ctl.signal,
+                headers: {
+                    'content-type': 'application/json',
+                    'authorization': `Bearer ${key}`,
                 },
-            }),
-        });
+                body: JSON.stringify({
+                    model: 'openai/gpt-oss-120b',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are an advertising copywriter for Zeneva. Return valid JSON matching {"opening": {"line1": string, "line2": string}, "closing": {"line1": string, "line2": string}}.',
+                        },
+                        {
+                            role: 'user',
+                            content: buildPrompt(body),
+                        },
+                    ],
+                    response_format: { type: 'json_object' },
+                    temperature: 0.7,
+                }),
+            });
 
-        if (!res.ok) {
-            let detail = `Gemini answered ${res.status}`;
-            try {
-                const err = await res.json();
-                detail = err?.error?.message || detail;
-            } catch { /* the status alone is the message */ }
-            // The key is never echoed, and neither is the request — only the
-            // API's own complaint, which is what the operator can act on.
-            return NextResponse.json({ error: detail }, { status: 502, headers: corsHeaders });
+            if (!res.ok) {
+                let detail = `Groq answered ${res.status}`;
+                try {
+                    const err = await res.json();
+                    detail = err?.error?.message || detail;
+                } catch { /* the status alone is the message */ }
+                return NextResponse.json({ error: detail }, { status: 502, headers: corsHeaders });
+            }
+
+            const payload = await res.json();
+            text = payload?.choices?.[0]?.message?.content ?? '';
+        } else {
+            // Preserved Google Gemini generateContent call
+            const res = await fetch(`${API_ROOT}/${MODEL}:generateContent`, {
+                method: 'POST',
+                signal: ctl.signal,
+                headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: buildPrompt(body) }] }],
+                    generationConfig: {
+                        responseMimeType: 'application/json',
+                        responseSchema: SCHEMA,
+                        temperature: 1,
+                    },
+                }),
+            });
+
+            if (!res.ok) {
+                let detail = `Gemini answered ${res.status}`;
+                try {
+                    const err = await res.json();
+                    detail = err?.error?.message || detail;
+                } catch { /* the status alone is the message */ }
+                return NextResponse.json({ error: detail }, { status: 502, headers: corsHeaders });
+            }
+
+            const payload = await res.json();
+            text = payload?.candidates?.[0]?.content?.parts
+                ?.map((p: { text?: string }) => p?.text)
+                .filter(Boolean)
+                .join('') ?? '';
         }
 
-        const payload = await res.json();
-        const text = payload?.candidates?.[0]?.content?.parts
-            ?.map((p: { text?: string }) => p?.text)
-            .filter(Boolean)
-            .join('') ?? '';
         if (!text) {
             return NextResponse.json(
                 { error: 'The model returned nothing. Try again, or write the slides by hand.' },

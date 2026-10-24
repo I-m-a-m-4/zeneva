@@ -280,15 +280,36 @@ export default function PurchaseOrdersPage() {
 
     try {
       // 1. Delete from purchaseOrders subcollection
-      const orderRef = doc(firestore, 'businessInstances', business.id, 'purchaseOrders', orderToDelete.id);
-      await deleteDoc(orderRef);
+      await deleteDoc(doc(firestore, 'businessInstances', business.id, 'purchaseOrders', orderToDelete.id)).catch(() => {});
 
-      // Also delete from top-level supplier_purchases if it exists
-      try {
-        await deleteDoc(doc(firestore, 'supplier_purchases', orderToDelete.id));
-      } catch (e) {}
+      // 2. Also delete from top-level supplier_purchases if it exists
+      await deleteDoc(doc(firestore, 'supplier_purchases', orderToDelete.id)).catch(() => {});
 
-      // 2. If it was already received and products exist, revert stock
+      // 3. Search and delete any matching purchase order by purchaseNumber/poNumber in both places
+      if (orderToDelete.purchaseNumber) {
+        try {
+          const poSnap = await getDocs(query(
+            collection(firestore, 'businessInstances', business.id, 'purchaseOrders'),
+            where('purchaseNumber', '==', orderToDelete.purchaseNumber)
+          ));
+          for (const d of poSnap.docs) {
+            await deleteDoc(d.ref).catch(() => {});
+          }
+        } catch (e) {}
+
+        try {
+          const spSnap = await getDocs(query(
+            collection(firestore, 'supplier_purchases'),
+            where('businessId', '==', business.id),
+            where('poNumber', '==', orderToDelete.purchaseNumber)
+          ));
+          for (const d of spSnap.docs) {
+            await deleteDoc(d.ref).catch(() => {});
+          }
+        } catch (e) {}
+      }
+
+      // 4. If it was already received and products exist, revert stock
       if (orderToDelete.status === 'received' && orderToDelete.items?.length > 0 && products) {
         orderToDelete.items.forEach(item => {
           if (item.productId) {
@@ -314,7 +335,7 @@ export default function PurchaseOrdersPage() {
                   closingStock: newStock,
                   notes: `Reversal of deleted PO #${orderToDelete.purchaseNumber}`,
                   referenceId: orderToDelete.id,
-                  createdBy: 'System',
+                  createdBy: currentUserProfile?.name || 'System',
                   date: new Date()
                 }
               }, `Logging stock reversal transaction for ${currentProd.name}`);
@@ -323,7 +344,7 @@ export default function PurchaseOrdersPage() {
         });
       }
 
-      // 3. Delete any linked expenses matching this PO number
+      // 5. Delete any linked expenses matching this PO number or order id
       if (orderToDelete.purchaseNumber) {
         try {
           const expQuery = query(
@@ -333,14 +354,31 @@ export default function PurchaseOrdersPage() {
           );
           const expSnap = await getDocs(expQuery);
           for (const d of expSnap.docs) {
-            await deleteDoc(d.ref);
+            await deleteDoc(d.ref).catch(() => {});
           }
         } catch (e) {}
       }
 
+      if (orderToDelete.id && orderToDelete.id !== orderToDelete.purchaseNumber) {
+        try {
+          const expQuery2 = query(
+            collection(firestore, 'expenses'),
+            where('businessId', '==', business.id),
+            where('referenceId', '==', orderToDelete.id)
+          );
+          const expSnap2 = await getDocs(expQuery2);
+          for (const d of expSnap2.docs) {
+            await deleteDoc(d.ref).catch(() => {});
+          }
+        } catch (e) {}
+      }
+
+      // 6. Optimistic state removal
+      setOrders(prev => prev.filter(o => o.id !== orderToDelete.id && (orderToDelete.purchaseNumber ? o.purchaseNumber !== orderToDelete.purchaseNumber : true)));
+
       toast({
         title: 'Purchase Order Deleted',
-        description: `Order ${orderToDelete.purchaseNumber} has been removed successfully.`
+        description: `Order ${orderToDelete.purchaseNumber || ''} has been removed successfully.`
       });
       setOrderToDelete(null);
     } catch (err: any) {

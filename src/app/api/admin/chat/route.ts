@@ -18,6 +18,7 @@
  */
 
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { getChatModel, google as sharedGoogle, isAIConfigured, getActiveAIProvider } from '@/ai/provider';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { NextResponse } from 'next/server';
 import { adminFirestore } from '@/firebase/admin';
@@ -27,7 +28,8 @@ import { createCapTableTools } from './cap-table-tools';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const google = createGoogleGenerativeAI({
+// Preserved Google Generative AI instance
+const google = sharedGoogle || createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });
 
@@ -151,8 +153,17 @@ export async function POST(req: Request) {
     );
   }
 
+  if (!isAIConfigured()) {
+    const provider = getActiveAIProvider();
+    return NextResponse.json(
+      { error: `AI service awaiting configuration: please set ${provider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY'}.` },
+      { status: 503, headers: corsHeaders },
+    );
+  }
+
   const result = streamText({
-    model: google('gemini-3.6-flash'),
+    // Uses Groq by default, preserves google('gemini-3.6-flash')
+    model: getChatModel(),
     system: SYSTEM_PROMPT,
     messages: modelMessages,
     // Lower than the merchant route's 24. These tools are few and cheap, and a

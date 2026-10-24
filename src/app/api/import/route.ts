@@ -46,6 +46,7 @@
 
 import { NextResponse } from 'next/server';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { getChatModel, isAIConfigured, getActiveAIProvider } from '@/ai/provider';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -603,8 +604,10 @@ export async function POST(req: Request) {
     return fail(429, 'Zeneva is at its AI limit for today. Spreadsheet and paste imports still work — they do not use AI.');
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return fail(500, 'AI is not configured on this server.');
+  if (!isAIConfigured()) {
+    const provider = getActiveAIProvider();
+    return fail(500, `AI is not configured on this server (missing ${provider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY'}).`);
+  }
 
   // ── Payment, up front, inside a transaction. ──
   const floor = IMPORT_CREDIT_FLOORS[action];
@@ -635,8 +638,10 @@ export async function POST(req: Request) {
     });
   }
 
-  const google = createGoogleGenerativeAI({ apiKey });
-  const model = google(MODEL_ID);
+  // Preserved Gemini model instance for direct compatibility
+  // const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+  // const geminiModel = google(MODEL_ID);
+  const model = getChatModel();
 
   try {
     const result = await runAction(action, body, model);

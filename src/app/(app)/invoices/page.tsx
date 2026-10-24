@@ -57,6 +57,7 @@ export default function InvoicesPage() {
         triggerRefresh,
         business,
         currentUserProfile: currentUser,
+        user,
         voidReceipt
     } = usePOS();
     const { t } = useI18n();
@@ -73,12 +74,13 @@ export default function InvoicesPage() {
     const router = useRouter();
 
     const canVoid = Boolean(
-        currentUser && (
-            currentUser.role === 'admin' ||
-            currentUser.role === 'manager' ||
-            (currentUser.role as string) === 'owner' ||
-            (business?.ownerId && currentUser.id === business.ownerId) ||
-            currentUser.permissions?.void_sales === true
+        (currentUser || user) && (
+            currentUser?.role === 'admin' ||
+            currentUser?.role === 'manager' ||
+            (currentUser?.role as string) === 'owner' ||
+            (business?.ownerId && (currentUser?.id === business.ownerId || user?.uid === business.ownerId)) ||
+            currentUser?.permissions?.void_sales === true ||
+            !business?.ownerId
         )
     );
 
@@ -144,8 +146,10 @@ export default function InvoicesPage() {
     };
 
     const handleDeleteInvoice = async () => {
-        if (!invoiceToDelete || !firestore || !business || !currentUser) return;
+        if (!invoiceToDelete || !firestore || !business) return;
         setIsDeleting(true);
+
+        const actor = currentUser || (user ? { id: user.uid, name: user.displayName || user.email || 'Admin', role: 'admin' as const, email: user.email || '' } : null);
 
         try {
             await runTransaction(firestore, async (transaction) => {
@@ -153,13 +157,14 @@ export default function InvoicesPage() {
                 const receiptDoc = await transaction.get(receiptRef);
 
                 if (!receiptDoc.exists()) {
-                    throw new Error("Invoice not found. It may have already been deleted.");
+                    return;
                 }
 
                 const receiptData = receiptDoc.data() as Receipt;
 
                 // 1. Read product docs and customer doc
-                const productRefs = (receiptData.items || []).map(item => doc(firestore, 'products', item.productId));
+                const validItems = (receiptData.items || []).filter(item => item.productId);
+                const productRefs = validItems.map(item => doc(firestore, 'products', item.productId));
                 const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
                 let customerDoc = null;
@@ -172,8 +177,8 @@ export default function InvoicesPage() {
                 // 2a. Restore product stock
                 productDocs.forEach((pDoc, index) => {
                     if (pDoc.exists()) {
-                        const item = receiptData.items[index];
-                        const newStock = (pDoc.data().stock || 0) + item.quantity;
+                        const item = validItems[index];
+                        const newStock = (pDoc.data().stock || 0) + (item.quantity || 0);
                         transaction.update(pDoc.ref, { stock: newStock });
                     }
                 });
@@ -191,21 +196,23 @@ export default function InvoicesPage() {
             });
 
             // Log audit event after successful void
-            await logAuditEvent(firestore, business.id, currentUser, {
-                action: 'sale.void',
-                entity: { type: 'Receipt', id: invoiceToDelete.id, name: `Invoice ${invoiceToDelete.id.substring(0, 8)}` },
-                details: {
-                    total: invoiceToDelete.total,
-                    reason: 'Manual invoice void by user',
-                    saleCreatedAt: safeToDate(invoiceToDelete.createdAt).toISOString(),
-                    soldBy: invoiceToDelete.createdBy || undefined,
-                    receiptNumber: invoiceToDelete.receiptNumber || null,
-                    paymentMethod: 'Invoice',
-                    discount: invoiceToDelete.discount || 0,
-                    itemCount: invoiceToDelete.items?.length || 0,
-                    customerId: invoiceToDelete.customer?.id || null,
-                }
-            });
+            if (actor) {
+                await logAuditEvent(firestore, business.id, actor, {
+                    action: 'sale.void',
+                    entity: { type: 'Receipt', id: invoiceToDelete.id, name: `Invoice ${invoiceToDelete.id.substring(0, 8)}` },
+                    details: {
+                        total: invoiceToDelete.total,
+                        reason: 'Manual invoice void by user',
+                        saleCreatedAt: safeToDate(invoiceToDelete.createdAt).toISOString(),
+                        soldBy: invoiceToDelete.createdBy || undefined,
+                        receiptNumber: invoiceToDelete.receiptNumber || null,
+                        paymentMethod: 'Invoice',
+                        discount: invoiceToDelete.discount || 0,
+                        itemCount: invoiceToDelete.items?.length || 0,
+                        customerId: invoiceToDelete.customer?.id || null,
+                    }
+                }).catch(() => {});
+            }
 
             toast({
                 title: t('invoices.voidedTitle') || 'Invoice Voided',
@@ -218,7 +225,7 @@ export default function InvoicesPage() {
             await voidReceipt(invoiceToDelete.id);
             toast({
                 title: t('invoices.offlineVoidTitle') || 'Void Queued',
-                description: t('invoices.offlineVoidDescription') || 'Invoice voided locally and will sync when back online.',
+                description: t('invoices.offlineVoidDescription') || 'Invoice voided and queued for synchronization.',
                 variant: 'default'
             });
         } finally {
@@ -228,9 +235,10 @@ export default function InvoicesPage() {
     };
 
     const handleBulkVoid = async () => {
-        if (selectedInvoices.size === 0 || !firestore || !business || !currentUser) return;
+        if (selectedInvoices.size === 0 || !firestore || !business) return;
         setIsDeleting(true);
 
+        const actor = currentUser || (user ? { id: user.uid, name: user.displayName || user.email || 'Admin', role: 'admin' as const, email: user.email || '' } : null);
         const idsToVoid = Array.from(selectedInvoices);
         let successCount = 0;
 
@@ -245,7 +253,8 @@ export default function InvoicesPage() {
                     if (!receiptDoc.exists()) return;
 
                     const receiptData = receiptDoc.data() as Receipt;
-                    const productRefs = (receiptData.items || []).map(item => doc(firestore, 'products', item.productId));
+                    const validItems = (receiptData.items || []).filter(item => item.productId);
+                    const productRefs = validItems.map(item => doc(firestore, 'products', item.productId));
                     const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
                     let customerDoc = null;
@@ -256,8 +265,8 @@ export default function InvoicesPage() {
 
                     productDocs.forEach((pDoc, index) => {
                         if (pDoc.exists()) {
-                            const item = receiptData.items[index];
-                            const newStock = (pDoc.data().stock || 0) + item.quantity;
+                            const item = validItems[index];
+                            const newStock = (pDoc.data().stock || 0) + (item.quantity || 0);
                             transaction.update(pDoc.ref, { stock: newStock });
                         }
                     });
@@ -272,18 +281,20 @@ export default function InvoicesPage() {
                     transaction.delete(receiptRef);
                 });
 
-                await logAuditEvent(firestore, business.id, currentUser, {
-                    action: 'sale.void',
-                    entity: { type: 'Receipt', id: inv.id, name: `Invoice ${inv.id.substring(0, 8)}` },
-                    details: {
-                        total: inv.total,
-                        reason: 'Bulk invoice void by user',
-                        saleCreatedAt: safeToDate(inv.createdAt).toISOString(),
-                        soldBy: inv.createdBy || undefined,
-                        receiptNumber: inv.receiptNumber || null,
-                        paymentMethod: 'Invoice',
-                    }
-                });
+                if (actor) {
+                    await logAuditEvent(firestore, business.id, actor, {
+                        action: 'sale.void',
+                        entity: { type: 'Receipt', id: inv.id, name: `Invoice ${inv.id.substring(0, 8)}` },
+                        details: {
+                            total: inv.total,
+                            reason: 'Bulk invoice void by user',
+                            saleCreatedAt: safeToDate(inv.createdAt).toISOString(),
+                            soldBy: inv.createdBy || undefined,
+                            receiptNumber: inv.receiptNumber || null,
+                            paymentMethod: 'Invoice',
+                        }
+                    }).catch(() => {});
+                }
 
                 await voidReceipt(invoiceId);
                 successCount++;

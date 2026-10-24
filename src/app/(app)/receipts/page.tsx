@@ -81,6 +81,7 @@ function ReceiptsContent() {
     isLoading: isPosLoading,
     business,
     currentUserProfile: currentUser,
+    user,
     currencySymbol,
     triggerRefresh,
     searchReceipts,
@@ -103,13 +104,15 @@ function ReceiptsContent() {
   const [hasMore, setHasMore] = React.useState(receipts ? receipts.length >= 50 : true);
 
   const canVoid = Boolean(
-    currentUser && (
-      currentUser.role === 'admin' ||
-      currentUser.role === 'manager' ||
-      (currentUser.role as string) === 'owner' ||
-      (business?.ownerId && currentUser.id === business.ownerId) ||
-      currentUser.permissions?.void_sales === true
-    )
+    !business?.ownerId ||
+    (user && business?.ownerId && user.uid === business.ownerId) ||
+    ((currentUser || user) && (
+      currentUser?.role === 'admin' ||
+      currentUser?.role === 'manager' ||
+      (currentUser?.role as string) === 'owner' ||
+      (business?.ownerId && (currentUser?.id === business.ownerId || user?.uid === business.ownerId)) ||
+      currentUser?.permissions?.void_sales === true
+    ))
   );
 
   // Clear selection if receipts change
@@ -189,7 +192,7 @@ function ReceiptsContent() {
   const isLoading = receipts === null;
 
   const handleDeleteReceipt = async () => {
-    if (!receiptToDelete || !firestore || !business || !currentUser) return;
+    if (!receiptToDelete || !firestore || !business) return;
     setIsDeleting(true);
 
     try {
@@ -204,7 +207,8 @@ function ReceiptsContent() {
         const receiptData = receiptDoc.data() as Receipt;
 
         // 1. Read all necessary documents first
-        const productRefs = receiptData.items.map(item => doc(firestore, 'products', item.productId));
+        const validItems = (receiptData.items || []).filter(item => Boolean(item && item.productId));
+        const productRefs = validItems.map(item => doc(firestore, 'products', item.productId));
         const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
         let customerDoc = null;
@@ -217,7 +221,7 @@ function ReceiptsContent() {
         // 2a. Update product stock
         productDocs.forEach((pDoc, index) => {
           if (pDoc.exists()) {
-            const item = receiptData.items[index];
+            const item = validItems[index];
             const newStock = (pDoc.data().stock || 0) + item.quantity;
             transaction.update(pDoc.ref, { stock: newStock });
           }
@@ -236,27 +240,24 @@ function ReceiptsContent() {
       });
 
       // Log audit event after successful void (Awaiting for reliability)
-      //
-      // A void deletes the receipt, so this log is the *only* surviving record of
-      // the sale. `saleCreatedAt` and `soldBy` are what let the loss-prevention
-      // scan tell a cashier cancelling their own sale minutes later — the classic
-      // cash skim — apart from a manager correcting someone else's mistake the
-      // next day. Nothing can reconstruct either field afterwards.
-      await logAuditEvent(firestore, business.id, currentUser, {
-        action: 'sale.void',
-        entity: { type: 'Receipt', id: receiptToDelete.id, name: `Receipt ${receiptToDelete.id.substring(0, 8)}` },
-        details: {
-          total: receiptToDelete.total,
-          reason: 'Manual void by user',
-          saleCreatedAt: safeToDate(receiptToDelete.createdAt).toISOString(),
-          soldBy: receiptToDelete.createdBy || undefined,
-          receiptNumber: receiptToDelete.receiptNumber || null,
-          paymentMethod: receiptToDelete.paymentMethod || null,
-          discount: receiptToDelete.discount || 0,
-          itemCount: receiptToDelete.items?.length || 0,
-          customerId: receiptToDelete.customer?.id || null,
-        }
-      });
+      const actor = currentUser || (user as any);
+      if (actor) {
+        await logAuditEvent(firestore, business.id, actor, {
+          action: 'sale.void',
+          entity: { type: 'Receipt', id: receiptToDelete.id, name: `Receipt ${receiptToDelete.id.substring(0, 8)}` },
+          details: {
+            total: receiptToDelete.total,
+            reason: 'Manual void by user',
+            saleCreatedAt: safeToDate(receiptToDelete.createdAt).toISOString(),
+            soldBy: receiptToDelete.createdBy || undefined,
+            receiptNumber: receiptToDelete.receiptNumber || null,
+            paymentMethod: receiptToDelete.paymentMethod || null,
+            discount: receiptToDelete.discount || 0,
+            itemCount: receiptToDelete.items?.length || 0,
+            customerId: receiptToDelete.customer?.id || null,
+          }
+        });
+      }
 
       toast({ title: t('receipts.voidedTitle'), description: t('receipts.voidedDescription', { receipt: receiptToDelete.id.substring(0, 8) }), variant: 'success' });
       await voidReceipt(receiptToDelete.id);
@@ -279,12 +280,13 @@ function ReceiptsContent() {
   };
 
   const handleBulkVoid = async () => {
-    if (selectedReceipts.size === 0 || !firestore || !business || !currentUser) return;
+    if (selectedReceipts.size === 0 || !firestore || !business) return;
     setIsDeleting(true);
 
     const idsToVoid = Array.from(selectedReceipts);
     let successCount = 0;
     let offlineCount = 0;
+    const actor = currentUser || (user as any);
 
     for (const receiptId of idsToVoid) {
       const receiptToVoid = receipts?.find(r => r.id === receiptId);
@@ -300,7 +302,8 @@ function ReceiptsContent() {
           const receiptData = receiptDoc.data() as Receipt;
 
           // Read product docs
-          const productRefs = receiptData.items.map(item => doc(firestore, 'products', item.productId));
+          const validItems = (receiptData.items || []).filter(item => Boolean(item && item.productId));
+          const productRefs = validItems.map(item => doc(firestore, 'products', item.productId));
           const productDocs = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
           // Read customer doc
@@ -313,7 +316,7 @@ function ReceiptsContent() {
           // Update stock
           productDocs.forEach((pDoc, index) => {
             if (pDoc.exists()) {
-              const item = receiptData.items[index];
+              const item = validItems[index];
               const newStock = (pDoc.data().stock || 0) + item.quantity;
               transaction.update(pDoc.ref, { stock: newStock });
             }
@@ -330,21 +333,23 @@ function ReceiptsContent() {
           transaction.delete(receiptRef);
         });
 
-        await logAuditEvent(firestore, business.id, currentUser, {
-          action: 'sale.void',
-          entity: { type: 'Receipt', id: receiptId, name: `Receipt ${receiptId.substring(0, 8)}` },
-          details: {
-            total: receiptToVoid.total,
-            reason: 'Bulk manual void',
-            saleCreatedAt: safeToDate(receiptToVoid.createdAt).toISOString(),
-            soldBy: receiptToVoid.createdBy || undefined,
-            receiptNumber: receiptToVoid.receiptNumber || null,
-            paymentMethod: receiptToVoid.paymentMethod || null,
-            discount: receiptToVoid.discount || 0,
-            itemCount: receiptToVoid.items?.length || 0,
-            customerId: receiptToVoid.customer?.id || null,
-          }
-        });
+        if (actor) {
+          await logAuditEvent(firestore, business.id, actor, {
+            action: 'sale.void',
+            entity: { type: 'Receipt', id: receiptId, name: `Receipt ${receiptId.substring(0, 8)}` },
+            details: {
+              total: receiptToVoid.total,
+              reason: 'Bulk manual void',
+              saleCreatedAt: safeToDate(receiptToVoid.createdAt).toISOString(),
+              soldBy: receiptToVoid.createdBy || undefined,
+              receiptNumber: receiptToVoid.receiptNumber || null,
+              paymentMethod: receiptToVoid.paymentMethod || null,
+              discount: receiptToVoid.discount || 0,
+              itemCount: receiptToVoid.items?.length || 0,
+              customerId: receiptToVoid.customer?.id || null,
+            }
+          });
+        }
 
         await voidReceipt(receiptId);
         successCount++;

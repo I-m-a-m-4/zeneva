@@ -1,4 +1,5 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { getChatModel, google as sharedGoogle, getActiveAIProvider, isAIConfigured } from '@/ai/provider';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { adminAuth, adminFirestore } from '@/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -82,7 +83,8 @@ function textOf(message: any): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // AI Provider
 // ─────────────────────────────────────────────────────────────────────────────
-const google = createGoogleGenerativeAI({
+// Preserved Google Generative AI instance (can be switched via AI_PROVIDER=gemini)
+const google = sharedGoogle || createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });
 
@@ -449,6 +451,15 @@ export async function POST(req: Request) {
     });
   }
 
+  if (!isAIConfigured()) {
+    const provider = getActiveAIProvider();
+    return new Response(JSON.stringify({
+      error: `AI service is awaiting configuration: please provide ${provider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY'}.`,
+    }), {
+      status: 503, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   if (caller?.status === 'suspended') {
     return new Response(JSON.stringify({ error: 'This account is suspended.' }), {
       status: 403, headers: { 'Content-Type': 'application/json' },
@@ -632,7 +643,8 @@ export async function POST(req: Request) {
   const startedAt = Date.now();
 
   const result = streamText({
-    model: google('gemini-3.6-flash'),
+    // Uses Groq (e.g. llama-3.3-70b-versatile) by default, preserving google('gemini-3.6-flash')
+    model: getChatModel(),
     system: `${SYSTEM_PROMPT.replace(
       RATING_SECTION_TOKEN,
       ratingEnabled ? RATING_SECTION_ON : RATING_SECTION_OFF,

@@ -123,6 +123,7 @@ import {
   increment,
   writeBatch,
   getDocs,
+  setDoc,
 } from 'firebase/firestore';
 
 // ======================== EXPENSE DEFINITIONS ========================
@@ -1280,89 +1281,126 @@ function ExpensesAndPurchasesContent() {
     if (!firestore || !business?.id || !deletingPurchase) return;
     setSubmitting(true);
     try {
-      const batch = writeBatch(firestore);
+      // 1. Delete purchase order doc from supplier_purchases
+      await deleteDoc(doc(firestore, 'supplier_purchases', deletingPurchase.id)).catch((err) => {
+        console.warn('Could not delete from supplier_purchases:', err);
+      });
 
-      // 1. Delete purchase order doc
-      const purchaseRef = doc(firestore, 'supplier_purchases', deletingPurchase.id);
-      batch.delete(purchaseRef);
+      // 2. Also delete from legacy/subcollection purchaseOrders if present
+      await deleteDoc(doc(firestore, 'businessInstances', business.id, 'purchaseOrders', deletingPurchase.id)).catch(() => {});
 
-      // 2. Also check if it exists in legacy purchaseOrders subcollection and delete it
-      try {
-        const legacyRef = doc(firestore, 'businessInstances', business.id, 'purchaseOrders', deletingPurchase.id);
-        batch.delete(legacyRef);
-      } catch (e) {
-        // ignore if not present
+      // 3. Search and delete any matching purchase order by poNumber in both places
+      if (deletingPurchase.poNumber) {
+        try {
+          const poSnap = await getDocs(query(
+            collection(firestore, 'businessInstances', business.id, 'purchaseOrders'),
+            where('purchaseNumber', '==', deletingPurchase.poNumber)
+          ));
+          for (const d of poSnap.docs) {
+            await deleteDoc(d.ref).catch(() => {});
+          }
+        } catch (e) {}
+
+        try {
+          const spSnap = await getDocs(query(
+            collection(firestore, 'supplier_purchases'),
+            where('businessId', '==', business.id),
+            where('poNumber', '==', deletingPurchase.poNumber)
+          ));
+          for (const d of spSnap.docs) {
+            if (d.id !== deletingPurchase.id) {
+              await deleteDoc(d.ref).catch(() => {});
+            }
+          }
+        } catch (e) {}
       }
 
-      // 3. Rollback supplier totals (totalPurchased & totalDebt)
+      // 4. Query and delete associated expenses that were auto-created for this purchase order
+      // (This directly cleans up supplier payment expenses affecting net profit)
+      if (deletingPurchase.poNumber) {
+        try {
+          const expQuery = query(
+            collection(firestore, 'expenses'),
+            where('businessId', '==', business.id),
+            where('referenceId', '==', deletingPurchase.poNumber)
+          );
+          const expSnap = await getDocs(expQuery);
+          for (const d of expSnap.docs) {
+            await deleteDoc(d.ref).catch(() => {});
+          }
+        } catch (e) {}
+      }
+
+      if (deletingPurchase.id && deletingPurchase.id !== deletingPurchase.poNumber) {
+        try {
+          const expQuery2 = query(
+            collection(firestore, 'expenses'),
+            where('businessId', '==', business.id),
+            where('referenceId', '==', deletingPurchase.id)
+          );
+          const expSnap2 = await getDocs(expQuery2);
+          for (const d of expSnap2.docs) {
+            await deleteDoc(d.ref).catch(() => {});
+          }
+        } catch (e) {}
+      }
+
+      // 5. Rollback supplier totals (totalPurchased & totalDebt)
       if (deletingPurchase.supplierId) {
-        const supplierRef = doc(firestore, 'suppliers', deletingPurchase.supplierId);
-        batch.update(supplierRef, {
-          totalPurchased: increment(-(deletingPurchase.totalAmount || 0)),
-          totalDebt: increment(-(deletingPurchase.balanceDue || 0)),
-          updatedAt: serverTimestamp(),
-        });
+        try {
+          const supplierRef = doc(firestore, 'suppliers', deletingPurchase.supplierId);
+          await updateDoc(supplierRef, {
+            totalPurchased: increment(-(deletingPurchase.totalAmount || 0)),
+            totalDebt: increment(-(deletingPurchase.balanceDue || 0)),
+            updatedAt: serverTimestamp(),
+          });
+        } catch (e) {
+          try {
+            const subSupRef = doc(firestore, 'businessInstances', business.id, 'suppliers', deletingPurchase.supplierId);
+            await updateDoc(subSupRef, {
+              totalPurchased: increment(-(deletingPurchase.totalAmount || 0)),
+              totalDebt: increment(-(deletingPurchase.balanceDue || 0)),
+              updatedAt: serverTimestamp(),
+            });
+          } catch (e2) {}
+        }
       }
 
-      // 4. If the order was marked received and autoRestock was true, revert product stock
+      // 6. If the order was marked received and autoRestock was true, revert product stock
       if (deletingPurchase.status === 'received' && deletingPurchase.autoRestock !== false && deletingPurchase.items?.length > 0) {
         for (const item of deletingPurchase.items) {
           if (item.productId) {
-            const productRef = doc(firestore, 'products', item.productId);
             const qtyToRevert = item.quantityReceived || item.quantityOrdered || 0;
             if (qtyToRevert > 0) {
-              batch.update(productRef, {
-                stock: increment(-qtyToRevert),
-                updatedAt: serverTimestamp(),
-              });
+              try {
+                const productRef = doc(firestore, 'products', item.productId);
+                await updateDoc(productRef, {
+                  stock: increment(-qtyToRevert),
+                  updatedAt: serverTimestamp(),
+                });
 
-              // Log reversal inventory transaction
-              const txRef = doc(collection(firestore, 'inventory_transactions'));
-              batch.set(txRef, {
-                businessId: business.id,
-                productId: item.productId,
-                productName: item.productName || 'Unknown',
-                type: 'out',
-                quantity: qtyToRevert,
-                date: serverTimestamp(),
-                notes: `Stock reversal for deleted PO #${deletingPurchase.poNumber || deletingPurchase.id.substring(0, 8)}`,
-                referenceId: deletingPurchase.id,
-                createdBy: currentUserProfile?.name || 'System'
-              });
+                const txRef = doc(collection(firestore, 'inventory_transactions'));
+                await setDoc(txRef, {
+                  businessId: business.id,
+                  productId: item.productId,
+                  productName: item.productName || 'Unknown',
+                  type: 'out',
+                  quantity: qtyToRevert,
+                  date: serverTimestamp(),
+                  notes: `Stock reversal for deleted PO #${deletingPurchase.poNumber || deletingPurchase.id.substring(0, 8)}`,
+                  referenceId: deletingPurchase.id,
+                  createdBy: currentUserProfile?.name || 'System'
+                });
+              } catch (e) {}
             }
           }
         }
       }
 
-      // 5. Query and delete associated expenses that were auto-created for this purchase order
-      // (This directly fixes the issue where net profit in reports was deducting supplier payments!)
-      if (deletingPurchase.poNumber) {
-        const expQuery = query(
-          collection(firestore, 'expenses'),
-          where('businessId', '==', business.id),
-          where('referenceId', '==', deletingPurchase.poNumber)
-        );
-        const expSnap = await getDocs(expQuery);
-        expSnap.forEach(d => {
-          batch.delete(d.ref);
-        });
-      }
+      // 7. Optimistic local state update
+      setPurchases(prev => prev.filter(p => p.id !== deletingPurchase.id && (deletingPurchase.poNumber ? p.poNumber !== deletingPurchase.poNumber : true)));
 
-      if (deletingPurchase.id && deletingPurchase.id !== deletingPurchase.poNumber) {
-        const expQuery2 = query(
-          collection(firestore, 'expenses'),
-          where('businessId', '==', business.id),
-          where('referenceId', '==', deletingPurchase.id)
-        );
-        const expSnap2 = await getDocs(expQuery2);
-        expSnap2.forEach(d => {
-          batch.delete(d.ref);
-        });
-      }
-
-      await batch.commit();
-
-      // Log audit event
+      // 8. Log audit event
       await logAuditEvent(firestore, business.id, currentUserProfile, {
         action: 'purchase.delete',
         entity: { type: 'SupplierPurchase', id: deletingPurchase.id, name: deletingPurchase.poNumber || 'Purchase Order' },
@@ -1373,11 +1411,11 @@ function ExpensesAndPurchasesContent() {
           status: deletingPurchase.status,
           itemsCount: deletingPurchase.items?.length || 0,
         }
-      });
+      }).catch(() => {});
 
       toast({
         title: 'Purchase Order Deleted',
-        description: `Order ${deletingPurchase.poNumber} and related financial records removed successfully.`,
+        description: `Order ${deletingPurchase.poNumber || ''} and related financial records removed successfully.`,
         variant: 'success'
       });
       setDeletingPurchase(null);

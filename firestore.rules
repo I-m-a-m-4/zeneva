@@ -343,6 +343,18 @@ service cloud.firestore {
         allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
         allow create, update, delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserAdmin() && isRequestingUserMemberOf(businessId));
       }
+
+      match /purchaseOrders/{orderId} {
+        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+        allow create, update: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() && isRequestingUserMemberOf(businessId));
+        allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+      }
+
+      match /suppliers/{supplierId} {
+        allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+        allow create, update: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() && isRequestingUserMemberOf(businessId));
+        allow delete: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(businessId));
+      }
     }
 
     match /users/{userId} {
@@ -480,8 +492,7 @@ service cloud.firestore {
                       fieldsUnchanged(['businessId'].toSet()));
       allow delete: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || (
                       isRequestingUserManager() &&
-                      isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
-                      isSubscriptionActive(resource.data.get('businessId', null)))));
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)))));
     }
 
     match /receipts/{receiptId} {
@@ -501,9 +512,7 @@ service cloud.firestore {
                                 isSubscriptionActive(resource.data.get('businessId', null)));
         allow delete: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || (
                                 isRequestingUserManager() &&
-                                hasPermission('record_sales') &&
-                                isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
-                                isSubscriptionActive(resource.data.get('businessId', null)))));
+                                isRequestingUserMemberOf(resource.data.get('businessId', null)))));
     }
 
     match /customers/{customerId} {
@@ -534,27 +543,30 @@ service cloud.firestore {
       allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
       allow create: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
                       isRequestingUserMemberOf(request.resource.data.get('businessId', null)));
-      allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
-                      isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
-                      isSubscriptionActive(resource.data.get('businessId', null)));
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)));
     }
 
     match /suppliers/{supplierId} {
       allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
       allow create: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
                       isRequestingUserMemberOf(request.resource.data.get('businessId', null)));
-      allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
-                      isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
-                      isSubscriptionActive(resource.data.get('businessId', null)));
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)));
     }
 
     match /supplier_purchases/{purchaseId} {
       allow read, list: if isSuperAdmin() || (isUserAuthenticated() && isRequestingUserMemberOf(resource.data.get('businessId', null)));
       allow create: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
                       isRequestingUserMemberOf(request.resource.data.get('businessId', null)));
-      allow update, delete: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
-                      isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
-                      isSubscriptionActive(resource.data.get('businessId', null)));
+      allow update: if isSuperAdmin() || (isUserAuthenticated() && isNotSuspended() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)));
+      allow delete: if isSuperAdmin() || (isUserAuthenticated() &&
+                      isRequestingUserMemberOf(resource.data.get('businessId', null)));
     }
 
     match /ai_sessions/{sessionId} {
