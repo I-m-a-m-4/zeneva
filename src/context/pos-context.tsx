@@ -1053,10 +1053,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
             totalProducts: realTotalProducts 
           }, { merge: true });
         }
-      } catch (e) {
+      } catch (e: any) {
         // Only log error if the user is actually still logged in (to suppress normal abort/logout permission errors)
         if (getAuth().currentUser) {
-          console.error("Failed to reconcile stats:", e);
+          if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota exceeded') || e?.message?.includes('429')) {
+            console.warn('[POS] Stats reconciliation deferred: Daily Firestore quota reached.');
+          } else {
+            console.error("Failed to reconcile stats:", e);
+          }
         }
       }
     };
