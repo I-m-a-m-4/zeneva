@@ -11,6 +11,7 @@ import Link from "next/link";
 import * as React from "react";
 import type { Product } from '@/types';
 import { isFashionIndustry, getIndustryConfig, type IndustryConfig } from "@/lib/industry";
+import { isCoreFeatureBlocked } from "@/lib/plan";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn, smartSearchMatch } from "@/lib/utils";
@@ -59,7 +60,7 @@ function renderCategoryIcon(icon?: string, size = 16) {
     }
 }
 
-const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addToCart, onPreview, variants, isFashion, industryConfig }: {
+const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addToCart, onPreview, variants, isFashion, industryConfig, isReadOnly }: {
     product: Product,
     currencySymbol: string,
     handleAddToCart: (product: Product) => void,
@@ -67,7 +68,8 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
     onPreview: (src: string, alt: string) => void,
     variants?: Product[],
     isFashion?: boolean,
-    industryConfig?: IndustryConfig
+    industryConfig?: IndustryConfig,
+    isReadOnly?: boolean
 }) => {
     const { t } = useI18n();
     const hasVariants = variants && variants.length > 0;
@@ -119,16 +121,17 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                             <button
                                 key={v.id}
                                 type="button"
-                                disabled={!inStock}
+                                disabled={isReadOnly || !inStock}
                                 className={cn(
                                     "text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all select-none active:scale-95",
-                                    inStock 
+                                    (inStock && !isReadOnly)
                                         ? "bg-secondary/60 hover:bg-primary hover:text-primary-foreground border-border/80 text-foreground cursor-pointer shadow-2xs" 
                                         : "opacity-40 line-through bg-muted/20 border-border/40 cursor-not-allowed text-muted-foreground"
                                 )}
-                                title={`${v.variantValue || v.name} (${v.stock} in stock)`}
+                                title={isReadOnly ? "Plan expired" : `${v.variantValue || v.name} (${v.stock} in stock)`}
                                 onClick={(e) => {
                                     e.stopPropagation();
+                                    if (isReadOnly) return;
                                     addToCart(v);
                                 }}
                             >
@@ -139,9 +142,11 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                     {variants.length > 4 && (
                         <button
                             type="button"
-                            className="text-[10px] text-muted-foreground hover:text-primary px-1 font-semibold hover:underline"
+                            disabled={isReadOnly}
+                            className="text-[10px] text-muted-foreground hover:text-primary px-1 font-semibold hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                             onClick={(e) => {
                                 e.stopPropagation();
+                                if (isReadOnly) return;
                                 handleAddToCart(product);
                             }}
                         >
@@ -161,7 +166,8 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                     <Button 
                         size="sm" 
                         variant="outline" 
-                        className="h-10 px-3 rounded-lg border-primary/30 text-primary hover:bg-primary/10 flex items-center gap-1.5 text-xs font-semibold shadow-2xs" 
+                        disabled={isReadOnly}
+                        className="h-10 px-3 rounded-lg border-primary/30 text-primary hover:bg-primary/10 flex items-center gap-1.5 text-xs font-semibold shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed" 
                         onClick={() => handleAddToCart(product)}
                     >
                         {renderCategoryIcon(industryConfig?.fastSwitcherIcon, 14)}
@@ -170,7 +176,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                 ) : product.uomConversions && product.uomConversions.length > 0 ? (
                     <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center">
+                            <Button size="icon" variant="outline" disabled={isReadOnly} className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed">
                                 <PlusCircle className="h-6 w-6 text-foreground dark:text-white" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -178,6 +184,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                             <DropdownMenuLabel>{t('pos.selectUnit')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuRadioGroup onValueChange={(unit) => {
+                                if (isReadOnly) return;
                                 if (unit === 'base') {
                                     handleAddToCart(product);
                                 } else {
@@ -197,7 +204,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                         </DropdownMenuContent>
                     </DropdownMenu>
                 ) : (
-                    <Button size="icon" variant="outline" className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center" onClick={() => handleAddToCart(product)}>
+                    <Button size="icon" variant="outline" disabled={isReadOnly} className="h-11 w-11 rounded-lg border-border/50 hover:bg-accent flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed" onClick={() => handleAddToCart(product)}>
                         <PlusCircle className="h-6 w-6 text-foreground dark:text-white" />
                     </Button>
                 )}
@@ -208,7 +215,7 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
 
 ProductItem.displayName = 'ProductItem';
 
-const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeFromCart, updateCartItemPrice, t, allowPosPriceOverride, allowCostPriceOverride }: any) => {
+const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeFromCart, updateCartItemPrice, t, allowPosPriceOverride, allowCostPriceOverride, isReadOnly }: any) => {
     const { products } = usePOS();
     const masterProduct = products?.find((p: any) => p.id === (item.product.parentId || item.product.id));
     const baseCostPrice = item.costPriceOverride ?? item.product.costPrice ?? masterProduct?.costPrice ?? 0;
@@ -246,7 +253,7 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
     const currentCost = parseFloat(editCostPrice) || 0;
     const unitProfit = currentSale - currentCost;
     const marginPercent = currentSale > 0 ? ((unitProfit / currentSale) * 100).toFixed(1) : '0';
-    const canEditAny = allowPosPriceOverride || allowCostPriceOverride;
+    const canEditAny = (allowPosPriceOverride || allowCostPriceOverride) && !isReadOnly;
 
     return (
         <div className="flex justify-between items-center py-1">
@@ -374,10 +381,11 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
                     type="number"
                     value={item.quantity}
                     onChange={(e) => updateQuantity(cartItemId, parseInt(e.target.value))}
-                    className="w-16 h-8 text-center"
+                    className="w-16 h-8 text-center disabled:opacity-50"
                     min="1"
+                    disabled={isReadOnly}
                 />
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeFromCart(cartItemId)}>
+                <Button size="icon" variant="ghost" className="h-8 w-8 disabled:opacity-40" onClick={() => removeFromCart(cartItemId)} disabled={isReadOnly}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
             </div>
@@ -403,6 +411,7 @@ const CartContents = () => {
     const { t } = useI18n();
     const { currentUserProfile } = useUser();
 
+    const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
     const isAdmin = currentUserProfile?.role === 'admin' || business?.ownerId === currentUserProfile?.id;
     const canOverridePrice = isAdmin || (
         business?.settings?.allowPosPriceOverride === true &&
@@ -438,7 +447,8 @@ const CartContents = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => holdCurrentSale()}
-                                className="h-8 gap-1.5 px-2 text-xs font-medium border-dashed"
+                                disabled={isReadOnly}
+                                className="h-8 gap-1.5 px-2 text-xs font-medium border-dashed disabled:opacity-40"
                             >
                                 <Archive className="h-3.5 w-3.5" />
                                 {t('pos.hold')}
@@ -448,7 +458,8 @@ const CartContents = () => {
                             variant="ghost"
                             size="sm"
                             onClick={clearCart}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 gap-1.5 px-2 text-xs font-medium"
+                            disabled={isReadOnly}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 gap-1.5 px-2 text-xs font-medium disabled:opacity-40"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
                             {t('pos.clearCart')}
@@ -468,6 +479,7 @@ const CartContents = () => {
                                 t={t}
                                 allowPosPriceOverride={canOverridePrice}
                                 allowCostPriceOverride={canOverrideCostPrice}
+                                isReadOnly={isReadOnly}
                             />
                         );
                     })}
@@ -511,6 +523,8 @@ export default function SelectProductsPage() {
     const router = useRouter();
     const { toast } = useToast();
     const { t } = useI18n();
+
+    const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
     const [searchTerm, setSearchTerm] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('all');
     const [columns, setColumns] = React.useState<'auto' | '3' | '4' | '5' | '6'>('4');
@@ -692,15 +706,31 @@ export default function SelectProductsPage() {
     const [variantParent, setVariantParent] = React.useState<Product | null>(null);
 
     const handleAddToCart = React.useCallback((product: Product) => {
+        if (isReadOnly) {
+            toast({
+                title: "Plan Expired",
+                description: "Your 30-day trial or plan has ended. Please upgrade your plan to record new sales.",
+                variant: "destructive"
+            });
+            return;
+        }
         const childVariants = products?.filter(p => p.parentId === product.id) || [];
         if (product.type === 'variant' || childVariants.length > 0) {
             setVariantParent(product);
         } else {
             addToCart(product);
         }
-    }, [addToCart, products]);
+    }, [addToCart, products, isReadOnly, toast]);
 
     const handleScan = (sku: string) => {
+        if (isReadOnly) {
+            toast({
+                title: "Plan Expired",
+                description: "Your 30-day trial or plan has ended. Please upgrade your plan to record new sales.",
+                variant: "destructive"
+            });
+            return;
+        }
         const product = products?.find(p => p.sku === sku);
 
         if (product) {
@@ -729,6 +759,14 @@ export default function SelectProductsPage() {
 
 
     const handleNext = () => {
+        if (isReadOnly) {
+            toast({
+                title: "Plan Expired",
+                description: "Your 30-day trial or plan has ended. Please upgrade your plan to record new sales.",
+                variant: "destructive"
+            });
+            return;
+        }
         setIsNavigating(true);
         router.push('/sales/pos/customer');
     };
@@ -845,6 +883,7 @@ export default function SelectProductsPage() {
                                                     variants={productVariants.get(product.id) || []}
                                                     isFashion={isFashion}
                                                     industryConfig={industryConfig}
+                                                    isReadOnly={isReadOnly}
                                                 />
                                             </div>
                                         ))}
@@ -948,7 +987,7 @@ export default function SelectProductsPage() {
                         </ScrollArea>
                     </CardContent>
                     <CardFooter>
-                        <Button className="w-full" onClick={handleNext} disabled={cart.length === 0 || isNavigating}>
+                        <Button className="w-full" onClick={handleNext} disabled={cart.length === 0 || isNavigating || isReadOnly}>
                             {isNavigating && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                             {t('pos.nextCustomer')}
                         </Button>
@@ -978,7 +1017,7 @@ export default function SelectProductsPage() {
                             <CartContents />
                         </ScrollArea>
                         <SheetFooter className="mt-4">
-                            <Button className="w-full" onClick={handleNext} disabled={cart.length === 0 || isNavigating}>
+                            <Button className="w-full" onClick={handleNext} disabled={cart.length === 0 || isNavigating || isReadOnly}>
                                 {isNavigating && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                                 {t('pos.nextCustomer')}
                             </Button>
@@ -1028,8 +1067,16 @@ export default function SelectProductsPage() {
                                     <button
                                         key={variant.id}
                                         type="button"
-                                        disabled={!inStock}
+                                        disabled={!inStock || isReadOnly}
                                         onClick={() => {
+                                            if (isReadOnly) {
+                                                toast({
+                                                    title: t('pos.readOnlyTitle', 'Read-Only Mode'),
+                                                    description: t('pos.readOnlyDesc', 'Your trial or subscription has expired. Please upgrade to record sales.'),
+                                                    variant: 'destructive',
+                                                });
+                                                return;
+                                            }
                                             addToCart(variant);
                                             setVariantParent(null);
                                             toast({ 
@@ -1039,9 +1086,9 @@ export default function SelectProductsPage() {
                                         }}
                                         className={cn(
                                             "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all text-center relative group select-none",
-                                            inStock 
-                                                ? "border-border/80 hover:border-primary hover:bg-primary/5 active:scale-95 cursor-pointer bg-card shadow-2xs" 
-                                                : "border-border/30 bg-muted/20 opacity-50 cursor-not-allowed"
+                                            !inStock || isReadOnly
+                                                ? "border-border/30 bg-muted/20 opacity-50 cursor-not-allowed"
+                                                : "border-border/80 hover:border-primary hover:bg-primary/5 active:scale-95 cursor-pointer bg-card shadow-2xs"
                                         )}
                                     >
                                         <span className="text-base font-bold text-foreground group-hover:text-primary tracking-tight">

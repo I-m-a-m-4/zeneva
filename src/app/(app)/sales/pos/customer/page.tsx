@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { useI18n } from '@/context/i18n-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 
 
 function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: (customer: Customer) => void }) {
@@ -138,9 +139,11 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 }
 
 export default function CustomerPage() {
-    const { selectedCustomer, selectCustomer, customers, isLoading: isPosLoading, currentUserProfile: currentUser, searchCustomers } = usePOS();
+    const { selectedCustomer, selectCustomer, customers, isLoading: isPosLoading, currentUserProfile: currentUser, searchCustomers, business } = usePOS();
     const router = useRouter();
+    const { toast } = useToast();
     const { t } = useI18n();
+    const isReadOnly = isCoreFeatureBlocked(business);
     const [searchTerm, setSearchTerm] = React.useState('');
     const [searchedCustomers, setSearchedCustomers] = React.useState<Customer[] | null>(null);
     const [isSearching, setIsSearching] = React.useState(false);
@@ -205,6 +208,14 @@ export default function CustomerPage() {
 
 
     const handleNext = () => {
+        if (isReadOnly) {
+            toast({
+                title: t('pos.readOnlyTitle', 'Read-Only Mode'),
+                description: t('pos.readOnlyDesc', 'Your trial or subscription has expired. Please upgrade to record sales.'),
+                variant: 'destructive',
+            });
+            return;
+        }
         setIsNavigating(true);
         router.push('/sales/pos/payment');
     };
@@ -308,7 +319,7 @@ export default function CustomerPage() {
                         <Button className="w-full" variant="outline" asChild>
                             <Link href="/sales/pos/select-products">{t('common.back')}</Link>
                         </Button>
-                        <Button className="w-full" onClick={handleNext} disabled={isNavigating}>
+                        <Button className="w-full" onClick={handleNext} disabled={isNavigating || isReadOnly}>
                             {isNavigating && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                             {t('pos.nextPayment')}
                         </Button>

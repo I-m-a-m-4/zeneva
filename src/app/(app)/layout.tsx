@@ -1625,7 +1625,7 @@ export default function AuthenticatedLayout({
                   <div className="flex items-center gap-2 text-red-700 dark:text-red-400 text-xs sm:text-sm font-medium min-w-0">
                     <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
                     <span className="truncate sm:whitespace-normal">
-                      <strong>Read-Only Mode:</strong> Your 30-day trial or plan has expired. Recording sales and managing data are disabled.
+                      Your 30-day trial or plan has expired. Please upgrade your plan to record sales and manage inventory.
                     </span>
                   </div>
                   <Button size="sm" className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white shrink-0 shadow-sm" asChild>

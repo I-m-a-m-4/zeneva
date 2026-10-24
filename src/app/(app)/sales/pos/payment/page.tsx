@@ -16,15 +16,27 @@ import { useBusiness } from '@/context/pos-context';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/context/i18n-context';
 import { trackFeature } from '@/lib/product-telemetry';
+import { isCoreFeatureBlocked } from '@/lib/plan';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PaymentPage() {
     const { subtotal, tax, taxRate, discount, total, setTax, setDiscount, paymentMethod, setPaymentMethod, amountReceived, setAmountReceived, currencySymbol, autoPrint, setAutoPrint } = usePOS();
     const business = useBusiness();
     const router = useRouter();
+    const { toast } = useToast();
     const { t } = useI18n();
+    const isReadOnly = isCoreFeatureBlocked(business);
     const [isNavigating, setIsNavigating] = React.useState(false);
 
     const handleNext = () => {
+        if (isReadOnly) {
+            toast({
+                title: t('pos.readOnlyTitle', 'Read-Only Mode'),
+                description: t('pos.readOnlyDesc', 'Your trial or subscription has expired. Please upgrade to record sales.'),
+                variant: 'destructive',
+            });
+            return;
+        }
         setIsNavigating(true);
         // Added a timeout safeguard to prevent the button from being stuck if navigation is slow
         const timer = setTimeout(() => setIsNavigating(false), 5000);
@@ -225,7 +237,7 @@ export default function PaymentPage() {
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
-                        <Button className="w-full h-12 text-lg" onClick={handleNext} disabled={isNavigating}>
+                        <Button className="w-full h-12 text-lg" onClick={handleNext} disabled={isNavigating || isReadOnly}>
                             {isNavigating && <Loader2 className="me-2 h-5 w-5 animate-spin" />}
                             {autoPrint ? t('pos.finalizeAndPrint') : t('pos.reviewAndComplete')}
                         </Button>
