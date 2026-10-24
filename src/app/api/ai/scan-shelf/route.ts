@@ -43,6 +43,51 @@ export async function POST(req: Request) {
     // Format the list of products for the prompt
     const productList = products.map((p: any) => `- ${p.name} (ID: ${p.id})`).join('\n');
 
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    if (openRouterApiKey) {
+      try {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${openRouterApiKey}`,
+            'HTTP-Referer': 'https://zeneva.space',
+            'X-Title': 'Zeneva POS',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-4o',
+            max_tokens: 2000,
+            response_format: { type: 'json_object' },
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: `You are an AI inventory auditor. Here is an image of a store shelf. Count how many of each of the following products you see on the shelf.\n\nThe possible products are:\n${productList}\n\nReturn strictly valid JSON: { "counts": [{ "id": "product_id", "count": number }] }`
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: { url: image.startsWith('data:') ? image : `data:image/png;base64,${image}` }
+                  }
+                ]
+              }
+            ]
+          })
+        });
+
+        if (orRes.ok) {
+          const data = await orRes.json();
+          const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+          if (Array.isArray(parsed.counts)) {
+            return NextResponse.json({ result: parsed.counts }, { headers: corsHeaders });
+          }
+        }
+      } catch (orErr) {
+        console.warn('OpenRouter shelf scan attempt failed, falling back:', orErr);
+      }
+    }
+
     const { object } = await generateObject({
       // Uses Groq vision (llama-3.2-11b-vision-preview) by default, preserving google('gemini-1.5-flash-latest')
       model,

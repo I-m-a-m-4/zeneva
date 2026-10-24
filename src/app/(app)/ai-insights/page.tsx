@@ -8,8 +8,10 @@ import {
   ArrowUp, Loader2, Clock, TrendingUp, DollarSign, Users, ReceiptText,
   SquarePen, BookOpen, Trash2, Send, Gauge, X, Zap, Search,
   PanelLeft, PanelLeftClose, XCircle, Mic, SlidersHorizontal,
-  Laptop, ArrowUpRight, RotateCw, Sparkles, Layers, Box, FileText, ChevronRight, ChevronLeft, ChevronDown
+  Laptop, ArrowUpRight, RotateCw, Sparkles, Layers, Box, FileText, ChevronRight, ChevronLeft, ChevronDown,
+  Camera, Image as ImageIcon
 } from 'lucide-react';
+import { RestockSheetProposal } from '@/components/ai-insights/restock-sheet-proposal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppConfig } from '@/lib/config';
 import { useUser, useFirestore } from '@/firebase';
@@ -302,6 +304,131 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
       console.error('Error accessing microphone:', err);
       toast({ title: 'Microphone access denied', description: 'Please allow microphone access to use voice dictation.', variant: 'destructive' });
     }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Invalid file', description: 'Please select an image file (PNG, JPG, or WEBP).', variant: 'destructive' });
+      return;
+    }
+
+    if (!authRef.current.businessId) {
+      toast({ title: 'No store selected', description: 'Please wait for your store session to load.', variant: 'destructive' });
+      return;
+    }
+
+    setIsAnalyzingImage(true);
+    toast({ title: 'Analyzing image...', description: 'Extracting product items and quantities with GPT-4o Vision.' });
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result as string;
+
+      const userMsgId = `user-img-${Date.now()}`;
+      const assistantMsgId = `zen-sheet-${Date.now()}`;
+
+      // Append user uploaded image message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: userMsgId,
+          role: 'user',
+          content: `Uploaded inventory sheet: ${file.name}`,
+          imageUrl: base64Data,
+          parts: [{ type: 'text', text: `Uploaded inventory sheet: ${file.name}` }],
+        } as any,
+      ]);
+
+      try {
+        const token = await getAuth().currentUser?.getIdToken();
+        const res = await fetch('/api/ai/analyze-sheet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            image: base64Data,
+            businessId: authRef.current.businessId,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to analyze image');
+        }
+
+        const data = await res.json();
+        const items = data.items || [];
+
+        if (items.length === 0) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: assistantMsgId,
+              role: 'assistant',
+              content: "I scanned the image, but couldn't detect any clear product lines or handwritten stock items. Please try uploading a sharper or closer picture.",
+              parts: [
+                {
+                  type: 'text',
+                  text: "I scanned the image, but couldn't detect any clear product lines or handwritten stock items. Please try uploading a sharper or closer picture.",
+                },
+              ],
+            } as any,
+          ]);
+          return;
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: `I've analyzed your inventory sheet and detected ${items.length} items. Here is the matching restock table. You can search or change any matched product, edit the pieces, and tap "Approve & Update" to apply the changes to your inventory.`,
+            parts: [
+              {
+                type: 'text',
+                text: `I've analyzed your inventory sheet and detected ${items.length} items. Here is the matching restock table. You can search or change any matched product, edit the pieces, and tap "Approve & Update" to apply the changes to your inventory.`,
+              },
+              {
+                type: 'restock-sheet',
+                output: {
+                  type: 'RESTOCK_SHEET',
+                  sheetTitle: data.sheetTitle || 'Inventory Restock Sheet',
+                  items,
+                  imageUrl: base64Data,
+                  status: 'pending',
+                },
+              },
+            ],
+          } as any,
+        ]);
+
+        toast({
+          title: 'Sheet Analyzed',
+          description: `Found ${items.length} product lines. Review the table to approve.`,
+          variant: 'success',
+        });
+      } catch (err: any) {
+        console.error('Error analyzing image:', err);
+        toast({
+          title: 'Analysis Failed',
+          description: err.message || 'Could not analyze inventory sheet.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsAnalyzingImage(false);
+      }
+    };
+
+    reader.readAsDataURL(file);
   };
 
   useEffect(() => {
@@ -843,6 +970,25 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isAnalyzingImage || isLoading}
+                          className={cn(
+                            "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
+                            isAnalyzingImage ? "bg-orange-500/20 text-orange-600 animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                          )}
+                          title="Upload stock sheet or handwritten inventory image"
+                        >
+                          {isAnalyzingImage ? <Loader2 className="h-4 w-4 animate-spin text-orange-500" /> : <Camera className="h-4 w-4" />}
+                        </button>
                         <button
                           type="button"
                           onClick={toggleListening}
@@ -972,7 +1118,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
               {messages.map((m, i) => {
                 const isUser = m.role === 'user';
                 const text = textOf(m as any);
-                const toolParts = (m.parts ?? []).filter(isToolUIPart);
+                const toolParts = (m.parts ?? []).filter((p: any) => isToolUIPart(p) || p?.type === 'restock-sheet' || p?.output?.type === 'RESTOCK_SHEET');
                 const hasToolUI = toolParts.length > 0;
                 const streaming = isLoading && !isUser && i === messages.length - 1;
 
@@ -1002,6 +1148,12 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                         </div>
                       )}
 
+                      {isUser && (m as any).imageUrl && (
+                        <div className="mt-1.5 max-w-xs sm:max-w-sm rounded-2xl overflow-hidden border border-border/80 shadow-xs bg-muted/30 p-1">
+                          <img src={(m as any).imageUrl} alt="Uploaded inventory sheet" className="w-full max-h-52 object-contain rounded-xl" />
+                        </div>
+                      )}
+
                       {!isUser && text.trim() && (
                         <div className="w-full max-w-full text-foreground">
                           <Markdown>{text}</Markdown>
@@ -1027,7 +1179,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                               : output;
 
                             return (
-                              <div key={part.toolCallId} className="flex flex-col gap-1.5">
+                              <div key={part.toolCallId || `part-${part.type}-${Date.now()}`} className="flex flex-col gap-1.5">
                                 {output && (
                                   <ToolResult
                                     output={enriched}
@@ -1090,6 +1242,18 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
               {creditWall && <div className="mb-3">{creditWall}</div>}
               <div className="w-full bg-card rounded-2xl border border-border shadow-md focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:shadow-lg transition-all">
                 <form onSubmit={handleSend} className="flex items-center p-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isAnalyzingImage || isLoading}
+                    className={cn(
+                      "p-2.5 rounded-xl transition-colors",
+                      isAnalyzingImage ? "bg-orange-500/20 text-orange-600 animate-pulse" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    title="Upload stock sheet or handwritten inventory image"
+                  >
+                    {isAnalyzingImage ? <Loader2 className="w-4 h-4 animate-spin text-orange-500" /> : <Camera className="w-4 h-4" />}
+                  </button>
                   <button
                     type="button"
                     onClick={toggleListening}

@@ -22,6 +22,7 @@ import { apiBase } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
+import { RestockSheetProposal } from './restock-sheet-proposal';
 
 /**
  * Generative UI for Zen AI tool results.
@@ -1409,6 +1410,8 @@ export function ToolResult({ output, onApprove, onReject, onPick }: {
   }
 
   switch (output.type) {
+    case 'RESTOCK_SHEET':
+      return <RestockSheetProposal {...output} />;
     case 'PROPOSAL':
       return <ProposalCard result={output} onApprove={onApprove} onReject={onReject} />;
     case 'CHART':
@@ -1455,6 +1458,8 @@ export function ToolResult({ output, onApprove, onReject, onPick }: {
       );
     case 'SET_TIME_RANGE':
       return <SetTimeRangeCard result={output} />;
+    case 'RESTOCK_SHEET':
+      return <RestockSheetProposal {...output} />;
     case 'PAGE_ACTION':
       return <PageActionCard result={output} />;
     default:

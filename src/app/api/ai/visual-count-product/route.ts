@@ -74,6 +74,54 @@ export async function POST(req: Request) {
       image: image.replace(/^data:image\/\w+;base64,/, '')
     });
 
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    if (openRouterApiKey) {
+      try {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${openRouterApiKey}`,
+            'HTTP-Referer': 'https://zeneva.space',
+            'X-Title': 'Zeneva POS',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-4o',
+            max_tokens: 2000,
+            response_format: { type: 'json_object' },
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: `You are an expert computer vision inventory counter. Look at the provided photo to accurately count how many units of the product "${productName}" are present.` +
+                      (productImage ? ` Reference product image is also provided.` : ``) +
+                      `\nReturn strictly valid JSON: { "count": number, "confidence": number (0-100), "explanation": "string note" }`
+                  },
+                  ...(productImage ? [{ type: 'image_url', image_url: { url: productImage } }] : []),
+                  {
+                    type: 'image_url',
+                    image_url: { url: image.startsWith('data:') ? image : `data:image/png;base64,${image}` }
+                  }
+                ]
+              }
+            ]
+          })
+        });
+
+        if (orRes.ok) {
+          const data = await orRes.json();
+          const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+          if (typeof parsed.count === 'number') {
+            return NextResponse.json({ result: parsed }, { headers: corsHeaders });
+          }
+        }
+      } catch (orErr) {
+        console.warn('OpenRouter visual count attempt failed, falling back:', orErr);
+      }
+    }
+
     const { object } = await generateObject({
       // Uses Groq vision (llama-3.2-11b-vision-preview) by default, preserving google('gemini-1.5-flash-latest')
       model,
