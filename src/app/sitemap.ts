@@ -20,6 +20,7 @@ const CORE_ROUTES: { path: string; priority: number; changeFrequency: MetadataRo
   // excluded from the index by the same rule.
   { path: '/zen-ai', priority: 0.85, changeFrequency: 'monthly' },
   { path: '/blog', priority: 0.85, changeFrequency: 'daily' },
+  { path: '/status', priority: 0.85, changeFrequency: 'daily' },
   { path: '/use-cases', priority: 0.85, changeFrequency: 'monthly' },
   { path: '/help-center', priority: 0.85, changeFrequency: 'weekly' },
   { path: '/help-center/guides', priority: 0.8, changeFrequency: 'weekly' },

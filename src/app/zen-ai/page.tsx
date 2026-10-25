@@ -61,6 +61,7 @@ import {
   Users,
   Check,
   X,
+  Camera,
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import MarketingHeader from '@/components/layout/marketing-header';
@@ -316,6 +317,18 @@ const CAPABILITIES: {
       'Full record: SKU, category, cost, margin, units sold in 30 days, days of cover',
       'A name that matches several products returns cards to tap, not a wrong guess',
       'It never picks between two similar names on your behalf',
+    ],
+  },
+  {
+    icon: Camera,
+    accent: 'var(--zia-magenta)',
+    title: 'Snap & restock with visual AI',
+    blurb: 'Drop photos of handwritten stock sheets, delivery notes or shelves right into the chat.',
+    points: [
+      'Handwritten stock sheet OCR matches items and quantities to your live catalogue',
+      'Interactive restock proposals with 1-tap inventory updates',
+      'Visual shelf counting and facing audits from shelf photos',
+      'Instant product recognition and price lookup from a picture',
     ],
   },
   {

@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, XCircle, Trash2, Plus, Sparkles, Search,
-  ArrowRight, Package, AlertCircle, RefreshCw, Check, Layers
+  ArrowRight, Package, AlertCircle, RefreshCw, Check, Layers,
+  Camera, Eye, SlidersHorizontal
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,34 +31,194 @@ export interface SheetRowItem {
   } | null;
   matchStatus?: 'matched' | 'suggested' | 'unmatched';
   matchConfidence?: number;
+  topCandidate?: {
+    product: Product;
+    score: number;
+  } | null;
 }
 
 export interface RestockSheetProposalProps {
   sheetTitle?: string;
   items: SheetRowItem[];
   imageUrl?: string;
+  imageUrls?: string[];
   status?: 'pending' | 'approved' | 'discarded';
   onApproveSuccess?: (approvedCount: number) => void;
   onDiscard?: () => void;
 }
 
-export function RestockSheetProposal({
+/**
+ * Normalizes text for clean fuzzy token comparison.
+ */
+function cleanText(str: string): string {
+  return (str || '')
+    .normalize('NFKD')
+    .replace(/\p{Mn}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Fast client-side fuzzy matcher comparing scanned sheet text to the store's inventory.
+ */
+function findBestCatalogMatch(
+  rawName: string,
+  catalog: Product[]
+): { product: Product; score: number } | null {
+  if (!rawName || !catalog || catalog.length === 0) return null;
+
+  const rawClean = cleanText(rawName);
+  if (!rawClean) return null;
+
+  const rawTokens = rawClean.split(' ').filter((t) => t.length > 1);
+
+  let bestProd: Product | null = null;
+  let bestScore = 0;
+
+  for (const prod of catalog) {
+    if (!prod.name || (prod as any).deleted) continue;
+    const prodClean = cleanText(prod.name);
+    if (!prodClean) continue;
+
+    // 1. Exact string match
+    if (prodClean === rawClean) {
+      return { product: prod, score: 1.0 };
+    }
+
+    // 2. Full containment
+    if (prodClean.includes(rawClean) || rawClean.includes(prodClean)) {
+      const minL = Math.min(prodClean.length, rawClean.length);
+      const maxL = Math.max(prodClean.length, rawClean.length);
+      const score = 0.85 + 0.15 * (minL / maxL);
+      if (score > bestScore) {
+        bestScore = score;
+        bestProd = prod;
+      }
+      continue;
+    }
+
+    // 3. Token overlap
+    const prodTokens = new Set(prodClean.split(' ').filter((t) => t.length > 1));
+    if (prodTokens.size === 0 || rawTokens.length === 0) continue;
+
+    let shared = 0;
+    for (const rt of rawTokens) {
+      if (prodTokens.has(rt)) {
+        shared += 1;
+      } else {
+        // partial token substring/prefix (e.g. "tretin" in "tretinoin")
+        for (const pt of prodTokens) {
+          if (pt.length >= 4 && rt.length >= 4 && (pt.includes(rt) || rt.includes(pt))) {
+            shared += 0.65;
+            break;
+          }
+        }
+      }
+    }
+
+    const score = shared / Math.max(rawTokens.length, prodTokens.size);
+    if (score > bestScore) {
+      bestScore = score;
+      bestProd = prod;
+    }
+  }
+
+  if (bestProd && bestScore > 0.18) {
+    return { product: bestProd, score: Math.min(1, Math.round(bestScore * 100) / 100) };
+  }
+  return null;
+}
+
+export const RestockSheetProposal = React.memo(function RestockSheetProposal({
   sheetTitle = 'Inventory Restock Sheet',
   items: initialItems,
   imageUrl,
+  imageUrls,
   status: initialStatus = 'pending',
   onApproveSuccess,
   onDiscard,
 }: RestockSheetProposalProps) {
-  const { products, addToQueue } = usePOS();
+  const { products, addToQueue, isReadOnly } = usePOS();
   const { toast } = useToast();
 
-  const [items, setItems] = React.useState<SheetRowItem[]>(initialItems);
+  const [items, setItems] = React.useState<SheetRowItem[]>(() => {
+    if (!products || products.length === 0) return initialItems;
+    return initialItems.map((row) => {
+      if (row.matchedProduct && row.matchedProduct.id) return row;
+      const candidate = findBestCatalogMatch(row.rawName, products);
+      if (!candidate) return row;
+      if (candidate.score >= 0.38) {
+        return {
+          ...row,
+          matchedProduct: {
+            id: candidate.product.id,
+            name: candidate.product.name,
+            price: candidate.product.price,
+            stock: candidate.product.stock ?? 0,
+            sku: candidate.product.sku || '',
+            imageUrl: candidate.product.imageUrl || '',
+            costPrice: candidate.product.costPrice ?? null,
+          },
+          matchConfidence: candidate.score,
+          matchStatus: candidate.score >= 0.85 ? 'matched' : 'suggested',
+          topCandidate: candidate,
+        };
+      }
+      return { ...row, topCandidate: candidate };
+    });
+  });
+
   const [status, setStatus] = React.useState<'pending' | 'approved' | 'discarded'>(initialStatus);
   const [isApplying, setIsApplying] = React.useState(false);
   const [mode, setMode] = React.useState<'add' | 'set'>('add'); // 'add' = add to current stock, 'set' = set exact stock
   const [activeSearchRowId, setActiveSearchRowId] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [filterTab, setFilterTab] = React.useState<'all' | 'needs_match' | 'matched'>('all');
+  const hasAutoMatchedRef = React.useRef(false);
+
+  // Auto-crosscheck unmatched items against live store products once when products load
+  React.useEffect(() => {
+    if (!products || products.length === 0 || hasAutoMatchedRef.current) return;
+    hasAutoMatchedRef.current = true;
+
+    setItems((prev) =>
+      prev.map((row) => {
+        // If already matched with product details, keep it
+        if (row.matchedProduct && row.matchedProduct.id) {
+          return row;
+        }
+
+        const candidate = findBestCatalogMatch(row.rawName, products);
+        if (!candidate) return row;
+
+        // Auto-match if confidence is reasonable (>= 0.38)
+        if (candidate.score >= 0.38) {
+          return {
+            ...row,
+            matchedProduct: {
+              id: candidate.product.id,
+              name: candidate.product.name,
+              price: candidate.product.price,
+              stock: candidate.product.stock ?? 0,
+              sku: candidate.product.sku || '',
+              imageUrl: candidate.product.imageUrl || '',
+              costPrice: candidate.product.costPrice ?? null,
+            },
+            matchConfidence: candidate.score,
+            matchStatus: candidate.score >= 0.85 ? 'matched' : 'suggested',
+            topCandidate: candidate,
+          };
+        }
+
+        return {
+          ...row,
+          topCandidate: candidate,
+        };
+      })
+    );
+  }, [products]);
 
   const handleQuantityChange = (id: string, newQty: number) => {
     if (status !== 'pending') return;
@@ -118,6 +278,15 @@ export function RestockSheetProposal({
 
   const handleApprove = async () => {
     if (status !== 'pending' || isApplying) return;
+
+    if (isReadOnly) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Please upgrade to record stock updates.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const validRows = items.filter((row) => row.matchedProduct && row.quantity > 0);
     if (validRows.length === 0) {
@@ -181,37 +350,45 @@ export function RestockSheetProposal({
   };
 
   const filteredCatalogProducts = React.useMemo(() => {
-    if (!searchTerm.trim()) return (products || []).slice(0, 20);
+    if (!searchTerm.trim()) return (products || []).slice(0, 30);
     const lower = searchTerm.toLowerCase();
     return (products || [])
       .filter((p) => p.name.toLowerCase().includes(lower) || (p.sku && p.sku.toLowerCase().includes(lower)))
-      .slice(0, 25);
+      .slice(0, 30);
   }, [products, searchTerm]);
 
   const totalUnits = items.reduce((acc, row) => (row.matchedProduct ? acc + (Number(row.quantity) || 0) : acc), 0);
   const matchedCount = items.filter((r) => !!r.matchedProduct).length;
+  const unmatchedCount = items.length - matchedCount;
+
+  const displayedItems = React.useMemo(() => {
+    if (filterTab === 'needs_match') {
+      return items.filter((r) => !r.matchedProduct);
+    }
+    if (filterTab === 'matched') {
+      return items.filter((r) => !!r.matchedProduct);
+    }
+    return items;
+  }, [items, filterTab]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full my-3 rounded-2xl border border-border/80 bg-card shadow-sm overflow-hidden"
-    >
+    <div className="w-full my-3 rounded-2xl border border-border/80 bg-card shadow-sm overflow-hidden">
       {/* Header */}
       <div className="p-4 bg-muted/30 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-orange-500/10 text-orange-600 border border-orange-500/20 flex items-center justify-center shrink-0">
+          <div className="h-10 w-10 rounded-xl bg-orange-500/10 text-orange-600 border border-orange-500/20 flex items-center justify-center shrink-0 shadow-2xs">
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-foreground">{sheetTitle}</h3>
-              <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">
-                GPT-4o Vision
+              <Badge variant="outline" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-500/20 font-medium">
+                Zen Vision
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {matchedCount} of {items.length} items matched • {totalUnits} total units to update
+              {matchedCount} of {items.length} items matched
+              {imageUrls && imageUrls.length > 1 ? ` across ${imageUrls.length} photos` : ''} • {totalUnits} total units to update
             </p>
           </div>
         </div>
@@ -247,126 +424,114 @@ export function RestockSheetProposal({
         )}
       </div>
 
-      {/* Interactive Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-border/40 bg-muted/15 text-muted-foreground font-semibold">
-              <th className="py-2.5 px-3">From Photo</th>
-              <th className="py-2.5 px-3 min-w-[220px]">Matched Store Product</th>
-              <th className="py-2.5 px-3 w-28 text-center">Pieces</th>
-              <th className="py-2.5 px-3 min-w-[120px]">Stock Preview</th>
-              {status === 'pending' && <th className="py-2.5 px-3 w-10 text-center"></th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/30">
-            {items.map((row) => {
-              const matched = row.matchedProduct;
-              const liveProduct = products?.find((p) => p.id === matched?.id);
-              const currentStock = liveProduct?.stock ?? matched?.stock ?? 0;
-              const nextStock = mode === 'add' ? currentStock + (Number(row.quantity) || 0) : Number(row.quantity) || 0;
+      {/* Filter Tabs & Quick Summary */}
+      <div className="px-4 py-2.5 border-b border-border/40 bg-muted/10 flex items-center justify-between gap-2 flex-wrap text-xs">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setFilterTab('all')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg font-medium transition-colors',
+              filterTab === 'all'
+                ? 'bg-foreground text-background font-semibold'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
+          >
+            All Items ({items.length})
+          </button>
+          {unmatchedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterTab('needs_match')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg font-medium transition-colors flex items-center gap-1',
+                filterTab === 'needs_match'
+                  ? 'bg-amber-500 text-white font-semibold'
+                  : 'text-amber-600 dark:text-amber-400 hover:bg-amber-500/10'
+              )}
+            >
+              <AlertCircle className="h-3 w-3" />
+              Needs Match ({unmatchedCount})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setFilterTab('matched')}
+            className={cn(
+              'px-2.5 py-1 rounded-lg font-medium transition-colors',
+              filterTab === 'matched'
+                ? 'bg-emerald-600 text-white font-semibold'
+                : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+            )}
+          >
+            Matched ({matchedCount})
+          </button>
+        </div>
 
-              return (
-                <tr key={row.id} className="hover:bg-muted/20 transition-colors group">
-                  {/* Photo note */}
-                  <td className="py-2.5 px-3">
-                    <span className="font-medium text-foreground tracking-tight block truncate max-w-[150px] sm:max-w-[190px]" title={row.rawName}>
-                      {row.rawName}
+        <span className="text-[11px] text-muted-foreground">
+          Cross-referenced with live store inventory
+        </span>
+      </div>
+
+      {/* Product Match Deck (Cards View) */}
+      <div className="p-3 sm:p-4 space-y-3 max-h-[72vh] overflow-y-auto">
+        {displayedItems.length === 0 ? (
+          <div className="text-center py-8 text-xs text-muted-foreground">
+            No items in this filter view.
+          </div>
+        ) : (
+          displayedItems.map((row, idx) => {
+            const matched = row.matchedProduct;
+            const liveProduct = products?.find((p) => p.id === matched?.id);
+            const currentStock = liveProduct?.stock ?? matched?.stock ?? 0;
+            const nextStock = mode === 'add' ? currentStock + (Number(row.quantity) || 0) : Number(row.quantity) || 0;
+            const isUnmatched = !matched;
+
+            return (
+              <div
+                key={row.id}
+                className={cn(
+                  'rounded-2xl border p-3.5 sm:p-4 transition-all bg-card shadow-2xs flex flex-col gap-3',
+                  isUnmatched
+                    ? 'border-amber-500/40 bg-amber-500/[0.02]'
+                    : 'border-border/80 hover:border-primary/40'
+                )}
+              >
+                {/* Top Row: Scanned photo line & Quantity Stepper */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <span className="h-6 px-2 rounded-md bg-muted text-[11px] font-semibold text-muted-foreground flex items-center justify-center shrink-0">
+                      #{idx + 1}
                     </span>
-                    {row.price != null && (
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        ₦{Number(row.price).toLocaleString()}
-                      </span>
-                    )}
-                  </td>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/80 flex items-center gap-1">
+                          <Camera className="h-3 w-3 text-orange-500" /> Scanned Line
+                        </span>
+                        {row.price != null && (
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-mono">
+                            ₦{Number(row.price).toLocaleString()} unit cost
+                          </Badge>
+                        )}
+                      </div>
+                      <h4 className="text-sm sm:text-base font-bold text-foreground mt-0.5 break-words">
+                        {row.rawName}
+                      </h4>
+                    </div>
+                  </div>
 
-                  {/* Matched Product Picker */}
-                  <td className="py-2.5 px-3">
-                    <Popover
-                      open={activeSearchRowId === row.id}
-                      onOpenChange={(open) => {
-                        if (status !== 'pending') return;
-                        setActiveSearchRowId(open ? row.id : null);
-                        setSearchTerm('');
-                      }}
-                    >
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          disabled={status !== 'pending'}
-                          className={cn(
-                            'w-full text-left p-1.5 rounded-xl border flex items-center justify-between gap-2 transition-all',
-                            matched
-                              ? 'bg-card border-border hover:border-primary/50'
-                              : 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400',
-                            status !== 'pending' && 'cursor-default pointer-events-none'
-                          )}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden text-[10px]">
-                              {matched?.imageUrl ? (
-                                <img src={matched.imageUrl} alt="" className="h-full w-full object-contain" />
-                              ) : (
-                                <Package className="h-3 w-3 text-muted-foreground" />
-                              )}
-                            </div>
-                            <span className="truncate font-medium text-xs">
-                              {matched ? matched.name : 'Select or search matching product...'}
-                            </span>
-                          </div>
-                          {status === 'pending' && (
-                            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0 opacity-60" />
-                          )}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-72 p-2" align="start">
-                        <div className="relative mb-2">
-                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                          <Input
-                            placeholder="Search catalog products..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="h-8 pl-8 text-xs"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="max-h-48 overflow-y-auto space-y-1">
-                          {filteredCatalogProducts.map((prod) => (
-                            <button
-                              key={prod.id}
-                              type="button"
-                              onClick={() => handleSelectProduct(row.id, prod)}
-                              className="w-full text-left p-2 rounded-lg hover:bg-muted flex items-center justify-between gap-2 transition-colors text-xs"
-                            >
-                              <div className="min-w-0">
-                                <p className="font-semibold truncate">{prod.name}</p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  Stock: {prod.stock ?? 0} • ₦{Number(prod.price).toLocaleString()}
-                                </p>
-                              </div>
-                              {matched?.id === prod.id && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
-                            </button>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => handleSelectProduct(row.id, null)}
-                            className="w-full text-left p-2 rounded-lg hover:bg-destructive/10 text-destructive text-xs transition-colors"
-                          >
-                            Unlink / Skip this row
-                          </button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </td>
-
-                  {/* Quantity / Pieces input */}
-                  <td className="py-2.5 px-3 text-center">
+                  {/* Quantity Stepper */}
+                  <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0 bg-muted/40 p-1.5 rounded-xl border border-border/60">
+                    <span className="text-[11px] font-medium text-muted-foreground px-1">
+                      {mode === 'add' ? 'Add Units:' : 'Set Count:'}
+                    </span>
                     {status === 'pending' ? (
-                      <div className="inline-flex items-center border border-border/80 rounded-lg overflow-hidden bg-background">
+                      <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-background shadow-2xs">
                         <button
                           type="button"
                           onClick={() => handleQuantityChange(row.id, row.quantity - 1)}
-                          className="px-2 py-1 text-muted-foreground hover:bg-muted transition-colors font-bold text-xs"
+                          className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground font-bold transition-colors text-sm"
+                          title="Decrease"
                         >
                           -
                         </button>
@@ -375,58 +540,237 @@ export function RestockSheetProposal({
                           min="0"
                           value={row.quantity}
                           onChange={(e) => handleQuantityChange(row.id, parseInt(e.target.value, 10) || 0)}
-                          className="w-12 text-center text-xs font-semibold tabular-nums outline-none bg-transparent"
+                          className="w-14 text-center text-sm font-bold tabular-nums outline-none bg-transparent"
                         />
                         <button
                           type="button"
                           onClick={() => handleQuantityChange(row.id, row.quantity + 1)}
-                          className="px-2 py-1 text-muted-foreground hover:bg-muted transition-colors font-bold text-xs"
+                          className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground font-bold transition-colors text-sm"
+                          title="Increase"
                         >
                           +
                         </button>
                       </div>
                     ) : (
-                      <span className="font-bold text-foreground tabular-nums">{row.quantity}</span>
+                      <span className="font-bold text-foreground text-sm px-2 tabular-nums">
+                        {row.quantity} pcs
+                      </span>
                     )}
-                  </td>
+                  </div>
+                </div>
 
-                  {/* Stock preview */}
-                  <td className="py-2.5 px-3">
-                    {matched ? (
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="text-muted-foreground tabular-nums">{currentStock}</span>
-                        <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                          {nextStock}
-                        </span>
+                {/* Middle Row: Cross-checked Store Product Card */}
+                <div>
+                  {matched ? (
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-xl bg-muted/20 border border-border/60">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-12 w-12 rounded-xl bg-background border border-border/80 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                          {matched.imageUrl ? (
+                            <img src={matched.imageUrl} alt={matched.name} className="h-full w-full object-contain" />
+                          ) : (
+                            <Package className="h-6 w-6 text-muted-foreground/60" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-sm text-foreground truncate max-w-xs sm:max-w-md">
+                              {matched.name}
+                            </p>
+                            {row.matchConfidence ? (
+                              row.matchConfidence >= 0.85 ? (
+                                <Badge className="text-[10px] py-0 px-1.5 bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-semibold gap-1">
+                                  <Check className="h-3 w-3" /> Exact ({Math.round(row.matchConfidence * 100)}%)
+                                </Badge>
+                              ) : (
+                                <Badge className="text-[10px] py-0 px-1.5 bg-amber-500/10 text-amber-600 border-amber-500/30 font-semibold gap-1">
+                                  <Sparkles className="h-3 w-3" /> Best Match ({Math.round(row.matchConfidence * 100)}%)
+                                </Badge>
+                              )
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-medium">
+                                Matched
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                            <span>Current: <strong className="text-foreground">{currentStock}</strong> in stock</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                              <span>After restock: {nextStock}</span>
+                              <span className="text-[10px] font-normal text-muted-foreground">({mode === 'add' ? `+${row.quantity}` : 'set'})</span>
+                            </span>
+                            <span>•</span>
+                            <span>₦{Number(matched.price).toLocaleString()}</span>
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground italic">No product chosen</span>
-                    )}
-                  </td>
 
-                  {/* Delete row */}
-                  {status === 'pending' && (
-                    <td className="py-2.5 px-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRow(row.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-md"
-                        title="Remove row"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
+                      {/* Change / Search Popover & Delete */}
+                      {status === 'pending' && (
+                        <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+                          <Popover
+                            open={activeSearchRowId === row.id}
+                            onOpenChange={(open) => {
+                              setActiveSearchRowId(open ? row.id : null);
+                              setSearchTerm(open ? row.rawName : '');
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 font-medium">
+                                <Search className="h-3.5 w-3.5" />
+                                <span>Change Product</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-2.5" align="end">
+                              <div className="relative mb-2">
+                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                  placeholder="Search catalog products..."
+                                  value={searchTerm}
+                                  onChange={(e) => setSearchTerm(e.target.value)}
+                                  className="h-8 pl-8 text-xs"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="max-h-52 overflow-y-auto space-y-1">
+                                {filteredCatalogProducts.map((prod) => (
+                                  <button
+                                    key={prod.id}
+                                    type="button"
+                                    onClick={() => handleSelectProduct(row.id, prod)}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-muted flex items-center justify-between gap-2 transition-colors text-xs"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="font-semibold truncate">{prod.name}</p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        Stock: {prod.stock ?? 0} • ₦{Number(prod.price).toLocaleString()}
+                                      </p>
+                                    </div>
+                                    {matched?.id === prod.id && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectProduct(row.id, null)}
+                                  className="w-full text-left p-2 rounded-lg hover:bg-destructive/10 text-destructive text-xs transition-colors"
+                                >
+                                  Unlink this product
+                                </button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRow(row.id)}
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors"
+                            title="Remove row"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Unmatched State with Top Suggestion */
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                            No exact inventory match found
+                          </p>
+                          {row.topCandidate ? (
+                            <div className="mt-1 flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-muted-foreground">
+                                Did you mean: <strong className="text-foreground">{row.topCandidate.product.name}</strong>?
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleSelectProduct(row.id, row.topCandidate!.product)}
+                                className="text-xs text-primary font-bold hover:underline inline-flex items-center gap-1"
+                              >
+                                ✓ Use this ({Math.round(row.topCandidate.score * 100)}% match)
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Search your store catalog to pair with this scanned item.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Search Catalog Button */}
+                      {status === 'pending' && (
+                        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                          <Popover
+                            open={activeSearchRowId === row.id}
+                            onOpenChange={(open) => {
+                              setActiveSearchRowId(open ? row.id : null);
+                              setSearchTerm(open ? row.rawName : '');
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button size="sm" className="h-8 text-xs gap-1.5 bg-orange-600 hover:bg-orange-700 text-white font-medium shadow-2xs">
+                                <Search className="h-3.5 w-3.5" />
+                                <span>Search Catalog</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-2.5" align="end">
+                              <div className="relative mb-2">
+                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                  placeholder="Search catalog products..."
+                                  value={searchTerm}
+                                  onChange={(e) => setSearchTerm(e.target.value)}
+                                  className="h-8 pl-8 text-xs"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="max-h-52 overflow-y-auto space-y-1">
+                                {filteredCatalogProducts.map((prod) => (
+                                  <button
+                                    key={prod.id}
+                                    type="button"
+                                    onClick={() => handleSelectProduct(row.id, prod)}
+                                    className="w-full text-left p-2 rounded-lg hover:bg-muted flex items-center justify-between gap-2 transition-colors text-xs"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="font-semibold truncate">{prod.name}</p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        Stock: {prod.stock ?? 0} • ₦{Number(prod.price).toLocaleString()}
+                                      </p>
+                                    </div>
+                                    <Check className="h-3.5 w-3.5 text-transparent group-hover:text-primary shrink-0" />
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRow(row.id)}
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors"
+                            title="Remove row"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Footer & Actions */}
-      <div className="p-3 bg-muted/20 border-t border-border/60 flex flex-wrap items-center justify-between gap-3">
+      <div className="p-3.5 bg-muted/20 border-t border-border/60 flex flex-wrap items-center justify-between gap-3">
         {status === 'pending' ? (
           <>
             <button
@@ -435,7 +779,7 @@ export function RestockSheetProposal({
               className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
             >
               <Plus className="h-3.5 w-3.5 text-orange-500" />
-              <span>Add another product row</span>
+              <span>Add another product item</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -452,8 +796,9 @@ export function RestockSheetProposal({
                 type="button"
                 size="sm"
                 onClick={handleApprove}
-                disabled={isApplying || matchedCount === 0}
-                className="text-xs h-8 bg-foreground text-background hover:opacity-90 gap-1.5 shadow-sm"
+                disabled={isApplying || matchedCount === 0 || isReadOnly}
+                title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                className="text-xs h-8 bg-foreground text-background hover:opacity-90 gap-1.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isApplying ? (
                   <>
@@ -481,6 +826,6 @@ export function RestockSheetProposal({
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
-}
+});

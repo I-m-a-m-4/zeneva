@@ -8,6 +8,7 @@ import { usePOS } from '@/context/pos-context';
 import { doc, deleteDoc, updateDoc, serverTimestamp, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import type { Customer, Receipt, CustomerInsightsOutput, Product } from '@/types';
 import { generateLocalCustomerIntelligence } from '@/lib/customer-intelligence';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import NProgress from 'nprogress';
 
 import { Button } from '@/components/ui/button';
@@ -79,7 +80,8 @@ function CustomerDetailContent() {
     const { toast } = useToast();
     const { t } = useI18n();
 
-    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue, business, selectCustomer } = usePOS();
+    const { firestore, currencySymbol, customers, products: allProducts, receipts: allReceipts, isLoading: isPosLoading, currentUserProfile, triggerRefresh, addToQueue, business, selectCustomer, isReadOnly } = usePOS();
+    const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
 
     const customer = React.useMemo(() => customers?.find(c => c.id === customerId), [customers, customerId]);
     
@@ -361,6 +363,14 @@ function CustomerDetailContent() {
 
 
     const handleGenerateInsights = async () => {
+        if (isReadOnlyStore) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. AI customer insights are disabled.',
+                variant: 'destructive',
+            });
+            return;
+        }
         if (!customer || !receipts || !firestore || !currentUserProfile) {
             toast({
                 variant: "destructive",
@@ -561,11 +571,29 @@ function CustomerDetailContent() {
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-2">
-                        <Button variant="outline" className="w-full" onClick={() => setCustomerToEdit(displayCustomer)}>
+                        <Button 
+                            variant="outline" 
+                            className="w-full disabled:opacity-40 disabled:cursor-not-allowed" 
+                            disabled={isReadOnlyStore}
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                            onClick={() => {
+                                if (isReadOnlyStore) return;
+                                setCustomerToEdit(displayCustomer);
+                            }}
+                        >
                             <Pencil className="mr-2 h-4 w-4" /> {t('customers.editProfile')}
                         </Button>
                         {canDelete && (
-                            <Button variant="destructive" className="w-full" onClick={() => setCustomerToDelete(displayCustomer)} disabled={isDeleting}>
+                            <Button 
+                                variant="destructive" 
+                                className="w-full disabled:opacity-40 disabled:cursor-not-allowed" 
+                                disabled={isDeleting || isReadOnlyStore}
+                                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                                onClick={() => {
+                                    if (isReadOnlyStore) return;
+                                    setCustomerToDelete(displayCustomer);
+                                }}
+                            >
                                 <Trash2 className="mr-2 h-4 w-4" /> {t('customers.deleteCustomer')}
                             </Button>
                         )}
@@ -645,8 +673,11 @@ function CustomerDetailContent() {
 
                     <CardFooter className="border-t border-border/40 pt-4 flex flex-col sm:flex-row gap-3">
                         <Button 
-                            className="w-full flex-1" 
+                            className="w-full flex-1 disabled:opacity-40 disabled:cursor-not-allowed" 
+                            disabled={isReadOnlyStore}
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
                             onClick={() => {
+                                if (isReadOnlyStore) return;
                                 if (selectCustomer) selectCustomer(displayCustomer);
                                 NProgress.start();
                                 router.push('/sales/pos/select-products');
@@ -656,8 +687,11 @@ function CustomerDetailContent() {
                         </Button>
                         <Button 
                             variant="outline" 
-                            className="w-full flex-1"
+                            className="w-full flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={isReadOnlyStore}
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
                             onClick={() => {
+                                if (isReadOnlyStore) return;
                                 if (selectCustomer) selectCustomer(displayCustomer);
                                 toast({
                                     variant: "success",
@@ -684,6 +718,7 @@ function CustomerDetailContent() {
                         customer={displayCustomer}
                         outstanding={totalDebt}
                         currencySymbol={currencySymbol}
+                        isReadOnly={isReadOnlyStore}
                     />
                 </div>
 
@@ -842,7 +877,12 @@ function CustomerDetailContent() {
                         <div className="text-center p-8 border-2 border-dashed rounded-lg">
                             <p className="font-medium">{t('customers.analyticsReady')}</p>
                             <p className="text-sm text-muted-foreground mb-4">{t('customers.analyticsReadyDesc')}</p>
-                            <Button onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
+                            <Button 
+                                onClick={handleGenerateInsights} 
+                                disabled={isGeneratingInsights || isReadOnlyStore}
+                                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                                className="disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
                                 {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 {t('customers.generateAnalysis')}
                             </Button>
@@ -872,7 +912,13 @@ function CustomerDetailContent() {
                                     {insights.engagementTactics.map((tactic, i) => <li key={i}>{tactic}</li>)}
                                 </ul>
                             </div>
-                            <Button variant="outline" onClick={handleGenerateInsights} disabled={isGeneratingInsights}>
+                            <Button 
+                                variant="outline" 
+                                onClick={handleGenerateInsights} 
+                                disabled={isGeneratingInsights || isReadOnlyStore}
+                                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                                className="disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
                                 {isGeneratingInsights ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 {t('customers.regenerate')}
                             </Button>
@@ -893,6 +939,15 @@ function CustomerDetailContent() {
                         <AlertDialogCancel disabled={isDeleting} onClick={() => setCustomerToDelete(null)}>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={async () => {
+                                if (isReadOnlyStore) {
+                                    toast({
+                                        variant: 'destructive',
+                                        title: 'Plan Expired (Read-Only Mode)',
+                                        description: 'Deleting customers is disabled in read-only mode.',
+                                    });
+                                    setCustomerToDelete(null);
+                                    return;
+                                }
                                 if (!customerToDelete || !firestore || !currentUserProfile) {
                                     toast({
                                         variant: 'destructive',
@@ -949,8 +1004,9 @@ function CustomerDetailContent() {
                                     setIsDeleting(false);
                                 }
                             }}
-                            className="bg-destructive hover:bg-destructive/90"
-                            disabled={isDeleting}
+                            className="bg-destructive hover:bg-destructive/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={isDeleting || isReadOnlyStore}
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
                         >
                             {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {t('common.delete')}
@@ -963,6 +1019,7 @@ function CustomerDetailContent() {
                 isOpen={!!customerToEdit}
                 onOpenChange={(open) => !open && setCustomerToEdit(null)}
                 customer={customerToEdit}
+                isReadOnly={isReadOnlyStore}
             />
         </div>
     );

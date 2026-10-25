@@ -73,6 +73,7 @@ interface CustomerHealthPanelProps {
   /** Every code in the book, normalised — so a suggested code cannot collide. */
   codesInUse: Set<string>;
   busy?: boolean;
+  disabled?: boolean;
 }
 
 function Tile({
@@ -198,6 +199,7 @@ export default function CustomerHealthPanel({
   onRecode,
   codesInUse,
   busy,
+  disabled,
 }: CustomerHealthPanelProps) {
   const [pendingMerge, setPendingMerge] = React.useState<DuplicateGroup | null>(null);
 
@@ -370,8 +372,9 @@ export default function CustomerHealthPanel({
                                   key={m.id}
                                   size="sm"
                                   variant="outline"
-                                  className="h-8"
-                                  disabled={busy}
+                                  className="h-8 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  disabled={busy || disabled}
+                                  title={disabled ? 'Plan expired (Read-only mode)' : undefined}
                                   onClick={() => onRecode(m, suggested)}
                                 >
                                   <Hash className="me-1 h-3.5 w-3.5" />
@@ -384,8 +387,9 @@ export default function CustomerHealthPanel({
                           <Button
                             size="sm"
                             variant={copy.certain ? 'default' : 'outline'}
-                            className="h-8"
-                            disabled={busy}
+                            className="h-8 disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={busy || disabled}
+                            title={disabled ? 'Plan expired (Read-only mode)' : undefined}
                             onClick={() => setPendingMerge(group)}
                           >
                             {busy ? (
@@ -461,7 +465,11 @@ export default function CustomerHealthPanel({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={disabled}
+              title={disabled ? 'Plan expired (Read-only mode)' : undefined}
+              className="disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={() => {
+                if (disabled) return;
                 if (pendingMerge) onMerge(pendingMerge);
                 setPendingMerge(null);
               }}

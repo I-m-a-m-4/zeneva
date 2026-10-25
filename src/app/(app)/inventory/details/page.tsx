@@ -167,6 +167,7 @@ function EditProductContent() {
 
     const { toast } = useToast();
     const { currentUserProfile, business, queuedActions, addToQueue, products } = usePOS();
+    const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
     const { t } = useI18n();
     const firestore = useFirestore();
 
@@ -755,6 +756,14 @@ function EditProductContent() {
 
     const handleToggleArchive = async () => {
         if (!productId || !business || !currentUserProfile || !product) return;
+        if (isReadOnly) {
+            toast({
+                title: 'Trial Expired (Read-Only Mode)',
+                description: 'Your 30-day trial or plan has expired. Please upgrade to change product status.',
+                variant: 'destructive',
+            });
+            return;
+        }
         const newArchived = !product.isArchived;
 
         addToQueue({
@@ -800,6 +809,14 @@ function EditProductContent() {
 
     const handleDelete = async () => {
         if (!productId || !business || !currentUserProfile) return;
+        if (isReadOnly) {
+            toast({
+                title: 'Trial Expired (Read-Only Mode)',
+                description: 'Your 30-day trial or plan has expired. Please upgrade to delete products.',
+                variant: 'destructive',
+            });
+            return;
+        }
 
         setIsDeleteDialogOpen(false);
 
@@ -876,10 +893,14 @@ function EditProductContent() {
                                 size="lg"
                                 type="button"
                                 onClick={handleToggleArchive}
-                                disabled={isSaving}
-                                className={product?.isArchived 
-                                    ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors" 
-                                    : "border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"}
+                                disabled={isSaving || isReadOnly}
+                                title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                                className={cn(
+                                    "disabled:opacity-40 disabled:cursor-not-allowed",
+                                    product?.isArchived 
+                                        ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors" 
+                                        : "border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                                )}
                             >
                                 {product?.isArchived ? (
                                     <>
@@ -895,13 +916,27 @@ function EditProductContent() {
                             </Button>
                         )}
                         {canManageProduct && (
-                            <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
+                            <Button
+                                variant="destructive"
+                                size="lg"
+                                type="button"
+                                onClick={() => setIsDeleteDialogOpen(true)}
+                                disabled={isSaving || isReadOnly}
+                                title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                                className="disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 {t('common.delete')}
                             </Button>
                         )}
                         {canManageProduct && (
-                            <Button size="lg" type="submit" disabled={isSaving}>
+                            <Button
+                                size="lg"
+                                type="submit"
+                                disabled={isSaving || isReadOnly}
+                                title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                                className="disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
                             </Button>
@@ -1852,13 +1887,27 @@ function EditProductContent() {
                         </Button>
                     )}
                     {canManageProduct && (
-                        <Button variant="destructive" size="lg" type="button" onClick={() => setIsDeleteDialogOpen(true)} disabled={isSaving}>
+                        <Button
+                            variant="destructive"
+                            size="lg"
+                            type="button"
+                            onClick={() => setIsDeleteDialogOpen(true)}
+                            disabled={isSaving || isReadOnly}
+                            title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                            className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                             <Trash2 className="mr-2 h-4 w-4" />
                             {t('common.delete')}
                         </Button>
                     )}
                     {canManageProduct && (
-                        <Button size="lg" type="submit" disabled={isSaving}>
+                        <Button
+                            size="lg"
+                            type="submit"
+                            disabled={isSaving || isReadOnly}
+                            title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                            className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
                         </Button>

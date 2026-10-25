@@ -35,6 +35,7 @@
 import * as React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { usePOS, useBusiness } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import type { Customer } from '@/types';
 
 import {
@@ -79,6 +80,7 @@ export function useCustomerImport(onFinished: () => void) {
     triggerConfetti,
     currencySymbol,
   } = usePOS();
+  const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
 
   const [stage, setStage] = React.useState<CustomerImportStage>('pick');
   const [source, setSource] = React.useState<CustomerImportSource>('spreadsheet');
@@ -456,6 +458,15 @@ export function useCustomerImport(onFinished: () => void) {
 
   const commit = React.useCallback(() => {
     if (!business?.id) return;
+    if (isReadOnly) {
+      setError('Your plan has expired. Importing customers is disabled in read-only mode.');
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Importing customers is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const bundle = buildCustomerWrites(
       plan,
@@ -536,7 +547,7 @@ export function useCustomerImport(onFinished: () => void) {
     // edits
     changeMapping, decideRow, editDraft, removeRow, proceedToReview,
     // control
-    commit, reset, setError,
+    commit, reset, setError, isReadOnly,
   };
 }
 

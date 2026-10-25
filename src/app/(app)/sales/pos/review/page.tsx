@@ -29,9 +29,10 @@ import { qualifyReferralOnSale } from '@/actions/referral';
 function ReviewPageContent() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, amountReceived, currencySymbol, resetPOS, products, currentUserProfile, offlineProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, amountReceived, currencySymbol, resetPOS, products, currentUserProfile, offlineProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale, isReadOnly } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
+    const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
     const { user } = useUser();
     const { t, locale } = useI18n();
     const [isCompleting, setIsCompleting] = React.useState(false);
@@ -115,6 +116,15 @@ function ReviewPageContent() {
 
         if (!canCompleteSale) {
             toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
+            return;
+        }
+
+        if (isReadOnlyStore) {
+            toast({
+                title: t('pos.readOnlyTitle', 'Read-Only Mode'),
+                description: t('pos.readOnlyDesc', 'Your trial or subscription has expired. Please upgrade to record sales.'),
+                variant: 'destructive',
+            });
             return;
         }
 
@@ -613,14 +623,28 @@ function ReviewPageContent() {
                     </div>
 
                     <div className="flex flex-col gap-2 pt-2">
-                        <Button size="lg" className="w-full text-lg h-12 shadow-md hover:shadow-lg transition-all" onClick={handleCompleteSale} disabled={isCompleting}>
+                        <Button 
+                            size="lg" 
+                            className="w-full text-lg h-12 shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed" 
+                            onClick={handleCompleteSale} 
+                            disabled={isCompleting || isReadOnlyStore}
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                        >
                             {isCompleting && <Loader2 className="me-2 h-5 w-5 animate-spin" />}
                             {isCompleting ? t('pos.finalizing') : (paymentMethod === 'Invoice' ? t('pos.issueInvoice') : t('pos.completeSale'))}
                         </Button>
-                        <Button size="lg" className="w-full h-12" variant="outline" onClick={() => {
-                            holdCurrentSale();
-                            router.push('/sales/pos/select-products');
-                        }} disabled={isCompleting}>
+                        <Button 
+                            size="lg" 
+                            className="w-full h-12 disabled:opacity-40 disabled:cursor-not-allowed" 
+                            variant="outline" 
+                            onClick={() => {
+                                if (isReadOnlyStore) return;
+                                holdCurrentSale();
+                                router.push('/sales/pos/select-products');
+                            }} 
+                            disabled={isCompleting || isReadOnlyStore}
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                        >
                             {t('pos.parkSale')}
                         </Button>
                         <Button size="lg" className="w-full" variant="outline" asChild>

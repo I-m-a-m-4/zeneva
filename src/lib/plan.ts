@@ -85,6 +85,18 @@ export const AI_MONTHLY_LIMITS: Record<PlanId, number> = {
 };
 
 /**
+ * Daily Zen Vision image allowance per plan.
+ * Starter: 5 images/day
+ * Pro: 10 images/day
+ * Business: 15 images/day
+ */
+export const AI_IMAGE_DAILY_LIMITS: Record<PlanId, number> = {
+  starter: 5,
+  pro: 10,
+  business: 15,
+};
+
+/**
  * List price per month. Must match `components/settings/subscription-section.tsx`
  * and the marketing pages — this is the same number, not an approximation of it.
  *
@@ -237,6 +249,11 @@ export function staffLimit(business: BusinessLike): number {
 /** Monthly Zen AI allowance in force right now. */
 export function aiMonthlyLimit(business: BusinessLike): number {
   return AI_MONTHLY_LIMITS[effectivePlan(business)];
+}
+
+/** Daily Zen Vision image allowance in force right now. */
+export function aiImageDailyLimit(business: BusinessLike): number {
+  return AI_IMAGE_DAILY_LIMITS[effectivePlan(business)];
 }
 
 /** Pro-tier features: also available to Business and lifetime. */

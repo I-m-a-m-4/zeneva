@@ -94,6 +94,7 @@ import {
   Printer,
 } from "lucide-react";
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
@@ -288,7 +289,8 @@ function ExpensesAndPurchasesContent() {
   const searchParams = useSearchParams();
   const initialTabParam = searchParams.get('tab');
 
-  const { business, currentUserProfile, products } = usePOS();
+  const { business, currentUserProfile, products, isReadOnly } = usePOS();
+  const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
   
   const canViewPurchasesAndSuppliers = currentUserProfile?.role !== 'vendor_operator';
   const firestore = useFirestore();
@@ -927,6 +929,14 @@ function ExpensesAndPurchasesContent() {
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !business?.id) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Please upgrade to record expenses.',
+        variant: 'destructive',
+      });
+      return;
+    }
     const amt = parseFloat(expenseAmount);
     if (!expenseTitle.trim() || isNaN(amt) || amt <= 0) {
       toast({ variant: 'destructive', title: 'Invalid Expense', description: 'Please enter a valid title and amount.' });
@@ -992,6 +1002,14 @@ function ExpensesAndPurchasesContent() {
 
   const handleDeleteExpense = async () => {
     if (!firestore || !business?.id || !deletingExpense) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Modifications are disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       await deleteDoc(doc(firestore, 'expenses', deletingExpense.id));
@@ -1063,6 +1081,14 @@ function ExpensesAndPurchasesContent() {
   const handleCreatePurchaseOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !business?.id) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Please upgrade to create purchase orders.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (!orderSupplierId) {
       toast({ variant: 'destructive', title: 'Supplier Required', description: 'Please pick or add a supplier.' });
@@ -1156,6 +1182,14 @@ function ExpensesAndPurchasesContent() {
 
   const handleReceivePurchaseOrder = async (purchase: SupplierPurchase) => {
     if (!firestore || !business?.id) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Stock updates are disabled in read-only mode.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -1216,6 +1250,14 @@ function ExpensesAndPurchasesContent() {
 
   const handleRecordOrderPayment = async (purchase: SupplierPurchase) => {
     if (!firestore || !business?.id) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Payment recordings are disabled in read-only mode.',
+        variant: 'destructive',
+      });
+      return;
+    }
     const amount = parseFloat(payAmount);
     if (isNaN(amount) || amount <= 0) {
       toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
@@ -1279,6 +1321,14 @@ function ExpensesAndPurchasesContent() {
 
   const handleDeletePurchaseOrder = async () => {
     if (!firestore || !business?.id || !deletingPurchase) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Deletions are disabled in read-only mode.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       // 1. Delete purchase order doc from supplier_purchases
@@ -1437,6 +1487,14 @@ function ExpensesAndPurchasesContent() {
   const handleCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !business?.id || !supplierName.trim()) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Trial Expired (Read-Only Mode)',
+        description: 'Your 30-day trial or plan has expired. Adding suppliers is disabled in read-only mode.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -1810,19 +1868,48 @@ function ExpensesAndPurchasesContent() {
             </Button>
           )}
           {activeTab === 'suppliers' && (
-            <Button variant="outline" size="sm" onClick={() => setIsAddSupplierOpen(true)} className="group hover:bg-primary hover:text-white transition-colors">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              onClick={() => {
+                if (isReadOnlyStore) return;
+                setIsAddSupplierOpen(true);
+              }}
+              className="group hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <PlusCircle className="h-4 w-4 me-2 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
               Add Supplier
             </Button>
           )}
 
-          <Button onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }} variant="outline" className="shadow-xs group hover:bg-primary hover:text-white transition-colors">
+          <Button
+            onClick={() => {
+              if (isReadOnlyStore) return;
+              resetExpenseForm();
+              setIsAddExpenseOpen(true);
+            }}
+            disabled={isReadOnlyStore}
+            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+            variant="outline"
+            className="shadow-xs group hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             <PlusCircle className="h-4 w-4 me-2 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
             Record Expense
           </Button>
 
           {canViewPurchasesAndSuppliers && (
-            <Button onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }} className="shadow-sm group bg-primary text-white hover:bg-primary/90 transition-colors">
+            <Button
+              onClick={() => {
+                if (isReadOnlyStore) return;
+                resetOrderForm();
+                setIsAddOrderOpen(true);
+              }}
+              disabled={isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="shadow-sm group bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <Truck className="h-4 w-4 me-2 text-white group-hover:text-white transition-colors" />
               New Purchase Order
             </Button>
@@ -2277,10 +2364,16 @@ function ExpensesAndPurchasesContent() {
                   </div>
                 )}
                 <Button 
-                  onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }}
+                  onClick={() => {
+                    if (isReadOnlyStore) return;
+                    resetExpenseForm();
+                    setIsAddExpenseOpen(true);
+                  }}
+                  disabled={isReadOnlyStore}
+                  title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
                   variant="outline" 
                   size="sm" 
-                  className="w-full text-xs mt-2 group hover:bg-primary hover:text-white transition-colors"
+                  className="w-full text-xs mt-2 group hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <PlusCircle className="h-3.5 w-3.5 mr-1.5 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
                   Record New Expense
@@ -2354,10 +2447,16 @@ function ExpensesAndPurchasesContent() {
                 )}
                 {canViewPurchasesAndSuppliers && (
                   <Button 
-                    onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }}
+                    onClick={() => {
+                      if (isReadOnlyStore) return;
+                      resetOrderForm();
+                      setIsAddOrderOpen(true);
+                    }}
+                    disabled={isReadOnlyStore}
+                    title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
                     variant="outline" 
                     size="sm" 
-                    className="w-full text-xs mt-2 group hover:bg-primary hover:text-white transition-colors"
+                    className="w-full text-xs mt-2 group hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Truck className="h-3.5 w-3.5 mr-1.5 text-orange-500 dark:text-orange-400 group-hover:text-white transition-colors" />
                     New Purchase Order
@@ -2614,7 +2713,17 @@ function ExpensesAndPurchasesContent() {
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                     Record operational shop costs like generator fuel, staff salaries, rent, and packaging to keep track of overheads.
                   </p>
-                  <Button onClick={() => { resetExpenseForm(); setIsAddExpenseOpen(true); }} size="sm" className="group bg-primary text-white hover:bg-primary/90">
+                  <Button
+                    onClick={() => {
+                      if (isReadOnlyStore) return;
+                      resetExpenseForm();
+                      setIsAddExpenseOpen(true);
+                    }}
+                    disabled={isReadOnlyStore}
+                    title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                    size="sm"
+                    className="group bg-primary text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     <PlusCircle className="h-4 w-4 me-2 text-white group-hover:text-white" />
                     Record First Expense
                   </Button>
@@ -2703,7 +2812,7 @@ function ExpensesAndPurchasesContent() {
                                   <Download className="h-4 w-4 mr-2" />
                                   Download Voucher (PDF)
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => {
+                                <DropdownMenuItem disabled={isReadOnlyStore} onClick={() => {
                                   setEditingExpense(exp);
                                   setExpenseTitle(exp.title);
                                   setExpenseAmount(exp.amount.toString());
@@ -2719,7 +2828,7 @@ function ExpensesAndPurchasesContent() {
                                   <Pencil className="h-4 w-4 mr-2" />
                                   Edit Expense
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setDeletingExpense(exp)} className="text-destructive focus:text-destructive">
+                                <DropdownMenuItem disabled={isReadOnlyStore} onClick={() => setDeletingExpense(exp)} className="text-destructive focus:text-destructive">
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete
                                 </DropdownMenuItem>
@@ -2974,7 +3083,13 @@ function ExpensesAndPurchasesContent() {
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                     Create purchase orders when buying stock from distributors or wholesalers. Products will automatically restock into inventory when marked received.
                   </p>
-                  <Button onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }} size="sm" className="group bg-primary text-white hover:bg-primary/90">
+                  <Button 
+                    onClick={() => { resetOrderForm(); setIsAddOrderOpen(true); }} 
+                    disabled={isReadOnlyStore}
+                    title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                    size="sm" 
+                    className="group bg-primary text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     <Truck className="h-4 w-4 me-2 text-white group-hover:text-white" />
                     New Purchase Order
                   </Button>
@@ -3086,14 +3201,14 @@ function ExpensesAndPurchasesContent() {
                                 </DropdownMenuItem>
 
                                 {purchase.status === 'ordered' && (
-                                  <DropdownMenuItem onClick={() => setReceivingPurchase(purchase)} className="text-emerald-600 focus:text-emerald-600">
+                                  <DropdownMenuItem disabled={isReadOnlyStore} title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined} onClick={() => setReceivingPurchase(purchase)} className="text-emerald-600 focus:text-emerald-600">
                                     <Boxes className="h-4 w-4 mr-2" />
                                     Mark as Received & Restock
                                   </DropdownMenuItem>
                                 )}
 
                                 {purchase.balanceDue > 0 && (
-                                  <DropdownMenuItem onClick={() => {
+                                  <DropdownMenuItem disabled={isReadOnlyStore} title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined} onClick={() => {
                                     setPayingPurchase(purchase);
                                     setPayAmount(purchase.balanceDue.toString());
                                     setPayDeductionSource(purchase.deductionSource || 'revenue');
@@ -3103,7 +3218,7 @@ function ExpensesAndPurchasesContent() {
                                   </DropdownMenuItem>
                                 )}
 
-                                <DropdownMenuItem onClick={() => setDeletingPurchase(purchase)} className="text-destructive focus:text-destructive">
+                                <DropdownMenuItem disabled={isReadOnlyStore} title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined} onClick={() => setDeletingPurchase(purchase)} className="text-destructive focus:text-destructive">
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete Order
                                 </DropdownMenuItem>
@@ -3201,7 +3316,12 @@ function ExpensesAndPurchasesContent() {
                 className="pl-9"
               />
             </div>
-            <Button onClick={() => setIsAddSupplierOpen(true)} className="group bg-primary text-white hover:bg-primary/90 transition-colors">
+            <Button 
+              onClick={() => setIsAddSupplierOpen(true)} 
+              disabled={isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="group bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <PlusCircle className="h-4 w-4 me-2 text-white group-hover:text-white transition-colors" />
               Add New Supplier
             </Button>
@@ -3220,7 +3340,13 @@ function ExpensesAndPurchasesContent() {
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                   Add wholesalers, distributors, and vendors you buy inventory from to track purchase histories and outstanding debt.
                 </p>
-                <Button onClick={() => setIsAddSupplierOpen(true)} size="sm" className="group bg-primary text-white hover:bg-primary/90 transition-colors">
+                <Button 
+                  onClick={() => setIsAddSupplierOpen(true)} 
+                  disabled={isReadOnlyStore}
+                  title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                  size="sm" 
+                  className="group bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
                   <PlusCircle className="h-4 w-4 me-2 text-white group-hover:text-white transition-colors" />
                   Add First Supplier
                 </Button>
@@ -3536,7 +3662,12 @@ function ExpensesAndPurchasesContent() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting} className="h-10 px-5 text-xs font-semibold shadow-md">
+              <Button
+                type="submit"
+                disabled={submitting || isReadOnlyStore}
+                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                className="h-10 px-5 text-xs font-semibold shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {isEditExpenseOpen ? 'Save Changes' : 'Record Expense'}
               </Button>
@@ -3794,7 +3925,12 @@ function ExpensesAndPurchasesContent() {
               <Button type="button" variant="outline" onClick={() => setIsAddOrderOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button
+                type="submit"
+                disabled={submitting || isReadOnlyStore}
+                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                className="disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Create Purchase Order
               </Button>
@@ -3891,7 +4027,12 @@ function ExpensesAndPurchasesContent() {
               <Button type="button" variant="outline" onClick={() => setIsAddSupplierOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button
+                type="submit"
+                disabled={submitting || isReadOnlyStore}
+                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                className="disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Save Supplier
               </Button>
@@ -4051,7 +4192,12 @@ function ExpensesAndPurchasesContent() {
               <Button variant="outline" onClick={() => setPayingPurchase(null)}>
                 Cancel
               </Button>
-              <Button onClick={() => handleRecordOrderPayment(payingPurchase)} disabled={submitting}>
+              <Button 
+                onClick={() => handleRecordOrderPayment(payingPurchase)} 
+                disabled={submitting || isReadOnlyStore}
+                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                className="disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Confirm Payment
               </Button>
@@ -4076,7 +4222,9 @@ function ExpensesAndPurchasesContent() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => receivingPurchase && handleReceivePurchaseOrder(receivingPurchase)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={submitting || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Restock Now
@@ -4096,7 +4244,12 @@ function ExpensesAndPurchasesContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteExpense} className="bg-destructive hover:bg-destructive/90 text-white">
+            <AlertDialogAction 
+              onClick={handleDeleteExpense} 
+              disabled={submitting || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="bg-destructive hover:bg-destructive/90 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -4126,8 +4279,9 @@ function ExpensesAndPurchasesContent() {
             <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeletePurchaseOrder}
-              disabled={submitting}
-              className="bg-destructive hover:bg-destructive/90 text-white"
+              disabled={submitting || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="bg-destructive hover:bg-destructive/90 text-white disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Delete Order

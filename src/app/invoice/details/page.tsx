@@ -11,6 +11,7 @@ import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, runTransaction } from "firebase/firestore";
 import type { Receipt, BusinessInstance } from "@/types";
 import { usePOS } from "@/context/pos-context";
+import { isCoreFeatureBlocked } from "@/lib/plan";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import { logAuditEvent } from "@/lib/audit";
 import { safeToDate } from "@/lib/utils";
@@ -22,7 +23,7 @@ function InvoiceContent() {
     const searchParams = useSearchParams();
     const invoiceId = searchParams.get('id');
     const router = useRouter();
-    const { business: posBusiness, user, receipts, currentUserProfile, voidReceipt } = usePOS();
+    const { business: posBusiness, user, receipts, currentUserProfile, voidReceipt, isReadOnly } = usePOS();
 
     const firestore = useFirestore();
     const invoiceRef = useMemoFirebase(() => (firestore && invoiceId ? doc(firestore, 'receipts', invoiceId) : null), [firestore, invoiceId]);
@@ -42,6 +43,7 @@ function InvoiceContent() {
     const { data: dbBusiness, isLoading: isBusinessLoading } = useDoc<BusinessInstance>(businessRef);
 
     const business = posBusiness || dbBusiness;
+    const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
     const currencySymbol = business?.settings?.currency ? CURRENCY_SYMBOLS[business.settings.currency] : '₦';
 
     const receiptContentRef = useRef<HTMLDivElement>(null);
@@ -110,6 +112,14 @@ function InvoiceContent() {
 
     const handleMarkPaid = async () => {
         if (!firestore || !invoice) return;
+        if (isReadOnlyStore) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. Modifying invoices is disabled.',
+                variant: 'destructive',
+            });
+            return;
+        }
         try {
             await updateDoc(doc(firestore, 'receipts', invoice.id), {
                 status: 'paid'
@@ -143,6 +153,14 @@ function InvoiceContent() {
 
     const handleVoidInvoice = async () => {
         if (!invoice || !firestore || !business) return;
+        if (isReadOnlyStore) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. Voiding invoices is disabled.',
+                variant: 'destructive',
+            });
+            return;
+        }
         setIsVoiding(true);
 
         try {
@@ -245,12 +263,24 @@ function InvoiceContent() {
 
             <div className="flex flex-wrap items-center justify-center gap-3 no-print">
                 {user && invoice.status && invoice.status !== 'paid' && (
-                    <Button onClick={handleMarkPaid} variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    <Button 
+                        onClick={handleMarkPaid} 
+                        disabled={isReadOnlyStore}
+                        title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                        variant="default" 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
                         <CheckCircle className="mr-2 h-4 w-4" /> Mark as Paid
                     </Button>
                 )}
                 {user && canVoid && (
-                    <Button onClick={() => setIsVoidDialogOpen(true)} variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                    <Button 
+                        onClick={() => setIsVoidDialogOpen(true)} 
+                        disabled={isReadOnlyStore}
+                        title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                        variant="outline" 
+                        className="text-destructive border-destructive/30 hover:bg-destructive/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
                         <Trash2 className="mr-2 h-4 w-4" /> Void Invoice
                     </Button>
                 )}
@@ -282,7 +312,13 @@ function InvoiceContent() {
                     </DialogHeader>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsVoidDialogOpen(false)} disabled={isVoiding}>Cancel</Button>
-                        <Button onClick={handleVoidInvoice} disabled={isVoiding} variant="destructive">
+                        <Button 
+                            onClick={handleVoidInvoice} 
+                            disabled={isVoiding || isReadOnlyStore} 
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                            variant="destructive"
+                            className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                             {isVoiding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Void Invoice
                         </Button>

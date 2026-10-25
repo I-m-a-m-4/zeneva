@@ -161,6 +161,7 @@ export function CustomerReviewStep({
   onRemove,
   onCommit,
   busy,
+  isReadOnly,
 }: {
   rows: StagedCustomerRow[];
   plan: { create: StagedCustomerRow[]; update: StagedCustomerRow[]; skipped: StagedCustomerRow[] };
@@ -172,6 +173,7 @@ export function CustomerReviewStep({
   onRemove: (key: string) => void;
   onCommit: () => void;
   busy: string | null;
+  isReadOnly?: boolean;
 }) {
   const [visible, setVisible] = React.useState(VISIBLE_STEP);
 
@@ -257,7 +259,13 @@ export function CustomerReviewStep({
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t pt-3">
-        <Button type="button" onClick={onCommit} disabled={!!busy || plan.create.length + plan.update.length === 0}>
+        <Button
+          type="button"
+          onClick={onCommit}
+          disabled={!!busy || plan.create.length + plan.update.length === 0 || isReadOnly}
+          title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+          className="disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           <UserPlus className="mr-1.5 h-4 w-4" />
           Import {(plan.create.length + plan.update.length).toLocaleString()} customer
           {plan.create.length + plan.update.length === 1 ? '' : 's'}

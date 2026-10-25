@@ -9,8 +9,9 @@ import {
   SquarePen, BookOpen, Trash2, Send, Gauge, X, Zap, Search,
   PanelLeft, PanelLeftClose, XCircle, Mic, SlidersHorizontal,
   Laptop, ArrowUpRight, RotateCw, Sparkles, Layers, Box, FileText, ChevronRight, ChevronLeft, ChevronDown,
-  Camera, Image as ImageIcon
+  Camera, Image as ImageIcon, Maximize2, Plus
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { RestockSheetProposal } from '@/components/ai-insights/restock-sheet-proposal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppConfig } from '@/lib/config';
@@ -32,7 +33,7 @@ import { validateProposal, buildSaleFromProposal } from '@/components/ai-insight
 import { trackFeature } from '@/lib/product-telemetry';
 import { usePOS } from '@/context/pos-context';
 import { cn } from '@/lib/utils';
-import { aiMonthlyLimit, effectivePlan } from '@/lib/plan';
+import { aiMonthlyLimit, effectivePlan, aiImageDailyLimit } from '@/lib/plan';
 import { apiBase } from '@/lib/platform';
 
 type ZenMessage = {
@@ -85,14 +86,14 @@ const UPGRADE_HREF = '/billing';
 const SUGGESTION_POOLS = [
   [
     {
+      title: "Scan stock sheet or photo",
+      desc: "Tap the camera to upload delivery notes, receipts, or handwritten sheets.",
+      prompt: "How do I scan a handwritten stock sheet or delivery invoice with camera?"
+    },
+    {
       title: "Fetch product images",
       desc: "Automatically find and assign pictures for your inventory items.",
       prompt: "Fetch images for all my products that don't have one"
-    },
-    {
-      title: "Break down sales & profit",
-      desc: "See a detailed cost, revenue, and profit breakdown for recent transactions.",
-      prompt: "Can I see the breakdown of how the total net cost of yesterday's sales was gotten?"
     },
     {
       title: "Bulk restock & price updates",
@@ -171,6 +172,25 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
   const [isMounted, setIsMounted] = useState(false);
   const [businessData, setBusinessData] = useState<any>(null);
   const [creditsExhausted, setCreditsExhausted] = useState<{ plan: string; monthlyLimit: number; errorText?: string } | null>(null);
+
+  // Plan & Credits info
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const plan = effectivePlan(businessData);
+  const monthlyLimit = aiMonthlyLimit(businessData);
+  const allowanceUsed = businessData?.aiUsageCurrentDate === currentMonth ? (Number(businessData?.aiUsageCount) || 0) : 0;
+  const bonusCredits = Number(businessData?.aiBonusCredits) || 0;
+  const allowanceLeft = Math.max(0, monthlyLimit - allowanceUsed);
+  const totalCreditsLeft = allowanceLeft + bonusCredits;
+  const isCreditsExhausted = totalCreditsLeft <= 0;
+
+  // Zen Vision Daily Image Upload Allowance (Starter: 5/day, Pro: 10/day, Business: 15/day)
+  const imageDailyLimit = aiImageDailyLimit(businessData);
+  const imagesUsedToday = businessData?.aiImageUsageDate === todayDateStr
+    ? (Number(businessData?.aiImageUsageCount) || 0)
+    : 0;
+  const imagesLeftToday = Math.max(0, imageDailyLimit - imagesUsedToday);
+  const isImageQuotaExhausted = imagesLeftToday <= 0;
 
   // Sync URL session param when browser navigation occurs
   const urlSession = searchParams.get('session');
@@ -308,127 +328,253 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [pendingImages, setPendingImages] = useState<{
+    id: string;
+    file: File;
+    previewUrl: string;
+    name: string;
+    size: number;
+  }[]>([]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [lightboxImage, setLightboxImage] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
+
+  const removePendingImage = (id: string) => {
+    setPendingImages((prev) => prev.filter((img) => img.id !== id));
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
     e.target.value = '';
 
-    if (!file.type.startsWith('image/')) {
-      toast({ title: 'Invalid file', description: 'Please select an image file (PNG, JPG, or WEBP).', variant: 'destructive' });
+    const availableSlots = Math.max(0, imagesLeftToday - pendingImages.length);
+    if (availableSlots <= 0) {
+      toast({
+        title: 'Daily image limit reached',
+        description: `You have reached your daily limit of ${imageDailyLimit} images on ${plan}. ${
+          plan === 'business'
+            ? 'Your allowance resets tomorrow.'
+            : 'Upgrade to Business for 15 image scans per day.'
+        }`,
+        variant: 'destructive',
+      });
       return;
     }
 
+    const validFiles: File[] = [];
+    for (const file of rawFiles) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid file format',
+          description: `${file.name} is not an image file (PNG, JPG, JPEG, WEBP).`,
+          variant: 'destructive',
+        });
+        continue;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        toast({
+          title: 'Image too large',
+          description: `${file.name} exceeds 15MB.`,
+          variant: 'destructive',
+        });
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) return;
+
+    if (validFiles.length > availableSlots) {
+      toast({
+        title: 'Daily allowance limit',
+        description: `Only ${availableSlots} more image${
+          availableSlots === 1 ? '' : 's'
+        } can be uploaded today (${imageDailyLimit}/day limit). Adding first ${availableSlots}.`,
+      });
+    }
+
+    const filesToRead = validFiles.slice(0, availableSlots);
+
+    Promise.all(
+      filesToRead.map(
+        (file) =>
+          new Promise<{ id: string; file: File; previewUrl: string; name: string; size: number }>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                file,
+                previewUrl: reader.result as string,
+                name: file.name,
+                size: file.size,
+              });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          })
+      )
+    )
+      .then((newImages) => {
+        setPendingImages((prev) => [...prev, ...newImages]);
+        toast({
+          title: newImages.length > 1 ? `${newImages.length} images attached` : 'Image attached',
+          description: 'Type a prompt or tap Send to analyze with Zen Vision.',
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to read images:', err);
+        toast({
+          title: 'Failed to read image',
+          description: 'Could not load one or more selected images. Please try again.',
+          variant: 'destructive',
+        });
+      });
+  };
+
+  const submitImagePrompt = async (
+    promptText: string,
+    attachments: { id: string; file: File; previewUrl: string; name: string; size: number }[]
+  ) => {
     if (!authRef.current.businessId) {
-      toast({ title: 'No store selected', description: 'Please wait for your store session to load.', variant: 'destructive' });
+      toast({
+        title: 'No store selected',
+        description: 'Please wait for your store session to load.',
+        variant: 'destructive',
+      });
       return;
     }
+
+    if (attachments.length === 0) return;
 
     setIsAnalyzingImage(true);
-    toast({ title: 'Analyzing image...', description: 'Extracting product items and quantities with GPT-4o Vision.' });
+    toast({
+      title: 'Zen Vision is analyzing...',
+      description: `Scanning ${attachments.length > 1 ? `${attachments.length} images` : 'image'} and cross-referencing with your store catalog.`,
+    });
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Data = reader.result as string;
+    const userMsgId = `user-img-${Date.now()}`;
+    const assistantMsgId = `zen-sheet-${Date.now()}`;
+    const previewUrls = attachments.map((a) => a.previewUrl);
 
-      const userMsgId = `user-img-${Date.now()}`;
-      const assistantMsgId = `zen-sheet-${Date.now()}`;
+    // Append user message with text prompt and thumbnail gallery
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: 'user',
+        content: promptText,
+        imageUrl: previewUrls[0],
+        imageUrls: previewUrls,
+        parts: [{ type: 'text', text: promptText }],
+      } as any,
+    ]);
 
-      // Append user uploaded image message
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: userMsgId,
-          role: 'user',
-          content: `Uploaded inventory sheet: ${file.name}`,
-          imageUrl: base64Data,
-          parts: [{ type: 'text', text: `Uploaded inventory sheet: ${file.name}` }],
-        } as any,
-      ]);
+    try {
+      const token = await getAuth().currentUser?.getIdToken();
+      const res = await fetch('/api/ai/analyze-sheet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          images: previewUrls,
+          businessId: authRef.current.businessId,
+          prompt: promptText,
+        }),
+      });
 
-      try {
-        const token = await getAuth().currentUser?.getIdToken();
-        const res = await fetch('/api/ai/analyze-sheet', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            image: base64Data,
-            businessId: authRef.current.businessId,
-          }),
-        });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to analyze images with Zen Vision');
+      }
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to analyze image');
-        }
+      const data = await res.json();
+      const items = data.items || [];
 
-        const data = await res.json();
-        const items = data.items || [];
-
-        if (items.length === 0) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: assistantMsgId,
-              role: 'assistant',
-              content: "I scanned the image, but couldn't detect any clear product lines or handwritten stock items. Please try uploading a sharper or closer picture.",
-              parts: [
-                {
-                  type: 'text',
-                  text: "I scanned the image, but couldn't detect any clear product lines or handwritten stock items. Please try uploading a sharper or closer picture.",
-                },
-              ],
-            } as any,
-          ]);
-          return;
-        }
-
+      if (items.length === 0) {
         setMessages((prev) => [
           ...prev,
           {
             id: assistantMsgId,
             role: 'assistant',
-            content: `I've analyzed your inventory sheet and detected ${items.length} items. Here is the matching restock table. You can search or change any matched product, edit the pieces, and tap "Approve & Update" to apply the changes to your inventory.`,
+            content:
+              data.message ||
+              "I scanned the images, but couldn't detect any clear product items or handwritten stock lines. Please make sure the lighting is bright and the text is legible, or try taking closer photos.",
             parts: [
               {
                 type: 'text',
-                text: `I've analyzed your inventory sheet and detected ${items.length} items. Here is the matching restock table. You can search or change any matched product, edit the pieces, and tap "Approve & Update" to apply the changes to your inventory.`,
-              },
-              {
-                type: 'restock-sheet',
-                output: {
-                  type: 'RESTOCK_SHEET',
-                  sheetTitle: data.sheetTitle || 'Inventory Restock Sheet',
-                  items,
-                  imageUrl: base64Data,
-                  status: 'pending',
-                },
+                text:
+                  data.message ||
+                  "I scanned the images, but couldn't detect any clear product items or handwritten stock lines. Please make sure the lighting is bright and the text is legible, or try taking closer photos.",
               },
             ],
           } as any,
         ]);
-
-        toast({
-          title: 'Sheet Analyzed',
-          description: `Found ${items.length} product lines. Review the table to approve.`,
-          variant: 'success',
-        });
-      } catch (err: any) {
-        console.error('Error analyzing image:', err);
-        toast({
-          title: 'Analysis Failed',
-          description: err.message || 'Could not analyze inventory sheet.',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsAnalyzingImage(false);
+        return;
       }
-    };
 
-    reader.readAsDataURL(file);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMsgId,
+          role: 'assistant',
+          content: `I've analyzed your ${attachments.length > 1 ? `${attachments.length} images` : 'image'} with Zen Vision and identified ${items.length} items. Here is your restock review deck cross-referenced against your live inventory. You can verify matched items, adjust quantities, and tap "Approve & Update" to apply the changes.`,
+          parts: [
+            {
+              type: 'text',
+              text: `I've analyzed your ${attachments.length > 1 ? `${attachments.length} images` : 'image'} with Zen Vision and identified ${items.length} items. Here is your restock review deck cross-referenced against your live inventory. You can verify matched items, adjust quantities, and tap "Approve & Update" to apply the changes.`,
+            },
+            {
+              type: 'restock-sheet',
+              id: `${assistantMsgId}-restock-sheet`,
+              toolCallId: `${assistantMsgId}-restock-sheet`,
+              output: {
+                type: 'RESTOCK_SHEET',
+                sheetTitle: data.sheetTitle || 'Inventory Restock Count',
+                items,
+                imageUrl: previewUrls[0],
+                imageUrls: previewUrls,
+                status: 'pending',
+              },
+            },
+          ],
+        } as any,
+      ]);
+
+      const remMsg = data.dailyLimitInfo ? ` (${data.dailyLimitInfo.remainingToday} uploads left today)` : '';
+      toast({
+        title: 'Images Analyzed',
+        description: `Zen Vision identified ${items.length} items across ${attachments.length} image${attachments.length > 1 ? 's' : ''}${remMsg}.`,
+        variant: 'success',
+      });
+    } catch (err: any) {
+      console.error('Error analyzing image with Zen Vision:', err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMsgId,
+          role: 'assistant',
+          content: `⚠️ **Zen Vision Error**: ${err.message || 'Could not process the images.'}\n\nPlease check your daily upload limit and try again.`,
+          parts: [
+            {
+              type: 'text',
+              text: `⚠️ **Zen Vision Error**: ${err.message || 'Could not process the images.'}\n\nPlease check your daily upload limit and try again.`,
+            },
+          ],
+        } as any,
+      ]);
+      toast({
+        title: 'Analysis Failed',
+        description: err.message || 'Could not analyze images with Zen Vision.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAnalyzingImage(false);
+    }
   };
 
   useEffect(() => {
@@ -481,15 +627,6 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
     },
   }), []);
 
-  // Plan & Credits info
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const plan = effectivePlan(businessData);
-  const monthlyLimit = aiMonthlyLimit(businessData);
-  const allowanceUsed = businessData?.aiUsageCurrentDate === currentMonth ? (Number(businessData?.aiUsageCount) || 0) : 0;
-  const bonusCredits = Number(businessData?.aiBonusCredits) || 0;
-  const allowanceLeft = Math.max(0, monthlyLimit - allowanceUsed);
-  const totalCreditsLeft = allowanceLeft + bonusCredits;
-  const isCreditsExhausted = totalCreditsLeft <= 0;
 
   const {
     messages,
@@ -588,8 +725,30 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
     setLocalInput('');
   }, [sendMessage, isCreditsExhausted, plan, monthlyLimit]);
 
+  // Handle incoming ?q=... from use cases or external links
+  const queryParam = searchParams.get('q');
+  const handledQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (queryParam && handledQueryRef.current !== queryParam && isMounted) {
+      handledQueryRef.current = queryParam;
+      submitPrompt(queryParam);
+    }
+  }, [queryParam, submitPrompt, isMounted]);
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pendingImages.length > 0) {
+      const promptToSend =
+        localInput.trim() ||
+        (pendingImages.length > 1
+          ? `Analyze these ${pendingImages.length} images and compile inventory restock counts for identified items`
+          : 'Analyze this image and update inventory restock count if items are found');
+      const imagesToSubmit = [...pendingImages];
+      setPendingImages([]);
+      setLocalInput('');
+      submitImagePrompt(promptToSend, imagesToSubmit);
+      return;
+    }
     if (!localInput.trim() || isLoading) return;
     submitPrompt(localInput);
   };
@@ -898,9 +1057,20 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
       {/* ── Main Workspace Area ── */}
       <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden bg-background">
+        {/* Hidden persistent file input for Zen Vision image attachments */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handleImageSelect}
+        />
+
         {/* Top Header Actions */}
         <Link
           href="/ai-insights/use-cases"
+          prefetch={false}
           className="absolute top-4 right-4 z-[15] flex items-center gap-1.5 px-3 py-1.5 bg-background/80 backdrop-blur border border-border rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted shadow-xs transition-all"
         >
           <BookOpen className="w-3.5 h-3.5 text-orange-500" /> Use Cases
@@ -927,7 +1097,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.3 }}
-                className="w-full max-w-3xl px-4 flex flex-col items-center min-h-full py-8"
+                className="w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl px-4 flex flex-col items-center min-h-full py-8"
               >
                 {/* Spacer to push content down so it centers perfectly */}
                 <div className="flex-1 w-full" />
@@ -944,13 +1114,95 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
                   {/* ── DESKTOP ONLY: unified input box ── */}
                 <div className="hidden sm:flex w-full bg-card border border-border/90 rounded-3xl shadow-sm hover:shadow-md transition-all overflow-hidden flex-col">
+                  {/* Attached images preview banner */}
+                  {pendingImages.length > 0 && (
+                    <div className="p-2.5 sm:p-3 bg-muted/40 border-b border-border/60 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-orange-500/10 text-orange-600 border-orange-500/20 font-semibold">
+                            Zen Vision
+                          </Badge>
+                          <span className="font-semibold text-foreground">
+                            {pendingImages.length} {pendingImages.length === 1 ? 'image' : 'images'} attached
+                          </span>
+                          <span className="text-muted-foreground text-[11px]">
+                            • {Math.max(0, imagesLeftToday - pendingImages.length)} uploads remaining today
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPendingImages([])}
+                          className="text-[11px] text-muted-foreground hover:text-destructive transition-colors font-medium"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                        {pendingImages.map((img) => (
+                          <div
+                            key={img.id}
+                            className="relative group shrink-0 flex items-center gap-2 p-1.5 rounded-xl border border-border/80 bg-background shadow-2xs hover:border-orange-500/40 transition-all max-w-[200px]"
+                          >
+                            <div
+                              onClick={() => setLightboxImage({ url: img.previewUrl, title: img.name })}
+                              className="relative cursor-pointer h-10 w-10 rounded-lg overflow-hidden border border-border/60 shrink-0 bg-muted"
+                              title="Click to preview full size"
+                            >
+                              <img src={img.previewUrl} alt={img.name} className="h-full w-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                                <Maximize2 className="w-3 h-3" />
+                              </div>
+                            </div>
+                            <div className="min-w-0 pr-5">
+                              <p className="text-xs font-medium text-foreground truncate max-w-[110px]" title={img.name}>
+                                {img.name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {(img.size / 1024).toFixed(0)} KB
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removePendingImage(img.id)}
+                              className="absolute top-1.5 right-1.5 h-5 w-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors"
+                              title="Remove image"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {pendingImages.length < imagesLeftToday && (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="shrink-0 flex items-center gap-1.5 h-11 px-3 rounded-xl border border-dashed border-border/90 hover:border-orange-500/60 bg-muted/20 hover:bg-muted/40 text-xs font-medium text-muted-foreground hover:text-foreground transition-all"
+                            title="Attach another photo"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-orange-500" />
+                            <span>Add photo</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Prompt Text Input */}
                   <form onSubmit={handleSend} className="p-4 sm:p-5 flex flex-col gap-4">
                     <input
                       className="w-full bg-transparent outline-none text-foreground placeholder:text-muted-foreground/80 text-base sm:text-lg"
                       value={localInput}
                       onChange={(e) => setLocalInput(e.target.value)}
-                      placeholder={isTranscribing ? "Transcribing audio..." : isListening ? "Listening to your voice..." : "Assign a task, analyze inventory, or type a prompt..."}
+                      placeholder={
+                        pendingImages.length > 0
+                          ? `What would you like Zen Vision to do with ${pendingImages.length === 1 ? 'this image' : `these ${pendingImages.length} images`}? (e.g. Restock these items)`
+                          : isTranscribing
+                          ? "Transcribing audio..."
+                          : isListening
+                          ? "Listening to your voice..."
+                          : "Assign a task, analyze inventory, or type a prompt..."
+                      }
                       disabled={isLoading || isTranscribing}
                     />
 
@@ -970,22 +1222,33 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleImageUpload}
-                        />
                         <button
                           type="button"
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => {
+                            if (isImageQuotaExhausted) {
+                              toast({
+                                title: 'Daily image limit reached',
+                                description: `You have reached your limit of ${imageDailyLimit} images today. ${
+                                  plan === 'business'
+                                    ? 'Your limit resets tomorrow.'
+                                    : 'Upgrade to Business for 15 image scans per day.'
+                                }`,
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            fileInputRef.current?.click();
+                          }}
                           disabled={isAnalyzingImage || isLoading}
                           className={cn(
                             "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
-                            isAnalyzingImage ? "bg-orange-500/20 text-orange-600 animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            pendingImages.length > 0 || isAnalyzingImage ? "bg-orange-500/20 text-orange-600 animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                           )}
-                          title="Upload stock sheet or handwritten inventory image"
+                          title={
+                            isImageQuotaExhausted
+                              ? `Daily limit reached (${imageDailyLimit}/${imageDailyLimit} images used)`
+                              : `Upload inventory sheets (${imagesLeftToday} left today, up to ${imageDailyLimit}/day)`
+                          }
                         >
                           {isAnalyzingImage ? <Loader2 className="h-4 w-4 animate-spin text-orange-500" /> : <Camera className="h-4 w-4" />}
                         </button>
@@ -1011,10 +1274,10 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                         ) : (
                           <button
                             type="submit"
-                            disabled={!localInput.trim() || !businessId}
+                            disabled={(!localInput.trim() && pendingImages.length === 0) || !businessId}
                             className={cn(
                               "h-8 w-8 rounded-full flex items-center justify-center transition-all",
-                              localInput.trim() ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed"
+                              localInput.trim() || pendingImages.length > 0 ? "bg-foreground text-background hover:opacity-90 shadow-sm cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed"
                             )}
                           >
                             <ArrowUp className="h-4 w-4 stroke-[2.5]" />
@@ -1114,7 +1377,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
           {/* ── Active Chat Thread ── */}
           {!isInitialState && (
-            <div className="w-full max-w-3xl mx-auto py-8 px-4 space-y-8 pb-36">
+            <div className="w-full max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 pb-36">
               {messages.map((m, i) => {
                 const isUser = m.role === 'user';
                 const text = textOf(m as any);
@@ -1131,7 +1394,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                       </div>
                     )}
 
-                    <div className={`flex flex-col gap-1.5 min-w-0 ${isUser ? 'items-end max-w-[85%]' : 'items-start max-w-[85%]'}`}>
+                    <div className={`flex flex-col gap-1.5 min-w-0 ${isUser ? 'items-end max-w-[85%] sm:max-w-[75%]' : 'items-start w-full max-w-full'}`}>
                       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {isUser ? 'You' : 'Zen AI'}
                         {!isUser && typeof durations[m.id] === 'number' && (
@@ -1148,9 +1411,32 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                         </div>
                       )}
 
-                      {isUser && (m as any).imageUrl && (
-                        <div className="mt-1.5 max-w-xs sm:max-w-sm rounded-2xl overflow-hidden border border-border/80 shadow-xs bg-muted/30 p-1">
-                          <img src={(m as any).imageUrl} alt="Uploaded inventory sheet" className="w-full max-h-52 object-contain rounded-xl" />
+                      {isUser && ((m as any).imageUrls || (m as any).imageUrl) && (
+                        <div className="mt-1.5 flex flex-wrap gap-2 max-w-xl">
+                          {(((m as any).imageUrls && (m as any).imageUrls.length > 0)
+                            ? (m as any).imageUrls
+                            : [(m as any).imageUrl]
+                          ).map((url: string, imgIdx: number) => (
+                            <div
+                              key={imgIdx}
+                              onClick={() => setLightboxImage({ url, title: text || `Uploaded photo ${imgIdx + 1}` })}
+                              className="relative group cursor-pointer h-24 w-24 sm:h-28 sm:w-28 rounded-2xl overflow-hidden border border-border/80 shadow-xs bg-muted/30 p-1 hover:border-orange-500/50 transition-all shrink-0"
+                              title="Click to view full image"
+                            >
+                              <div className="relative w-full h-full rounded-xl overflow-hidden">
+                                <img
+                                  src={url}
+                                  alt={`Uploaded photo ${imgIdx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                                  <span className="text-[10px] bg-black/75 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm font-medium">
+                                    <Maximize2 className="w-3 h-3" /> View
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
 
@@ -1171,15 +1457,20 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
                       {hasToolUI && (
                         <div className="flex flex-col gap-3 w-full">
-                          {toolParts.map((part: any) => {
+                          {toolParts.map((part: any, partIdx: number) => {
                             const output = part.output;
                             const isProposal = output?.type === 'PROPOSAL';
                             const enriched = isProposal
                               ? { ...output, status: proposalStatuses[output.proposalId] || output.status }
                               : output;
 
+                            const stableKey =
+                              part.toolCallId ||
+                              part.id ||
+                              `${m.id}-part-${part.type || 'tool'}-${partIdx}`;
+
                             return (
-                              <div key={part.toolCallId || `part-${part.type}-${Date.now()}`} className="flex flex-col gap-1.5">
+                              <div key={stableKey} className="flex flex-col gap-1.5">
                                 {output && (
                                   <ToolResult
                                     output={enriched}
@@ -1238,19 +1529,109 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                 : "p-4 pb-20 md:p-5 md:pb-8"
             )}
           >
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto">
               {creditWall && <div className="mb-3">{creditWall}</div>}
-              <div className="w-full bg-card rounded-2xl border border-border shadow-md focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:shadow-lg transition-all">
+              <div className="w-full bg-card rounded-2xl border border-border shadow-md focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:shadow-lg transition-all overflow-hidden flex flex-col">
+                {pendingImages.length > 0 && (
+                  <div className="p-2 sm:p-2.5 bg-muted/40 border-b border-border/60 flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-orange-500/10 text-orange-600 border-orange-500/20 font-semibold">
+                          Zen Vision
+                        </Badge>
+                        <span className="font-semibold text-foreground">
+                          {pendingImages.length} {pendingImages.length === 1 ? 'image' : 'images'} attached
+                        </span>
+                        <span className="text-muted-foreground text-[11px]">
+                          • {Math.max(0, imagesLeftToday - pendingImages.length)} uploads remaining today
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPendingImages([])}
+                        className="text-[11px] text-muted-foreground hover:text-destructive transition-colors font-medium"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                      {pendingImages.map((img) => (
+                        <div
+                          key={img.id}
+                          className="relative group shrink-0 flex items-center gap-2 p-1.5 rounded-xl border border-border/80 bg-background shadow-2xs hover:border-orange-500/40 transition-all max-w-[200px]"
+                        >
+                          <div
+                            onClick={() => setLightboxImage({ url: img.previewUrl, title: img.name })}
+                            className="relative cursor-pointer h-10 w-10 rounded-lg overflow-hidden border border-border/60 shrink-0 bg-muted"
+                            title="Click to preview full size"
+                          >
+                            <img src={img.previewUrl} alt={img.name} className="h-full w-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                              <Maximize2 className="w-3 h-3" />
+                            </div>
+                          </div>
+                          <div className="min-w-0 pr-5">
+                            <p className="text-xs font-medium text-foreground truncate max-w-[110px]" title={img.name}>
+                              {img.name}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {(img.size / 1024).toFixed(0)} KB
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removePendingImage(img.id)}
+                            className="absolute top-1.5 right-1.5 h-5 w-5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors"
+                            title="Remove image"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+
+                      {pendingImages.length < imagesLeftToday && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="shrink-0 flex items-center gap-1.5 h-11 px-3 rounded-xl border border-dashed border-border/90 hover:border-orange-500/60 bg-muted/20 hover:bg-muted/40 text-xs font-medium text-muted-foreground hover:text-foreground transition-all"
+                          title="Attach another photo"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-orange-500" />
+                          <span>Add photo</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <form onSubmit={handleSend} className="flex items-center p-2">
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      if (isImageQuotaExhausted) {
+                        toast({
+                          title: 'Daily image limit reached',
+                          description: `You have reached your limit of ${imageDailyLimit} images today. ${
+                            plan === 'business'
+                              ? 'Your limit resets tomorrow.'
+                              : 'Upgrade to Business for 15 image scans per day.'
+                          }`,
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      fileInputRef.current?.click();
+                    }}
                     disabled={isAnalyzingImage || isLoading}
                     className={cn(
                       "p-2.5 rounded-xl transition-colors",
-                      isAnalyzingImage ? "bg-orange-500/20 text-orange-600 animate-pulse" : "text-muted-foreground hover:text-foreground"
+                      pendingImages.length > 0 || isAnalyzingImage ? "bg-orange-500/20 text-orange-600 animate-pulse" : "text-muted-foreground hover:text-foreground"
                     )}
-                    title="Upload stock sheet or handwritten inventory image"
+                    title={
+                      isImageQuotaExhausted
+                        ? `Daily limit reached (${imageDailyLimit}/${imageDailyLimit} images used)`
+                        : `Upload inventory sheets (${imagesLeftToday} left today, up to ${imageDailyLimit}/day)`
+                    }
                   >
                     {isAnalyzingImage ? <Loader2 className="w-4 h-4 animate-spin text-orange-500" /> : <Camera className="w-4 h-4" />}
                   </button>
@@ -1269,7 +1650,15 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                     className="flex-1 bg-transparent py-2.5 px-2 outline-none text-foreground placeholder:text-muted-foreground text-sm sm:text-base"
                     value={localInput}
                     onChange={(e) => setLocalInput(e.target.value)}
-                    placeholder={isTranscribing ? "Transcribing audio..." : isListening ? "Listening to your voice..." : "Ask Zen AI anything about your store..."}
+                    placeholder={
+                      pendingImages.length > 0
+                        ? `What would you like Zen Vision to do with ${pendingImages.length === 1 ? 'this image' : `these ${pendingImages.length} images`}?`
+                        : isTranscribing
+                        ? "Transcribing audio..."
+                        : isListening
+                        ? "Listening to your voice..."
+                        : "Ask Zen AI anything about your store..."
+                    }
                     disabled={isLoading || isTranscribing}
                   />
                   {isLoading ? (
@@ -1284,7 +1673,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                   ) : (
                     <button
                       type="submit"
-                      disabled={!localInput.trim() || !businessId}
+                      disabled={(!localInput.trim() && pendingImages.length === 0) || !businessId}
                       className="p-2.5 rounded-xl bg-foreground text-background hover:opacity-90 disabled:bg-muted disabled:text-muted-foreground transition-colors ml-2"
                     >
                       <ArrowUp className="w-4 h-4 stroke-[2.5]" />
@@ -1292,18 +1681,76 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                   )}
                 </form>
               </div>
-              <div className="flex justify-between items-center mt-2 px-1 text-xs text-muted-foreground">
+              <div className="flex justify-between items-center mt-2 px-1 text-xs text-muted-foreground flex-wrap gap-2">
                 <span>Zen AI may make mistakes. All stock and sale updates require your approval.</span>
-                {businessData && (
-                  <span className="font-medium flex items-center gap-1.5">
-                    <Gauge className="w-3.5 h-3.5 text-orange-500" />
-                    {totalCreditsLeft > 0 ? `${totalCreditsLeft.toLocaleString()} credits left` : '0 credits left'}
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "font-medium flex items-center gap-1.5",
+                      isImageQuotaExhausted ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"
+                    )}
+                    title={`Your plan (${plan}) includes ${imageDailyLimit} image scans per day`}
+                  >
+                    <Camera className="w-3.5 h-3.5 text-orange-500" />
+                    <span>{imagesLeftToday} / {imageDailyLimit} images left today</span>
                   </span>
-                )}
+                  {businessData && (
+                    <span className="font-medium flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5 text-orange-500" />
+                      {totalCreditsLeft > 0 ? `${totalCreditsLeft.toLocaleString()} credits left` : '0 credits left'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
         )}
+
+        {/* Full Image Preview Lightbox Modal */}
+        <AnimatePresence>
+          {lightboxImage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+              onClick={() => setLightboxImage(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative max-w-5xl w-full max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              >
+                <div className="flex items-center justify-between p-3.5 border-b border-border/80 bg-muted/40">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Badge variant="outline" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-500/20 font-medium shrink-0">
+                      Zen Vision
+                    </Badge>
+                    <span className="text-xs font-semibold text-foreground truncate max-w-md">
+                      {lightboxImage.title || 'Image Preview'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxImage(null)}
+                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="p-4 flex-1 flex items-center justify-center overflow-auto bg-black/40 min-h-[320px]">
+                  <img
+                    src={lightboxImage.url}
+                    alt={lightboxImage.title || 'Full image'}
+                    className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-lg"
+                  />
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

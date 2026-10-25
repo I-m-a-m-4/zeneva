@@ -18,18 +18,21 @@ import { useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import type { Customer } from '@/types';
 
 interface EditCustomerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   customer: Customer | null;
+  isReadOnly?: boolean;
 }
 
-export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: EditCustomerDialogProps) {
+export default function EditCustomerDialog({ isOpen, onOpenChange, customer, isReadOnly }: EditCustomerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { triggerRefresh, addToQueue } = usePOS();
+  const { triggerRefresh, addToQueue, business, isReadOnly: posReadOnly } = usePOS();
+  const isReadOnlyStore = isReadOnly ?? (posReadOnly || (business ? isCoreFeatureBlocked(business) : false));
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
@@ -48,7 +51,15 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSaving || isSavingRef.current) return;
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Editing customers is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!customer || isSaving || isSavingRef.current) return;
     isSavingRef.current = true;
     setIsSaving(true);
     try {
@@ -114,7 +125,12 @@ export default function EditCustomerDialog({ isOpen, onOpenChange, customer }: E
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button
+              type="submit"
+              disabled={isSaving || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
             </Button>

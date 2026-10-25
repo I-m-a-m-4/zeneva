@@ -76,10 +76,16 @@ export function getChatModel(): any {
   const provider = getActiveAIProvider();
   if (provider === 'gemini') {
     const modelName = process.env.GEMINI_MODEL || AI_CONFIG.gemini.defaultChatModel;
-    return google(modelName) as any;
+    const gClient = createGoogleGenerativeAI({
+      apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '',
+    });
+    return gClient(modelName) as any;
   }
   const modelName = process.env.GROQ_MODEL || AI_CONFIG.groq.defaultChatModel;
-  return groq(modelName) as any;
+  const gClient = createGroq({
+    apiKey: process.env.GROQ_API_KEY || '',
+  });
+  return gClient(modelName) as any;
 }
 
 /**
@@ -89,10 +95,16 @@ export function getVisionModel(): any {
   const provider = getActiveAIProvider();
   if (provider === 'gemini') {
     const modelName = process.env.GEMINI_VISION_MODEL || AI_CONFIG.gemini.defaultVisionModel;
-    return google(modelName) as any;
+    const gClient = createGoogleGenerativeAI({
+      apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '',
+    });
+    return gClient(modelName) as any;
   }
   const modelName = process.env.GROQ_VISION_MODEL || AI_CONFIG.groq.defaultVisionModel;
-  return groq(modelName) as any;
+  const gClient = createGroq({
+    apiKey: process.env.GROQ_API_KEY || '',
+  });
+  return gClient(modelName) as any;
 }
 
 /**

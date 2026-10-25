@@ -214,6 +214,7 @@ export default function CustomerImportDialog({
                 onEdit={importer.editDraft}
                 onRemove={importer.removeRow}
                 onCommit={importer.commit}
+                isReadOnly={importer.isReadOnly}
               />
             )}
 

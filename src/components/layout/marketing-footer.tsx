@@ -175,6 +175,12 @@ export default function MarketingFooter() {
                   <li><Link href="/blog" className="transition text-neutral-300 hover:text-white">{t('footer.linkBlog')}</Link></li>
                   <li><a href="#faq" className="transition text-neutral-300 hover:text-white">{t('footer.linkFaq')}</a></li>
                   <li><Link href="/help-center" className="transition text-neutral-300 hover:text-white">{t('footer.linkHelpCenter')}</Link></li>
+                  <li>
+                    <Link href="/status" className="transition text-neutral-300 hover:text-white inline-flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>System Status</span>
+                    </Link>
+                  </li>
                   <li><Link href="/blog/zeneva-vs-square" className="transition text-neutral-300 hover:text-white">Zeneva vs Square</Link></li>
                   <li><Link href="/blog/zeneva-vs-clover" className="transition text-neutral-300 hover:text-white">Zeneva vs Clover</Link></li>
                 </ul>
@@ -296,6 +302,11 @@ export default function MarketingFooter() {
             </div>
 
             <div className="flex items-center gap-4 text-sm text-white/60">
+              <Link href="/status" className="transition hover:text-white inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                <span>Status</span>
+              </Link>
+              <span className="hidden sm:block text-white/20">•</span>
               <Link href="/legal/privacy-policy" className="transition hover:text-white">{t('footer.privacyShort')}</Link>
               <span className="hidden sm:block text-white/20">•</span>
               <Link href="/legal/terms-of-service" className="transition hover:text-white">{t('footer.termsShort')}</Link>

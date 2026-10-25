@@ -15,6 +15,7 @@ import {
 import PageTitle from '@/components/shared/page-title';
 import { Button } from '@/components/ui/button';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import {
   Table,
   TableBody,
@@ -31,7 +32,8 @@ import { cn } from '@/lib/utils';
 type Mode = 'idle' | 'camera' | 'preview';
 
 export default function VisualStockTakePage() {
-  const { products, updateProduct } = usePOS();
+  const { products, updateProduct, isReadOnly, business } = usePOS();
+  const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -203,6 +205,14 @@ export default function VisualStockTakePage() {
 
   // ── Reconcile ─────────────────────────────────────────────────────────────
   const handleReconcile = async () => {
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Updating inventory stock is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       await Promise.all(
         scanResults
@@ -477,8 +487,9 @@ export default function VisualStockTakePage() {
           </div>
 
           <Button
-            className="w-full h-12 text-base"
-            disabled={scanResults.length === 0}
+            className="w-full h-12 text-base disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={scanResults.length === 0 || isReadOnlyStore}
+            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
             onClick={handleReconcile}
           >
             Update Inventory Stock

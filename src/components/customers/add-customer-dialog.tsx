@@ -29,12 +29,14 @@ interface AddCustomerDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   businessId: string;
   customers: Customer[] | null;
+  isReadOnly?: boolean;
 }
 
-export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, customers }: AddCustomerDialogProps) {
+export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, customers, isReadOnly }: AddCustomerDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { triggerRefresh, addToQueue, business } = usePOS();
+  const { triggerRefresh, addToQueue, business, isReadOnly: posReadOnly } = usePOS();
+  const isReadOnlyStore = isReadOnly ?? (posReadOnly || (business ? isCoreFeatureBlocked(business) : false));
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
@@ -58,8 +60,12 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
       toast({ title: 'Missing fields', description: 'Customer name is required.', variant: 'destructive' });
       return;
     }
-    if (business && isCoreFeatureBlocked(business)) {
-        setShowUpgradeOverlay(true);
+    if (isReadOnlyStore) {
+        toast({
+            title: 'Plan Expired (Read-Only Mode)',
+            description: 'Your plan has expired. Adding customers is disabled.',
+            variant: 'destructive',
+        });
         return;
     }
     if (!businessId) {
@@ -174,7 +180,12 @@ export default function AddCustomerDialog({ isOpen, onOpenChange, businessId, cu
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button
+              type="submit"
+              disabled={isSaving || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Customer
             </Button>

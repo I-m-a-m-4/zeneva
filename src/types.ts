@@ -525,6 +525,10 @@ export interface BusinessInstance {
     aiUsageCurrentDate?: string;
     /** Turns used inside `aiUsageCurrentDate`. Reset by comparing the month, never cleared. */
     aiUsageCount?: number;
+    /** Day the vision image counter belongs to, as `YYYY-MM-DD`. Daily image upload cap. */
+    aiImageUsageDate?: string;
+    /** Image scans used inside `aiImageUsageDate`. */
+    aiImageUsageCount?: number;
     /**
      * Purchased and granted credit balance, spent once the monthly allowance runs out.
      * Non-expiring and never reset. The name is historic — it predates credits being

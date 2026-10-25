@@ -21,6 +21,7 @@ import { Eye, Inbox, Share2, Search, MoreHorizontal, Trash2, CheckCircle, Loader
 import type { Receipt } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import RefreshButton from "@/components/shared/refresh-button";
@@ -58,8 +59,10 @@ export default function InvoicesPage() {
         business,
         currentUserProfile: currentUser,
         user,
-        voidReceipt
+        voidReceipt,
+        isReadOnly
     } = usePOS();
+    const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
     const { t } = useI18n();
     const isLoading = receipts === null;
     const [searchTerm, setSearchTerm] = React.useState('');
@@ -86,6 +89,14 @@ export default function InvoicesPage() {
 
     const handleMarkPaid = async (id: string) => {
         if (!firestore) return;
+        if (isReadOnlyStore) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. Modifying invoices is disabled.',
+                variant: 'destructive',
+            });
+            return;
+        }
         setUpdatingId(id);
         try {
             await updateDoc(doc(firestore, 'receipts', id), {
@@ -147,6 +158,14 @@ export default function InvoicesPage() {
 
     const handleDeleteInvoice = async () => {
         if (!invoiceToDelete || !firestore || !business) return;
+        if (isReadOnlyStore) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. Voiding invoices is disabled.',
+                variant: 'destructive',
+            });
+            return;
+        }
         setIsDeleting(true);
 
         const actor = currentUser || (user ? { id: user.uid, name: user.displayName || user.email || 'Admin', role: 'admin' as const, email: user.email || '' } : null);
@@ -236,6 +255,14 @@ export default function InvoicesPage() {
 
     const handleBulkVoid = async () => {
         if (selectedInvoices.size === 0 || !firestore || !business) return;
+        if (isReadOnlyStore) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. Voiding invoices is disabled.',
+                variant: 'destructive',
+            });
+            return;
+        }
         setIsDeleting(true);
 
         const actor = currentUser || (user ? { id: user.uid, name: user.displayName || user.email || 'Admin', role: 'admin' as const, email: user.email || '' } : null);
@@ -350,8 +377,10 @@ export default function InvoicesPage() {
                                     <Button
                                         variant="destructive"
                                         size="sm"
+                                        disabled={isReadOnlyStore}
+                                        title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
                                         onClick={() => setIsBulkVoidDialogOpen(true)}
-                                        className="animate-in fade-in slide-in-from-left-2 duration-200"
+                                        className="animate-in fade-in slide-in-from-left-2 duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         <Trash2 className="me-2 h-4 w-4" />
                                         {t('invoices.voidSelected', { count: selectedInvoices.size }) || `Void Selected (${selectedInvoices.size})`}
@@ -469,7 +498,16 @@ export default function InvoicesPage() {
                                                         {invoice.status !== 'paid' && (
                                                             <>
                                                                 <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); handleMarkPaid(invoice.id); }} disabled={updatingId === invoice.id}>
+                                                                <DropdownMenuItem 
+                                                                    className="cursor-pointer" 
+                                                                    disabled={updatingId === invoice.id || isReadOnlyStore}
+                                                                    title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                                                                    onSelect={(e) => { 
+                                                                        e.preventDefault(); 
+                                                                        if (isReadOnlyStore) return;
+                                                                        handleMarkPaid(invoice.id); 
+                                                                    }} 
+                                                                >
                                                                     {updatingId === invoice.id ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <CheckCircle className="me-2 h-4 w-4 text-emerald-600" />} 
                                                                     {t('invoices.markPaid')}
                                                                 </DropdownMenuItem>
@@ -478,7 +516,16 @@ export default function InvoicesPage() {
                                                         {canVoid && (
                                                             <>
                                                                 <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setInvoiceToDelete(invoice); }}>
+                                                                <DropdownMenuItem 
+                                                                    className="text-destructive cursor-pointer" 
+                                                                    disabled={isReadOnlyStore}
+                                                                    title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                                                                    onSelect={(e) => { 
+                                                                        e.preventDefault(); 
+                                                                        if (isReadOnlyStore) return;
+                                                                        setInvoiceToDelete(invoice); 
+                                                                    }}
+                                                                >
                                                                     <Trash2 className="me-2 h-4 w-4" /> {t('invoices.voidInvoice') || 'Void Invoice'}
                                                                 </DropdownMenuItem>
                                                             </>
@@ -519,7 +566,13 @@ export default function InvoicesPage() {
                         <Button variant="outline" onClick={() => setInvoiceToDelete(null)} disabled={isDeleting}>
                             {t('common.cancel')}
                         </Button>
-                        <Button onClick={handleDeleteInvoice} disabled={isDeleting} variant="destructive">
+                        <Button 
+                            onClick={handleDeleteInvoice} 
+                            disabled={isDeleting || isReadOnlyStore} 
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                            variant="destructive"
+                            className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                             {isDeleting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                             {t('invoices.voidInvoice') || 'Void Invoice'}
                         </Button>
@@ -541,7 +594,13 @@ export default function InvoicesPage() {
                         <Button variant="outline" onClick={() => setIsBulkVoidDialogOpen(false)} disabled={isDeleting}>
                             {t('common.cancel')}
                         </Button>
-                        <Button onClick={handleBulkVoid} disabled={isDeleting} variant="destructive">
+                        <Button 
+                            onClick={handleBulkVoid} 
+                            disabled={isDeleting || isReadOnlyStore} 
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                            variant="destructive"
+                            className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                             {isDeleting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                             {t('invoices.voidAllSelected') || 'Void All Selected'}
                         </Button>

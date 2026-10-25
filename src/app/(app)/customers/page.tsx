@@ -33,6 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AddCustomerDialog from '@/components/customers/add-customer-dialog';
 import EditCustomerDialog from '@/components/customers/edit-customer-dialog';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import { useI18n } from '@/context/i18n-context';
 import { useFirestore } from '@/firebase';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
@@ -148,8 +149,10 @@ export default function CustomersPage() {
     isFullSyncingCustomers,
     searchCustomers,
     allCustomersUnfiltered,
-    addToQueue
+    addToQueue,
+    isReadOnly
   } = usePOS();
+  const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
   const { toast } = useToast();
   const router = useRouter();
   const { t } = useI18n();
@@ -295,6 +298,14 @@ export default function CustomersPage() {
    * round loses the money.
    */
   const handleMergeGroup = React.useCallback(async (group: DuplicateGroup) => {
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Resolving customer health issues is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     const plan = buildMergePlan(group.members);
     if (!plan) return;
 
@@ -347,6 +358,14 @@ export default function CustomersPage() {
 
   /** Resolve a code collision by giving one record a free code. */
   const handleRecode = React.useCallback(async (customer: Customer, newCode: string) => {
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Resolving customer health issues is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsFixingHealth(true);
     try {
       await addToQueue(
@@ -632,6 +651,14 @@ export default function CustomersPage() {
       toast({ title: t('toast.error'), description: t('customers.deleteFailedSession'), variant: 'destructive' });
       return;
     }
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Deleting customers is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const targets = selectedCustomerIds
       .map(id => displayCustomers?.find(c => c.id === id))
@@ -730,6 +757,7 @@ export default function CustomersPage() {
               onRecode={handleRecode}
               codesInUse={codesInUse}
               busy={isFixingHealth}
+              disabled={isReadOnlyStore}
             />
           )}
         </div>
@@ -837,7 +865,14 @@ export default function CustomersPage() {
               {(() => {
                 const visibleSelectedCount = selectedCustomerIds.filter(id => filtered.some(c => c.id === id)).length;
                 return visibleSelectedCount > 0 && (
-                  <Button variant="destructive" size="sm" className="h-8 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    disabled={isReadOnlyStore}
+                    title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                    className="h-8 gap-1 disabled:opacity-40 disabled:cursor-not-allowed" 
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                       {t('customers.deleteSelected', { count: visibleSelectedCount })}
@@ -852,13 +887,26 @@ export default function CustomersPage() {
                   Export
                 </span>
               </Button>
-              <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setIsImportOpen(true)}>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                disabled={isReadOnlyStore}
+                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                className="h-8 gap-1 disabled:opacity-40 disabled:cursor-not-allowed" 
+                onClick={() => setIsImportOpen(true)}
+              >
                 <Upload className="h-3.5 w-3.5" />
                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                   {t('common.import')}
                 </span>
               </Button>
-              <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
+              <Button 
+                size="sm" 
+                disabled={isReadOnlyStore}
+                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                className="h-8 gap-1 disabled:opacity-40 disabled:cursor-not-allowed" 
+                onClick={() => setIsAddCustomerOpen(true)}
+              >
                 <PlusCircle className="h-3.5 w-3.5" />
                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                   {t('customers.addCustomer')}
@@ -1006,7 +1054,14 @@ export default function CustomersPage() {
                       </TableCell>
                       <TableCell className="text-end" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCustomerToEdit(customer)}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            disabled={isReadOnlyStore}
+                            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                            className="h-8 w-8 disabled:opacity-40 disabled:cursor-not-allowed" 
+                            onClick={() => setCustomerToEdit(customer)}
+                          >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { NProgress.start(); router.push(`/customers/details?id=${customer.id}`); }}>
@@ -1027,7 +1082,13 @@ export default function CustomersPage() {
                 {searchTerm ? t('customers.noneFoundSearch') : t('customers.noneFoundHint')}
               </p>
               {!searchTerm && (
-                <Button size="sm" className="h-8 gap-1" onClick={() => setIsAddCustomerOpen(true)}>
+                <Button 
+                  size="sm" 
+                  disabled={isReadOnlyStore}
+                  title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                  className="h-8 gap-1 disabled:opacity-40 disabled:cursor-not-allowed" 
+                  onClick={() => setIsAddCustomerOpen(true)}
+                >
                   <PlusCircle className="h-3.5 w-3.5" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                     {t('customers.addCustomer')}
@@ -1117,7 +1178,14 @@ export default function CustomersPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">{t('common.delete')}</AlertDialogAction>
+            <AlertDialogAction 
+              onClick={handleBulkDelete} 
+              disabled={isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="bg-destructive hover:bg-destructive/90 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {t('common.delete')}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1128,6 +1196,7 @@ export default function CustomersPage() {
           onOpenChange={setIsAddCustomerOpen}
           businessId={currentUser.businessId}
           customers={displayCustomers}
+          isReadOnly={isReadOnlyStore}
         />
       )}
       {currentUser?.businessId && (
@@ -1146,6 +1215,7 @@ export default function CustomersPage() {
         isOpen={!!customerToEdit}
         onOpenChange={(open) => !open && setCustomerToEdit(null)}
         customer={customerToEdit}
+        isReadOnly={isReadOnlyStore}
       />
     </>
   );

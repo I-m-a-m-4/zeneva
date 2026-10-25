@@ -30,7 +30,8 @@ import { isCoreFeatureBlocked } from '@/lib/plan';
 function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, onCustomerAdded: (customer: Customer) => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { triggerRefresh, customers, addToQueue } = usePOS();
+    const { triggerRefresh, customers, addToQueue, business, isReadOnly: posReadOnly } = usePOS();
+    const isReadOnly = posReadOnly || (business ? isCoreFeatureBlocked(business) : false);
     const { t } = useI18n();
     const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
@@ -41,6 +42,14 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isReadOnly) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. Adding customers is disabled in read-only mode.',
+                variant: 'destructive',
+            });
+            return;
+        }
         if (!name) {
             toast({ title: t('pos.missingFields'), description: t('pos.customerNameRequired'), variant: 'destructive' });
             return;
@@ -129,7 +138,12 @@ function AddCustomerForm({ businessId, onCustomerAdded }: { businessId: string, 
                 </div>
             </div>
             <DialogFooter>
-                <Button type="submit" disabled={isSaving}>
+                <Button
+                    type="submit"
+                    disabled={isSaving || isReadOnly}
+                    title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                    className="disabled:opacity-40 disabled:cursor-not-allowed"
+                >
                     {isSaving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                     {t('pos.saveCustomer')}
                 </Button>
@@ -239,7 +253,12 @@ export default function CustomerPage() {
                             </div>
                             <Dialog open={isAddCustomerOpen} onOpenChange={setIsAddCustomerOpen}>
                                 <DialogTrigger asChild>
-                                    <Button variant="outline">
+                                    <Button
+                                        variant="outline"
+                                        disabled={isReadOnly}
+                                        title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+                                        className="disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
                                         <PlusCircle className="me-2 h-4 w-4" /> {t('pos.addNew')}
                                     </Button>
                                 </DialogTrigger>

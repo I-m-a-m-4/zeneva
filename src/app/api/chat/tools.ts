@@ -662,11 +662,11 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     queryProducts: tool({
       description:
-        'Search and retrieve products from inventory (stock levels, prices, categories). Returns product cards. READ-ONLY. If the user named a product loosely or you are unsure which item they mean, use findSimilarProducts instead.',
+        'Search products from inventory (stock, prices, categories). Returns product cards. Use findSimilarProducts if product name is ambiguous.',
       inputSchema: z.object({
         searchTerm: z.string().optional().describe('Product name or SKU keyword.'),
         category: z.string().optional().describe('Filter by exact category.'),
-        lowStockOnly: z.boolean().optional().describe('Only items at or below their low stock threshold.'),
+        lowStockOnly: z.boolean().optional().describe('Only items at or below low stock threshold.'),
         limit: z.number().min(1).max(50).default(12).describe('Max results.'),
       }),
       execute: async ({ searchTerm, category, lowStockOnly, limit }) => {
@@ -702,9 +702,9 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     findSimilarProducts: tool({
       description:
-        'Resolve an ambiguous product name to a specific item. Use this FIRST whenever the user names a product and you are not certain which one they mean — it returns a picker the user can click. If exactly one confident match exists it resolves automatically.',
+        'Resolve an ambiguous product name. Returns a clickable picker card or single match. Call before proposing changes when name is uncertain.',
       inputSchema: z.object({
-        name: z.string().describe('The product name the user typed, verbatim.'),
+        name: z.string().describe('The product name typed by the user.'),
         limit: z.number().min(2).max(8).default(5).describe('Max candidates to offer.'),
       }),
       execute: async ({ name, limit }) => {
@@ -754,7 +754,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
     }),
 
     searchWebForImages: tool({
-      description: 'Search the web for images of a product or brand by name. Use this when the user asks you to find an image, look up a picture, or search the web for what a product looks like. Do NOT call findSimilarProducts when using this tool. If the user only asks for an image, just use this tool.',
+      description: 'Search the web for product images. Use when asked to find photos of a product.',
       inputSchema: z.object({ query: z.string().describe('The product name or search term.') }),
       execute: async ({ query }) => {
         try {
@@ -851,9 +851,9 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     showProductImage: tool({
       description:
-        "Show a product's photo, by name. Use this when the user asks to see, view or look at a product, or asks what it looks like. Returns the picture at full size with its price and stock. If the name is ambiguous this returns a picker instead — do not guess.",
+        "Display a product's photo with price and stock by name. Use when user asks to see or view a product photo.",
       inputSchema: z.object({
-        name: z.string().describe('The product name the user typed, verbatim.'),
+        name: z.string().describe('The product name typed by the user.'),
       }),
       execute: async ({ name }) => {
         try {
@@ -1175,7 +1175,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     getDataHealthCheck: tool({
       description:
-        'Audit inventory data quality: negative stock, missing cost price, missing SKU, missing image, zero price. Use when the owner asks what is wrong with their data or why numbers look off.',
+        'Audit inventory data issues: negative stock, missing cost price, missing SKU/image, zero price.',
       inputSchema: z.object({}),
       execute: async () => {
         try {
@@ -1251,7 +1251,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
      */
     getDailyReport: tool({
       description:
-        "A day's trading drawn as a report card — takings, transactions, method split, top items, debt owed. Use when the user asks 'how did we do today', 'daily report', or 'end of day'.",
+        "Daily trading report card: takings, profit, transaction count, payment split. Use for 'how did we do today' or 'daily report'.",
       inputSchema: z.object({
         date: z.string().optional().describe('YYYY-MM-DD. Defaults to today.'),
       }),
@@ -1359,7 +1359,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
      */
     getBusinessRating: tool({
       description:
-        "The shop's business rating out of 100 — the same score shown in the top bar and on Reports → Business Rating. Returns the four pillars that multiply revenue (margin, basket, repeat, momentum), how many points each one has available, the action that moves each, and the largest money opportunities. Use when the user asks how their business is doing overall, what their rating or score is, how to improve it, what to work on next, or where they are leaving money on the table. For a single period's takings use getSalesMetrics instead.",
+        "Business rating out of 100 and pillars (margin, basket, repeat, momentum). Use for overall performance or 'how am I doing'. For takings use getDailyReport or getSalesMetrics.",
       inputSchema: z.object({}),
       execute: async () => {
         if (!ratingEnabled) {
@@ -1459,14 +1459,14 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
      */
     explainHowTo: tool({
       description:
-        "Step-by-step walkthrough for a task in the app. Use whenever the user asks how to DO something — 'how do I bulk import', 'teach me to record a sale', 'how do refunds work', 'how do I add staff'. Returns a numbered card with a link to the right page. Always prefer this over describing steps yourself.",
+        "Step-by-step walkthrough for an app task (bulkImport, recordSale, addProduct, refund, addStaff). Returns a card with steps and page link.",
       inputSchema: z.object({
         topic: z
           .enum([
             'bulkImport', 'recordSale', 'addProduct', 'lowStockThreshold', 'addBranch',
             'refund', 'addStaff', 'invoice', 'stocktake', 'loyalty',
           ])
-          .describe('Which walkthrough to show.'),
+          .describe('Walkthrough topic to show.'),
       }),
       execute: async ({ topic }) => {
         const w = WORKFLOWS[topic];
@@ -1487,11 +1487,11 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     linkToPage: tool({
       description:
-        "Offer a tap-through link to a page in the Zeneva app. Use when the user asks to open, go to, or see a page — e.g. 'open inventory', 'show me the reports', 'take me to the POS'. Returns a LINK card. Covers sub-pages too: adding a product, branches, debts, the POS steps.",
+        "Provide a tap-through button link to a page in the Zeneva app (e.g. /inventory, /reports, /sales/pos/select-products).",
       inputSchema: z.object({
-        href: z.string().describe('Absolute app path, starting with a forward slash. (e.g. /inventory, /reports, /sales/pos/select-products for the POS)'),
-        label: z.string().describe('What the link says, e.g. "Open Inventory".'),
-        detail: z.string().optional().describe('One short line on what is on that page.'),
+        href: z.string().describe('Absolute app path starting with / (e.g. /inventory, /reports).'),
+        label: z.string().describe('Link button label (e.g. "Open Inventory").'),
+        detail: z.string().optional().describe('Brief subtitle for the page.'),
       }),
       execute: async ({ href, label, detail }) => {
         // Only ever link inside the app — never to external sites.
@@ -2095,7 +2095,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     getBusinessOverview: tool({
       description:
-        'One-shot health snapshot: today and this month revenue, inventory value, low stock count, data issues. Use for open-ended questions like "how is my business doing".',
+        'Health snapshot: revenue (today/month), stock value, low-stock count, data issues.',
       inputSchema: z.object({}),
       execute: async () => {
         try {
@@ -2149,14 +2149,14 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
      */
     runLossPreventionScan: tool({
       description:
-        'Run the full theft and shrinkage sweep over this business: cancelled sales, discount and price-override abuse, price-swaps, stock write-offs, out-of-hours trading, receipt integrity and staff risk profiles. Use for "is anyone stealing from me", "check for fraud", "why is my stock short", "review my staff", "run an audit". Returns a finished report — relay its summary, do not re-derive or second-guess its findings.',
+        'Theft and shrinkage sweep: cancelled sales, discount/override abuse, staff risk profiles. Use for fraud, theft, short stock, or staff audits. Relay summary directly.',
       inputSchema: z.object({
         days: z
           .number()
           .min(7)
           .max(180)
           .default(90)
-          .describe('How much trading history to examine. Patterns need weeks; 90 is the sensible default.'),
+          .describe('Days of trading history to analyze (default 90).'),
       }),
       execute: async ({ days }) => {
         try {
@@ -2242,18 +2242,18 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
      */
     proposeCostPrices: tool({
       description:
-        'Propose cost prices for several products from a list the owner gave, e.g. "coke 380, indomie 190". Pass the names exactly as they said them — Zeneva matches them to real products itself. Streams an approval card and does NOT write to the database.',
+        'Propose cost prices for multiple products from user text (e.g. "coke 380, indomie 190"). Streams an approval card. Does NOT write to database.',
       inputSchema: z.object({
         entries: z
           .array(
             z.object({
-              name: z.string().describe('The product name as the owner wrote it. Do not correct or expand it.'),
-              cost: z.number().min(0).describe('What they paid, as a plain number.'),
+              name: z.string().describe('Product name as user wrote it.'),
+              cost: z.number().min(0).describe('Cost amount.'),
             }),
           )
           .min(1)
           .max(200)
-          .describe('One entry per product they named.'),
+          .describe('One entry per product.'),
       }),
       execute: async (p) => {
         const products = await allProducts();
@@ -2343,19 +2343,17 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
      */
     proposeCostEstimate: tool({
       description:
-        'Propose estimating cost prices from selling prices and a margin the owner states, e.g. "I make about 25% on drinks". Fills gaps only — never overwrites a real cost price. Streams an approval card and does NOT write to the database.',
+        'Propose estimating cost prices from selling prices using given margin or markup percentage. Fills gaps only. Requires approval.',
       inputSchema: z.object({
-        percent: z.number().min(1).max(95).describe('The percentage they said.'),
+        percent: z.number().min(1).max(95).describe('Percentage value.'),
         basis: z
           .enum(['margin', 'markup'])
-          .describe(
-            'margin = share of the selling price ("I make 25% on it"); markup = added on top of cost ("I add 25%"). If genuinely unclear, use markup — it is the smaller change.',
-          ),
+          .describe('margin = % of selling price; markup = % added to cost.'),
         category: z
           .string()
           .nullable()
           .optional()
-          .describe('Limit to one category if they named one. Omit for the whole catalogue.'),
+          .describe('Category name to restrict to, or omit for all products.'),
       }),
       execute: async (p) => {
         const products = await allProducts();
@@ -2622,10 +2620,10 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     forecastRevenue: tool({
       description:
-        'Project revenue forward from the actual sales trend. Use this for ANY forward-looking money question — "what will I make next month", "how much in a year", "where are we heading". It fits a line to real daily takings and reports its own confidence, refusing to extrapolate when the history is too thin. Never answer a projection question from memory; call this.',
+        'Project revenue forward from actual sales trend. Use for forward-looking revenue questions. Fits a line to real sales and quotes confidence.',
       inputSchema: z.object({
-        aheadDays: z.number().min(7).max(3650).default(30).describe('How far ahead to project, in days.'),
-        basedOnDays: z.number().min(14).max(365).default(90).describe('How much history to fit the trend to.'),
+        aheadDays: z.number().min(7).max(3650).default(30).describe('Days ahead to project.'),
+        basedOnDays: z.number().min(14).max(365).default(90).describe('Days of history to fit trend to.'),
       }),
       execute: async ({ aheadDays, basedOnDays }) => {
         try {
@@ -2720,7 +2718,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     getGrowthRate: tool({
       description:
-        'Growth rate between two consecutive equal periods, with the annualised equivalent. Use for "are we growing", "how fast", "what rate are we growing at".',
+        'Growth rate between two consecutive equal periods. Use for "are we growing" or growth rate questions.',
       inputSchema: z.object({ periodDays: z.number().min(7).max(180).default(30).describe('Length of each half being compared.') }),
       execute: async ({ periodDays }) => {
         try {
@@ -2772,7 +2770,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
     forecastStockout: tool({
       description:
-        'When each product will run out, based on its recent sales velocity, and the date to reorder by. Use for "what will run out", "what should I reorder first", "how long will stock last".',
+        'Forecast when products run out based on sales velocity and days to reorder. Use for reorder planning.',
       inputSchema: z.object({
         basedOnDays: z.number().min(7).max(180).default(30).describe('History window used to measure velocity.'),
         withinDays: z.number().min(1).max(365).default(30).describe('Only report items running out within this many days.'),
@@ -2844,9 +2842,9 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
       },
     }),
     setPageTimeRange: tool({
-      description: 'Change the date range filter on the current page to the specified number of days (e.g. 7 for last 7 days, 30 for last 30 days). Use this when the user asks you to filter the current view or change the date range on screen.',
+      description: 'Change the date range filter on the active page to a specified number of days (e.g. 1 for today, 7, 30).',
       parameters: z.object({
-        days: z.number().describe('Number of days to filter by (1 for today, 7 for last 7 days, 30 for this month)'),
+        days: z.number().describe('Number of days to filter by.'),
       }),
       execute: async ({ days }) => {
         return {
@@ -2857,31 +2855,16 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
       },
     }),
     executePageAction: tool({
-      description: `Trigger a generic UI action on the current page to act as the user's co-pilot. Supported actions include:
-- 'open_create_product': Open the "Add Product" modal
-- 'open_create_expense': Open the "Record Expense" modal
-- 'open_point_of_sale': Navigate directly to the active POS register
-- 'open_settings_tab': Navigate to Settings (pass tab name like 'staff' or 'receipt' in payload)
-- 'search_inventory': Apply a search string to the inventory (pass search string in payload)
-- 'filter_low_stock': Filter inventory view to low stock items
-- 'search_customer': Look up a specific customer (pass name in payload)
-- 'filter_receipts_by_status': Filter sales history (pass status in payload)
-- 'export_current_view': Trigger CSV/PDF export for the current table
-- 'export_customers': Export and download all customers and their contact info as a CSV
-- 'open_bulk_image_editor': Open the Bulk Image Finder to fetch and populate product images in bulk
-- 'switch_report_tab': Switch between Analytics/Profit&Loss (pass tab name in payload)
-- 'contact_support': Open the live chat/support modal
-- 'show_tutorial': Trigger a guided tour for the current page
-- 'open_visual_stock_take': Open the Visual Stock Take page where the user can upload a shelf image for AI reconciliation.`,
+      description: 'Trigger a UI co-pilot action on the current page (e.g. open modals, apply search/filters, export data, switch tabs).',
       parameters: z.object({
         action: z.enum([
           'open_create_product', 'open_create_expense', 'open_point_of_sale', 'open_settings_tab',
           'search_inventory', 'filter_low_stock', 'search_customer', 'filter_receipts_by_status',
           'export_current_view', 'export_customers', 'open_bulk_image_editor', 'switch_report_tab',
           'contact_support', 'show_tutorial', 'open_visual_stock_take'
-        ]).describe('The exact action identifier to trigger.'),
-        payload: z.string().optional().describe('Optional payload for the action, such as a search query.'),
-        message: z.string().describe('A friendly message to show the user confirming the action.'),
+        ]).describe('The action identifier to trigger.'),
+        payload: z.string().optional().describe('Optional payload (e.g. search query, tab name).'),
+        message: z.string().describe('Confirmation message to display to the user.'),
       }),
       execute: async ({ action, payload, message }) => {
         return {

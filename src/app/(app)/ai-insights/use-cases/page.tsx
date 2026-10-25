@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Sparkles, Package, BarChart2, Users, ShieldCheck,
   ChevronRight, CheckCircle2, AlertTriangle, ReceiptText, Building2,
-  ImageIcon, ArrowUpRight, LineChart,
+  ImageIcon, ArrowUpRight, LineChart, Camera,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUser, useFirestore } from '@/firebase';
@@ -44,6 +44,30 @@ type UseCase = {
 };
 
 const USE_CASES: UseCase[] = [
+  {
+    id: 'vision',
+    icon: Camera,
+    iconColor: 'text-rose-500',
+    iconBg: 'bg-rose-50 dark:bg-rose-950/40',
+    title: 'Zen Vision — Snap, Prompt & Restock in Seconds',
+    description:
+      'Attach any photo with your own custom prompt in chat — handwritten restock sheets, supplier invoices, shelf counts, or unlabelled products. Preview full images, cross-reference live store inventory, and update stock in 1 tap.',
+    capabilities: [
+      { label: 'Multi-image uploads with custom instructions', detail: 'Upload multiple photos at once (up to 5 images per day on standard plans, and 15 per day on Business). Preview image thumbnails inside the chatbox, inspect in full-resolution lightbox, and type specific instructions before analyzing.' },
+      { label: 'Live store catalog cross-referencing', detail: 'Zen Vision automatically crosschecks scanned names against your store inventory with fuzzy AI matching, displaying product photos, stock on hand, and confidence scores.' },
+      { label: 'Handwritten stock sheet OCR', detail: 'Snap paper sheets, waybills, or notebook tallies. Zen Vision extracts items, quantities, and unit costs into an interactive review card deck.' },
+      { label: 'One-tap bulk restock cards', detail: 'Review match suggestions, adjust quantities with tactile +/- steppers, or search your catalog to switch products before approving into your inventory queue.' },
+      { label: 'Visual shelf counting & audit', detail: 'Photograph shelves or cartons to count physical units and reconcile inventory discrepancies.' },
+      { label: 'Product recognition & lookup', detail: 'Identify unlabelled bottles or boxes, retrieve current retail prices and SKUs, or discover missing product images.' },
+    ],
+    examples: [
+      'Upload a handwritten stock sheet and restock',
+      'Scan this delivery invoice and update inventory',
+      'What store product is in this photo?',
+      'Count the items on this shelf',
+    ],
+    usageKey: 'showProductImage',
+  },
   {
     id: 'inventory',
     icon: Package,
@@ -259,6 +283,7 @@ function ExamplePrompt({ text }: { text: string }) {
   return (
     <Link
       href={`/ai-insights?q=${encodeURIComponent(text)}`}
+      prefetch={false}
       className="group flex items-start gap-2 w-full text-left bg-muted hover:bg-orange-500/10 rounded-lg px-3.5 py-2.5 border border-border hover:border-orange-500/40 transition-colors"
     >
       <span className="flex-1 text-xs text-foreground/80 font-medium leading-relaxed group-hover:text-orange-700 dark:group-hover:text-orange-300">
@@ -292,7 +317,7 @@ export default function ZenAIUseCasesPage() {
     <div className="min-h-[calc(100vh-64px)] bg-muted/40 flex flex-col">
       {/* Header */}
       <div className="max-w-3xl mx-auto w-full px-5 pt-7 pb-6">
-        <Link href="/ai-insights" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-5">
+        <Link href="/ai-insights" prefetch={false} className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-5">
           <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Chat
         </Link>
         <div className="flex items-start justify-between gap-4">
@@ -307,7 +332,7 @@ export default function ZenAIUseCasesPage() {
             </p>
           </div>
           <Button asChild size="sm" className="flex-shrink-0 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold">
-            <Link href="/ai-insights">Open Chat <ChevronRight className="w-3.5 h-3.5 ml-1" /></Link>
+            <Link href="/ai-insights" prefetch={false}>Open Chat <ChevronRight className="w-3.5 h-3.5 ml-1" /></Link>
           </Button>
         </div>
       </div>

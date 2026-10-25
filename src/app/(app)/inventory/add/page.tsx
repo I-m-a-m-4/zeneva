@@ -101,6 +101,7 @@ export default function AddProductPage() {
   const { t } = useI18n();
   const productSchema = React.useMemo(() => makeProductSchema(t), [t]);
   const { business, products, currentUserProfile, isLoading, addToQueue, addProductWithImage } = usePOS();
+  const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
   const industryConfig = React.useMemo(() => getIndustryConfig(business?.settings?.industry), [business?.settings?.industry]);
   const firestore = useFirestore();
   const [isSaving, setIsSaving] = React.useState(false);
@@ -511,7 +512,13 @@ export default function AddProductPage() {
             <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
               {t('common.discard')}
             </Button>
-            <Button size="default" type="submit" disabled={isSaving}>
+            <Button
+              size="default"
+              type="submit"
+              disabled={isSaving || isReadOnly}
+              title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+              className="disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
             </Button>
@@ -1430,7 +1437,13 @@ export default function AddProductPage() {
           <Button variant="outline" size="default" type="button" onClick={() => router.push('/inventory')}>
             {t('common.discard')}
           </Button>
-          <Button size="default" type="submit" disabled={isSaving}>
+          <Button
+            size="default"
+            type="submit"
+            disabled={isSaving || isReadOnly}
+            title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+            className="disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {categoryType === 'service' ? t('inventory.saveService') : t('inventory.saveProduct')}
           </Button>

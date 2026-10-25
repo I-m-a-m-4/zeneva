@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import type { Product } from '@/types';
 import { useI18n } from '@/context/i18n-context';
 
@@ -17,7 +18,8 @@ export function QuickRestockModal({
 }) {
     const { t } = useI18n();
     const { toast } = useToast();
-    const { addToQueue } = usePOS();
+    const { addToQueue, isReadOnly, business } = usePOS();
+    const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
     const [quantityToAdd, setQuantityToAdd] = React.useState('');
     const [backdate, setBackdate] = React.useState('');
     const [isSaving, setIsSaving] = React.useState(false);
@@ -28,6 +30,14 @@ export function QuickRestockModal({
 
     const handleSave = () => {
         if (!product) return;
+        if (isReadOnlyStore) {
+            toast({
+                title: 'Plan Expired (Read-Only Mode)',
+                description: 'Your plan has expired. Stock updates are disabled.',
+                variant: 'destructive',
+            });
+            return;
+        }
         if (isNaN(addedAmount) || addedAmount === 0) {
             onClose();
             return;
@@ -153,7 +163,13 @@ export function QuickRestockModal({
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSave} disabled={isSaving || !quantityToAdd}>Save Stock</Button>
+                    <Button 
+                        onClick={handleSave} 
+                        disabled={isSaving || !quantityToAdd || isReadOnlyStore}
+                        title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                    >
+                        Save Stock
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

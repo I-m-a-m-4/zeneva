@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import type { Supplier } from '@/types';
@@ -48,7 +49,8 @@ import type { Supplier } from '@/types';
 export default function SuppliersPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { business, currentUserProfile, currencySymbol } = usePOS();
+  const { business, currentUserProfile, currencySymbol, isReadOnly } = usePOS();
+  const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
   const firestore = useFirestore();
 
   const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
@@ -95,6 +97,14 @@ export default function SuppliersPage() {
   }, [business?.id, firestore]);
 
   const openAddDialog = () => {
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Adding suppliers is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setEditingSupplier(null);
     setName('');
     setContactPerson('');
@@ -119,6 +129,14 @@ export default function SuppliersPage() {
   };
 
   const handleSave = async () => {
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Saving suppliers is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!name.trim()) {
       toast({ variant: 'destructive', title: 'Supplier Name Required', description: 'Please enter a name for the supplier.' });
       return;
@@ -170,6 +188,14 @@ export default function SuppliersPage() {
   };
 
   const handleDelete = async (supplierId: string, supplierName: string) => {
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Deleting suppliers is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!confirm(`Are you sure you want to delete supplier "${supplierName}"?`)) return;
     if (!business?.id || !firestore) return;
 
@@ -213,7 +239,12 @@ export default function SuppliersPage() {
               <PackageCheck className="h-4 w-4 mr-2" /> Purchase Orders
             </Link>
           </Button>
-          <Button onClick={openAddDialog}>
+          <Button 
+            onClick={openAddDialog}
+            disabled={isReadOnlyStore}
+            title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+            className="disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             <Plus className="h-4 w-4 mr-2" /> Add Supplier
           </Button>
         </div>
@@ -285,7 +316,14 @@ export default function SuppliersPage() {
               </CardContent>
 
               <div className="p-4 pt-2 border-t flex items-center justify-between text-xs mt-3">
-                <Button variant="ghost" size="sm" onClick={() => openEditDialog(supplier)}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="disabled:opacity-40 disabled:cursor-not-allowed" 
+                  disabled={isReadOnlyStore}
+                  title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                  onClick={() => openEditDialog(supplier)}
+                >
                   <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit
                 </Button>
                 <div className="flex items-center gap-1">
@@ -294,7 +332,14 @@ export default function SuppliersPage() {
                       Create PO
                     </Link>
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(supplier.id, supplier.name)}>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-destructive disabled:opacity-40 disabled:cursor-not-allowed" 
+                    disabled={isReadOnlyStore}
+                    title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                    onClick={() => handleDelete(supplier.id, supplier.name)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -310,7 +355,12 @@ export default function SuppliersPage() {
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
               Add your vendors and suppliers to streamline restocking and track purchase orders.
             </p>
-            <Button onClick={openAddDialog} className="mt-2">
+            <Button 
+              onClick={openAddDialog} 
+              disabled={isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="mt-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <Plus className="h-4 w-4 mr-2" /> Add Your First Supplier
             </Button>
           </CardContent>
@@ -411,7 +461,12 @@ export default function SuppliersPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button 
+              onClick={handleSave} 
+              disabled={isSaving || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+              className="disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingSupplier ? 'Save Changes' : 'Create Supplier'}
             </Button>

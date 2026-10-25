@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminFirestore, adminAuth } from '@/firebase/admin';
 import { buildProductIndex, matchDraft } from '@/lib/import/match';
+import { effectivePlan, AI_IMAGE_DAILY_LIMITS } from '@/lib/plan';
 import type { Product } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -42,11 +43,72 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { image, businessId: requestedBusinessId } = body;
+    const { image, images, businessId: requestedBusinessId, prompt: customPrompt } = body;
     const businessId = authenticatedBusinessId || requestedBusinessId;
 
-    if (!image) {
-      return NextResponse.json({ error: 'Image is required' }, { status: 400, headers: corsHeaders });
+    // Collect images into array (supports multiple images or single fallback)
+    let rawImages: string[] = [];
+    if (Array.isArray(images) && images.length > 0) {
+      rawImages = images.filter((img): img is string => typeof img === 'string' && img.trim().length > 0);
+    } else if (typeof image === 'string' && image.trim().length > 0) {
+      rawImages = [image.trim()];
+    }
+
+    if (rawImages.length === 0) {
+      return NextResponse.json({ error: 'At least one image is required' }, { status: 400, headers: corsHeaders });
+    }
+
+    // Daily image upload limit check
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let plan = 'starter';
+    let dailyLimit = AI_IMAGE_DAILY_LIMITS.starter;
+    let usedToday = 0;
+
+    if (businessId) {
+      try {
+        const bizSnap = await adminFirestore.collection('businessInstances').doc(businessId).get();
+        if (bizSnap.exists) {
+          const bizData = bizSnap.data();
+          plan = effectivePlan(bizData);
+          dailyLimit = AI_IMAGE_DAILY_LIMITS[plan as keyof typeof AI_IMAGE_DAILY_LIMITS] ?? 5;
+          usedToday = bizData?.aiImageUsageDate === todayStr ? (Number(bizData?.aiImageUsageCount) || 0) : 0;
+        }
+      } catch (err) {
+        console.warn('[analyze-sheet] Error fetching business quota:', err);
+      }
+    }
+
+    const remainingToday = Math.max(0, dailyLimit - usedToday);
+    if (usedToday >= dailyLimit) {
+      return NextResponse.json(
+        {
+          error: `Daily image limit reached. Your plan allows ${dailyLimit} images per day (${usedToday} used today). ${
+            plan === 'business'
+              ? 'Your allowance resets tomorrow.'
+              : 'Upgrade to Business for 15 image scans per day.'
+          }`,
+          code: 'daily_image_limit_exceeded',
+          dailyLimit,
+          usedToday,
+          remainingToday: 0,
+        },
+        { status: 429, headers: corsHeaders }
+      );
+    }
+
+    if (rawImages.length > remainingToday) {
+      return NextResponse.json(
+        {
+          error: `You can only upload ${remainingToday} more image${
+            remainingToday === 1 ? '' : 's'
+          } today (${dailyLimit}/day limit). You provided ${rawImages.length}.`,
+          code: 'daily_image_limit_exceeded',
+          dailyLimit,
+          usedToday,
+          remainingToday,
+        },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
@@ -54,20 +116,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'OpenRouter API key not configured' }, { status: 500, headers: corsHeaders });
     }
 
-    // Prepare image data URL
-    let imageUrl = image;
-    if (!imageUrl.startsWith('data:') && !imageUrl.startsWith('http')) {
-      imageUrl = `data:image/png;base64,${image}`;
-    }
+    // Format all image URLs
+    const formattedUrls = rawImages.map((img) => {
+      if (img.startsWith('data:') || img.startsWith('http')) return img;
+      return `data:image/png;base64,${img}`;
+    });
 
-    // Call OpenRouter with openai/gpt-4o (with fallback to openai/gpt-4o-mini)
-    const promptText = `You are an expert AI retail inventory and handwriting OCR auditor.
-Analyze this image carefully. It contains an inventory stock sheet, supplier invoice, waybill, handwritten stock count, or price list.
+    const userInstruction = customPrompt?.trim()
+      ? `SPECIFIC USER INSTRUCTION:\n"${customPrompt.trim()}"\n\n`
+      : '';
+
+    const isMultiple = formattedUrls.length > 1;
+    const promptText = `You are Zen Vision, an expert retail inventory, handwriting OCR, and visual auditor.
+${userInstruction}Analyze the ${isMultiple ? `${formattedUrls.length} images` : 'image'} carefully. They may contain inventory stock sheets, supplier invoices, waybills, handwritten stock counts, shelf photos, or price lists across one or multiple pages/views.
 
 TASK:
-Extract every product line visible. For each line, extract:
-1. rawName: The exact product name/description as written on the paper/sheet.
-2. quantity: Number of units, pieces, cartons, or bottles. If missing, default to 1.
+Extract every product line or item mentioned/visible in accordance with the user's instructions across ALL provided images into a single consolidated list.
+- If the same item appears across multiple pages/sheets, sum the total quantity.
+- For each item, extract:
+1. rawName: The exact product name/description as written on the paper/sheet or identified in the image.
+2. quantity: Number of units, pieces, cartons, or bottles. If missing or unclear, default to 1.
 3. price: The price or cost written alongside the item (numeric only, strip any currency symbols), or null if not written.
 
 Return strictly a valid JSON object with NO markdown formatting, NO backticks, and NO extra text:
@@ -82,8 +150,13 @@ Return strictly a valid JSON object with NO markdown formatting, NO backticks, a
   ]
 }`;
 
+    const imageContentParts = formattedUrls.map((url) => ({
+      type: 'image_url',
+      image_url: { url },
+    }));
+
     let parsedResult: { sheetTitle?: string; items?: ExtractedItem[] } | null = null;
-    let modelUsed = 'openai/gpt-4o';
+    let modelUsed = 'Zen Vision';
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -96,17 +169,14 @@ Return strictly a valid JSON object with NO markdown formatting, NO backticks, a
         },
         body: JSON.stringify({
           model: 'openai/gpt-4o',
-          max_tokens: 3000,
+          max_tokens: 3500,
           response_format: { type: 'json_object' },
           messages: [
             {
               role: 'user',
               content: [
                 { type: 'text', text: promptText },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageUrl },
-                },
+                ...imageContentParts,
               ],
             },
           ],
@@ -128,17 +198,14 @@ Return strictly a valid JSON object with NO markdown formatting, NO backticks, a
           },
           body: JSON.stringify({
             model: 'openai/gpt-4o-mini',
-            max_tokens: 2500,
+            max_tokens: 3000,
             response_format: { type: 'json_object' },
             messages: [
               {
                 role: 'user',
                 content: [
                   { type: 'text', text: promptText },
-                  {
-                    type: 'image_url',
-                    image_url: { url: imageUrl },
-                  },
+                  ...imageContentParts,
                 ],
               },
             ],
@@ -164,6 +231,22 @@ Return strictly a valid JSON object with NO markdown formatting, NO backticks, a
         { error: e.message || 'Failed to extract items from image' },
         { status: 500, headers: corsHeaders }
       );
+    }
+
+    // Atomically increment daily usage counter in Firestore
+    const newUsed = usedToday + rawImages.length;
+    if (businessId) {
+      try {
+        await adminFirestore.collection('businessInstances').doc(businessId).set(
+          {
+            aiImageUsageDate: todayStr,
+            aiImageUsageCount: newUsed,
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.warn('[analyze-sheet] Error updating daily usage:', err);
+      }
     }
 
     const rawItems = Array.isArray(parsedResult?.items) ? parsedResult!.items : [];
@@ -273,6 +356,12 @@ Return strictly a valid JSON object with NO markdown formatting, NO backticks, a
         sheetTitle: parsedResult?.sheetTitle || 'Inventory Restock Sheet',
         items: analyzedItems,
         totalDetected: analyzedItems.length,
+        imagesProcessed: rawImages.length,
+        dailyLimitInfo: {
+          dailyLimit,
+          usedToday: newUsed,
+          remainingToday: Math.max(0, dailyLimit - newUsed),
+        },
       },
       { headers: corsHeaders }
     );

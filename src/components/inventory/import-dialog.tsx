@@ -53,6 +53,7 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
   const firestore = useFirestore();
   const { user } = useUser();
   const business = useBusiness();
+  const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
   const { triggerConfetti, triggerRefresh } = usePOS();
 
   const [file, setFile] = React.useState<File | null>(null);
@@ -369,7 +370,13 @@ export default function ImportDialog({ isOpen, onOpenChange, onSuccess, business
 
         <DialogFooter className='mt-4'>
           <Button variant="outline" size="lg" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button size="lg" onClick={handleImport} disabled={isParsing || isImporting || parsedData.length === 0 || !!error || !businessId}>
+          <Button
+            size="lg"
+            onClick={handleImport}
+            disabled={isParsing || isImporting || parsedData.length === 0 || !!error || !businessId || isReadOnly}
+            title={isReadOnly ? 'Plan expired (Read-only mode)' : undefined}
+            className="disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
             {isImporting ? 'Importing...' : `Import ${parsedData.length} Products`}
           </Button>

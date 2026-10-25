@@ -111,6 +111,7 @@ import { Input } from '@/components/ui/input';
 import QuickEditDialog from '@/components/inventory/quick-edit-dialog';
 import { QuickRestockModal } from '@/components/inventory/quick-restock-modal';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import { useI18n } from '@/context/i18n-context';
 import { useBranch } from '@/context/branch-context';
 import { cn, safeToDate, smartSearchMatch } from '@/lib/utils';
@@ -308,8 +309,10 @@ function InventoryPageContent() {
     isImpersonating,
     productSyncError,
     isCatalogUnverified,
-    retryProductSync
+    retryProductSync,
+    isReadOnly
   } = usePOS();
+  const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
 
   const [viewLayout, setViewLayout] = React.useState<'list' | 'grid'>('list');
   const [stockHistoryProductId, setStockHistoryProductId] = React.useState<string | null>(null);
@@ -1047,25 +1050,70 @@ function InventoryPageContent() {
         <div className="hidden md:flex items-center gap-2">
             {selectedProductIds.length > 0 && canManageStock && (
                <>
-                 <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => { setBulkEditInitialMode('grid'); setBulkEditInitialInstruction(''); setIsBulkEditDialogOpen(true); }}>
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   className="h-9 gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                   disabled={isReadOnlyStore}
+                   title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                   onClick={() => {
+                     if (isReadOnlyStore) return;
+                     setBulkEditInitialMode('grid');
+                     setBulkEditInitialInstruction('');
+                     setIsBulkEditDialogOpen(true);
+                   }}
+                 >
                    <Edit className="h-3.5 w-3.5" />
                    <span className="sm:whitespace-nowrap">
                      {t('inventory.bulkEditCount', { count: selectedProductIds.length })}
                    </span>
                  </Button>
-                 <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => { setBulkImageEditorMode('selected'); setIsBulkImageEditorOpen(true); }}>
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   className="h-9 gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                   disabled={isReadOnlyStore}
+                   title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                   onClick={() => {
+                     if (isReadOnlyStore) return;
+                     setBulkImageEditorMode('selected');
+                     setIsBulkImageEditorOpen(true);
+                   }}
+                 >
                    <ImageOff className="h-3.5 w-3.5" />
                    <span className="sm:whitespace-nowrap">
                      Fetch Images
                    </span>
                  </Button>
-                 <Button variant="default" size="sm" className="h-9 gap-1 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground hover:bg-primary/90" onClick={() => { setBulkEditInitialMode('ai'); setBulkEditInitialInstruction(''); setIsBulkEditDialogOpen(true); }}>
+                 <Button
+                   variant="default"
+                   size="sm"
+                   className="h-9 gap-1 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                   disabled={isReadOnlyStore}
+                   title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                   onClick={() => {
+                     if (isReadOnlyStore) return;
+                     setBulkEditInitialMode('ai');
+                     setBulkEditInitialInstruction('');
+                     setIsBulkEditDialogOpen(true);
+                   }}
+                 >
                    <Sparkles className="h-3.5 w-3.5" />
                    <span className="sm:whitespace-nowrap">
                      AI Bulk Edit
                    </span>
                  </Button>
-                 <Button variant="destructive" size="sm" className="h-9 gap-1" onClick={() => setIsDeleteDialogOpen(true)}>
+                 <Button
+                   variant="destructive"
+                   size="sm"
+                   className="h-9 gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                   disabled={isReadOnlyStore}
+                   title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                   onClick={() => {
+                     if (isReadOnlyStore) return;
+                     setIsDeleteDialogOpen(true);
+                   }}
+                 >
                    <Trash2 className="h-3.5 w-3.5" />
                    <span className="sm:whitespace-nowrap">
                      {t('inventory.deleteCount', { count: selectedProductIds.length })}
@@ -1172,7 +1220,18 @@ function InventoryPageContent() {
               <span className="sm:whitespace-nowrap">{t('common.export')}</span>
             </Button>
             {canManageStock && (
-              <Button size="sm" variant="outline" className="h-9 gap-1" id="tour-import-products" onClick={() => setIsImportOpen(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                id="tour-import-products"
+                disabled={isReadOnlyStore}
+                title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                onClick={() => {
+                  if (isReadOnlyStore) return;
+                  setIsImportOpen(true);
+                }}
+              >
                 <Upload className="h-3.5 w-3.5" />
                 <span className="sm:whitespace-nowrap">{t('common.import')}</span>
               </Button>
@@ -1277,12 +1336,24 @@ function InventoryPageContent() {
               </DropdownMenu>
             )}
             {canManageStock && (
-              <Button size="sm" asChild className="h-9 gap-1" id="tour-add-product">
-                <Link href="/inventory/add">
+              isReadOnlyStore ? (
+                <Button
+                  size="sm"
+                  disabled
+                  className="h-9 gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Plan expired (Read-only mode)"
+                >
                   <PlusCircle className="h-3.5 w-3.5" />
                   <span className="sm:whitespace-nowrap">{t('inventory.addProduct')}</span>
-                </Link>
-              </Button>
+                </Button>
+              ) : (
+                <Button size="sm" asChild className="h-9 gap-1" id="tour-add-product">
+                  <Link href="/inventory/add">
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    <span className="sm:whitespace-nowrap">{t('inventory.addProduct')}</span>
+                  </Link>
+                </Button>
+              )
             )}
           </div>
 
@@ -2230,10 +2301,24 @@ function InventoryPageContent() {
                                 <DropdownMenuItem onSelect={() => router.push(`/inventory/details?id=${product.id}`)}>
                                   <Edit className="me-2 h-4 w-4" /> {t('inventory.fullEdit')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => setQuickEditProduct(product)}>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (isReadOnlyStore) return;
+                                    setQuickEditProduct(product);
+                                  }}
+                                  disabled={isReadOnlyStore}
+                                  className={isReadOnlyStore ? "opacity-40 cursor-not-allowed" : ""}
+                                >
                                   <Edit className="me-2 h-4 w-4" /> {t('inventory.quickEdit')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => setQuickRestockProduct(product)}>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (isReadOnlyStore) return;
+                                    setQuickRestockProduct(product);
+                                  }}
+                                  disabled={isReadOnlyStore}
+                                  className={isReadOnlyStore ? "opacity-40 cursor-not-allowed" : ""}
+                                >
                                   <PackagePlus className="me-2 h-4 w-4" /> Quick Restock
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => setStockHistoryProductId(product.id)}>
@@ -2241,8 +2326,12 @@ function InventoryPageContent() {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onSelect={() => handleToggleArchive(product)}
-                                  className={product.isArchived ? "text-primary" : "text-amber-600 focus:text-amber-600"}
+                                  onSelect={() => {
+                                    if (isReadOnlyStore) return;
+                                    handleToggleArchive(product);
+                                  }}
+                                  disabled={isReadOnlyStore}
+                                  className={isReadOnlyStore ? "opacity-40 cursor-not-allowed" : (product.isArchived ? "text-primary" : "text-amber-600 focus:text-amber-600")}
                                 >
                                   {product.isArchived ? (
                                     <>
@@ -2517,12 +2606,27 @@ function InventoryPageContent() {
                 </p>
                 {activeTab === 'all' && (!searchTerm && stockFilter === 'all' && categoryFilter === 'all') && (
                   <div className="flex gap-2">
-                    <Button asChild>
-                      <Link href="/inventory/add">
+                    {isReadOnlyStore ? (
+                      <Button disabled className="disabled:opacity-40 disabled:cursor-not-allowed" title="Plan expired (Read-only mode)">
                         <PlusCircle className="me-2 h-4 w-4" /> {t('inventory.addProduct')}
-                      </Link>
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                      </Button>
+                    ) : (
+                      <Button asChild>
+                        <Link href="/inventory/add">
+                          <PlusCircle className="me-2 h-4 w-4" /> {t('inventory.addProduct')}
+                        </Link>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      disabled={isReadOnlyStore}
+                      title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+                      className="disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => {
+                        if (isReadOnlyStore) return;
+                        setIsImportOpen(true);
+                      }}
+                    >
                       <Upload className="me-2 h-4 w-4" /> {t('inventory.importProducts')}
                     </Button>
                   </div>

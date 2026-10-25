@@ -37,6 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { COUNTRY_CODES } from '@/components/ui/phone-input';
 import { usePOS } from '@/context/pos-context';
+import { isCoreFeatureBlocked } from '@/lib/plan';
 import { useToast } from '@/hooks/use-toast';
 import type { Customer } from '@/types';
 
@@ -89,14 +90,17 @@ interface CustomerCrmPanelProps {
   /** Unpaid + pending total we can see, for the payment-reminder template. */
   outstanding?: number;
   currencySymbol?: string;
+  isReadOnly?: boolean;
 }
 
 export default function CustomerCrmPanel({
   customer,
   outstanding = 0,
   currencySymbol = '',
+  isReadOnly,
 }: CustomerCrmPanelProps) {
-  const { addToQueue, business } = usePOS();
+  const { addToQueue, business, isReadOnly: posReadOnly } = usePOS();
+  const isReadOnlyStore = isReadOnly ?? (posReadOnly || (business ? isCoreFeatureBlocked(business) : false));
   const { toast } = useToast();
 
   const [tags, setTags] = React.useState<string[]>(customer.tags || []);
@@ -116,10 +120,18 @@ export default function CustomerCrmPanel({
   const notesDirty = (customer.notes || '') !== notes;
 
   const persist = async (values: Partial<Customer>) => {
+    if (isReadOnlyStore) {
+      toast({
+        title: 'Plan Expired (Read-Only Mode)',
+        description: 'Your plan has expired. Editing CRM details is disabled.',
+        variant: 'destructive',
+      });
+      return;
+    }
     await addToQueue({
       type: 'update-customer',
       payload: { id: customer.id, values },
-    } as any);
+    } as any, `Updating CRM details for customer: ${customer.name || customer.id}`);
   };
 
   const commitTags = async (next: string[]) => {
@@ -136,6 +148,7 @@ export default function CustomerCrmPanel({
   };
 
   const addTag = () => {
+    if (isReadOnlyStore) return;
     const value = tagDraft.trim().slice(0, MAX_TAG_LENGTH);
     if (!value) return;
     // Case-insensitive dedupe: "Wholesale" and "wholesale" are one tag, and two
@@ -153,6 +166,7 @@ export default function CustomerCrmPanel({
   };
 
   const removeTag = (tag: string) => {
+    if (isReadOnlyStore) return;
     void commitTags(tags.filter(t => t !== tag));
   };
 
@@ -296,8 +310,9 @@ export default function CustomerCrmPanel({
                   {tag}
                   <button
                     type="button"
+                    disabled={isReadOnlyStore}
                     onClick={() => removeTag(tag)}
-                    className="rounded-full p-0.5 hover:bg-background/60"
+                    className="rounded-full p-0.5 hover:bg-background/60 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Remove tag ${tag}`}
                   >
                     <X className="h-3 w-3" />
@@ -310,17 +325,25 @@ export default function CustomerCrmPanel({
             <Input
               value={tagDraft}
               onChange={e => setTagDraft(e.target.value)}
+              disabled={isReadOnlyStore}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   addTag();
                 }
               }}
-              placeholder="Add a tag and press Enter"
+              placeholder={isReadOnlyStore ? 'Tag editing disabled' : 'Add a tag and press Enter'}
               maxLength={MAX_TAG_LENGTH}
-              className="h-8 text-xs"
+              className="h-8 text-xs disabled:opacity-50"
             />
-            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={addTag} disabled={!tagDraft.trim()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={addTag}
+              disabled={!tagDraft.trim() || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+            >
               Add
             </Button>
           </div>
@@ -341,15 +364,22 @@ export default function CustomerCrmPanel({
           <Textarea
             value={notes}
             onChange={e => setNotes(e.target.value.slice(0, MAX_NOTES_LENGTH))}
-            placeholder="Prefers the 50cl bottles. Always asks for Tunde."
+            disabled={isReadOnlyStore}
+            placeholder={isReadOnlyStore ? 'Note editing disabled' : 'Prefers the 50cl bottles. Always asks for Tunde.'}
             rows={4}
-            className="text-sm"
+            className="text-sm disabled:opacity-50"
           />
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground">
               {notes.length}/{MAX_NOTES_LENGTH}
             </span>
-            <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={saveNotes} disabled={!notesDirty || savingNotes}>
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={saveNotes}
+              disabled={!notesDirty || savingNotes || isReadOnlyStore}
+              title={isReadOnlyStore ? 'Plan expired (Read-only mode)' : undefined}
+            >
               {savingNotes ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
               {notesDirty ? 'Save note' : 'Saved'}
             </Button>
