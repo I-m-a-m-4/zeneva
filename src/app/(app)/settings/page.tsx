@@ -31,6 +31,8 @@ import FeatureGate from '@/components/shared/feature-gate';
 import { BusinessInstance, UserProfile } from '@/types';
 import { ALL_CURRENCIES, CURRENCY_SYMBOLS } from '@/lib/constants';
 import { Combobox } from '@/components/ui/combobox';
+import { AppConfig } from '@/lib/config';
+import { isNewerVersion, openExternal } from '@/lib/platform';
 
 const CURRENCY_COUNTRY_CODES: Record<string, string> = {
     USD: 'us', EUR: 'eu', GBP: 'gb', NGN: 'ng', PKR: 'pk', MUR: 'mu', GHS: 'gh', KES: 'ke', ZAR: 'za',
@@ -169,7 +171,7 @@ function SettingsPageContent() {
     const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
     const [isTauri, setIsTauri] = React.useState(false);
     const [isMobile, setIsMobile] = React.useState(false);
-    const [currentVersion, setCurrentVersion] = React.useState<string>('0.3.5');
+    const [currentVersion, setCurrentVersion] = React.useState<string>(AppConfig.version);
     const [isCheckingUpdates, setIsCheckingUpdates] = React.useState(false);
     const isNative = isTauri; // Derived from isTauri state
 
@@ -651,29 +653,100 @@ function SettingsPageContent() {
     };
 
     const handleCheckUpdates = async () => {
-        if (!isTauri) return;
         setIsCheckingUpdates(true);
         try {
-            const { check } = await import('@tauri-apps/plugin-updater');
-            const update = await check();
-            if (update) {
+            // 1. If in Tauri native shell, attempt Tauri built-in updater check first
+            if (isTauri) {
+                try {
+                    const { check } = await import('@tauri-apps/plugin-updater');
+                    const update = await check();
+                    if (update) {
+                        toast({
+                            title: t('settings.toastUpdateAvailable') || 'Update Available',
+                            description: `Downloading Zeneva v${update.version}...`,
+                        });
+                        await update.downloadAndInstall();
+                        const { relaunch } = await import('@tauri-apps/plugin-process');
+                        toast({
+                            title: 'Update Downloaded',
+                            description: 'Click here or restart Zeneva to apply the update.',
+                            action: (
+                                <Button size="sm" onClick={() => relaunch()}>
+                                    Restart Now
+                                </Button>
+                            ),
+                        });
+                        setIsCheckingUpdates(false);
+                        return;
+                    }
+                } catch (tauriErr) {
+                    console.warn('Tauri native updater check skipped, querying GitHub Releases:', tauriErr);
+                }
+            }
+
+            // 2. Query GitHub Releases (checks I-m-a-m-4/zeneva then I-m-a-m-4/zeneva-releases)
+            let releaseData: any = null;
+            const repos = ['I-m-a-m-4/zeneva', 'I-m-a-m-4/zeneva-releases'];
+            for (const repo of repos) {
+                try {
+                    const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+                        headers: { Accept: 'application/vnd.github.v3+json' },
+                    });
+                    if (res.ok) {
+                        releaseData = await res.json();
+                        if (releaseData?.tag_name) break;
+                    }
+                } catch (e) {
+                    console.warn(`Failed to fetch latest release from ${repo}:`, e);
+                }
+            }
+
+            if (!releaseData || !releaseData.tag_name) {
+                throw new Error('Could not fetch release information from GitHub.');
+            }
+
+            const latestTag = releaseData.tag_name.replace(/^v/i, '');
+            const hasUpdate = isNewerVersion(latestTag, currentVersion);
+
+            if (hasUpdate) {
+                // Determine user platform for installer download
+                const isWin = typeof navigator !== 'undefined' && /windows|win32/i.test(navigator.userAgent);
+                const isMac = typeof navigator !== 'undefined' && /macintosh|mac os x/i.test(navigator.userAgent);
+
+                let downloadUrl = releaseData.html_url;
+                if (Array.isArray(releaseData.assets)) {
+                    const winAsset = releaseData.assets.find((a: any) => 
+                        a.name.endsWith('.msi') || a.name.endsWith('-setup.exe') || a.name.endsWith('.exe')
+                    );
+                    const macAsset = releaseData.assets.find((a: any) => 
+                        a.name.endsWith('.dmg') || a.name.endsWith('.app.tar.gz')
+                    );
+                    if (isWin && winAsset?.browser_download_url) {
+                        downloadUrl = winAsset.browser_download_url;
+                    } else if (isMac && macAsset?.browser_download_url) {
+                        downloadUrl = macAsset.browser_download_url;
+                    }
+                }
+
                 toast({
-                    title: t('settings.toastUpdateAvailable'),
-                    description: t('settings.toastUpdateAvailableBody', { version: update.version }),
+                    title: 'Update Available!',
+                    description: `Zeneva v${latestTag} is ready. Starting download...`,
                 });
-                // The TauriUpdater component in the root layout will handle the UI for downloading/restarting
+
+                // Automatically trigger download/open installer
+                await openExternal(downloadUrl);
             } else {
                 toast({
-                    title: t('settings.toastUpToDate'),
-                    description: t('settings.toastUpToDateBody'),
+                    title: t('settings.toastUpToDate') || 'Up to Date',
+                    description: `Zeneva v${currentVersion} is currently the latest version.`,
                 });
             }
         } catch (error) {
             console.error('Update check failed:', error);
             toast({
                 variant: 'destructive',
-                title: t('settings.toastUpdateFailed'),
-                description: error instanceof Error ? error.message : t('settings.toastUpdateFailedBody'),
+                title: t('settings.toastUpdateFailed') || 'Update Check Failed',
+                description: error instanceof Error ? error.message : 'Could not check for updates. Please try again.',
             });
         } finally {
             setIsCheckingUpdates(false);

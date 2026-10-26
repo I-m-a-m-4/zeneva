@@ -300,7 +300,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
         formData.append('file', audioBlob, 'audio.webm');
 
         try {
-          const res = await fetch('/api/transcribe', {
+          const res = await fetch(`${apiBase()}/api/transcribe`, {
             method: 'POST',
             body: formData,
           });
@@ -474,7 +474,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
     try {
       const token = await getAuth().currentUser?.getIdToken();
-      const res = await fetch('/api/ai/analyze-sheet', {
+      const res = await fetch(`${apiBase()}/api/ai/analyze-sheet`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -487,12 +487,21 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
         }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to analyze images with Zen Vision');
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        if (!res.ok) {
+          throw new Error('Zen Vision server route is currently unavailable. Please check your connection.');
+        }
+        throw new Error('Received an invalid response format from server.');
       }
 
-      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to analyze images with Zen Vision');
+      }
+
       const items = data.items || [];
 
       if (items.length === 0) {
