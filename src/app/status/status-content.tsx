@@ -214,7 +214,7 @@ const PLATFORM_RELEASES: PlatformRelease[] = [
     id: 'windows',
     platform: 'Windows Desktop',
     os: 'windows',
-    latestVersion: 'v3.4.6',
+    latestVersion: 'v3.4.7',
     releaseDate: 'October 2026',
     stability: 'Stable',
     architecture: 'x64 (Windows 10 / 11)',
@@ -237,7 +237,7 @@ const PLATFORM_RELEASES: PlatformRelease[] = [
     id: 'android',
     platform: 'Android Mobile & POS Tablet',
     os: 'android',
-    latestVersion: 'v3.4.6',
+    latestVersion: 'v3.4.7',
     releaseDate: 'October 2026',
     stability: 'Stable',
     architecture: 'ARM64 & Universal (Android 8.0+)',
@@ -260,7 +260,7 @@ const PLATFORM_RELEASES: PlatformRelease[] = [
     id: 'macos',
     platform: 'macOS Desktop',
     os: 'mac',
-    latestVersion: 'v3.4.6',
+    latestVersion: 'v3.4.7',
     releaseDate: 'October 2026',
     stability: 'Stable',
     architecture: 'Universal (Apple Silicon M1-M4 & Intel)',
@@ -281,7 +281,7 @@ const PLATFORM_RELEASES: PlatformRelease[] = [
     id: 'web',
     platform: 'Web App & Cloud POS',
     os: 'web',
-    latestVersion: 'v3.4.6',
+    latestVersion: 'v3.4.7',
     releaseDate: 'October 2026',
     stability: 'Active',
     architecture: 'Edge Cloud (Chrome, Edge, Safari, Firefox)',
@@ -302,7 +302,7 @@ const PLATFORM_RELEASES: PlatformRelease[] = [
 
 const CHANGELOG: ChangelogItem[] = [
   {
-    version: 'v3.4.6',
+    version: 'v3.4.7',
     date: 'Current Production Release',
     tag: 'Latest Stable',
     summary: 'Introduced multimodal Zen Vision AI, multi-image receipt and physical stock sheet intake, dynamic daily usage quotas, and major Groq reasoning speedups.',
@@ -385,7 +385,7 @@ export default function StatusContent() {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
 
-  const shippingVersion = AppConfig.version || '3.4.6';
+  const shippingVersion = AppConfig.version || '3.4.7';
   const cleanShippingVersion = shippingVersion.replace(/^v/i, '');
 
   // Detect user's environment on mount

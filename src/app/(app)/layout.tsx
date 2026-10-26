@@ -241,6 +241,14 @@ export default function AuthenticatedLayout({
   const isReadOnly = businessInstance ? isCoreFeatureBlocked(businessInstance) : false;
   const trialDaysRemaining = businessInstance ? getTrialDaysRemaining(businessInstance) : null;
   const showTrialWarning = !isPremium && !isReadOnly && trialDaysRemaining !== null && trialDaysRemaining > 0 && trialDaysRemaining <= 7;
+  const [isTrialWarningDismissed, setIsTrialWarningDismissed] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return sessionStorage.getItem('zeneva_dismissed_trial_warning') === 'true';
+      } catch (_) {}
+    }
+    return false;
+  });
 
   React.useEffect(() => {
     getCountryFromIP().then(country => {
@@ -1633,17 +1641,33 @@ export default function AuthenticatedLayout({
                   </Button>
                 </div>
               )}
-              {showTrialWarning && (
-                <div className="bg-orange-50 dark:bg-orange-950/20 border-b border-orange-200 dark:border-orange-800/40 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 z-20">
+              {showTrialWarning && !isTrialWarningDismissed && (
+                <div className="bg-orange-50 dark:bg-orange-950/20 border-b border-orange-200 dark:border-orange-800/40 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 z-20 animate-in fade-in">
                   <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300 text-xs sm:text-sm font-medium min-w-0">
                     <Clock className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />
                     <span className="truncate sm:whitespace-normal">
                       Your trial expires in <strong>{trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'}</strong>. Upgrade your plan to maintain full trading access.
                     </span>
                   </div>
-                  <Button variant="outline" size="sm" className="h-7 text-xs bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 dark:border-orange-700 shrink-0" asChild>
-                    <Link href="/billing">Upgrade Now</Link>
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="outline" size="sm" className="h-7 text-xs bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 dark:border-orange-700 shrink-0" asChild>
+                      <Link href="/billing">Upgrade Now</Link>
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTrialWarningDismissed(true);
+                        try {
+                          sessionStorage.setItem('zeneva_dismissed_trial_warning', 'true');
+                        } catch (_) {}
+                      }}
+                      className="p-1 rounded-md text-orange-800/70 hover:text-orange-950 hover:bg-orange-200/60 dark:text-orange-300 dark:hover:text-orange-100 dark:hover:bg-orange-900/50 transition-colors"
+                      title="Dismiss warning"
+                      aria-label="Dismiss warning"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
               <header className="no-print flex h-16 shrink-0 items-center gap-2 sm:gap-4 border-b bg-background px-2 sm:px-6 z-10">
