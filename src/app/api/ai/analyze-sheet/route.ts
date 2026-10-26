@@ -280,6 +280,7 @@ Return strictly a valid JSON object with NO markdown formatting, NO backticks, a
       }
     }
 
+    const productMap = new Map<string, Product>(catalogProducts.map((p) => [p.id, p]));
     const productIndex = catalogProducts.length > 0 ? buildProductIndex(catalogProducts) : null;
 
     const analyzedItems = rawItems.map((item, idx) => {
@@ -302,37 +303,42 @@ Return strictly a valid JSON object with NO markdown formatting, NO backticks, a
         );
 
         if (verdict.kind === 'certain') {
+          const p = productMap.get(verdict.match.productId);
           matchedProduct = {
-            id: verdict.match.product.id,
-            name: verdict.match.product.name,
-            price: verdict.match.product.price,
-            stock: verdict.match.product.stock ?? 0,
-            sku: verdict.match.product.sku || '',
-            imageUrl: verdict.match.product.imageUrl || '',
-            costPrice: verdict.match.product.costPrice ?? null,
+            id: verdict.match.productId,
+            name: verdict.match.productName,
+            price: verdict.match.productPrice ?? p?.price ?? 0,
+            stock: verdict.match.productStock ?? p?.stock ?? 0,
+            sku: verdict.match.productSku || p?.sku || '',
+            imageUrl: p?.imageUrl || '',
+            costPrice: verdict.match.productCostPrice ?? p?.costPrice ?? null,
           };
           matchConfidence = verdict.match.score || 1;
           matchStatus = 'matched';
         } else if (verdict.kind === 'possible' && verdict.candidates.length > 0) {
           const top = verdict.candidates[0];
+          const topP = productMap.get(top.productId);
           matchedProduct = {
-            id: top.product.id,
-            name: top.product.name,
-            price: top.product.price,
-            stock: top.product.stock ?? 0,
-            sku: top.product.sku || '',
-            imageUrl: top.product.imageUrl || '',
-            costPrice: top.product.costPrice ?? null,
+            id: top.productId,
+            name: top.productName,
+            price: top.productPrice ?? topP?.price ?? 0,
+            stock: top.productStock ?? topP?.stock ?? 0,
+            sku: top.productSku || topP?.sku || '',
+            imageUrl: topP?.imageUrl || '',
+            costPrice: top.productCostPrice ?? topP?.costPrice ?? null,
           };
           matchConfidence = top.score || 0.7;
           matchStatus = 'suggested';
-          candidates = verdict.candidates.slice(0, 4).map((c) => ({
-            id: c.product.id,
-            name: c.product.name,
-            price: c.product.price,
-            stock: c.product.stock ?? 0,
-            score: c.score,
-          }));
+          candidates = verdict.candidates.slice(0, 4).map((c) => {
+            const cP = productMap.get(c.productId);
+            return {
+              id: c.productId,
+              name: c.productName,
+              price: c.productPrice ?? cP?.price ?? 0,
+              stock: c.productStock ?? cP?.stock ?? 0,
+              score: c.score,
+            };
+          });
         }
       }
 

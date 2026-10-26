@@ -290,9 +290,9 @@ export async function POST(req: Request) {
   const GLOBAL_LIMIT = 1500;
 
   // 1. Global Check
+  const globalRef = db.collection('platform_stats').doc('ai_usage_global');
   let globalDoc: any = null;
   try {
-    const globalRef = db.collection('platform_stats').doc('ai_usage_global');
     globalDoc = await globalRef.get();
   } catch (err: any) {
     if (isFirestoreQuotaExceeded(err)) {
