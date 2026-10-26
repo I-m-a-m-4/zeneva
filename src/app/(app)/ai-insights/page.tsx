@@ -1110,10 +1110,10 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                   </h1>
 
                   {/* Credit wall — always visible */}
-                  {creditWall && <div className="w-full mb-3">{creditWall}</div>}
+                  {creditWall && <div className="w-full max-w-3xl mb-3">{creditWall}</div>}
 
                   {/* ── DESKTOP ONLY: unified input box ── */}
-                <div className="hidden sm:flex w-full bg-card border border-border/90 rounded-3xl shadow-sm hover:shadow-md transition-all overflow-hidden flex-col">
+                <div className="hidden sm:flex w-full max-w-3xl bg-card border border-border/90 rounded-3xl shadow-sm hover:shadow-md transition-all overflow-hidden flex-col">
                   {/* Attached images preview banner */}
                   {pendingImages.length > 0 && (
                     <div className="p-2.5 sm:p-3 bg-muted/40 border-b border-border/60 flex flex-col gap-2">
@@ -1529,7 +1529,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                 : "p-4 pb-20 md:p-5 md:pb-8"
             )}
           >
-            <div className="max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto">
+            <div className="w-full max-w-3xl mx-auto">
               {creditWall && <div className="mb-3">{creditWall}</div>}
               <div className="w-full bg-card rounded-2xl border border-border shadow-md focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:shadow-lg transition-all overflow-hidden flex flex-col">
                 {pendingImages.length > 0 && (
