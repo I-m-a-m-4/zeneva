@@ -39,15 +39,20 @@ export const AI_CONFIG = {
  */
 export function getActiveAIProvider(): AIProvider {
   const envProvider = process.env.AI_PROVIDER?.trim().toLowerCase();
-  if (envProvider === 'gemini') return 'gemini';
-  if (envProvider === 'groq') return 'groq';
 
+  // If GROQ_API_KEY is present, prioritize Groq (the new default platform model)
   if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim() !== '') {
+    if (envProvider === 'gemini' && process.env.FORCE_GEMINI === 'true') {
+      return 'gemini';
+    }
     return 'groq';
   }
 
+  if (envProvider === 'gemini') return 'gemini';
+  if (envProvider === 'groq') return 'groq';
+
   if (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    // If only Gemini key is currently set and no explicit Groq key, fallback to Gemini
+    // Fallback to Gemini only if Groq is not configured
     return 'gemini';
   }
 

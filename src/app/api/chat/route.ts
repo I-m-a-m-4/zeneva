@@ -470,6 +470,7 @@ export async function POST(req: Request) {
   // Latency is measured around the whole stream, so it is what the owner
   // actually waited for rather than time-to-first-token.
   const startedAt = Date.now();
+  console.log(`[chat/route] Active AI Provider: ${getActiveAIProvider()} | Groq Key: ${Boolean(process.env.GROQ_API_KEY)} | Gemini Key: ${Boolean(process.env.GEMINI_API_KEY)}`);
 
   const result = streamText({
     // Uses Groq (e.g. llama-3.3-70b-versatile) by default, preserving google('gemini-3.6-flash')
