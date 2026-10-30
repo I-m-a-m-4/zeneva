@@ -59,6 +59,7 @@ import { getIndustryConfig } from '@/lib/industry';
 
 import { Combobox } from '@/components/ui/combobox';
 import { UpgradeOverlay } from '@/components/shared/upgrade-overlay';
+import { UnsplashImagePicker } from '@/components/inventory/unsplash-image-picker';
 /**
  * Built per render rather than at module scope because every message here is
  * user-visible and has to come from the active catalogue. `t` is memoised on
@@ -427,6 +428,7 @@ export default function AddProductPage() {
         businessId: userProfile.businessId,
         isSerializable: rawSerials.length > 0 || !!values.isSerializable || !!industryConfig.hasSerialNumbers,
         serialNumbers: rawSerials,
+        ...(imagePreview && imagePreview.startsWith('http') ? { imageUrl: imagePreview } : {}),
         ...(customCreatedAt ? { createdAt: customCreatedAt } : {}),
       };
 
@@ -1443,6 +1445,30 @@ export default function AddProductPage() {
                       </div>
                     )}
                   </div>
+                  {imagePreview && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImagePreview(null);
+                        setImageFile(null);
+                      }}
+                      className="w-full text-xs text-muted-foreground hover:text-destructive h-8"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      {t('common.remove') || 'Remove Image'}
+                    </Button>
+                  )}
+                  <UnsplashImagePicker
+                    onImageSelect={(url, file) => {
+                      setImagePreview(url);
+                      setImageFile(file);
+                    }}
+                    initialSearchQuery={form.watch('name')}
+                    disabled={isReadOnly}
+                  />
                 </div>
               </CardContent>
             </Card>
