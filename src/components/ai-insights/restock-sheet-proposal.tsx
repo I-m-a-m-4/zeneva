@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Product } from '@/types';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Maximize2 } from 'lucide-react';
+import { ImageLightboxModal } from '@/components/shared/image-lightbox-modal';
 
 export interface SheetRowItem {
   id: string;
@@ -176,6 +178,13 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
   const [activeSearchRowId, setActiveSearchRowId] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterTab, setFilterTab] = React.useState<'all' | 'needs_match' | 'matched'>('all');
+  const [previewImage, setPreviewImage] = React.useState<{
+    url: string;
+    title: string;
+    subtitle?: string;
+    gallery?: string[];
+    initialIndex?: number;
+  } | null>(null);
   const hasAutoMatchedRef = React.useRef(false);
 
   // Auto-crosscheck unmatched items against live store products once when products load
@@ -380,16 +389,40 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-foreground">{sheetTitle}</h3>
-              <Badge variant="outline" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-500/20 font-medium">
-                Zen Vision
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {matchedCount} of {items.length} items matched
-              {imageUrls && imageUrls.length > 1 ? ` across ${imageUrls.length} photos` : ''} • {totalUnits} total units to update
-            </p>
+            {(() => {
+              const allPhotos = imageUrls && imageUrls.length > 0 ? imageUrls : imageUrl ? [imageUrl] : [];
+              return (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-foreground">{sheetTitle}</h3>
+                    <Badge variant="outline" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-500/20 font-medium">
+                      Zen Vision
+                    </Badge>
+                    {allPhotos.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImage({
+                          url: allPhotos[0],
+                          title: sheetTitle || 'Original Scanned Stock Sheet',
+                          subtitle: `${allPhotos.length} photo${allPhotos.length > 1 ? 's' : ''} uploaded for Zen Vision analysis`,
+                          gallery: allPhotos,
+                          initialIndex: 0,
+                        })}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 hover:text-orange-700 bg-orange-500/10 hover:bg-orange-500/20 px-2.5 py-0.5 rounded-full border border-orange-500/30 transition-all cursor-pointer shadow-2xs"
+                        title="Click to view original scanned stock sheet"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-orange-500" />
+                        <span>View Scanned Photo{allPhotos.length > 1 ? `s (${allPhotos.length})` : ''}</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {matchedCount} of {items.length} items matched
+                    {allPhotos.length > 1 ? ` across ${allPhotos.length} photos` : ''} • {totalUnits} total units to update
+                  </p>
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -564,9 +597,29 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
                   {matched ? (
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-xl bg-muted/20 border border-border/60">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-12 w-12 rounded-xl bg-background border border-border/80 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                        <div
+                          onClick={() => {
+                            if (matched.imageUrl) {
+                              setPreviewImage({
+                                url: matched.imageUrl,
+                                title: matched.name,
+                                subtitle: `SKU: ${matched.sku || 'N/A'} • Stock: ${matched.stock} • Price: ₦${Number(matched.price).toLocaleString()}`,
+                              });
+                            }
+                          }}
+                          className={cn(
+                            "h-12 w-12 rounded-xl bg-background border border-border/80 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs relative group transition-all",
+                            matched.imageUrl ? "cursor-pointer hover:border-orange-500 hover:ring-2 hover:ring-orange-500/20" : ""
+                          )}
+                          title={matched.imageUrl ? "Click to inspect product image" : undefined}
+                        >
                           {matched.imageUrl ? (
-                            <img src={matched.imageUrl} alt={matched.name} className="h-full w-full object-contain" />
+                            <>
+                              <img src={matched.imageUrl} alt={matched.name} className="h-full w-full object-contain" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                                <Maximize2 className="w-3.5 h-3.5" />
+                              </div>
+                            </>
                           ) : (
                             <Package className="h-6 w-6 text-muted-foreground/60" />
                           )}
@@ -826,6 +879,18 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
           </div>
         )}
       </div>
+
+      {previewImage && (
+        <ImageLightboxModal
+          open={!!previewImage}
+          onClose={() => setPreviewImage(null)}
+          imageUrl={previewImage.url}
+          title={previewImage.title}
+          subtitle={previewImage.subtitle}
+          gallery={previewImage.gallery}
+          initialIndex={previewImage.initialIndex}
+        />
+      )}
     </div>
   );
 });

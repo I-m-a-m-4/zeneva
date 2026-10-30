@@ -736,13 +736,13 @@ function SettingsPageContent() {
                 if (isTauri) {
                     toast({
                         title: 'Update Available!',
-                        description: Zeneva v is available. The in-app updater is downloading in the background. Look for the top banner to restart.,
+                        description: `Zeneva v${latestTag} is available. The in-app updater is downloading in the background. Look for the top banner to restart.`,
                         duration: 8000,
                     });
                 } else {
                     toast({
                         title: 'Update Available!',
-                        description: Zeneva v is ready. Opening download page...,
+                        description: `Zeneva v${latestTag} is ready. Opening download page...`,
                     });
                     await openExternal(downloadUrl);
                 }

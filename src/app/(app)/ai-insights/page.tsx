@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RestockSheetProposal } from '@/components/ai-insights/restock-sheet-proposal';
+import { ImageLightboxModal } from '@/components/shared/image-lightbox-modal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppConfig } from '@/lib/config';
 import { useUser, useFirestore } from '@/firebase';
@@ -338,7 +339,10 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
   const [lightboxImage, setLightboxImage] = useState<{
     url: string;
-    title: string;
+    title?: string;
+    gallery?: string[];
+    initialIndex?: number;
+    subtitle?: string;
   } | null>(null);
 
   const removePendingImage = (id: string) => {
@@ -1148,13 +1152,21 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                       </div>
 
                       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                        {pendingImages.map((img) => (
+                        {pendingImages.map((img, pIdx) => (
                           <div
                             key={img.id}
                             className="relative group shrink-0 flex items-center gap-2 p-1.5 rounded-xl border border-border/80 bg-background shadow-2xs hover:border-orange-500/40 transition-all max-w-[200px]"
                           >
                             <div
-                              onClick={() => setLightboxImage({ url: img.previewUrl, title: img.name })}
+                              onClick={() =>
+                                setLightboxImage({
+                                  url: img.previewUrl,
+                                  title: img.name,
+                                  gallery: pendingImages.map((p) => p.previewUrl),
+                                  initialIndex: pIdx,
+                                  subtitle: `${(img.size / 1024).toFixed(0)} KB`,
+                                })
+                              }
                               className="relative cursor-pointer h-10 w-10 rounded-lg overflow-hidden border border-border/60 shrink-0 bg-muted"
                               title="Click to preview full size"
                             >
@@ -1422,30 +1434,41 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
 
                       {isUser && ((m as any).imageUrls || (m as any).imageUrl) && (
                         <div className="mt-1.5 flex flex-wrap gap-2 max-w-xl">
-                          {(((m as any).imageUrls && (m as any).imageUrls.length > 0)
-                            ? (m as any).imageUrls
-                            : [(m as any).imageUrl]
-                          ).map((url: string, imgIdx: number) => (
-                            <div
-                              key={imgIdx}
-                              onClick={() => setLightboxImage({ url, title: text || `Uploaded photo ${imgIdx + 1}` })}
-                              className="relative group cursor-pointer h-24 w-24 sm:h-28 sm:w-28 rounded-2xl overflow-hidden border border-border/80 shadow-xs bg-muted/30 p-1 hover:border-orange-500/50 transition-all shrink-0"
-                              title="Click to view full image"
-                            >
-                              <div className="relative w-full h-full rounded-xl overflow-hidden">
-                                <img
-                                  src={url}
-                                  alt={`Uploaded photo ${imgIdx + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
-                                  <span className="text-[10px] bg-black/75 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm font-medium">
-                                    <Maximize2 className="w-3 h-3" /> View
-                                  </span>
+                          {(() => {
+                            const rawList = (m as any).imageUrls && (m as any).imageUrls.length > 0
+                              ? (m as any).imageUrls
+                              : [(m as any).imageUrl];
+                            const allUrls: string[] = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
+                            return allUrls.map((url: string, imgIdx: number) => (
+                              <div
+                                key={imgIdx}
+                                onClick={() =>
+                                  setLightboxImage({
+                                    url,
+                                    title: text || `Uploaded Document ${imgIdx + 1}`,
+                                    gallery: allUrls,
+                                    initialIndex: imgIdx,
+                                    subtitle: allUrls.length > 1 ? `Photo ${imgIdx + 1} of ${allUrls.length}` : undefined,
+                                  })
+                                }
+                                className="relative group cursor-pointer h-24 w-24 sm:h-28 sm:w-28 rounded-2xl overflow-hidden border border-border/80 shadow-xs bg-muted/30 p-1 hover:border-orange-500 hover:ring-2 hover:ring-orange-500/20 transition-all shrink-0"
+                                title="Click to inspect photo in high resolution"
+                              >
+                                <div className="relative w-full h-full rounded-xl overflow-hidden">
+                                  <img
+                                    src={url}
+                                    alt={`Uploaded photo ${imgIdx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                                    <span className="text-[10px] bg-black/75 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm font-medium">
+                                      <Maximize2 className="w-3 h-3" /> Zoom
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ));
+                          })()}
                         </div>
                       )}
 
@@ -1565,13 +1588,21 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                     </div>
 
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                      {pendingImages.map((img) => (
+                      {pendingImages.map((img, pIdx) => (
                         <div
                           key={img.id}
                           className="relative group shrink-0 flex items-center gap-2 p-1.5 rounded-xl border border-border/80 bg-background shadow-2xs hover:border-orange-500/40 transition-all max-w-[200px]"
                         >
                           <div
-                            onClick={() => setLightboxImage({ url: img.previewUrl, title: img.name })}
+                            onClick={() =>
+                              setLightboxImage({
+                                url: img.previewUrl,
+                                title: img.name,
+                                gallery: pendingImages.map((p) => p.previewUrl),
+                                initialIndex: pIdx,
+                                subtitle: `${(img.size / 1024).toFixed(0)} KB`,
+                              })
+                            }
                             className="relative cursor-pointer h-10 w-10 rounded-lg overflow-hidden border border-border/60 shrink-0 bg-muted"
                             title="Click to preview full size"
                           >
@@ -1716,50 +1747,17 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
         )}
 
         {/* Full Image Preview Lightbox Modal */}
-        <AnimatePresence>
-          {lightboxImage && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
-              onClick={() => setLightboxImage(null)}
-            >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-                className="relative max-w-5xl w-full max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-              >
-                <div className="flex items-center justify-between p-3.5 border-b border-border/80 bg-muted/40">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Badge variant="outline" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-500/20 font-medium shrink-0">
-                      Zen Vision
-                    </Badge>
-                    <span className="text-xs font-semibold text-foreground truncate max-w-md">
-                      {lightboxImage.title || 'Image Preview'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLightboxImage(null)}
-                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="p-4 flex-1 flex items-center justify-center overflow-auto bg-black/40 min-h-[320px]">
-                  <img
-                    src={lightboxImage.url}
-                    alt={lightboxImage.title || 'Full image'}
-                    className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-lg"
-                  />
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {lightboxImage && (
+          <ImageLightboxModal
+            open={!!lightboxImage}
+            onClose={() => setLightboxImage(null)}
+            imageUrl={lightboxImage.url}
+            title={lightboxImage.title || 'Zen Vision Document'}
+            subtitle={lightboxImage.subtitle}
+            gallery={lightboxImage.gallery}
+            initialIndex={lightboxImage.initialIndex}
+          />
+        )}
       </div>
     </div>
   );
