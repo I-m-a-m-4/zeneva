@@ -2373,22 +2373,29 @@ function UserDetailDialog({ user, business, open, onOpenChange }: { user: UserPr
                             <Label className="text-xs text-muted-foreground font-bold">App & Device Platforms</Label>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5 font-medium">
                                 {(() => {
-                                    const { hasMicrosoftApp, hasMobileApp, hasWeb, isCrossPlatform } = classifyUserPlatform(user);
+                                    const { hasMicrosoftApp, hasMobileApp, hasWeb, isCrossPlatform, currentActivePlatform } = classifyUserPlatform(user);
+                                    const isMsActive = currentActivePlatform === 'microsoft';
+                                    const isMobileActive = currentActivePlatform === 'mobile';
+                                    const isWebActive = currentActivePlatform === 'web';
+
                                     return (
                                         <>
                                             {hasMicrosoftApp && (
-                                                <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 text-xs">
-                                                    <Laptop className="h-3 w-3 mr-1" /> Microsoft App
+                                                <Badge variant={isMsActive ? 'default' : 'outline'} className={cn("text-xs flex items-center gap-1", isMsActive ? "bg-blue-600 text-white font-semibold" : "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 opacity-60")}>
+                                                    {isMsActive && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse mr-0.5" />}
+                                                    <Laptop className="h-3 w-3 mr-1" /> Microsoft App {isMsActive && '(Active)'}
                                                 </Badge>
                                             )}
                                             {hasMobileApp && (
-                                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 text-xs">
-                                                    <Smartphone className="h-3 w-3 mr-1" /> Mobile App
+                                                <Badge variant={isMobileActive ? 'default' : 'outline'} className={cn("text-xs flex items-center gap-1", isMobileActive ? "bg-emerald-600 text-white font-semibold" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 opacity-60")}>
+                                                    {isMobileActive && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse mr-0.5" />}
+                                                    <Smartphone className="h-3 w-3 mr-1" /> Mobile App {isMobileActive && '(Active)'}
                                                 </Badge>
                                             )}
                                             {hasWeb && (
-                                                <Badge variant="outline" className="bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 text-xs">
-                                                    <Globe className="h-3 w-3 mr-1" /> Web
+                                                <Badge variant={isWebActive ? 'default' : 'outline'} className={cn("text-xs flex items-center gap-1", isWebActive ? "bg-zinc-700 text-white font-semibold" : "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 opacity-60")}>
+                                                    {isWebActive && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse mr-0.5" />}
+                                                    <Globe className="h-3 w-3 mr-1" /> Web {isWebActive && '(Active)'}
                                                 </Badge>
                                             )}
                                             {isCrossPlatform && (
@@ -5690,27 +5697,95 @@ function AdminDashboardContent({
                                                             </TableCell>
                                                             <TableCell>
                                                                 {(() => {
-                                                                    const { hasMicrosoftApp, hasMobileApp, hasWeb, isCrossPlatform } = classifyUserPlatform(user);
+                                                                    const { hasMicrosoftApp, hasMobileApp, hasWeb, isCrossPlatform, currentActivePlatform } = classifyUserPlatform(user);
+                                                                    const isMsActive = currentActivePlatform === 'microsoft';
+                                                                    const isMobileActive = currentActivePlatform === 'mobile';
+                                                                    const isWebActive = currentActivePlatform === 'web';
+
                                                                     return (
                                                                         <div className="flex flex-wrap items-center gap-1">
                                                                             {hasMicrosoftApp && (
-                                                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-                                                                                    <Laptop className="h-3 w-3 mr-1 inline" /> MS App
+                                                                                <Badge
+                                                                                    variant={isMsActive ? 'default' : 'outline'}
+                                                                                    className={cn(
+                                                                                        "text-[10px] px-1.5 py-0 flex items-center gap-1 transition-all",
+                                                                                        isMsActive
+                                                                                            ? "bg-blue-600 hover:bg-blue-600 text-white font-semibold shadow-xs border-blue-600 ring-1 ring-blue-400/40"
+                                                                                            : "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 opacity-60 hover:opacity-100"
+                                                                                    )}
+                                                                                    title={isMsActive ? "Active Session: Microsoft Desktop App" : "Has used Microsoft Desktop App"}
+                                                                                >
+                                                                                    {isMsActive && (
+                                                                                        <span className="relative flex h-1.5 w-1.5 mr-0.5">
+                                                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
+                                                                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <Laptop className="h-3 w-3 mr-0.5 inline" /> MS App
+                                                                                    {isMsActive && (
+                                                                                        <span className="ml-1 text-[8px] bg-white/25 px-1 py-0 rounded font-black tracking-wider uppercase">
+                                                                                            Active
+                                                                                        </span>
+                                                                                    )}
                                                                                 </Badge>
                                                                             )}
                                                                             {hasMobileApp && (
-                                                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-                                                                                    <Smartphone className="h-3 w-3 mr-1 inline" /> Mobile
-                                                                                </Badge>
-                                                                            )}
-                                                                            {isCrossPlatform && (
-                                                                                <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-semibold" title="Active on both Microsoft Desktop & Mobile apps">
-                                                                                    ✨ Both
+                                                                                <Badge
+                                                                                    variant={isMobileActive ? 'default' : 'outline'}
+                                                                                    className={cn(
+                                                                                        "text-[10px] px-1.5 py-0 flex items-center gap-1 transition-all",
+                                                                                        isMobileActive
+                                                                                            ? "bg-emerald-600 hover:bg-emerald-600 text-white font-semibold shadow-xs border-emerald-600 ring-1 ring-emerald-400/40"
+                                                                                            : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 opacity-60 hover:opacity-100"
+                                                                                    )}
+                                                                                    title={isMobileActive ? "Active Session: Mobile App" : "Has used Mobile App"}
+                                                                                >
+                                                                                    {isMobileActive && (
+                                                                                        <span className="relative flex h-1.5 w-1.5 mr-0.5">
+                                                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
+                                                                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <Smartphone className="h-3 w-3 mr-0.5 inline" /> Mobile
+                                                                                    {isMobileActive && (
+                                                                                        <span className="ml-1 text-[8px] bg-white/25 px-1 py-0 rounded font-black tracking-wider uppercase">
+                                                                                            Active
+                                                                                        </span>
+                                                                                    )}
                                                                                 </Badge>
                                                                             )}
                                                                             {hasWeb && !hasMicrosoftApp && !hasMobileApp && (
-                                                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800">
-                                                                                    <Globe className="h-3 w-3 mr-1 inline" /> Web
+                                                                                <Badge
+                                                                                    variant={isWebActive ? 'default' : 'outline'}
+                                                                                    className={cn(
+                                                                                        "text-[10px] px-1.5 py-0 flex items-center gap-1 transition-all",
+                                                                                        isWebActive
+                                                                                            ? "bg-zinc-700 hover:bg-zinc-700 text-white font-semibold shadow-xs border-zinc-700"
+                                                                                            : "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 opacity-60 hover:opacity-100"
+                                                                                    )}
+                                                                                    title={isWebActive ? "Active Session: Web Browser" : "Has used Web Browser"}
+                                                                                >
+                                                                                    {isWebActive && (
+                                                                                        <span className="relative flex h-1.5 w-1.5 mr-0.5">
+                                                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
+                                                                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <Globe className="h-3 w-3 mr-0.5 inline" /> Web
+                                                                                    {isWebActive && (
+                                                                                        <span className="ml-1 text-[8px] bg-white/25 px-1 py-0 rounded font-black tracking-wider uppercase">
+                                                                                            Active
+                                                                                        </span>
+                                                                                    )}
+                                                                                </Badge>
+                                                                            )}
+                                                                            {isCrossPlatform && (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="text-[10px] px-1 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-semibold"
+                                                                                    title={`User has both PC & Mobile apps (Currently active on ${isMsActive ? 'MS App' : isMobileActive ? 'Mobile App' : 'Web'})`}
+                                                                                >
+                                                                                    ✨ Both
                                                                                 </Badge>
                                                                             )}
                                                                             {!hasMicrosoftApp && !hasMobileApp && !hasWeb && (

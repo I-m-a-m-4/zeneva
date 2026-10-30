@@ -38,6 +38,7 @@ export interface UserPlatformClassification {
     hasMobileApp: boolean;
     hasWeb: boolean;
     isCrossPlatform: boolean;
+    currentActivePlatform: 'microsoft' | 'mobile' | 'web' | null;
     primaryCategory: 'microsoft' | 'mobile' | 'cross' | 'web';
     platformsList: string[];
 }
@@ -93,11 +94,41 @@ export function classifyUserPlatform(user: UserProfile): UserPlatformClassificat
     if (hasMobileApp) platformsList.push('Mobile App');
     if (hasWeb) platformsList.push('Web Browser');
 
+    const currentDev = (user.deviceType || '').toLowerCase();
+    const currentUa = ((user as any).userAgent || '').toLowerCase();
+
+    let currentActivePlatform: 'microsoft' | 'mobile' | 'web' | null = null;
+    if (
+        currentDev.includes('desktop') || 
+        currentDev.includes('microsoft') || 
+        currentDev.includes('windows') ||
+        (currentUa.includes('windows') && (currentUa.includes('tauri') || currentDev === 'desktop app'))
+    ) {
+        currentActivePlatform = 'microsoft';
+    } else if (
+        currentDev.includes('mobile app') || 
+        currentDev === 'mobile' ||
+        currentDev.includes('android') || 
+        currentDev.includes('ios') ||
+        ((currentUa.includes('android') || currentUa.includes('iphone') || currentUa.includes('mobile')) && (currentUa.includes('tauri') || currentDev === 'mobile app'))
+    ) {
+        currentActivePlatform = 'mobile';
+    } else if (currentDev === 'web' || currentDev.includes('browser') || currentUa.length > 0) {
+        currentActivePlatform = 'web';
+    } else if (hasMicrosoftApp && !hasMobileApp) {
+        currentActivePlatform = 'microsoft';
+    } else if (hasMobileApp && !hasMicrosoftApp) {
+        currentActivePlatform = 'mobile';
+    } else if (hasWeb) {
+        currentActivePlatform = 'web';
+    }
+
     return {
         hasMicrosoftApp,
         hasMobileApp,
         hasWeb,
         isCrossPlatform,
+        currentActivePlatform,
         primaryCategory,
         platformsList
     };
@@ -607,18 +638,18 @@ export default function DevicePlatformAdoptionSection({
                                                             <div className="flex flex-col gap-0.5">
                                                                 <div className="flex flex-wrap items-center gap-1">
                                                                     {info.hasMicrosoftApp && (
-                                                                        <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                                                                            <Laptop className="h-3 w-3" /> Microsoft App
+                                                                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${info.currentActivePlatform === 'microsoft' ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 opacity-70'}`}>
+                                                                            <Laptop className="h-3 w-3" /> Microsoft App ${info.currentActivePlatform === 'microsoft' ? '• Active' : ''}
                                                                         </span>
                                                                     )}
                                                                     {info.hasMobileApp && (
-                                                                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                                                            <Smartphone className="h-3 w-3" /> Mobile App
+                                                                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${info.currentActivePlatform === 'mobile' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 opacity-70'}`}>
+                                                                            <Smartphone className="h-3 w-3" /> Mobile App ${info.currentActivePlatform === 'mobile' ? '• Active' : ''}
                                                                         </span>
                                                                     )}
                                                                     {info.hasWeb && !info.hasMicrosoftApp && !info.hasMobileApp && (
-                                                                        <span className="inline-flex items-center gap-1 rounded bg-zinc-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
-                                                                            <Globe className="h-3 w-3" /> Web
+                                                                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${info.currentActivePlatform === 'web' ? 'bg-zinc-700 text-white shadow-xs' : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 opacity-70'}`}>
+                                                                            <Globe className="h-3 w-3" /> Web ${info.currentActivePlatform === 'web' ? '• Active' : ''}
                                                                         </span>
                                                                     )}
                                                                 </div>

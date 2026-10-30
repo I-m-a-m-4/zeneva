@@ -131,22 +131,28 @@ const UserPlatformsBadges = ({ user }: { user: UserProfile }) => {
     return s.includes('web') && !s.includes('desktop app');
   }) || (!hasDesktop && !hasMobile);
 
+  const currentDev = (user.deviceType || '').toLowerCase();
+  const currentUa = ((user as any).userAgent || '').toLowerCase();
+  const isMsActive = currentDev.includes('desktop') || currentDev.includes('microsoft') || currentDev.includes('windows') || (currentUa.includes('windows') && (currentUa.includes('tauri') || currentDev === 'desktop app'));
+  const isMobileActive = currentDev.includes('mobile app') || currentDev === 'mobile' || currentDev.includes('android') || currentDev.includes('ios');
+  const isWebActive = !isMsActive && !isMobileActive;
+
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex flex-wrap items-center gap-1">
         {hasDesktop && (
-          <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400" title="Microsoft / Windows App">
-            <Laptop className="h-3 w-3" /> Microsoft App
+          <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${isMsActive ? 'bg-blue-600 text-white shadow-xs' : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 opacity-60'}`} title="Microsoft / Windows App">
+            <Laptop className="h-3 w-3" /> Microsoft App {isMsActive && '• Active'}
           </span>
         )}
         {hasMobile && (
-          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400" title="Mobile App (Android/iOS)">
-            <Smartphone className="h-3 w-3" /> Mobile App
+          <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${isMobileActive ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 opacity-60'}`} title="Mobile App (Android/iOS)">
+            <Smartphone className="h-3 w-3" /> Mobile App {isMobileActive && '• Active'}
           </span>
         )}
         {hasWeb && (
-          <span className="inline-flex items-center gap-1 rounded bg-zinc-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400" title="Web Browser">
-            <Globe className="h-3 w-3" /> Web
+          <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${isWebActive && !hasDesktop && !hasMobile ? 'bg-zinc-700 text-white shadow-xs' : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 opacity-60'}`} title="Web Browser">
+            <Globe className="h-3 w-3" /> Web {isWebActive && !hasDesktop && !hasMobile && '• Active'}
           </span>
         )}
       </div>
