@@ -594,6 +594,63 @@ function EditProductContent() {
         }
     };
 
+    const handleWebImageSelect = async (url: string, file: File) => {
+        setImagePreview(url);
+        setImageFile(file);
+
+        if (!product?.id) return;
+
+        try {
+            let finalImageUrl = url;
+
+            // Upload to ImageKit via /api/upload if online and file provided
+            if (file && typeof navigator !== 'undefined' && navigator.onLine) {
+                const formData = new FormData();
+                formData.append('file', file);
+                try {
+                    const response = await fetch(`${apiBase()}/api/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result?.url) {
+                            finalImageUrl = result.url;
+                        }
+                    }
+                } catch (uploadErr) {
+                    console.warn('Direct upload failed, keeping web URL:', uploadErr);
+                }
+            }
+
+            // Immediately persist via addToQueue (Law 1 write choke-point)
+            addToQueue({
+                type: 'update-product',
+                payload: {
+                    productId: product.id,
+                    values: {
+                        imageUrl: finalImageUrl
+                    }
+                }
+            }, `Updated image for ${product.name || 'product'}`);
+
+            setImagePreview(finalImageUrl);
+            setImageFile(null); // Saved to catalog, clear pending file
+
+            toast({
+                title: t('common.success') || 'Image Saved!',
+                description: t('inventory.imageSavedToFirestore') || 'Product image has been saved to your catalog.',
+            });
+        } catch (err: any) {
+            console.error('Failed to auto-save product image:', err);
+            toast({
+                variant: 'destructive',
+                title: t('common.error') || 'Error',
+                description: 'Failed to auto-save image to product.'
+            });
+        }
+    };
+
     const onSubmit = async (values: ProductFormValues) => {
         if (isSaving || isSubmitting.current) return;
         isSubmitting.current = true;
@@ -1622,13 +1679,39 @@ function EditProductContent() {
                                             disabled={!canManageProduct}
                                         />
                                     </div>
+                                    {imagePreview && canManageProduct && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            type="button"
+                                            onClick={() => {
+                                                setImagePreview(null);
+                                                setImageFile(null);
+                                                if (product?.id) {
+                                                    addToQueue({
+                                                        type: 'update-product',
+                                                        payload: {
+                                                            productId: product.id,
+                                                            values: { imageUrl: '' }
+                                                        }
+                                                    }, `Removed image for ${product.name || 'product'}`);
+                                                    toast({
+                                                        title: 'Image Removed',
+                                                        description: 'Product image removed from catalog.'
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full text-xs text-muted-foreground hover:text-destructive h-8"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                            {t('common.remove') || 'Remove Image'}
+                                        </Button>
+                                    )}
                                     <UnsplashImagePicker 
-                                        onImageSelect={(url, file) => {
-                                            setImagePreview(url);
-                                            setImageFile(file);
-                                        }}
+                                        onImageSelect={handleWebImageSelect}
                                         initialSearchQuery={form.watch('name')}
                                         disabled={!canManageProduct}
+                                        isExistingProduct={true}
                                     />
                                 </div>
                             </CardContent>

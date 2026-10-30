@@ -39,9 +39,11 @@ export interface WebProductImage {
 }
 
 interface UnsplashImagePickerProps {
-    onImageSelect: (imageUrl: string, file: File) => void;
+    onImageSelect: (imageUrl: string, file: File) => void | Promise<void>;
     initialSearchQuery?: string;
     disabled?: boolean;
+    autoSaveText?: string;
+    isExistingProduct?: boolean;
 }
 
 const getQuerySuggestions = (raw: string): string[] => {
@@ -75,7 +77,7 @@ const getQuerySuggestions = (raw: string): string[] => {
     return suggestions.slice(0, 3);
 };
 
-export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', disabled = false }: UnsplashImagePickerProps) {
+export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', disabled = false, autoSaveText, isExistingProduct = false }: UnsplashImagePickerProps) {
     const { business, currentUserProfile } = usePOS();
     const firestore = useFirestore();
     const isPro = hasProFeatures(business);
@@ -233,7 +235,7 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
             const filename = `product-${targetImage.id}.jpg`;
             const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
             
-            onImageSelect(imageUrl, file);
+            await Promise.resolve(onImageSelect(imageUrl, file));
 
             // Audit log image fetch action for tracking in Admin / Audit Logs
             if (firestore && business?.id && currentUserProfile) {
@@ -305,6 +307,11 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                                     Search online retail catalogues for authentic product photos and packaging.
                                 </DialogDescription>
                             </div>
+                            {isExistingProduct && (
+                                <Badge variant="secondary" className="text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mr-2">
+                                    Auto-saves to product
+                                </Badge>
+                            )}
                             {images.length > 0 && (
                                 <Badge variant="secondary" className="text-[11px] font-medium hidden sm:inline-flex">
                                     {images.length} results
@@ -417,7 +424,7 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                                                             disabled={isDownloading}
                                                         >
                                                             <CheckCircle2 className="h-3 w-3" />
-                                                            Use
+                                                            {isExistingProduct ? 'Save' : 'Use'}
                                                         </Button>
                                                         <button
                                                             type="button"
@@ -549,12 +556,12 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                                     {isDownloading ? (
                                         <>
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                            Downloading...
+                                            {autoSaveText || (isExistingProduct ? 'Saving to Catalog...' : 'Downloading & Saving...')}
                                         </>
                                     ) : (
                                         <>
                                             <CheckCircle2 className="h-4 w-4" />
-                                            Use This Image
+                                            {isExistingProduct ? 'Save to Product' : 'Use This Image'}
                                         </>
                                     )}
                                 </Button>
@@ -566,7 +573,7 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                 {/* Pinned Footer: ALWAYS VISIBLE WITHOUT SCROLLING */}
                 <div className="p-3 sm:px-5 border-t bg-card/90 backdrop-blur-xs shrink-0 flex items-center justify-between">
                     <p className="text-[11px] text-muted-foreground hidden sm:block truncate mr-3">
-                        Double-click any image to use it immediately.
+                        {isExistingProduct ? 'Double-click any image to instantly save it to this product.' : 'Double-click any image to use it immediately.'}
                     </p>
                     <div className="flex items-center gap-2 ml-auto">
                         <Button variant="outline" type="button" onClick={() => setOpen(false)}>
@@ -581,12 +588,12 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                             {isDownloading ? (
                                 <>
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    Downloading...
+                                    {autoSaveText || (isExistingProduct ? 'Saving to Catalog...' : 'Downloading & Saving...')}
                                 </>
                             ) : (
                                 <>
                                     <CheckCircle2 className="h-4 w-4" />
-                                    Use Selected Image
+                                    {isExistingProduct ? 'Save to Product' : 'Use Selected Image'}
                                 </>
                             )}
                         </Button>
