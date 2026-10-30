@@ -27,10 +27,13 @@ async function main() {
     const bundleDir = 'src-tauri/target/release/bundle';
     console.log(`Searching for artifacts in ${path.resolve(bundleDir)}...`);
     
-    // Windows Patterns (Tauri 2 often uses .nsis.zip or just .zip for updates)
+    // Windows Patterns: Strictly prioritize NSIS setup executable with currentUser mode
+    // (Never use MSI as MSI requires Administrator UAC prompt and launches Windows installer)
     const windowsPatterns = [
+        { bin: /-setup\.exe$/, sig: /-setup\.exe\.sig$/ },
         { bin: /\.nsis\.zip$/, sig: /\.nsis\.zip\.sig$/ },
-        { bin: /\.zip$/, sig: /\.zip\.sig$/, exclude: /\.app\.tar\.gz$/ }
+        { bin: /\.zip$/, sig: /\.zip\.sig$/, exclude: /\.app\.tar\.gz$/ },
+        { bin: /\.exe$/, sig: /\.exe\.sig$/ }
     ];
 
     let foundWindows = false;
@@ -42,17 +45,19 @@ async function main() {
             console.log(`Found Windows Update artifact: ${binPath}`);
             const fileName = path.basename(binPath);
             const signature = fs.readFileSync(sigPath, 'utf8').trim();
-            latestJson.platforms['windows-x86_64'] = {
+            const platformConfig = {
                 signature,
                 url: `https://github.com/I-m-a-m-4/zeneva/releases/download/${tagName}/${fileName}`
             };
+            latestJson.platforms['windows-x86_64'] = platformConfig;
+            latestJson.platforms['windows-x86_64-nsis'] = platformConfig;
             foundWindows = true;
             break;
         }
     }
 
     if (!foundWindows) {
-        console.warn('CRITICAL: No Windows update artifacts (.zip + .sig) found!');
+        console.warn('CRITICAL: No Windows update artifacts found!');
     }
 
     // MacOS (Universal/Intel/ARM)
@@ -84,6 +89,8 @@ async function main() {
             const existing = JSON.parse(fs.readFileSync(OUTPUT_FILE, 'utf8'));
             console.log('Merging with existing manifest...');
             latestJson.platforms = { ...existing.platforms, ...latestJson.platforms };
+            // Ensure MSI is never served as an update on Windows
+            delete latestJson.platforms['windows-x86_64-msi'];
         } catch (e) {
             console.log('No existing manifest found or failed to download. Creating new one.');
         }
