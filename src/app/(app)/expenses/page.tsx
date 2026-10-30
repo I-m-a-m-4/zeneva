@@ -155,15 +155,21 @@ export const PAYMENT_METHODS: { id: ExpensePaymentMethod; label: string }[] = [
 export const DEDUCTION_SOURCES: { id: ExpenseDeductionSource; label: string; shortLabel: string; description: string }[] = [
   {
     id: 'revenue',
-    label: 'Operational Revenue (Standard)',
-    shortLabel: 'Revenue',
-    description: 'Deducted from sales revenue and standard operational cash flow.'
+    label: 'Operational Overhead (Deduct from Profit)',
+    shortLabel: 'Operating',
+    description: 'Standard business expense deducted from operating profit. Never reduces sales revenue.'
   },
   {
     id: 'net_profit',
-    label: 'Net Profit / Reinvestment',
+    label: 'Net Profit Reinvestment',
     shortLabel: 'Net Profit',
-    description: 'Funded from business net profit / retained earnings reinvested into the business.'
+    description: 'Funded from retained profit/equity. Deducted from net profit as reinvestment.'
+  },
+  {
+    id: 'excluded',
+    label: 'Excluded (Do Not Deduct from Profit)',
+    shortLabel: 'Excluded',
+    description: 'Capital assets, personal drawings, or stock purchases excluded from profit and loss calculations.'
   }
 ];
 
@@ -521,15 +527,18 @@ function ExpensesAndPurchasesContent() {
     const totalPurchasesPaid = purchases.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
     const totalSupplierDebt = purchases.reduce((sum, p) => sum + (Number(p.balanceDue) || 0), 0);
 
-    // Source Breakdown: Revenue vs Net Profit Reinvestment
+    // Source Breakdown: Operating vs Net Profit Reinvestment vs Excluded
     const expensesFromProfit = operatingExpensesList.filter(e => e.deductionSource === 'net_profit').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const expensesFromRevenue = operatingExpensesList.filter(e => !e.deductionSource || e.deductionSource === 'revenue').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const expensesExcluded = operatingExpensesList.filter(e => e.deductionSource === 'excluded').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
     const purchasesFromProfit = purchases.filter(p => p.deductionSource === 'net_profit').reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
     const purchasesFromRevenue = purchases.filter(p => !p.deductionSource || p.deductionSource === 'revenue').reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+    const purchasesExcluded = purchases.filter(p => p.deductionSource === 'excluded').reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
 
     const totalProfitReinvested = expensesFromProfit + purchasesFromProfit;
     const totalFromRevenue = expensesFromRevenue + purchasesFromRevenue;
+    const totalExcludedOutflows = expensesExcluded + purchasesExcluded;
 
     // Combined Cash Outflow (Operating Expenses + Paid Restock Procurement)
     const combinedOutflow = totalOperatingExpenses + totalPurchasesPaid;
@@ -2774,9 +2783,13 @@ function ExpensesAndPurchasesContent() {
                                 <Sparkles className="h-3 w-3" />
                                 <span>Net Profit</span>
                               </Badge>
+                            ) : exp.deductionSource === 'excluded' ? (
+                              <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-300/40 flex items-center gap-1 w-fit font-medium">
+                                <span>Excluded</span>
+                              </Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
-                                <span>Revenue</span>
+                                <span>Operational</span>
                               </Badge>
                             )}
                           </TableCell>
@@ -3169,9 +3182,13 @@ function ExpensesAndPurchasesContent() {
                                 <Sparkles className="h-3 w-3" />
                                 <span>Net Profit</span>
                               </Badge>
+                            ) : purchase.deductionSource === 'excluded' ? (
+                              <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-300/40 flex items-center gap-1 w-fit font-medium">
+                                <span>Excluded</span>
+                              </Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
-                                <span>Revenue</span>
+                                <span>Operational</span>
                               </Badge>
                             )}
                           </TableCell>
@@ -3553,47 +3570,70 @@ function ExpensesAndPurchasesContent() {
                     </Label>
                     <span className="text-[11px] text-muted-foreground">Accounting treatment</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div
                       onClick={() => setExpenseDeductionSource('revenue')}
                       className={cn(
-                        "cursor-pointer p-3 rounded-lg border text-left transition-all",
+                        "cursor-pointer p-2.5 rounded-lg border text-left transition-all",
                         expenseDeductionSource === 'revenue'
                           ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/30"
                           : "bg-muted/20 border-border hover:bg-muted/40"
                       )}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <div className={cn("h-3.5 w-3.5 rounded-full border flex items-center justify-center", expenseDeductionSource === 'revenue' ? "border-primary bg-primary" : "border-muted-foreground")}>
                           {expenseDeductionSource === 'revenue' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                         </div>
-                        <span className="text-xs font-semibold text-foreground">Operational Revenue (Standard)</span>
+                        <span className="text-xs font-semibold text-foreground">Operational Overhead</span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-1.5 pl-5.5 leading-relaxed">
-                        Deducted directly from daily/monthly sales revenue as standard operating overhead.
+                      <p className="text-[10px] text-muted-foreground mt-1 pl-5 leading-relaxed">
+                        Deducted from operating profit as standard overhead. Never reduces sales revenue.
                       </p>
                     </div>
 
                     <div
                       onClick={() => setExpenseDeductionSource('net_profit')}
                       className={cn(
-                        "cursor-pointer p-3 rounded-lg border text-left transition-all",
+                        "cursor-pointer p-2.5 rounded-lg border text-left transition-all",
                         expenseDeductionSource === 'net_profit'
                           ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30 dark:bg-purple-950/30"
                           : "bg-muted/20 border-border hover:bg-muted/40"
                       )}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <div className={cn("h-3.5 w-3.5 rounded-full border flex items-center justify-center", expenseDeductionSource === 'net_profit' ? "border-purple-600 bg-purple-600" : "border-muted-foreground")}>
                           {expenseDeductionSource === 'net_profit' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                         </div>
                         <span className="text-xs font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1">
                           <Sparkles className="h-3 w-3" />
-                          Net Profit Reinvestment
+                          Net Profit Reinvest
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-1.5 pl-5.5 leading-relaxed">
-                        Funded by reinvesting retained business earnings when sales revenue is low or for business reinvestments.
+                      <p className="text-[10px] text-muted-foreground mt-1 pl-5 leading-relaxed">
+                        Reinvested from retained earnings without reducing operational gross margin.
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setExpenseDeductionSource('excluded')}
+                      className={cn(
+                        "cursor-pointer p-2.5 rounded-lg border text-left transition-all",
+                        expenseDeductionSource === 'excluded'
+                          ? "bg-emerald-500/10 border-emerald-500 shadow-xs ring-1 ring-emerald-500/30 dark:bg-emerald-950/30"
+                          : "bg-muted/20 border-border hover:bg-muted/40"
+                      )}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <div className={cn("h-3.5 w-3.5 rounded-full border flex items-center justify-center", expenseDeductionSource === 'excluded' ? "border-emerald-600 bg-emerald-600" : "border-muted-foreground")}>
+                          {expenseDeductionSource === 'excluded' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </div>
+                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                          <Check className="h-3 w-3" />
+                          Do Not Deduct
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1 pl-5 leading-relaxed">
+                        Excluded from profit & loss. Does not deduct from net profit or sales revenue.
                       </p>
                     </div>
                   </div>
@@ -3866,7 +3906,7 @@ function ExpensesAndPurchasesContent() {
                   </Label>
                   <span className="text-[10px] text-muted-foreground">Accounting source</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                   <div
                     onClick={() => setOrderDeductionSource('revenue')}
                     className={cn(
@@ -3880,10 +3920,10 @@ function ExpensesAndPurchasesContent() {
                       <div className={cn("h-3 w-3 rounded-full border flex items-center justify-center", orderDeductionSource === 'revenue' ? "border-primary bg-primary" : "border-muted-foreground")}>
                         {orderDeductionSource === 'revenue' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                       </div>
-                      <span className="text-xs font-medium text-foreground">Operational Revenue (COGS)</span>
+                      <span className="text-xs font-medium text-foreground">Operational (COGS)</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1 pl-4.5 leading-relaxed">
-                      Standard inventory purchase deducted from operating revenue.
+                      Paid from operating cash flow. Never reduces sales revenue.
                     </p>
                   </div>
 
@@ -3902,11 +3942,34 @@ function ExpensesAndPurchasesContent() {
                       </div>
                       <span className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1">
                         <Sparkles className="h-3 w-3" />
-                        Net Profit Reinvestment
+                        Net Profit Reinvest
                       </span>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1 pl-4.5 leading-relaxed">
-                      Funded from retained profit without reducing operational gross margin.
+                      Reinvested from retained earnings without reducing sales revenue.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setOrderDeductionSource('excluded')}
+                    className={cn(
+                      "cursor-pointer p-2.5 rounded-md border text-left transition-all",
+                      orderDeductionSource === 'excluded'
+                        ? "bg-emerald-500/10 border-emerald-500 shadow-xs ring-1 ring-emerald-500/30 dark:bg-emerald-950/30"
+                        : "bg-background border-border hover:bg-muted/40"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className={cn("h-3 w-3 rounded-full border flex items-center justify-center", orderDeductionSource === 'excluded' ? "border-emerald-600 bg-emerald-600" : "border-muted-foreground")}>
+                        {orderDeductionSource === 'excluded' && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </div>
+                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                        <Check className="h-3 w-3" />
+                        Do Not Deduct
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 pl-4.5 leading-relaxed">
+                      Asset stock. Not deducted from net profit or sales revenue.
                     </p>
                   </div>
                 </div>
@@ -4178,8 +4241,9 @@ function ExpensesAndPurchasesContent() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="revenue">Operational Revenue (Standard)</SelectItem>
+                    <SelectItem value="revenue">Operational Overhead / COGS</SelectItem>
                     <SelectItem value="net_profit">Net Profit Reinvestment</SelectItem>
+                    <SelectItem value="excluded">Do Not Deduct (Asset Stock / Excluded)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-[10px] text-muted-foreground">
@@ -4412,9 +4476,13 @@ function ExpensesAndPurchasesContent() {
                                     <Sparkles className="h-2.5 w-2.5" />
                                     <span>Net Profit</span>
                                   </Badge>
+                                ) : item.deductionSource === 'excluded' ? (
+                                  <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-300/40 flex items-center gap-1 w-fit font-medium">
+                                    <span>Excluded</span>
+                                  </Badge>
                                 ) : (
                                   <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 w-fit">
-                                    <span>Revenue</span>
+                                    <span>Operational</span>
                                   </Badge>
                                 )}
                               </TableCell>
@@ -4699,9 +4767,13 @@ function ExpensesAndPurchasesContent() {
                       <Sparkles className="h-3 w-3" />
                       <span>Net Profit Reinvestment</span>
                     </Badge>
+                  ) : selectedExpenseDetail.deductionSource === 'excluded' ? (
+                    <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-300/40 flex items-center gap-1 font-medium px-2 py-0.5">
+                      <span>Excluded from Profit</span>
+                    </Badge>
                   ) : (
                     <Badge variant="outline" className="text-xs bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300/40 flex items-center gap-1 px-2 py-0.5">
-                      <span>Operational Revenue</span>
+                      <span>Operational Overhead</span>
                     </Badge>
                   )}
                   {selectedExpenseDetail.deductFromCashDrawer && (
@@ -4761,7 +4833,11 @@ function ExpensesAndPurchasesContent() {
                 <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
                   <span className="text-muted-foreground font-medium block">Funding / Accounting Source</span>
                   <p className="font-semibold text-foreground text-sm">
-                    {selectedExpenseDetail.deductionSource === 'net_profit' ? 'Net Profit Reinvestment' : 'Operational Gross Revenue'}
+                    {selectedExpenseDetail.deductionSource === 'net_profit'
+                      ? 'Net Profit Reinvestment'
+                      : selectedExpenseDetail.deductionSource === 'excluded'
+                      ? 'Excluded (Do Not Deduct from Profit or Revenue)'
+                      : 'Operational Overhead'}
                   </p>
                 </div>
 

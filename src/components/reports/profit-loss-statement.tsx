@@ -92,7 +92,11 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             if (exp?.status === 'pending') return; // only count realized outflows
             const amt = Number(exp.amount) || 0;
             const cat = String(exp.category || 'miscellaneous');
-            const isProfitDeduction = (exp as any).deductionSource === 'net_profit';
+            const source = (exp as any).deductionSource;
+            // Excluded outflows never deduct from profit or sales revenue
+            if (source === 'excluded') return;
+
+            const isProfitDeduction = source === 'net_profit';
 
             if (isPurchaseExpense(exp)) {
                 if (isProfitDeduction) {
@@ -110,12 +114,10 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
             }
         });
 
-        // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to determine Net Sales Revenue.
-        const netSales = Math.max(0, grossRevenue - totalDiscounts - totalPurchases);
-        // Cost of Goods Sold is unit costs of sold inventory items when supplier purchases are not recorded.
-        // When supplier purchases are recorded and paid from revenue, they already account for inventory acquisition cost.
-        const effectiveCogs = totalPurchases > 0 ? 0 : totalCogs;
-        const grossProfit = totalPurchases > 0 ? netSales : Math.max(0, netSales - effectiveCogs);
+        // Sales Revenue is Gross Revenue minus sales discounts. Expenses/purchases never reduce sales revenue.
+        const netSales = Math.max(0, grossRevenue - totalDiscounts);
+        const effectiveCogs = totalCogs;
+        const grossProfit = Math.max(0, netSales - effectiveCogs);
         const operatingNetProfit = grossProfit - totalOperatingExpenses;
         const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
         const netProfit = operatingNetProfit - totalProfitReinvested;

@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { apiBase } from '@/lib/platform';
 
 type Mode = 'idle' | 'camera' | 'preview';
 
@@ -165,15 +166,25 @@ export default function VisualStockTakePage() {
         .filter((p) => p.categoryType !== 'service')
         .map((p) => ({ id: p.id, name: p.name }));
 
-      const res = await fetch('/api/ai/scan-shelf', {
+      const res = await fetch(`${apiBase()}/api/ai/scan-shelf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imagePreview, products: inventoryItems }),
       });
 
-      if (!res.ok) throw new Error('Failed to analyze image');
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        if (!res.ok) {
+          throw new Error('Shelf scanner service is currently unavailable. Please check your connection.');
+        }
+        throw new Error('Received an invalid response format from shelf scanner.');
+      }
 
-      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to analyze image');
+
       const counts: { id: string; count: number }[] = data.result || [];
 
       const results = counts.map((c) => {

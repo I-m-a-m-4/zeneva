@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,6 +10,8 @@ import { usePOS } from '@/context/pos-context';
 import { isCoreFeatureBlocked } from '@/lib/plan';
 import type { Product } from '@/types';
 import { useI18n } from '@/context/i18n-context';
+import { Sparkles, TrendingUp } from 'lucide-react';
+import { calculateProductDemandForecast } from '@/lib/demand-forecasting';
 
 export function QuickRestockModal({ 
     product, 
@@ -18,11 +22,27 @@ export function QuickRestockModal({
 }) {
     const { t } = useI18n();
     const { toast } = useToast();
-    const { addToQueue, isReadOnly, business } = usePOS();
+    const { addToQueue, isReadOnly, business, receipts } = usePOS();
     const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
     const [quantityToAdd, setQuantityToAdd] = React.useState('');
     const [backdate, setBackdate] = React.useState('');
     const [isSaving, setIsSaving] = React.useState(false);
+
+    // Demand Forecast Horizons (7d, 14d, 30d) calculated purely from store sales velocity
+    const forecast7d = React.useMemo(() => {
+        if (!product) return null;
+        return calculateProductDemandForecast(product, receipts, 7);
+    }, [product, receipts]);
+
+    const forecast14d = React.useMemo(() => {
+        if (!product) return null;
+        return calculateProductDemandForecast(product, receipts, 14);
+    }, [product, receipts]);
+
+    const forecast30d = React.useMemo(() => {
+        if (!product) return null;
+        return calculateProductDemandForecast(product, receipts, 30);
+    }, [product, receipts]);
 
     const currentStock = product?.stock || 0;
     const addedAmount = parseInt(quantityToAdd) || 0;
@@ -102,11 +122,11 @@ export function QuickRestockModal({
 
     return (
         <Dialog open={!!product} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[420px]">
+            <DialogContent className="sm:max-w-[430px]">
                 <DialogHeader>
                     <DialogTitle>Quick Restock: {product?.name}</DialogTitle>
                 </DialogHeader>
-                <div className="grid gap-5 py-3">
+                <div className="grid gap-4 py-3">
                     <div className="flex items-center justify-between px-4 py-3 bg-muted rounded-lg">
                         <div className="text-center">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Current Stock</p>
@@ -123,6 +143,55 @@ export function QuickRestockModal({
                             <p className="text-2xl font-bold text-green-600">{newTotal}</p>
                         </div>
                     </div>
+
+                    {/* Smart Demand Forecast & Quick Horizon Buttons */}
+                    {forecast14d && (
+                        <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20 space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                                    <span>Demand Forecast</span>
+                                </span>
+                                <span className="text-[11px] text-muted-foreground font-mono">
+                                    {forecast14d.dailyVelocity > 0 ? (
+                                        <>⚡ {forecast14d.dailyVelocity} / day • {forecast14d.daysRemaining === 0 ? 'Depleted' : `~${forecast14d.daysRemaining}d left`}</>
+                                    ) : (
+                                        <>No 30d sales</>
+                                    )}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setQuantityToAdd(String(Math.max(1, forecast7d?.recommendedQty || 5)))}
+                                    className="px-2 py-1.5 rounded-md border text-left bg-background hover:bg-orange-500/10 hover:border-orange-500/30 transition-all text-xs"
+                                    title="Restock for 7 days of projected sales"
+                                >
+                                    <p className="text-[10px] text-muted-foreground uppercase font-medium">7 Days</p>
+                                    <p className="font-bold text-foreground">+{Math.max(1, forecast7d?.recommendedQty || 5)}</p>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setQuantityToAdd(String(Math.max(1, forecast14d?.recommendedQty || 10)))}
+                                    className="px-2 py-1.5 rounded-md border text-left bg-background hover:bg-orange-500/10 border-orange-500/40 transition-all text-xs"
+                                    title="Recommended: Restock for 14 days of projected sales"
+                                >
+                                    <p className="text-[10px] text-orange-600 font-semibold uppercase">14 Days (Rec)</p>
+                                    <p className="font-bold text-foreground">+{Math.max(1, forecast14d?.recommendedQty || 10)}</p>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setQuantityToAdd(String(Math.max(1, forecast30d?.recommendedQty || 20)))}
+                                    className="px-2 py-1.5 rounded-md border text-left bg-background hover:bg-orange-500/10 hover:border-orange-500/30 transition-all text-xs"
+                                    title="Restock for full month of projected sales"
+                                >
+                                    <p className="text-[10px] text-muted-foreground uppercase font-medium">30 Days</p>
+                                    <p className="font-bold text-foreground">+{Math.max(1, forecast30d?.recommendedQty || 20)}</p>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     
                     <div className="grid gap-2">
                         <Label htmlFor="restockQty">Quantity to Add</Label>

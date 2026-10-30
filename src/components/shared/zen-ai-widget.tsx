@@ -365,7 +365,7 @@ export default function ZenAIWidget({ isOpen, onClose, dictationTrigger = 0 }: Z
         formData.append('file', audioBlob, 'audio.webm');
 
         try {
-          const res = await fetch('/api/transcribe', {
+          const res = await fetch(`${apiBase()}/api/transcribe`, {
             method: 'POST',
             body: formData,
           });

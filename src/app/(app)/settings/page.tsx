@@ -733,8 +733,19 @@ function SettingsPageContent() {
                     description: `Zeneva v${latestTag} is ready. Starting download...`,
                 });
 
-                // Automatically trigger download/open installer
-                await openExternal(downloadUrl);
+                if (isTauri) {
+                    toast({
+                        title: 'Update Available!',
+                        description: Zeneva v is available. The in-app updater is downloading in the background. Look for the top banner to restart.,
+                        duration: 8000,
+                    });
+                } else {
+                    toast({
+                        title: 'Update Available!',
+                        description: Zeneva v is ready. Opening download page...,
+                    });
+                    await openExternal(downloadUrl);
+                }
             } else {
                 toast({
                     title: t('settings.toastUpToDate') || 'Up to Date',

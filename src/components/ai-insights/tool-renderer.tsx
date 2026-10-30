@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Package, DollarSign, Users, Sparkles, CheckCircle2, XCircle,
   AlertTriangle, TrendingUp, ArrowRight, ReceiptText, LayoutGrid, Table2,
-  Coins, Calculator, Download, Plus,
+  Coins, Calculator, Download, Plus, Check, Zap, Layers, RefreshCw,
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -23,6 +23,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { RestockSheetProposal } from './restock-sheet-proposal';
+import { usePOS } from '@/context/pos-context';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * Generative UI for Zen AI tool results.
@@ -57,12 +59,17 @@ function fmtTile(tile: any, currency?: string) {
 // Product card — the POS grid card, sized for a chat column
 // ─────────────────────────────────────────────────────────────────────────────
 function ProductCard({
-  product, currency, onPick, confidence,
+  product, currency, onPick, confidence, showRestockInput, restockQty, restockMode = 'add', onRestockChange, onSingleApply,
 }: {
   product: any;
   currency?: string;
   onPick?: (product: any) => void;
   confidence?: number;
+  showRestockInput?: boolean;
+  restockQty?: number;
+  restockMode?: 'add' | 'set';
+  onRestockChange?: (productId: string, qty?: number) => void;
+  onSingleApply?: (productId: string) => void;
 }) {
   const stock = product.stock ?? 0;
   const threshold = product.lowStockThreshold ?? 5;
@@ -178,6 +185,49 @@ function ProductCard({
             )}
           </div>
         )}
+
+        {/* Inline Restock Input */}
+        {showRestockInput && !product.deleted && !isService && (
+          <div
+            className="mt-2 pt-2 border-t border-dashed border-border/70 flex flex-col gap-1.5 bg-muted/40 -mx-3 -mb-3 p-2.5 rounded-b-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium">
+              <span>{restockMode === 'set' ? 'New Target Stock:' : 'Add Stock Units:'}</span>
+              {restockQty != null && restockQty > 0 && (
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+                  → {restockMode === 'set' ? restockQty : (stock + restockQty)} in stock
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min="0"
+                placeholder={restockMode === 'set' ? `${Math.max(0, stock)}` : '+Qty'}
+                value={restockQty ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? undefined : Math.max(0, parseInt(e.target.value, 10));
+                  onRestockChange?.(product.id, isNaN(val as any) ? undefined : val);
+                }}
+                className="flex-1 min-w-0 h-7 px-2 text-xs rounded border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+              />
+              {onSingleApply && (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={restockQty == null || restockQty <= 0}
+                  onClick={() => onSingleApply(product.id)}
+                  className="h-7 px-2 text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 gap-1"
+                  title="Save stock for this product"
+                >
+                  <Check className="w-3 h-3" />
+                  <span>Save</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -186,6 +236,21 @@ function ProductCard({
 // ─────────────────────────────────────────────────────────────────────────────
 function ProductGrid({ result, onPick }: { result: any; onPick?: (p: any) => void }) {
   const products = result.products ?? [];
+  const isLowStockList = Boolean(result.title?.toLowerCase().includes('low stock'));
+  const [isRestockOpen, setIsRestockOpen] = React.useState(isLowStockList);
+  const [restockMode, setRestockMode] = React.useState<'add' | 'set'>('add');
+  const [restockInputs, setRestockInputs] = React.useState<Record<string, number>>({});
+  const [isApplying, setIsApplying] = React.useState(false);
+
+  const { toast } = useToast();
+  let addToQueue: any = null;
+  let isReadOnly = false;
+  try {
+    const pos = usePOS();
+    addToQueue = pos?.addToQueue;
+    isReadOnly = Boolean(pos?.isReadOnly);
+  } catch {}
+
   if (!products.length) {
     return (
       <div className="text-xs text-muted-foreground border border-dashed border-border rounded-lg px-3 py-4 text-center">
@@ -195,19 +260,216 @@ function ProductGrid({ result, onPick }: { result: any; onPick?: (p: any) => voi
   }
   const hidden = (result.totalMatches ?? products.length) - products.length;
 
+  const handleRestockChange = (id: string, qty?: number) => {
+    setRestockInputs((prev) => {
+      const next = { ...prev };
+      if (qty == null) delete next[id];
+      else next[id] = qty;
+      return next;
+    });
+  };
+
+  const handleSingleApply = (prodId: string) => {
+    if (!addToQueue) return;
+    if (isReadOnly) {
+      toast({ title: 'Read-Only Mode', description: 'Trial expired. Please upgrade.', variant: 'destructive' });
+      return;
+    }
+    const qty = restockInputs[prodId];
+    if (qty == null || qty <= 0) return;
+    const p = products.find((x: any) => x.id === prodId);
+    if (!p) return;
+
+    const currentStock = p.stock ?? 0;
+    const newStock = restockMode === 'add' ? currentStock + qty : qty;
+
+    addToQueue(
+      {
+        type: 'update-product',
+        payload: {
+          productId: p.id,
+          values: { stock: newStock },
+        },
+      },
+      `Zen AI Restock: ${p.name} stock (${currentStock} → ${newStock})`
+    );
+
+    toast({
+      title: 'Stock Updated',
+      description: `Restocked ${p.name}: ${currentStock} → ${newStock}`,
+      variant: 'success',
+    });
+
+    setRestockInputs((prev) => {
+      const next = { ...prev };
+      delete next[prodId];
+      return next;
+    });
+  };
+
+  const handleAutoFillDeficits = () => {
+    const newInputs: Record<string, number> = {};
+    for (const p of products) {
+      if (p.deleted || p.categoryType === 'service') continue;
+      const current = p.stock ?? 0;
+      const threshold = p.lowStockThreshold ?? 5;
+      if (restockMode === 'add') {
+        const needed = current < 0 ? Math.abs(current) + threshold : Math.max(1, threshold - current);
+        newInputs[p.id] = needed;
+      } else {
+        newInputs[p.id] = Math.max(15, threshold * 2);
+      }
+    }
+    setRestockInputs(newInputs);
+    toast({
+      title: 'Auto-Calculated Quantities',
+      description: 'Filled suggested quantities to clear negative stock & reach healthy threshold.',
+    });
+  };
+
+  const handleBulkApply = async () => {
+    if (!addToQueue) return;
+    if (isReadOnly) {
+      toast({ title: 'Read-Only Mode', description: 'Trial expired.', variant: 'destructive' });
+      return;
+    }
+    const entries = Object.entries(restockInputs).filter(([_, qty]) => typeof qty === 'number' && qty > 0);
+    if (entries.length === 0) {
+      toast({ title: 'No quantities entered', description: 'Enter quantities or click Auto-fill Deficits first.', variant: 'destructive' });
+      return;
+    }
+
+    setIsApplying(true);
+    try {
+      let count = 0;
+      for (const [prodId, qty] of entries) {
+        const p = products.find((x: any) => x.id === prodId);
+        if (!p) continue;
+        const currentStock = p.stock ?? 0;
+        const newStock = restockMode === 'add' ? currentStock + qty : qty;
+
+        addToQueue(
+          {
+            type: 'update-product',
+            payload: {
+              productId: p.id,
+              values: { stock: newStock },
+            },
+          },
+          `Zen AI Restock: ${p.name} stock (${currentStock} → ${newStock})`
+        );
+        count++;
+      }
+      toast({
+        title: 'Bulk Restock Applied',
+        description: `Successfully applied stock updates to ${count} product${count !== 1 ? 's' : ''}.`,
+        variant: 'success',
+      });
+      setRestockInputs({});
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const enteredCount = Object.keys(restockInputs).filter((k) => (restockInputs[k] ?? 0) > 0).length;
+
   return (
-    <div className="w-full">
+    <div className="w-full space-y-2.5">
       {result.title && (
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{result.title}</span>
-          <span className="text-[11px] text-muted-foreground">
-            {result.totalMatches ?? products.length} item{(result.totalMatches ?? products.length) === 1 ? '' : 's'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-muted-foreground">
+              {result.totalMatches ?? products.length} item{(result.totalMatches ?? products.length) === 1 ? '' : 's'}
+            </span>
+            <Button
+              type="button"
+              variant={isRestockOpen ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setIsRestockOpen(!isRestockOpen)}
+              className="h-6 px-2 text-[10px] gap-1 rounded-full"
+            >
+              <Plus className="w-3 h-3" />
+              <span>{isRestockOpen ? 'Hide Restock Inputs' : 'Bulk Restock'}</span>
+            </Button>
+          </div>
         </div>
       )}
+
+      {/* Restock Action Toolbar */}
+      {isRestockOpen && (
+        <div className="p-3 rounded-xl bg-orange-50/70 dark:bg-orange-950/30 border border-orange-200/70 dark:border-orange-800/50 space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-orange-950 dark:text-orange-200 flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5 text-primary" />
+                Bulk Restock
+              </span>
+              <div className="flex rounded-md border border-border bg-background p-0.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setRestockMode('add')}
+                  className={cn(
+                    'px-2 py-0.5 rounded font-medium transition-colors',
+                    restockMode === 'add' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  + Add Units
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRestockMode('set')}
+                  className={cn(
+                    'px-2 py-0.5 rounded font-medium transition-colors',
+                    restockMode === 'set' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  = Set Exact
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAutoFillDeficits}
+                className="h-7 px-2.5 text-[11px] gap-1 bg-background text-foreground hover:bg-muted"
+                title="Automatically fill quantities to clear negative stock and reach minimum threshold"
+              >
+                <Zap className="w-3 h-3 text-amber-500" />
+                <span>Auto-fill Deficits</span>
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                disabled={enteredCount === 0 || isApplying}
+                onClick={handleBulkApply}
+                className="h-7 px-3 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white gap-1"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Apply Restock ({enteredCount})</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         {products.map((p: any) => (
-          <ProductCard key={p.id} product={p} currency={result.currency} onPick={onPick} />
+          <ProductCard
+            key={p.id}
+            product={p}
+            currency={result.currency}
+            onPick={onPick}
+            showRestockInput={isRestockOpen}
+            restockQty={restockInputs[p.id]}
+            restockMode={restockMode}
+            onRestockChange={handleRestockChange}
+            onSingleApply={handleSingleApply}
+          />
         ))}
       </div>
       {hidden > 0 && (

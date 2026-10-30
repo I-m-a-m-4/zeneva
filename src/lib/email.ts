@@ -1,6 +1,7 @@
 'use client';
 
 import emailjs from '@emailjs/browser';
+import { apiBase } from '@/lib/platform';
 
 // --- For User Invitations & General Contact ---
 export interface ContactEmailParams {
@@ -13,7 +14,7 @@ export interface ContactEmailParams {
 
 export const sendInvitationEmail = async (params: ContactEmailParams) => {
     try {
-        const response = await fetch('/api/emails/invite', {
+        const response = await fetch(`${apiBase()}/api/emails/invite`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -21,12 +22,22 @@ export const sendInvitationEmail = async (params: ContactEmailParams) => {
             body: JSON.stringify(params),
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        const text = await response.text();
+        let data: any = {};
+        try {
+            data = JSON.parse(text);
+        } catch {
+            if (!response.ok) {
+                throw new Error('Email service is currently unreachable. Please check your connection.');
+            }
+            throw new Error('Received an invalid response from email service.');
         }
 
-        return await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+
+        return data;
     } catch (error: any) {
         console.error('[Email API] Failed to send invitation email:', error.message || error);
         throw error;

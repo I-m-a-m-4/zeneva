@@ -635,7 +635,7 @@ export default function AddProductPage() {
                           </Tooltip>
                         </TooltipProvider>
                       </FormLabel>
-                      <Button type="button" variant="outline" size="sm" onClick={() => appendUom({ unitName: "", multiplier: 1 })}>
+                      <Button type="button" variant="outline" size="sm" onClick={() => appendUom({ unitName: "", multiplier: 12 })}>
                         <Plus className="h-4 w-4 mr-2" /> {t('inventory.addUom')}
                       </Button>
                     </div>
@@ -651,6 +651,9 @@ export default function AddProductPage() {
                               <Input placeholder={t('inventory.baseUnitPlaceholder')} {...field} />
                             </FormControl>
                             <FormMessage />
+                            <FormDescription className="text-[11px] text-muted-foreground">
+                              {t('inventory.baseUnitHint')}
+                            </FormDescription>
                           </FormItem>
                         )}
                       />
@@ -666,6 +669,9 @@ export default function AddProductPage() {
                               <FormLabel className="text-xs">{t('inventory.unitName')}</FormLabel>
                               <FormControl><Input placeholder={t('inventory.unitNamePlaceholder')} {...field} /></FormControl>
                               <FormMessage />
+                            <FormDescription className="text-[11px] text-muted-foreground">
+                              {t('inventory.baseUnitHint')}
+                            </FormDescription>
                             </FormItem>
                           )}
                         />
@@ -677,6 +683,9 @@ export default function AddProductPage() {
                               <FormLabel className="text-xs">{t('inventory.uomMultiplier')}</FormLabel>
                               <FormControl><Input type="number" {...field} /></FormControl>
                               <FormMessage />
+                            <FormDescription className="text-[11px] text-muted-foreground">
+                              {t('inventory.baseUnitHint')}
+                            </FormDescription>
                             </FormItem>
                           )}
                         />
@@ -689,6 +698,9 @@ export default function AddProductPage() {
                                 <FormLabel className="text-xs">{t('inventory.priceOptional')}</FormLabel>
                                 <FormControl><Input type="number" placeholder={t('inventory.priceOverride')} {...field} /></FormControl>
                                 <FormMessage />
+                            <FormDescription className="text-[11px] text-muted-foreground">
+                              {t('inventory.baseUnitHint')}
+                            </FormDescription>
                               </FormItem>
                             )}
                           />
@@ -944,6 +956,9 @@ export default function AddProductPage() {
                                 Enter initial stock quantity.
                             </FormDescription>
                             <FormMessage />
+                            <FormDescription className="text-[11px] text-muted-foreground">
+                              {t('inventory.baseUnitHint')}
+                            </FormDescription>
                           </FormItem>
                         )
                       }}

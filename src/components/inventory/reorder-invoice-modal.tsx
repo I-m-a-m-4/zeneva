@@ -10,9 +10,11 @@ import { useToast } from '@/hooks/use-toast';
 import { usePOS } from '@/context/pos-context';
 import type { Product } from '@/types';
 import { useI18n } from '@/context/i18n-context';
-import { FileText, Send, Printer, Plus, Trash2, CheckCircle2, AlertTriangle, Building2, Package } from 'lucide-react';
+import { FileText, Send, Printer, Trash2, CheckCircle2, Package, Sparkles } from 'lucide-react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
+import { calculateProductDemandForecast } from '@/lib/demand-forecasting';
+import { cn } from '@/lib/utils';
 
 interface ReorderInvoiceModalProps {
     isOpen: boolean;
@@ -27,7 +29,7 @@ export function ReorderInvoiceModal({
 }: ReorderInvoiceModalProps) {
     const { t } = useI18n();
     const { toast } = useToast();
-    const { products, business, currencySymbol, currentUserProfile } = usePOS();
+    const { products, business, currencySymbol, currentUserProfile, receipts } = usePOS();
     const firestore = useFirestore();
 
     const [supplierName, setSupplierName] = React.useState('');
@@ -35,6 +37,7 @@ export function ReorderInvoiceModal({
     const [supplierEmail, setSupplierEmail] = React.useState('');
     const [notes, setNotes] = React.useState('Automatic reorder for stock items reaching reorder point.');
     const [isSaving, setIsSaving] = React.useState(false);
+    const [forecastHorizon, setForecastHorizon] = React.useState<7 | 14 | 30>(14);
 
     // Items list for the reorder invoice
     const [reorderItems, setReorderItems] = React.useState<{
@@ -45,9 +48,11 @@ export function ReorderInvoiceModal({
         reorderPoint: number;
         costPrice: number;
         orderQty: number;
+        dailyVelocity: number;
+        daysRemaining: number | null;
     }[]>([]);
 
-    // Initialize items when modal opens
+    // Initialize items when modal opens with demand forecasting
     React.useEffect(() => {
         if (!isOpen) return;
 
@@ -58,7 +63,7 @@ export function ReorderInvoiceModal({
         const mapped = candidateProducts.map(p => {
             const currentStock = p.stock || 0;
             const threshold = p.lowStockThreshold || 5;
-            const suggestedQty = Math.max(1, (threshold * 2) - currentStock);
+            const forecast = calculateProductDemandForecast(p, receipts, forecastHorizon);
             return {
                 productId: p.id,
                 name: p.name,
@@ -66,12 +71,29 @@ export function ReorderInvoiceModal({
                 currentStock,
                 reorderPoint: threshold,
                 costPrice: p.costPrice || p.price || 0,
-                orderQty: suggestedQty
+                orderQty: Math.max(1, forecast.recommendedQty),
+                dailyVelocity: forecast.dailyVelocity,
+                daysRemaining: forecast.daysRemaining,
             };
         });
 
         setReorderItems(mapped);
-    }, [isOpen, products, preselectedProducts]);
+    }, [isOpen, products, preselectedProducts, receipts, forecastHorizon]);
+
+    const handleHorizonChange = (newHorizon: 7 | 14 | 30) => {
+        setForecastHorizon(newHorizon);
+        setReorderItems(prev => prev.map(item => {
+            const prod = (products || []).find(p => p.id === item.productId);
+            if (!prod) return item;
+            const forecast = calculateProductDemandForecast(prod, receipts, newHorizon);
+            return {
+                ...item,
+                orderQty: Math.max(1, forecast.recommendedQty),
+                dailyVelocity: forecast.dailyVelocity,
+                daysRemaining: forecast.daysRemaining,
+            };
+        }));
+    };
 
     const totalCost = React.useMemo(() => {
         return reorderItems.reduce((sum, item) => sum + (item.costPrice * item.orderQty), 0);
@@ -100,6 +122,7 @@ export function ReorderInvoiceModal({
             `📦 *REORDER PURCHASE ORDER INVOICE*`,
             `From: *${business?.name || 'Zeneva Store'}*`,
             `To Supplier: *${supplierName || 'Valued Supplier'}*`,
+            `Forecast Horizon: *${forecastHorizon} Days*`,
             `Date: ${new Date().toLocaleDateString()}`,
             `-----------------------------------`,
             `*ITEMS REQUIRED:*`,
@@ -119,39 +142,46 @@ export function ReorderInvoiceModal({
             : `https://wa.me/?text=${text}`;
 
         window.open(waUrl, '_blank');
-        toast({ title: 'WhatsApp opened', description: 'Reorder invoice formatted and sent to WhatsApp.' });
+        toast({
+            variant: 'success',
+            title: 'WhatsApp Opened',
+            description: 'Order details prepared and copied to WhatsApp.',
+        });
     };
 
-    // Print Invoice / PDF layout
+    // Print or Export PDF
     const handlePrintInvoice = () => {
         if (reorderItems.length === 0) return;
 
         const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
+        if (!printWindow) {
+            toast({ variant: 'destructive', title: 'Pop-up blocked', description: 'Please allow pop-ups to print this invoice.' });
+            return;
+        }
 
         const html = `
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Purchase Order Invoice - ${business?.name || 'Zeneva'}</title>
+                <title>Purchase Order Invoice - ${business?.name || 'Zeneva Store'}</title>
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 40px; color: #111; max-width: 800px; margin: 0 auto; }
-                    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #ea580c; padding-bottom: 20px; margin-bottom: 30px; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #0f172a; line-height: 1.5; }
+                    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; }
                     .title { font-size: 24px; font-weight: bold; color: #ea580c; }
                     .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
                     table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                    th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
-                    th { background-color: #f8fafc; font-size: 12px; uppercase; color: #64748b; }
+                    th { background-color: #f8fafc; text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #cbd5e1; }
+                    td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
                     .text-right { text-align: right; }
-                    .total-box { margin-left: auto; width: 300px; padding: 15px; background: #f8fafc; border-radius: 8px; text-align: right; }
-                    .footer { margin-top: 50px; font-size: 12px; color: #64748b; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+                    .total-box { text-align: right; margin-top: 20px; padding: 15px; background: #fff7ed; border-radius: 8px; border: 1px solid #fed7aa; }
+                    .footer { margin-top: 40px; font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <div>
                         <div class="title">PURCHASE ORDER INVOICE</div>
-                        <p style="margin: 5px 0 0 0; color: #64748b;">Ref: PO-${Date.now().toString().slice(-6)}</p>
+                        <p style="margin: 5px 0 0 0; color: #64748b;">Ref: PO-${Date.now().toString().slice(-6)} (Horizon: ${forecastHorizon} Days)</p>
                     </div>
                     <div style="text-align: right;">
                         <h3 style="margin:0;">${business?.name || 'Zeneva Store'}</h3>
@@ -226,6 +256,7 @@ export function ReorderInvoiceModal({
                 supplierName: supplierName || 'General Supplier',
                 supplierPhone,
                 supplierEmail,
+                forecastHorizonDays: forecastHorizon,
                 items: reorderItems,
                 totalCost,
                 status: 'draft',
@@ -253,7 +284,7 @@ export function ReorderInvoiceModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+            <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
                     <div className="flex items-center gap-2">
                         <div className="p-2 bg-orange-500/10 text-orange-600 rounded-lg">
@@ -262,13 +293,13 @@ export function ReorderInvoiceModal({
                         <div>
                             <DialogTitle className="text-lg font-bold">Auto-Generated Reorder Invoice</DialogTitle>
                             <DialogDescription className="text-xs">
-                                Automatically pre-filled with low stock items below reorder threshold.
+                                Demand-forecasted purchase order based on sales velocity and target stock horizon.
                             </DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                     {/* Supplier Meta Form */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-muted/40 rounded-xl border border-border/50">
                         <div>
@@ -300,89 +331,135 @@ export function ReorderInvoiceModal({
                         </div>
                     </div>
 
-                    {/* Low Stock Items Table */}
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
+                    {/* Forecast Horizon Controls & Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                        <div className="flex items-center gap-2">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                                 <Package className="h-3.5 w-3.5 text-orange-500" />
                                 Reorder Items ({reorderItems.length})
                             </h4>
-                            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                                Total: {currencySymbol}{totalCost.toLocaleString()}
-                            </span>
                         </div>
 
-                        {reorderItems.length === 0 ? (
-                            <div className="p-8 text-center bg-muted/20 rounded-xl border border-dashed text-xs text-muted-foreground">
-                                <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
-                                All products are currently above their reorder points! No low stock items to restock.
-                            </div>
-                        ) : (
-                            <div className="border rounded-xl overflow-hidden bg-card">
-                                <div className="max-h-[260px] overflow-y-auto">
-                                    <table className="w-full text-xs text-left">
-                                        <thead className="bg-muted text-muted-foreground sticky top-0 font-semibold border-b">
-                                            <tr>
-                                                <th className="p-2.5">Item Name</th>
-                                                <th className="p-2.5 text-center">Stock / Threshold</th>
-                                                <th className="p-2.5 text-center w-24">Order Qty</th>
-                                                <th className="p-2.5 text-right">Cost Price</th>
-                                                <th className="p-2.5 text-right">Subtotal</th>
-                                                <th className="p-2.5 w-10"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {reorderItems.map((item, idx) => (
-                                                <tr key={item.productId} className="hover:bg-muted/30">
-                                                    <td className="p-2.5">
-                                                        <div className="font-semibold text-foreground">{item.name}</div>
-                                                        <div className="text-[10px] text-muted-foreground font-mono">SKU: {item.sku}</div>
-                                                    </td>
-                                                    <td className="p-2.5 text-center">
+                        {/* Forecast Horizon Selector */}
+                        <div className="flex items-center gap-1 bg-muted/70 p-1 rounded-lg border text-xs self-start sm:self-auto">
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase px-1.5 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-orange-500" />
+                                Forecast:
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleHorizonChange(7)}
+                                className={cn(
+                                    "px-2 py-0.5 rounded text-[11px] font-medium transition-all",
+                                    forecastHorizon === 7 ? "bg-background text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                7 Days
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleHorizonChange(14)}
+                                className={cn(
+                                    "px-2 py-0.5 rounded text-[11px] font-medium transition-all",
+                                    forecastHorizon === 14 ? "bg-orange-500 text-white shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                14 Days (Rec)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleHorizonChange(30)}
+                                className={cn(
+                                    "px-2 py-0.5 rounded text-[11px] font-medium transition-all",
+                                    forecastHorizon === 30 ? "bg-background text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                30 Days
+                            </button>
+                        </div>
+                    </div>
+
+                    {reorderItems.length === 0 ? (
+                        <div className="p-8 text-center bg-muted/20 rounded-xl border border-dashed text-xs text-muted-foreground">
+                            <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
+                            All products are currently above their reorder points! No low stock items to restock.
+                        </div>
+                    ) : (
+                        <div className="border rounded-xl overflow-hidden bg-card">
+                            <div className="max-h-[260px] overflow-y-auto">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-muted text-muted-foreground sticky top-0 font-semibold border-b">
+                                        <tr>
+                                            <th className="p-2.5">Item Name</th>
+                                            <th className="p-2.5 text-center">Velocity / Stock</th>
+                                            <th className="p-2.5 text-center w-24">Order Qty</th>
+                                            <th className="p-2.5 text-right">Cost Price</th>
+                                            <th className="p-2.5 text-right">Subtotal</th>
+                                            <th className="p-2.5 w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {reorderItems.map((item, idx) => (
+                                            <tr key={item.productId} className="hover:bg-muted/30">
+                                                <td className="p-2.5">
+                                                    <div className="font-semibold text-foreground">{item.name}</div>
+                                                    <div className="text-[10px] text-muted-foreground font-mono">SKU: {item.sku}</div>
+                                                </td>
+                                                <td className="p-2.5 text-center">
+                                                    <div className="flex flex-col items-center gap-0.5">
                                                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-orange-500/10 text-orange-600 border-orange-200">
                                                             {item.currentStock} / {item.reorderPoint}
                                                         </Badge>
-                                                    </td>
-                                                    <td className="p-2.5 text-center">
-                                                        <Input
-                                                            type="number"
-                                                            min={1}
-                                                            value={item.orderQty}
-                                                            onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 1)}
-                                                            className="h-7 text-center text-xs w-20 mx-auto"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2.5 text-right font-medium">
-                                                        {currencySymbol}{item.costPrice.toLocaleString()}
-                                                    </td>
-                                                    <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                                                        {currencySymbol}{(item.orderQty * item.costPrice).toLocaleString()}
-                                                    </td>
-                                                    <td className="p-2.5 text-center">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                                            onClick={() => handleRemoveItem(idx)}
-                                                        >
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                        <span className="text-[10px] text-muted-foreground font-mono">
+                                                            {item.dailyVelocity > 0 ? `⚡ ${item.dailyVelocity}/d` : 'No sales'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-2.5 text-center">
+                                                    <Input
+                                                        type="number"
+                                                        min={1}
+                                                        value={item.orderQty}
+                                                        onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 1)}
+                                                        className="h-7 text-center text-xs w-20 mx-auto font-semibold text-foreground"
+                                                    />
+                                                </td>
+                                                <td className="p-2.5 text-right font-medium">
+                                                    {currencySymbol}{item.costPrice.toLocaleString()}
+                                                </td>
+                                                <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {currencySymbol}{(item.orderQty * item.costPrice).toLocaleString()}
+                                                </td>
+                                                <td className="p-2.5 text-center">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => handleRemoveItem(idx)}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 <DialogFooter className="px-6 py-3 border-t bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-2">
-                    <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 order-2 sm:order-1">
+                        <span>Total PO Cost:</span>
+                        <strong className="text-sm text-foreground text-orange-600 dark:text-orange-400">
+                            {currencySymbol}{totalCost.toLocaleString()}
+                        </strong>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
+                        <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
                         <Button
                             variant="outline"
                             size="sm"
@@ -391,7 +468,7 @@ export function ReorderInvoiceModal({
                             className="gap-1.5 text-xs"
                         >
                             <Printer className="h-3.5 w-3.5" />
-                            Print / Export PDF
+                            Print / PDF
                         </Button>
                         <Button
                             variant="outline"
@@ -401,7 +478,7 @@ export function ReorderInvoiceModal({
                             className="gap-1.5 text-xs border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                         >
                             <Send className="h-3.5 w-3.5" />
-                            Send WhatsApp
+                            WhatsApp
                         </Button>
                         <Button
                             size="sm"

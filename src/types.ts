@@ -309,7 +309,7 @@ export interface OnlineOrder {
         location?: string;
     };
     status: 'pending' | 'paid' | 'shipped' | 'cancelled';
-    paymentMethod?: 'Paystack' | 'Bank Transfer';
+    paymentMethod?: 'Paystack' | 'Bank Transfer' | 'WhatsApp';
     paymentReference?: string;
     createdAt: any;
     branchId?: string;
@@ -894,7 +894,7 @@ export type ExpenseCategory =
 
 export type ExpensePaymentMethod = 'cash' | 'bank_transfer' | 'pos_card' | 'personal_funds' | 'other';
 
-export type ExpenseDeductionSource = 'revenue' | 'net_profit';
+export type ExpenseDeductionSource = 'revenue' | 'net_profit' | 'excluded';
 
 export interface Expense {
     id: string;

@@ -720,7 +720,11 @@ export function summarisePeriod(
   for (const exp of expenses || []) {
     if (exp?.status !== 'pending') { // Only count actual spent money (paid)
       const amt = num(exp?.amount);
-      const isProfitDeduction = (exp as any)?.deductionSource === 'net_profit';
+      const source = (exp as any)?.deductionSource;
+      // Excluded outflows never deduct from profit or sales revenue
+      if (source === 'excluded') continue;
+
+      const isProfitDeduction = source === 'net_profit';
       if (isPurchase(exp)) {
         if (isProfitDeduction) {
           purchasesFromProfit += amt;
@@ -739,16 +743,13 @@ export function summarisePeriod(
 
   const sales = list.length;
   const grossRevenue = revenue;
-  // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to yield Net Revenue.
-  const netRevenue = Math.max(0, grossRevenue - totalPurchases);
+  // Sales revenue is gross revenue from sales. Expenses and purchases never reduce sales revenue.
+  const netRevenue = grossRevenue;
   const costSumVal = anyCost ? costSum : 0;
 
-  // Gross Profit: when supplier purchases funded from revenue are recorded, they already represent inventory cost, so Gross Profit is netRevenue.
-  // When supplier purchases are not recorded, Gross Profit is Gross Revenue minus direct unit costs (costSumVal).
-  const grossProfit = totalPurchases > 0
-    ? netRevenue
-    : (anyCost ? Math.max(0, grossRevenue - costSumVal) : grossRevenue);
-  const profit = anyCost || totalPurchases > 0 ? grossProfit : null;
+  // Gross Profit = Net Revenue - direct unit costs of sold items (costSumVal)
+  const grossProfit = anyCost ? Math.max(0, netRevenue - costSumVal) : netRevenue;
+  const profit = anyCost ? grossProfit : null;
 
   // Operating Net Profit = Gross Profit - Operating Expenses (funded from revenue)
   const operatingNetProfit = grossProfit - totalExpenses;
@@ -758,9 +759,9 @@ export function summarisePeriod(
   const netProfit = operatingNetProfit - totalProfitReinvested;
 
   return {
-    revenue: netRevenue,
+    revenue: grossRevenue,
     grossRevenue,
-    netRevenue,
+    netRevenue: grossRevenue,
     totalPurchases,
     sales,
     units,

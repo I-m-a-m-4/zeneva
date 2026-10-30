@@ -49,8 +49,8 @@ export function TauriUpdater() {
                 break;
               case 'Progress':
                 downloaded += event.data.chunkLength;
-                if (totalSize) {
-                  const percent = Math.round((downloaded / totalSize) * 100);
+                if (totalSize && totalSize > 0) {
+                  const percent = Math.min(99, Math.round((downloaded / totalSize) * 100));
                   setDownloadProgress(percent);
                 }
                 break;
@@ -59,15 +59,20 @@ export function TauriUpdater() {
                 setUpdateReady(true);
                 toast({
                   title: "Update Downloaded",
-                  description: "Zeneva is ready to update. Click the restart button to apply.",
+                  description: "Zeneva is ready to update. Click RESTART NOW to apply.",
                   variant: "success",
                 });
                 break;
             }
           });
+
+          // Ensure states update upon promise completion
+          setIsDownloading(false);
+          setUpdateReady(true);
         }
       } catch (error) {
         console.error('Failed to check for updates:', error);
+        setIsDownloading(false);
       }
     };
 

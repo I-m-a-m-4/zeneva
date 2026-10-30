@@ -194,10 +194,21 @@ const ProductItem = React.memo(({ product, currencySymbol, handleAddToCart, addT
                                     }
                                 }
                             }}>
-                                <DropdownMenuRadioItem value="base">1 {product.baseUnit || t('pos.piece')} (<span className="mr-0.5">{currencySymbol}</span>{product.price.toLocaleString()})</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="base">
+                                    {(() => {
+                                        const unit = product.baseUnit || t('pos.piece');
+                                        const label = /^\d/.test(unit.trim()) ? unit : `1 ${unit}`;
+                                        return <>{label} (<span className="mr-0.5">{currencySymbol}</span>{product.price.toLocaleString()})</>;
+                                    })()}
+                                </DropdownMenuRadioItem>
                                 {product.uomConversions.map((uom) => (
                                     <DropdownMenuRadioItem key={uom.unitName} value={uom.unitName}>
-                                        1 {uom.unitName} ({uom.multiplier} {product.baseUnit || t('pos.pcs')}) - <span className="mr-0.5">{currencySymbol}</span>{(uom.price || product.price).toLocaleString()}
+                                        {(() => {
+                                            const unit = uom.unitName;
+                                            const label = /^\d/.test(unit.trim()) ? unit : `1 ${unit}`;
+                                            const unitPrice = (uom.price ?? (product.price * (uom.multiplier || 1))).toLocaleString();
+                                            return <>{label} ({uom.multiplier} {product.baseUnit || t('pos.pcs')}) (<span className="mr-0.5">{currencySymbol}</span>{unitPrice})</>;
+                                        })()}
                                     </DropdownMenuRadioItem>
                                 ))}
                             </DropdownMenuRadioGroup>

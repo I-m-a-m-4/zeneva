@@ -725,7 +725,11 @@ export default function ReportsDashboard() {
 
         for (const e of realizedExpenses) {
             const amt = Number(e.amount) || 0;
-            const isProfit = (e as any).deductionSource === 'net_profit';
+            const source = (e as any).deductionSource;
+            // Excluded outflows (capital assets, owner drawings, stock procurement) never deduct from profit or revenue
+            if (source === 'excluded') continue;
+
+            const isProfit = source === 'net_profit';
             if (isPurchaseExpense(e)) {
                 if (isProfit) purchasesFromProfit += amt;
                 else totalPurchases += amt;
@@ -736,20 +740,19 @@ export default function ReportsDashboard() {
         }
 
         const grossSalesRevenue = totalRevenue;
-        // In retail trading, supplier inventory purchases paid from operational revenue subtract directly from Gross Sales Revenue to determine Net Revenue.
-        const netRevenue = Math.max(0, grossSalesRevenue - totalPurchases);
-        // Cost of Goods Sold is unit costs of sold inventory items when supplier purchases are not recorded.
-        // When supplier purchases are recorded and paid from revenue, they already account for inventory acquisition cost.
-        const effectiveCost = totalPurchases > 0 ? 0 : receiptCost;
-        const grossProfit = totalPurchases > 0 ? netRevenue : Math.max(0, netRevenue - effectiveCost);
+        // Sales Revenue is the top-line turnover from customers. Operating expenses and purchases never reduce sales revenue.
+        const netRevenue = grossSalesRevenue;
+        // Cost of Goods Sold is unit costs of sold inventory items
+        const cogs = receiptCost;
+        const grossProfit = Math.max(0, netRevenue - cogs);
         const operatingProfit = grossProfit - totalOperatingExpenses;
         const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
         const totalProfit = operatingProfit - totalProfitReinvested;
 
         return {
-            totalRevenue: netRevenue,
+            totalRevenue: grossSalesRevenue,
             grossRevenue: grossSalesRevenue,
-            netRevenue,
+            netRevenue: grossSalesRevenue,
             totalSales,
             averageOrderValue,
             inventoryValue,

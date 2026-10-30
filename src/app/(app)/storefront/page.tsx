@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, Eye, Palette, Upload, Search, Package, Check, Twitter, Instagram, Facebook, Phone, Trash2, RefreshCcw, Banknote, CreditCard, ChevronRight, ChevronLeft, SlidersHorizontal, Share2, MapPin, Clock, Mail, ChevronDown, Shirt, Sparkles } from 'lucide-react';
+import { Loader2, Copy, Eye, Palette, Upload, Search, Package, Check, Twitter, Instagram, Facebook, Phone, Trash2, RefreshCcw, Banknote, CreditCard, ChevronRight, ChevronLeft, SlidersHorizontal, Share2, MapPin, Clock, Mail, ChevronDown, Shirt, Sparkles, MessageSquare } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import StorefrontChatManager from '@/components/store/storefront-chat-manager';
+import StoreChatWidget from '@/components/store/store-chat-widget';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { usePOS } from '@/context/pos-context';
 import { useToast } from '@/hooks/use-toast';
@@ -211,6 +214,15 @@ function StorefrontPreview({ settings, bannerPreview, business }: { settings: an
 
 
             <StoreFooter business={{ ...business, settings: { ...business?.settings, publicStore: settings } }} />
+            {business?.id && (
+                <div className="relative">
+                    <StoreChatWidget
+                        businessId={business.id}
+                        businessName={business.name || 'Store'}
+                        primaryColor={settings?.primaryColor}
+                    />
+                </div>
+            )}
         </div>
     )
 }
@@ -605,7 +617,21 @@ function StorefrontCustomizationPage() {
 
     return (
         <div className="space-y-8">
-            <PageTitle title="Storefront Customization" subtitle="Customize the look and feel of your public online store." />
+            <PageTitle title="Digital Storefront & Customer Hub" subtitle="Customize your public online store, manage live customer chat inquiries, and check stock in real-time." />
+
+            <Tabs defaultValue="customization" className="w-full space-y-6">
+                <TabsList className="bg-slate-100 p-1 rounded-xl h-auto flex flex-wrap gap-1">
+                    <TabsTrigger value="customization" className="gap-2 px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                        <SlidersHorizontal className="h-4 w-4" />
+                        <span>Storefront Customization</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="chats" className="gap-2 px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                        <MessageSquare className="h-4 w-4 text-orange-600" />
+                        <span>Customer Chats & Inquiries</span>
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="customization" className="space-y-6">
 
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] xl:grid-cols-[450px_1fr] gap-8 items-start">
                 <div className="lg:sticky lg:top-6 space-y-6">
@@ -832,6 +858,12 @@ function StorefrontCustomizationPage() {
                     </Card>
                 </div>
             </div>
+
+            </TabsContent>
+            <TabsContent value="chats">
+                <StorefrontChatManager />
+            </TabsContent>
+            </Tabs>
 
             <Dialog open={isBankModalOpen} onOpenChange={setIsBankModalOpen}>
                 <DialogContent>

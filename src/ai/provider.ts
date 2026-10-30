@@ -18,13 +18,13 @@ export const AI_CONFIG = {
   groq: {
     name: 'Groq',
     defaultChatModel: 'openai/gpt-oss-120b',
-    defaultVisionModel: 'openai/gpt-oss-20b',
+    defaultVisionModel: 'llama-3.2-11b-vision-preview',
     pricingUrl: 'https://groq.com/pricing',
   },
   gemini: {
     name: 'Google Gemini',
     defaultChatModel: 'gemini-3.6-flash',
-    defaultVisionModel: 'gemini-1.5-flash-latest',
+    defaultVisionModel: 'gemini-flash-latest',
     pricingUrl: 'https://ai.google.dev/gemini-api/docs/pricing',
   },
 } as const;
@@ -97,14 +97,19 @@ export function getChatModel(): any {
  * Return the active vision model (for image counting, shelf audits).
  */
 export function getVisionModel(): any {
+  // Multimodal Vision preference:
+  // If Gemini key is available, use Gemini for high-accuracy vision analysis
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
   const provider = getActiveAIProvider();
-  if (provider === 'gemini') {
+
+  if (provider === 'gemini' || hasGemini) {
     const modelName = process.env.GEMINI_VISION_MODEL || AI_CONFIG.gemini.defaultVisionModel;
     const gClient = createGoogleGenerativeAI({
       apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '',
     });
     return gClient(modelName) as any;
   }
+
   const modelName = process.env.GROQ_VISION_MODEL || AI_CONFIG.groq.defaultVisionModel;
   const gClient = createGroq({
     apiKey: process.env.GROQ_API_KEY || '',

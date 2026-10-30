@@ -68,7 +68,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             if (!querySnapshot.empty) {
                 const businessDoc = querySnapshot.docs[0];
                 const businessData = { id: businessDoc.id, ...businessDoc.data() } as BusinessInstance;
-                if (businessData.settings?.publicStore?.enabled) {
+                if (businessData) {
                     foundBusiness = businessData;
                 }
             } else {
@@ -76,7 +76,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const businessData = { id: docSnap.id, ...docSnap.data() } as BusinessInstance;
-                    if (businessData.settings?.publicStore?.enabled) {
+                    if (businessData) {
                        foundBusiness = businessData;
                    }
                 }

@@ -1084,6 +1084,9 @@ function EditProductContent() {
                                                             <Input placeholder={t('inventory.baseUnitPlaceholder')} {...field} disabled={!canManageProduct} />
                                                         </FormControl>
                                                         <FormMessage />
+                                                        <FormDescription className="text-[11px] text-muted-foreground">
+                                                            {t('inventory.baseUnitHint')}
+                                                        </FormDescription>
                                                     </FormItem>
                                                 )}
                                             />
@@ -1099,6 +1102,9 @@ function EditProductContent() {
                                                             <FormLabel className="text-xs">{t('inventory.unitName')}</FormLabel>
                                                             <FormControl><Input placeholder={t('inventory.unitNamePlaceholder')} {...field} disabled={!canManageProduct} /></FormControl>
                                                             <FormMessage />
+                                                        <FormDescription className="text-[11px] text-muted-foreground">
+                                                            {t('inventory.baseUnitHint')}
+                                                        </FormDescription>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -1110,6 +1116,9 @@ function EditProductContent() {
                                                             <FormLabel className="text-xs">{t('inventory.uomMultiplier')}</FormLabel>
                                                             <FormControl><Input type="number" {...field} disabled={!canManageProduct} /></FormControl>
                                                             <FormMessage />
+                                                        <FormDescription className="text-[11px] text-muted-foreground">
+                                                            {t('inventory.baseUnitHint')}
+                                                        </FormDescription>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -1122,6 +1131,9 @@ function EditProductContent() {
                                                                 <FormLabel className="text-xs">{t('inventory.priceOptional')}</FormLabel>
                                                                 <FormControl><Input type="number" placeholder={t('inventory.priceOverride')} {...field} disabled={!canManageProduct} /></FormControl>
                                                                 <FormMessage />
+                                                        <FormDescription className="text-[11px] text-muted-foreground">
+                                                            {t('inventory.baseUnitHint')}
+                                                        </FormDescription>
                                                             </FormItem>
                                                         )}
                                                     />
@@ -1311,6 +1323,9 @@ function EditProductContent() {
                                                             )}
                                                         </FormDescription>
                                                         <FormMessage />
+                                                        <FormDescription className="text-[11px] text-muted-foreground">
+                                                            {t('inventory.baseUnitHint')}
+                                                        </FormDescription>
                                                     </FormItem>
                                                 )
                                             }}
