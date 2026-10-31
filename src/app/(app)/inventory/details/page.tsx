@@ -375,11 +375,51 @@ function EditProductContent() {
         };
     }, [business?.id, firestore, product?.id, isProductLoading]);
     
+    const pendingTxLogs = React.useMemo(() => {
+        if (!queuedActions || !product?.id) return [];
+        return queuedActions
+            .filter(a => {
+                if (a.action.type === 'add-inventory-transaction') {
+                    return a.action.payload?.productId === product.id;
+                }
+                if (a.action.type === 'update-product') {
+                    return a.action.payload?.productId === product.id && a.action.payload?.values?.stock !== undefined;
+                }
+                return false;
+            })
+            .map(a => {
+                if (a.action.type === 'add-inventory-transaction') {
+                    const p = a.action.payload;
+                    return {
+                        id: `pending-${a.id}`,
+                        businessId: p.businessId || business?.id,
+                        productId: p.productId,
+                        type: p.type || 'in',
+                        quantity: Number(p.quantity) || 0,
+                        date: new Date(a.createdAt || Date.now()),
+                        notes: p.notes || 'Pending Restock Movement',
+                        createdBy: p.createdBy || currentUserProfile?.name || 'Local User',
+                        _isPending: true,
+                    };
+                }
+                const p = a.action.payload;
+                return {
+                    id: `pending-${a.id}`,
+                    businessId: business?.id,
+                    productId: p.productId,
+                    type: 'adjustment',
+                    quantity: Number(p.values.stock) || 0,
+                    closingStock: Number(p.values.stock) || 0,
+                    date: new Date(a.createdAt || Date.now()),
+                    notes: a.description || 'Pending Product Update',
+                    createdBy: currentUserProfile?.name || 'Local User',
+                    _isPending: true,
+                };
+            });
+    }, [queuedActions, product?.id, business?.id, currentUserProfile?.name]);
+
     const combinedLogs = React.useMemo(() => {
-        // We'll skip pending actions for inventory transactions to keep it simple,
-        // or just rely on local state if needed. Let's just return stockLogs for now,
-        // since inventory_transactions are server-authoritative.
-        const all = [...stockLogs];
+        const all = [...pendingTxLogs, ...stockLogs];
         const sorted = all.sort((a, b) => {
             const getMs = (d: any): number => {
                 if (!d) return 0;
@@ -1893,6 +1933,11 @@ function EditProductContent() {
                                                                 <span className="text-xs font-medium capitalize">
                                                                     {tx.type === 'in' ? 'Stock In' : tx.type === 'out' ? 'Stock Out' : tx.type === 'return' ? 'Return' : 'Adjustment'}
                                                                 </span>
+                                                                {tx._isPending && (
+                                                                    <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 text-[9px] py-0 px-1.5 h-4">
+                                                                        Syncing...
+                                                                    </Badge>
+                                                                )}
                                                             </div>
                                                             {tx.notes && (
                                                                 <span className="text-[10px] text-muted-foreground">{tx.notes}</span>
@@ -1943,7 +1988,7 @@ function EditProductContent() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right text-[10px] text-muted-foreground px-4">
-                                                        {tx.date ? formatDistanceToNow(tx.date.toDate(), { addSuffix: true }) : t('inventory.justNow')}
+                                                        {tx.date ? formatDistanceToNow(typeof tx.date?.toDate === 'function' ? tx.date.toDate() : (tx.date instanceof Date ? tx.date : new Date(tx.date)), { addSuffix: true }) : t('inventory.justNow')}
                                                     </TableCell>
                                                 </TableRow>
                                             );
