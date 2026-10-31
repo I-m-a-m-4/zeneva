@@ -15,13 +15,19 @@ import { useI18n } from '@/context/i18n-context';
 
 interface DateRangePickerProps extends React.HTMLAttributes<HTMLDivElement> {
   date: DateRange | undefined;
-  onDateChange: (date: DateRange | undefined) => void;
+  onDateChange?: (date: DateRange | undefined) => void;
+  setDate?: (date: DateRange | undefined) => void;
 }
 
-export function DateRangePicker({ className, date, onDateChange }: DateRangePickerProps) {
+export function DateRangePicker({ className, date, onDateChange, setDate }: DateRangePickerProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     const { business } = usePOS();
     const { t } = useI18n();
+
+    const triggerDateChange = React.useCallback((newDate: DateRange | undefined) => {
+        if (onDateChange) onDateChange(newDate);
+        else if (setDate) setDate(newDate);
+    }, [onDateChange, setDate]);
 
     const presets = React.useMemo(() => {
         const basePresets = [
@@ -64,7 +70,7 @@ export function DateRangePicker({ className, date, onDateChange }: DateRangePick
     };
 
     const handlePresetClick = (range: DateRange) => {
-        onDateChange(range);
+        triggerDateChange(range);
         setIsOpen(false);
     };
 
@@ -103,7 +109,7 @@ export function DateRangePicker({ className, date, onDateChange }: DateRangePick
                         defaultMonth={date?.from}
                         selected={date}
                         onSelect={(range) => {
-                            onDateChange(range);
+                            triggerDateChange(range);
                             if (range?.from && range?.to) {
                                 setIsOpen(false);
                             }

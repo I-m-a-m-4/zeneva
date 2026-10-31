@@ -23,9 +23,13 @@ import {
   Banknote,
   ArrowRightLeft,
   ShieldCheck,
-  Printer
+  Printer,
+  Copy,
+  Share2,
+  ExternalLink,
+  Sparkles
 } from 'lucide-react';
-import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { FeatureGateUpgradeCard } from '@/components/shared/feature-gate';
 import { useFirestore } from '@/firebase';
 import { safeToDate, cn } from '@/lib/utils';
@@ -34,6 +38,7 @@ import { DateRangePicker } from '@/components/reports/date-range-picker';
 import type { DateRange } from 'react-day-picker';
 import { startOfDay, endOfDay } from 'date-fns';
 import { NOTIFICATION_FETCH_LIMIT } from '@/lib/lifecycle-notifications';
+import type { Receipt } from '@/types';
 
 interface TerminalAlert {
   id: string;
@@ -92,7 +97,7 @@ const MOCK_STARTER_ALERTS: TerminalAlert[] = [
 ];
 
 export default function TerminalAlertsPage() {
-  const { currentUserProfile, currencySymbol, business } = usePOS();
+  const { currentUserProfile, currencySymbol, business, receipts, fetchReceiptsInRange } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -101,65 +106,102 @@ export default function TerminalAlertsPage() {
   const [soundEnabled, setSoundEnabled] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isMounted, setIsMounted] = React.useState(false);
-  
+  const [copiedAccount, setCopiedAccount] = React.useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
-  
-  // Daily Stats State
-  const [dailyCash, setDailyCash] = React.useState(0);
-  const [dailyTransferExpected, setDailyTransferExpected] = React.useState(0);
-  
+
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: startOfDay(new Date()),
     to: endOfDay(new Date())
   });
 
-  // Audio elements for alerts
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  // Synthesized Web Audio chime — 100% offline, zero-latency, no external audio downloads
+  const audioContextRef = React.useRef<AudioContext | null>(null);
 
-  React.useEffect(() => {
-    // Create audio context or sound element
-    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-84.wav');
+  const playTerminalChime = React.useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        audioContextRef.current = new AudioCtx();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+
+      // Primary crisp bell chime (880Hz -> 1320Hz ascending tone)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);
+      osc1.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+      gain1.gain.setValueAtTime(0.35, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.55);
+
+      // Shimmering second harmonic (1760Hz bell ping)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(1760, now + 0.08);
+      gain2.gain.setValueAtTime(0.22, now + 0.08);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.08);
+      osc2.stop(now + 0.75);
+    } catch (err) {
+      console.warn('Audio chime playback failed:', err);
+    }
   }, []);
 
-  // Fetch today's receipts for the summary cards
+  // Compute daily sales KPIs from POSContext receipts with backfill for date ranges
+  const [rangeReceipts, setRangeReceipts] = React.useState<Receipt[]>([]);
+
   React.useEffect(() => {
-    if (!currentUserProfile?.id || !firestore) return;
+    const fromDate = date?.from ? startOfDay(safeToDate(date.from)) : startOfDay(new Date());
+    const toDate = date?.to ? endOfDay(safeToDate(date.to)) : (date?.from ? endOfDay(safeToDate(date.from)) : endOfDay(new Date()));
 
-    const fromDate = date?.from || startOfDay(new Date());
-    const toDate = date?.to || endOfDay(new Date());
-
-    const q = query(
-      collection(firestore, `users/${currentUserProfile.id}/receipts`),
-      where('createdAt', '>=', fromDate),
-      where('createdAt', '<=', toDate)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let cash = 0;
-      let transferExpected = 0;
-      
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.paymentMethod === 'Cash') cash += (data.total || 0);
-        if (data.paymentMethod === 'Bank Transfer') transferExpected += (data.total || 0);
-      });
-
-      setDailyCash(cash);
-      setDailyTransferExpected(transferExpected);
+    // 1. Immediately filter in-memory synced receipts from POS context
+    const inMem = (receipts || []).filter(r => {
+      const d = safeToDate(r.createdAt);
+      return d >= fromDate && d <= toDate;
     });
+    setRangeReceipts(inMem);
 
-    return () => unsubscribe();
-  }, [currentUserProfile?.id, firestore, date]);
+    // 2. If range is historical or needs verification, query receipts for that range
+    if (fetchReceiptsInRange) {
+      let isCancelled = false;
+      fetchReceiptsInRange(fromDate, toDate).then(fetched => {
+        if (!isCancelled && fetched && fetched.length > 0) {
+          setRangeReceipts(fetched);
+        }
+      }).catch(err => {
+        console.warn('Receipts range query failed:', err);
+      });
+      return () => { isCancelled = true; };
+    }
+  }, [date, receipts, fetchReceiptsInRange]);
 
+  const { dailyCash, dailyTransferExpected } = React.useMemo(() => {
+    let cash = 0;
+    let transferExpected = 0;
+    for (const r of rangeReceipts) {
+      if (r.paymentMethod === 'Cash') cash += (r.total || 0);
+      if (r.paymentMethod === 'Bank Transfer') transferExpected += (r.total || 0);
+    }
+    return { dailyCash: cash, dailyTransferExpected: transferExpected };
+  }, [rangeReceipts]);
 
-  // `soundEnabled`, `isLoading` and `alerts.length` are read inside the snapshot
-  // handler below but must not be listener dependencies: every snapshot sets
-  // `alerts` and clears `isLoading`, so listing them re-ran this effect, which
-  // detached and re-attached the listener — and an attach bills every matching
-  // document again. Held in refs so the listener attaches once per user.
+  // Real-time listener for incoming terminal notifications
   const soundEnabledRef = React.useRef(soundEnabled);
   const isLoadingRef = React.useRef(isLoading);
   const alertCountRef = React.useRef(0);
@@ -177,12 +219,16 @@ export default function TerminalAlertsPage() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const newAlerts: TerminalAlert[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        // Filter for payment/sale related alerts
-        if (data.type === 'sale' || data.type === 'payment' || data.title?.toLowerCase().includes('payment') || data.title?.toLowerCase().includes('alert')) {
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (
+          data.type === 'sale' || 
+          data.type === 'payment' || 
+          data.title?.toLowerCase().includes('payment') || 
+          data.title?.toLowerCase().includes('alert')
+        ) {
           newAlerts.push({
-            id: doc.id,
+            id: docSnap.id,
             title: data.title || 'Payment Alert',
             body: data.body || '',
             createdAt: data.createdAt,
@@ -196,9 +242,9 @@ export default function TerminalAlertsPage() {
         }
       });
 
-      // Play alert sound if a new payment alert arrives and we aren't loading first batch
+      // Play alert chime when a new payment arrives (skip initial load)
       if (!isLoadingRef.current && newAlerts.length > alertCountRef.current && soundEnabledRef.current) {
-        audioRef.current?.play().catch(err => console.log('Audio playback prevented:', err));
+        playTerminalChime();
       }
 
       alertCountRef.current = newAlerts.length;
@@ -210,12 +256,12 @@ export default function TerminalAlertsPage() {
     });
 
     return () => unsubscribe();
-  }, [currentUserProfile?.id, firestore]);
+  }, [currentUserProfile?.id, firestore, playTerminalChime]);
 
-  // Compute total received via Terminal today
+  // Total received via Terminal within the selected date filter
   const dailyTransferReceived = React.useMemo(() => {
-    const start = date?.from || startOfDay(new Date());
-    const end = date?.to || endOfDay(new Date());
+    const start = date?.from ? startOfDay(safeToDate(date.from)) : startOfDay(new Date());
+    const end = date?.to ? endOfDay(safeToDate(date.to)) : (date?.from ? endOfDay(safeToDate(date.from)) : endOfDay(new Date()));
     return alerts
       .filter(a => {
         const d = a.createdAt ? safeToDate(a.createdAt) : new Date();
@@ -225,12 +271,12 @@ export default function TerminalAlertsPage() {
         const amount = a.amount || parseFloat(a.body.match(/[\d,]+(\.\d+)?/)?.[0]?.replace(/,/g, '') || '0');
         return sum + amount;
       }, 0);
-  }, [alerts]);
+  }, [alerts, date]);
 
   // Filter alerts by search query and date
   const filteredAlerts = React.useMemo(() => {
-    const start = date?.from || startOfDay(new Date());
-    const end = date?.to || endOfDay(new Date());
+    const start = date?.from ? startOfDay(safeToDate(date.from)) : startOfDay(new Date());
+    const end = date?.to ? endOfDay(safeToDate(date.to)) : (date?.from ? endOfDay(safeToDate(date.from)) : endOfDay(new Date()));
     return alerts.filter(alert => {
       const alertDate = alert.createdAt ? safeToDate(alert.createdAt) : new Date();
       const isWithinDate = alertDate >= start && alertDate <= end;
@@ -250,7 +296,28 @@ export default function TerminalAlertsPage() {
     }
   };
 
-  const hasLifetimeAccess = business?.accessLevel === 'lifetime';
+  const handleCopyAccountNumber = (accNumber: string) => {
+    navigator.clipboard.writeText(accNumber);
+    setCopiedAccount(true);
+    toast({
+      title: 'Account Number Copied',
+      description: `${accNumber} copied to clipboard.`
+    });
+    setTimeout(() => setCopiedAccount(false), 2500);
+  };
+
+  const handleCopyFullDetails = () => {
+    const bank = business?.settings?.terminalBankName || 'Wema Bank';
+    const num = business?.settings?.terminalAccountNumber || '';
+    const name = business?.settings?.terminalAccountName || `Zeneva - ${business?.name || 'Store'}`;
+    const text = `*Store Bank Transfer Details*\nBank: ${bank}\nAccount Number: ${num}\nAccount Name: ${name}`;
+    navigator.clipboard.writeText(text);
+    toast({
+      title: 'Transfer Details Copied',
+      description: 'Bank, account number, and name copied to clipboard for customer.'
+    });
+  };
+
   const hasAccess = hasProFeatures(business);
 
   const displayedAlerts = hasAccess ? filteredAlerts : MOCK_STARTER_ALERTS;
@@ -263,17 +330,24 @@ export default function TerminalAlertsPage() {
   return (
     <div className="relative flex flex-col gap-6 min-h-[70vh]">
       <div className={cn("flex flex-col gap-6 transition-all duration-500", !hasAccess && "blur-[3px] pointer-events-none select-none opacity-45")}>
-        <div className="flex items-center justify-between border-b pb-4">
-          <PageTitle title="Terminal Alerts" subtitle="Live stream of confirmed payments and transfers." />
-          <div className="flex items-center gap-3 print:hidden">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => window.print()}
-              className="flex items-center gap-2"
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+          <PageTitle title="Terminal Alerts" subtitle="Live stream of confirmed payments, instant chimes, and automatic POS reconciliation." />
+          <div className="flex items-center gap-2.5 print:hidden flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                playTerminalChime();
+                toast({
+                  title: 'Chime Sound Played',
+                  description: 'Terminal alert sound is active and loud.'
+                });
+              }}
+              className="flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              title="Test chime output"
             >
-              <Printer className="h-4 w-4 text-slate-500" />
-              Export PDF
+              <Volume2 className="h-4 w-4 text-emerald-600" />
+              Test Chime
             </Button>
             <Button 
               variant="outline" 
@@ -284,19 +358,141 @@ export default function TerminalAlertsPage() {
               {soundEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
               {soundEnabled ? "Sound On" : "Sound Muted"}
             </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => window.print()}
+              className="flex items-center gap-2"
+            >
+              <Printer className="h-4 w-4 text-slate-500" />
+              Export PDF
+            </Button>
           </div>
         </div>
 
+        {/* Dedicated Store Terminal Account Banner */}
+        {business?.settings?.terminalAccountNumber ? (
+          <Card className="border-emerald-200 bg-gradient-to-r from-emerald-50/90 via-emerald-50/40 to-white relative overflow-hidden shadow-sm">
+            <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-emerald-500" />
+            <CardContent className="p-5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 mt-0.5">
+                    <Building className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                        Store Dedicated Virtual Account
+                      </span>
+                      <Badge variant="outline" className="bg-emerald-100/90 text-emerald-800 border-emerald-300 text-[10px] py-0 font-medium">
+                        🟢 Active & Monitoring 24/7
+                      </Badge>
+                    </div>
+                    <div className="mt-1 flex items-baseline gap-3 flex-wrap">
+                      <span className="text-2xl sm:text-3xl font-mono font-bold tracking-tight text-slate-900 select-all">
+                        {business.settings.terminalAccountNumber}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-xs">
+                        {business.settings.terminalBankName || 'Wema Bank'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Beneficiary: <span className="font-semibold text-slate-900">{business.settings.terminalAccountName || `Zeneva - ${business.name}`}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start lg:self-center flex-wrap">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleCopyAccountNumber(business.settings.terminalAccountNumber!)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-medium"
+                  >
+                    {copiedAccount ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedAccount ? 'Copied!' : 'Copy Account'}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyFullDetails}
+                    className="gap-2 border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
+                  >
+                    <Share2 className="h-4 w-4 text-slate-600" />
+                    Copy Full Info
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="text-slate-600 hover:text-slate-900 gap-1.5"
+                  >
+                    <Link href="/settings">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Settings
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-emerald-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  Transfers to this account trigger real-time sound chimes and auto-verify POS sales.
+                </span>
+                <span className="text-slate-400">
+                  Daily automated payout settlement
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-amber-200 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-white p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 mt-0.5">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-slate-900 text-sm">Activate Your Store Virtual Terminal</h4>
+                    <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-[10px]">
+                      Setup Required
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1 max-w-xl leading-relaxed">
+                    Provide customers with a dedicated store account number for zero-friction bank transfers. Confirmed payments chime aloud automatically and reconcile directly into your POS.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                asChild
+                className="bg-primary hover:bg-primary/90 text-white shrink-0 self-start sm:self-center gap-1.5"
+              >
+                <Link href="/settings">
+                  Configure in Settings
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Daily Sales Summary Header */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-slate-50 border-slate-200">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium text-slate-500">Today's Cash Sales</CardTitle>
+              <CardTitle className="text-sm font-medium text-slate-500">Cash in Drawer</CardTitle>
               <Banknote className="h-4 w-4 text-slate-400" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900">{currencySymbol}{displayedCash.toLocaleString()}</div>
-              <p className="text-xs text-slate-500 mt-1">Total physical cash expected in drawer</p>
+              <p className="text-xs text-slate-500 mt-1">Physical cash recorded in selected period</p>
             </CardContent>
           </Card>
 
@@ -307,136 +503,138 @@ export default function TerminalAlertsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-900">{currencySymbol}{displayedTransferExpected.toLocaleString()}</div>
-              <p className="text-xs text-blue-600/70 mt-1">Total transfers processed via POS</p>
+              <p className="text-xs text-blue-600/70 mt-1">Total transfers processed via POS checkout</p>
             </CardContent>
           </Card>
 
           <Card className="bg-emerald-50 border-emerald-200">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-medium text-emerald-600">Verified Transfers</CardTitle>
+              <CardTitle className="text-sm font-medium text-emerald-600">Verified Terminal Transfers</CardTitle>
               <ShieldCheck className="h-4 w-4 text-emerald-400" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-emerald-900">{currencySymbol}{displayedTransferReceived.toLocaleString()}</div>
-              <p className="text-xs text-emerald-600/70 mt-1">Confirmed landing in terminal</p>
+              <p className="text-xs text-emerald-600/70 mt-1">Confirmed landing directly in terminal</p>
             </CardContent>
           </Card>
         </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-4 justify-between max-w-full print:hidden">
-        <div className="relative flex-1 w-full max-w-md">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by amount, bank, or transaction reference..." 
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <DateRangePicker
-            date={date}
-            setDate={setDate}
-          />
-        </div>
-      </div>
-
-      <div className="flex-grow flex flex-col min-h-0">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <span className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-            <span className="text-sm text-muted-foreground font-medium">Connecting to live Terminal feed...</span>
+        {/* Search & Filters */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 justify-between max-w-full print:hidden">
+          <div className="relative flex-1 w-full max-w-md">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by amount, bank, or transaction reference..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        ) : displayedAlerts.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed">
-            <Bell className="h-16 w-16 text-muted-foreground/30 mb-4 animate-bounce" />
-            <CardTitle className="text-lg font-semibold mb-2">No Terminal Alerts Yet</CardTitle>
-            <CardDescription className="max-w-sm">
-              All confirmed payments made to your Zeneva Terminal account will appear here in real-time with sound alerts.
-            </CardDescription>
-          </Card>
-        ) : (
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Destination Bank</TableHead>
-                    <TableHead>Reference ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right print:hidden">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {displayedAlerts.map((alert) => {
-                    const alertDate = alert.createdAt ? safeToDate(alert.createdAt) : new Date();
-                    const amountText = alert.amount?.toLocaleString() || alert.body.match(/₦[\d,]+/)?.[0].replace('₦', '') || 'Confirmed';
-                    
-                    return (
-                      <TableRow key={alert.id}>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1.5">
-                            <TrendingUp className="h-3 w-3" />
-                            {alertDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-[250px]">
-                          <div className="truncate text-xs text-slate-500" title={alert.body}>
-                            <span className="font-semibold text-slate-900 block truncate text-sm">{alert.title}</span>
-                            {alert.body}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold text-slate-900 whitespace-nowrap">
-                          {currencySymbol}{amountText}
-                        </TableCell>
-                        <TableCell>
-                          {alert.bankName ? (
-                            <span className="flex items-center gap-1.5 text-slate-600 whitespace-nowrap">
-                              <Building className="h-3.5 w-3.5 text-slate-400" />
-                              {alert.bankName}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-slate-500 whitespace-nowrap">
-                          {alert.reference || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200">
-                            <CheckCircle2 className="h-3 w-3 mr-1" /> Success
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right print:hidden">
-                          <div className="flex justify-end items-center gap-2">
-                            <Button variant="ghost" size="icon" asChild title="Trace Receipt">
-                              <Link href={`/receipts?search=${alert.reference || alert.id}`}>
-                                <Eye className="h-4 w-4 text-slate-500" />
-                              </Link>
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                              onClick={() => handleDeleteAlert(alert.id)}
-                              title="Delete Alert"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+          <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+            <DateRangePicker
+              date={date}
+              onDateChange={setDate}
+            />
+          </div>
+        </div>
+
+        {/* Live Feed Table */}
+        <div className="flex-grow flex flex-col min-h-0">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <span className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+              <span className="text-sm text-muted-foreground font-medium">Connecting to live Terminal feed...</span>
             </div>
-          </Card>
-        )}
-      </div>
+          ) : displayedAlerts.length === 0 ? (
+            <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed">
+              <Bell className="h-16 w-16 text-muted-foreground/30 mb-4 animate-bounce" />
+              <CardTitle className="text-lg font-semibold mb-2">No Terminal Alerts Yet</CardTitle>
+              <CardDescription className="max-w-sm">
+                All confirmed payments made to your Zeneva Terminal account will appear here in real-time with sound alerts.
+              </CardDescription>
+            </Card>
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Details</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Destination Bank</TableHead>
+                      <TableHead>Reference ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right print:hidden">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {displayedAlerts.map((alert) => {
+                      const alertDate = alert.createdAt ? safeToDate(alert.createdAt) : new Date();
+                      const amountText = alert.amount?.toLocaleString() || alert.body.match(/₦[\d,]+/)?.[0].replace('₦', '') || 'Confirmed';
+                      
+                      return (
+                        <TableRow key={alert.id}>
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1.5">
+                              <TrendingUp className="h-3 w-3" />
+                              {alertDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[250px]">
+                            <div className="truncate text-xs text-slate-500" title={alert.body}>
+                              <span className="font-semibold text-slate-900 block truncate text-sm">{alert.title}</span>
+                              {alert.body}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-semibold text-slate-900 whitespace-nowrap">
+                            {currencySymbol}{amountText}
+                          </TableCell>
+                          <TableCell>
+                            {alert.bankName ? (
+                              <span className="flex items-center gap-1.5 text-slate-600 whitespace-nowrap">
+                                <Building className="h-3.5 w-3.5 text-slate-400" />
+                                {alert.bankName}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-500 whitespace-nowrap">
+                            {alert.reference || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200">
+                              <CheckCircle2 className="h-3 w-3 mr-1" /> Success
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right print:hidden">
+                            <div className="flex justify-end items-center gap-2">
+                              <Button variant="ghost" size="icon" asChild title="Trace Receipt">
+                                <Link href={`/receipts?search=${alert.reference || alert.id}`}>
+                                  <Eye className="h-4 w-4 text-slate-500" />
+                                </Link>
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => handleDeleteAlert(alert.id)}
+                                title="Delete Alert"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          )}
+        </div>
       </div>
 
       {!hasAccess && (
