@@ -222,7 +222,6 @@ import {
     UserUsageDetailDialog,
     type UsageSession,
 } from '@/components/admin/user-detail/usage-insights';
-import ProductIntelligence from '@/components/admin/usage/product-intelligence';
 import NotificationEngagement from '@/components/admin/usage/notification-engagement';
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
@@ -2245,13 +2244,6 @@ function UsageAnalyticsTab({ users, businesses }: { users: UserProfile[]; busine
                     </div>
                 </CardContent>
             </Card>
-
-            {/*
-                Product intelligence: what the behaviour data says about the app
-                itself, rather than about who used it. Fed from the `users` array
-                this tab already holds, so the whole section costs no extra reads.
-            */}
-            <ProductIntelligence users={users} />
 
             {/*
                 Notification engagement: does the bell earn the interruption.
