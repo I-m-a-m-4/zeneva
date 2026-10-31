@@ -1,27 +1,29 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, ArrowUpCircle } from 'lucide-react';
+import { RefreshCw, ArrowUpCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * TauriUpdater Component
- * Automatically checks for updates and shows a restart button when ready.
+ * Silently downloads updates in the background and presents a smooth "Restart to Update"
+ * pill so users remain in control and are never interrupted during sales.
  */
 export function TauriUpdater() {
   const { toast } = useToast();
   const [updateReady, setUpdateReady] = useState(false);
   const [newVersion, setNewVersion] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const updateRef = useRef<any>(null);
 
   useEffect(() => {
-    // Only run in Tauri environment
+    // Only run in Tauri desktop environment
     if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return;
 
     const checkForUpdates = async () => {
@@ -40,24 +42,21 @@ export function TauriUpdater() {
 
         const update = await check();
         if (update) {
+          updateRef.current = update;
           setNewVersion(update.version);
           console.log(`Update available: ${update.version}`);
           
-          toast({
-            title: "Update Available",
-            description: `A new version (v${update.version}) is downloading in the background.`,
-            duration: 8000,
-          });
-
           setIsDownloading(true);
           let downloaded = 0;
           let totalSize: number | null = null;
 
-          await update.downloadAndInstall((event) => {
+          // SILENT BACKGROUND DOWNLOAD ONLY
+          // Does NOT execute or launch any installer while the user is actively working.
+          await update.download((event) => {
             switch (event.event) {
               case 'Started':
                 totalSize = event.data.contentLength ?? null;
-                console.log(`Started downloading ${totalSize} bytes`);
+                console.log(`Started downloading update package (${totalSize} bytes)`);
                 break;
               case 'Progress':
                 downloaded += event.data.chunkLength;
@@ -70,20 +69,21 @@ export function TauriUpdater() {
                 setIsDownloading(false);
                 setUpdateReady(true);
                 toast({
-                  title: "Update Downloaded",
-                  description: "Zeneva is ready to update. Click RESTART NOW to apply.",
+                  title: `Zeneva v${update.version} Ready`,
+                  description: "Update downloaded in background. Click 'Restart to Update' whenever you're ready.",
                   variant: "success",
+                  duration: 6000,
                 });
                 break;
             }
           });
 
-          // Ensure states update upon promise completion
+          // Ensure state flags are set when download completes
           setIsDownloading(false);
           setUpdateReady(true);
         }
       } catch (error) {
-        console.error('Failed to check for updates:', error);
+        console.error('Failed to check or download updates:', error);
         setIsDownloading(false);
       }
     };
@@ -94,11 +94,29 @@ export function TauriUpdater() {
   }, [toast]);
 
   const handleRestart = async () => {
+    if (isRestarting) return;
+    setIsRestarting(true);
     try {
+      toast({
+        title: "Applying Update...",
+        description: "Installing new version and restarting Zeneva...",
+      });
+
+      // Install downloaded payload when user explicitly triggers restart
+      if (updateRef.current && typeof updateRef.current.install === 'function') {
+        await updateRef.current.install();
+      }
+
       await relaunch();
     } catch (err) {
-      console.error('Failed to relaunch:', err);
-      window.location.reload(); // Fallback
+      console.error('Failed to install and relaunch:', err);
+      try {
+        await relaunch();
+      } catch {
+        window.location.reload();
+      }
+    } finally {
+      setIsRestarting(false);
     }
   };
 
@@ -111,18 +129,18 @@ export function TauriUpdater() {
           exit={{ y: -50, opacity: 0 }}
           className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] no-print"
         >
-          <div className="bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 border border-white/20 backdrop-blur-md">
+          <div className="bg-slate-900/95 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 border border-white/20 backdrop-blur-md">
             {isDownloading ? (
-               <div className="flex items-center gap-3 min-w-[200px]">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
+               <div className="flex items-center gap-3 min-w-[220px]">
+                  <RefreshCw className="h-4 w-4 animate-spin text-orange-400" />
                   <div className="flex-1 space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-slate-300">
                       <span>Downloading v{newVersion}</span>
-                      <span>{downloadProgress}%</span>
+                      <span className="text-orange-400">{downloadProgress}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
                       <motion.div 
-                        className="h-full bg-white" 
+                        className="h-full bg-orange-500" 
                         initial={{ width: 0 }}
                         animate={{ width: `${downloadProgress}%` }}
                       />
@@ -131,17 +149,20 @@ export function TauriUpdater() {
                </div>
             ) : (
               <>
-                <ArrowUpCircle className="h-5 w-5 animate-pulse" />
-                <span className="text-sm font-medium">New Version v{newVersion} Ready</span>
-                <div className="h-4 w-[1px] bg-white/30 mx-1" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <span className="text-xs font-semibold text-slate-100">
+                  Zeneva v{newVersion} Ready
+                </span>
+                <div className="h-4 w-[1px] bg-white/20 mx-1" />
                 <Button 
                   size="sm" 
-                  variant="secondary" 
+                  variant="default"
+                  disabled={isRestarting}
                   onClick={handleRestart}
-                  className="h-8 rounded-full px-4 font-bold text-xs"
+                  className="h-7 rounded-full px-3.5 font-bold text-xs bg-orange-600 hover:bg-orange-500 text-white shadow-sm"
                 >
-                  <RefreshCw className="mr-2 h-3 w-3" />
-                  RESTART NOW
+                  <RefreshCw className={`mr-1.5 h-3 w-3 ${isRestarting ? 'animate-spin' : ''}`} />
+                  {isRestarting ? 'Restarting...' : 'Restart Now'}
                 </Button>
               </>
             )}
