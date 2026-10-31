@@ -243,6 +243,14 @@ export default function LoginPage() {
         let description = t('auth.invalidCredentials');
         if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
           description = t('auth.invalidCredentialsDetailed');
+        } else if (error.code === 'auth/too-many-requests') {
+          description = 'Too many failed login attempts. Access is temporarily locked for security. Please tap "Forgot your password?" to reset it immediately, or try again in 15 minutes.';
+        } else if (error.code === 'auth/network-request-failed') {
+          description = 'Network connection failed. Please check your internet connection.';
+        } else if (error.code === 'auth/user-disabled') {
+          description = 'This account has been disabled. Please contact support.';
+        } else if (error?.message) {
+          description = error.message;
         }
         // The code, never the email or password. This endpoint is
         // unauthenticated, so nothing identifying may leave the device — and
