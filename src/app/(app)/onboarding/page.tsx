@@ -53,6 +53,7 @@ import {
   AlertTriangle,
   Award,
   LifeBuoy,
+  Phone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackLaunchStage } from '@/lib/launch-telemetry';
@@ -80,6 +81,7 @@ const onboardingSchemaBase = z.object({
   industry: z.string(),
   customIndustry: z.string().optional(),
   address: z.string().optional(),
+  phone: z.string().optional(),
   state: z.string(),
   country: z.string(),
   currency: z.string(),
@@ -707,6 +709,7 @@ export default function OnboardingPage() {
       industry: z.string().min(1, t.industryMin),
       customIndustry: z.string().optional(),
       address: z.string().optional(),
+      phone: z.string().optional(),
       state: z.string().min(2, t.stateMin),
       country: z.string().min(2, t.countryMin),
       currency: z.string().min(1, t.currencyMin),
@@ -724,7 +727,7 @@ export default function OnboardingPage() {
 
   const steps = React.useMemo(() => [
     { name: t.stepProfile, icon: Building, fields: ['organizationName', 'industry', 'customIndustry', 'language'] },
-    { name: t.stepLocation, icon: MapPin, fields: ['address', 'state', 'country'] },
+    { name: t.stepLocation, icon: MapPin, fields: ['address', 'phone', 'state', 'country'] },
     { name: t.stepCurrency, icon: Landmark, fields: ['currency'] },
   ], [t]);
 
@@ -758,6 +761,7 @@ export default function OnboardingPage() {
       organizationName: business?.name || '',
       industry: '',
       address: '',
+      phone: business?.phone || currentUserProfile?.phone || '',
       state: '',
       country: '',
       currency: 'NGN',
@@ -844,7 +848,9 @@ export default function OnboardingPage() {
 
       batch.update(businessDocRef, {
         name: data.organizationName,
-        address: data.address,
+        address: data.address || '',
+        phone: data.phone || '',
+        'settings.phone': data.phone || '',
         'settings.industry': finalIndustry,
         'settings.state': data.state,
         'settings.country': data.country,
@@ -869,6 +875,7 @@ export default function OnboardingPage() {
       batch.update(userDocRef, {
         surveyCompleted: true,
         businessName: data.organizationName,
+        phone: data.phone || '',
       });
 
       // 3. Create Welcome Notification
@@ -1390,6 +1397,24 @@ export default function OnboardingPage() {
                       <CardTitle className="flex items-center gap-3 text-lg sm:text-2xl font-bold"><MapPin className="text-primary h-5 w-5 sm:h-6 sm:w-6" /> {t.stepLocation}</CardTitle>
                       <FormField control={form.control} name="address" render={({ field }) => (
                         <FormItem className="space-y-2"><FormLabel className="text-xs sm:text-sm font-semibold">{t.address}</FormLabel><FormControl><Input className="h-10 sm:h-12 text-sm shadow-none" placeholder="Street Address" {...field} /></FormControl><FormMessage className="text-[11px]" /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="phone" render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <FormLabel className="text-xs sm:text-sm font-semibold flex items-center gap-1.5">
+                              <Phone className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                              WhatsApp / Phone Number
+                            </FormLabel>
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Optional</span>
+                          </div>
+                          <FormControl>
+                            <Input className="h-10 sm:h-12 text-sm shadow-none" placeholder="e.g. +1 555 123 4567 or +234 801 234 5678" {...field} />
+                          </FormControl>
+                          <p className="text-[11px] text-muted-foreground">
+                            Optional: For direct WhatsApp founder support, order routing, and receipt dispatch.
+                          </p>
+                          <FormMessage className="text-[11px]" />
+                        </FormItem>
                       )} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <FormField control={form.control} name="state" render={({ field }) => (
