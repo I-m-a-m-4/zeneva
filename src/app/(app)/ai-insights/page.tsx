@@ -547,11 +547,14 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
               toolCallId: `${assistantMsgId}-restock-sheet`,
               output: {
                 type: 'RESTOCK_SHEET',
+                id: `${assistantMsgId}-restock-sheet`,
+                proposalId: `${assistantMsgId}-restock-sheet`,
                 sheetTitle: data.sheetTitle || 'Inventory Restock Count',
                 items,
                 imageUrl: previewUrls[0],
                 imageUrls: previewUrls,
                 status: 'pending',
+                mode: 'add',
               },
             },
           ],
@@ -851,6 +854,35 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
     setProposalStatuses(prev => ({ ...prev, [proposalId]: 'REJECTED' }));
     trackFeature('ai_proposal_rejected');
   }, []);
+
+  const handleUpdateProposalOutput = useCallback((proposalId: string, updatedFields: any) => {
+    if (!proposalId) return;
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (!m.parts) return m;
+        let modified = false;
+        const newParts = m.parts.map((p: any) => {
+          const match =
+            p?.id === proposalId ||
+            p?.toolCallId === proposalId ||
+            p?.output?.id === proposalId ||
+            p?.output?.proposalId === proposalId;
+          if (match && p.output) {
+            modified = true;
+            return {
+              ...p,
+              output: {
+                ...p.output,
+                ...updatedFields,
+              },
+            };
+          }
+          return p;
+        });
+        return modified ? { ...m, parts: newParts } : m;
+      })
+    );
+  }, [setMessages]);
 
   const handlePick = useCallback((val: any) => {
     if (typeof val === 'string') {
@@ -1509,6 +1541,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                                     onApprove={handleApprove}
                                     onReject={handleReject}
                                     onPick={handlePick}
+                                    onUpdateOutput={handleUpdateProposalOutput}
                                   />
                                 )}
                                 {(output?.error || part.state === 'output-error') && (

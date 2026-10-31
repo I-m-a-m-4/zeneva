@@ -2267,7 +2267,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const processQueue = useCallback(async () => {
     const effectiveProfile = currentUserProfile || offlineProfile;
     if (isQueueProcessing || !isRealOnline || !firestore || !businessId || !effectiveProfile) return;
-    const pending = queuedActions.filter(a => a.status === 'pending');
+    const currentQueue = queuedActionsRef.current.length > 0 ? queuedActionsRef.current : queuedActions;
+    const pending = currentQueue.filter(a => a.status === 'pending');
     if (pending.length === 0) return;
     setIsQueueProcessing(true);
     
@@ -3023,6 +3024,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction).catch(console.error);
     
     setQueuedActions(prev => [...prev, newAction]);
+    queuedActionsRef.current = [...queuedActionsRef.current, newAction];
 
     // Advance referral qualification phase to 'products_added' for referred businesses
     if (action.type === 'add-product' && business?.referredBy && !business.referredBy.rewardClaimed && user) {

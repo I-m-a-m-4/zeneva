@@ -1654,11 +1654,12 @@ function PageActionCard({ result }: { result: any }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export function ToolResult({ output, onApprove, onReject, onPick }: {
+export function ToolResult({ output, onApprove, onReject, onPick, onUpdateOutput }: {
   output: any;
   onApprove: (proposalId: string, action: any) => void;
   onReject: (proposalId: string) => void;
   onPick?: (product: any) => void;
+  onUpdateOutput?: (proposalId: string, updated: any) => void;
 }) {
   if (!output || typeof output !== 'object') return null;
 
@@ -1673,7 +1674,15 @@ export function ToolResult({ output, onApprove, onReject, onPick }: {
 
   switch (output.type) {
     case 'RESTOCK_SHEET':
-      return <RestockSheetProposal {...output} />;
+      return (
+        <RestockSheetProposal
+          {...output}
+          proposalId={output.proposalId || output.id}
+          status={output.status}
+          mode={output.mode}
+          onUpdateOutput={onUpdateOutput ? (updated) => onUpdateOutput(output.proposalId || output.id, updated) : undefined}
+        />
+      );
     case 'PROPOSAL':
       return <ProposalCard result={output} onApprove={onApprove} onReject={onReject} />;
     case 'CHART':

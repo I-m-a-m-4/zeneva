@@ -16,6 +16,7 @@ import type { Product } from '@/types';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Maximize2 } from 'lucide-react';
 import { ImageLightboxModal } from '@/components/shared/image-lightbox-modal';
+import { trackFeature } from '@/lib/product-telemetry';
 
 export interface SheetRowItem {
   id: string;
@@ -40,13 +41,21 @@ export interface SheetRowItem {
 }
 
 export interface RestockSheetProposalProps {
+  proposalId?: string;
+  id?: string;
   sheetTitle?: string;
   items: SheetRowItem[];
   imageUrl?: string;
   imageUrls?: string[];
   status?: 'pending' | 'approved' | 'discarded';
+  mode?: 'add' | 'set';
   onApproveSuccess?: (approvedCount: number) => void;
   onDiscard?: () => void;
+  onUpdateOutput?: (updated: {
+    items: SheetRowItem[];
+    mode?: 'add' | 'set';
+    status?: 'pending' | 'approved' | 'discarded';
+  }) => void;
 }
 
 /**
@@ -134,18 +143,38 @@ function findBestCatalogMatch(
 }
 
 export const RestockSheetProposal = React.memo(function RestockSheetProposal({
+  proposalId,
+  id,
   sheetTitle = 'Inventory Restock Sheet',
   items: initialItems,
   imageUrl,
   imageUrls,
   status: initialStatus = 'pending',
+  mode: initialMode = 'add',
   onApproveSuccess,
   onDiscard,
+  onUpdateOutput,
 }: RestockSheetProposalProps) {
-  const { products, addToQueue, isReadOnly } = usePOS();
+  const { products, addToQueue, processQueue, isReadOnly, businessId, currentUserProfile } = usePOS();
   const { toast } = useToast();
 
+  const stableProposalId = proposalId || id || (imageUrl ? `vision_${imageUrl.slice(-32).replace(/[^a-zA-Z0-9]/g, '')}` : undefined);
+  const storageKey = stableProposalId ? `zeneva_restock_sheet_${stableProposalId}` : null;
+
+  // Hydrate persisted state from localStorage if available
+  const persistedState = React.useMemo(() => {
+    if (!storageKey || typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  }, [storageKey]);
+
   const [items, setItems] = React.useState<SheetRowItem[]>(() => {
+    if (persistedState?.items && Array.isArray(persistedState.items) && persistedState.items.length > 0) {
+      return persistedState.items;
+    }
     if (!products || products.length === 0) return initialItems;
     return initialItems.map((row) => {
       if (row.matchedProduct && row.matchedProduct.id) return row;
@@ -172,9 +201,39 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
     });
   });
 
-  const [status, setStatus] = React.useState<'pending' | 'approved' | 'discarded'>(initialStatus);
+  const [status, setStatus] = React.useState<'pending' | 'approved' | 'discarded'>(
+    persistedState?.status || initialStatus
+  );
   const [isApplying, setIsApplying] = React.useState(false);
-  const [mode, setMode] = React.useState<'add' | 'set'>('add'); // 'add' = add to current stock, 'set' = set exact stock
+  const [mode, setModeState] = React.useState<'add' | 'set'>(
+    persistedState?.mode || initialMode
+  );
+
+  const persistSnapshot = React.useCallback(
+    (newItems: SheetRowItem[], newMode: 'add' | 'set', newStatus: 'pending' | 'approved' | 'discarded') => {
+      if (storageKey && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            items: newItems,
+            mode: newMode,
+            status: newStatus,
+            updatedAt: Date.now(),
+          }));
+        } catch {}
+      }
+      onUpdateOutput?.({
+        items: newItems,
+        mode: newMode,
+        status: newStatus,
+      });
+    },
+    [storageKey, onUpdateOutput]
+  );
+
+  const setMode = (newMode: 'add' | 'set') => {
+    setModeState(newMode);
+    persistSnapshot(items, newMode, status);
+  };
   const [activeSearchRowId, setActiveSearchRowId] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterTab, setFilterTab] = React.useState<'all' | 'needs_match' | 'matched'>('all');
@@ -231,15 +290,18 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
 
   const handleQuantityChange = (id: string, newQty: number) => {
     if (status !== 'pending') return;
-    setItems((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, quantity: Math.max(0, newQty) } : row))
-    );
+    const cleanQty = Math.max(0, newQty);
+    setItems((prev) => {
+      const updated = prev.map((row) => (row.id === id ? { ...row, quantity: cleanQty } : row));
+      persistSnapshot(updated, mode, status);
+      return updated;
+    });
   };
 
   const handleSelectProduct = (rowId: string, product: Product | null) => {
     if (status !== 'pending') return;
-    setItems((prev) =>
-      prev.map((row) => {
+    setItems((prev) => {
+      const updated = prev.map((row) => {
         if (row.id !== rowId) return row;
         if (!product) {
           return { ...row, matchedProduct: null, matchStatus: 'unmatched', matchConfidence: 0 };
@@ -255,34 +317,44 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
             imageUrl: product.imageUrl || '',
             costPrice: product.costPrice ?? null,
           },
-          matchStatus: 'matched',
+          matchStatus: 'matched' as const,
           matchConfidence: 1,
         };
-      })
-    );
+      });
+      persistSnapshot(updated, mode, status);
+      return updated;
+    });
     setActiveSearchRowId(null);
     setSearchTerm('');
   };
 
   const handleRemoveRow = (id: string) => {
     if (status !== 'pending') return;
-    setItems((prev) => prev.filter((r) => r.id !== id));
+    setItems((prev) => {
+      const updated = prev.filter((r) => r.id !== id);
+      persistSnapshot(updated, mode, status);
+      return updated;
+    });
   };
 
   const handleAddBlankRow = () => {
     if (status !== 'pending') return;
     const newId = `manual-row-${Date.now()}`;
-    setItems((prev) => [
-      ...prev,
-      {
-        id: newId,
-        rawName: 'Manual Entry',
-        quantity: 1,
-        price: null,
-        matchedProduct: null,
-        matchStatus: 'unmatched',
-      },
-    ]);
+    setItems((prev) => {
+      const updated = [
+        ...prev,
+        {
+          id: newId,
+          rawName: 'Manual Entry',
+          quantity: 1,
+          price: null,
+          matchedProduct: null,
+          matchStatus: 'unmatched' as const,
+        },
+      ];
+      persistSnapshot(updated, mode, status);
+      return updated;
+    });
   };
 
   const handleApprove = async () => {
@@ -297,7 +369,7 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
       return;
     }
 
-    const validRows = items.filter((row) => row.matchedProduct && row.quantity > 0);
+    const validRows = items.filter((row) => row.matchedProduct && row.matchedProduct.id && row.quantity > 0);
     if (validRows.length === 0) {
       toast({
         title: 'No matched products',
@@ -311,30 +383,66 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
     try {
       let appliedCount = 0;
       for (const row of validRows) {
-        const prod = products?.find((p) => p.id === row.matchedProduct!.id) || row.matchedProduct!;
-        const currentStock = prod.stock ?? 0;
-        const newStock = mode === 'add' ? currentStock + row.quantity : row.quantity;
+        const targetId = String(row.matchedProduct!.id).trim();
+        if (!targetId) continue;
+        const prod = products?.find((p) => p.id === targetId) || row.matchedProduct!;
+        const currentStock = Number(prod.stock) || 0;
+        const qty = Math.max(0, Math.round(Number(row.quantity) || 0));
+        const newStock = mode === 'add' ? currentStock + qty : qty;
+
+        const updateValues: Record<string, any> = {
+          stock: Math.max(0, Math.round(newStock)),
+        };
+
+        if (typeof row.price === 'number' && !isNaN(row.price) && row.price > 0) {
+          updateValues.costPrice = row.price;
+        }
 
         addToQueue(
           {
             type: 'update-product',
             payload: {
-              productId: prod.id,
-              values: {
-                stock: newStock,
-                ...(row.price ? { costPrice: row.price } : {}),
-              },
+              productId: targetId,
+              values: updateValues,
             },
           },
-          `Zen AI Restock: ${prod.name} stock (${currentStock} → ${newStock})`
+          `Zen AI Restock: ${prod.name || row.rawName} stock (${currentStock} → ${newStock})`
         );
+
+        // Record stock movement transaction for audit history
+        if (businessId) {
+          addToQueue(
+            {
+              type: 'add-inventory-transaction',
+              payload: {
+                businessId,
+                productId: targetId,
+                productName: prod.name || row.rawName,
+                type: 'in',
+                quantity: qty,
+                notes: `Zen AI Restock Sheet: ${sheetTitle || 'Inventory Restock Count'}`,
+                createdBy: currentUserProfile?.name || 'Zen AI',
+              },
+            },
+            `Restock movement: ${prod.name || row.rawName} (+${qty})`
+          );
+        }
+
         appliedCount++;
       }
 
+      // Immediately trigger processing queue so the updates commit right away
+      if (processQueue) {
+        processQueue().catch(console.error);
+      }
+
       setStatus('approved');
+      persistSnapshot(items, mode, 'approved');
+      trackFeature('ai_proposal_approved');
+
       toast({
         title: 'Inventory updated successfully',
-        description: `Applied ${appliedCount} product updates to your catalog queue.`,
+        description: `Applied ${appliedCount} product updates to your catalog.`,
         variant: 'success',
       });
 
@@ -355,6 +463,8 @@ export const RestockSheetProposal = React.memo(function RestockSheetProposal({
 
   const handleReject = () => {
     setStatus('discarded');
+    persistSnapshot(items, mode, 'discarded');
+    trackFeature('ai_proposal_rejected');
     if (onDiscard) onDiscard();
   };
 
