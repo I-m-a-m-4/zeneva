@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
-  <Identity Name="Zeneva.ZenevaPOSInventoryApp" Version="3.4.8.0" Publisher="CN=FB9C471D-AB12-4486-AC75-1AA3579E4073" ProcessorArchitecture="x64" />
+  <Identity Name="Zeneva.ZenevaPOSInventoryApp" Version="3.5.2.0" Publisher="CN=FB9C471D-AB12-4486-AC75-1AA3579E4073" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>Zeneva POS &amp; Inventory App</DisplayName>
     <PublisherDisplayName>Bimex</PublisherDisplayName>
