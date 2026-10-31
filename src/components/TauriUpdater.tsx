@@ -26,6 +26,18 @@ export function TauriUpdater() {
 
     const checkForUpdates = async () => {
       try {
+        // If running inside Microsoft Store package container (WindowsApps),
+        // skip external EXE auto-updater to prevent installing a duplicate standalone app.
+        // Microsoft Store manages updates for Store installations through the Store app.
+        try {
+          const { resourceDir } = await import('@tauri-apps/api/path');
+          const res = await resourceDir();
+          if (res && /windowsapps/i.test(res)) {
+            console.log('Running inside Microsoft Store package (WindowsApps). Delegating update management to Store.');
+            return;
+          }
+        } catch {}
+
         const update = await check();
         if (update) {
           setNewVersion(update.version);
