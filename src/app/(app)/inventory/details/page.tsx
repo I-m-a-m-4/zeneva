@@ -379,38 +379,43 @@ function EditProductContent() {
         if (!queuedActions || !product?.id) return [];
         return queuedActions
             .filter(a => {
-                if (a.action.type === 'add-inventory-transaction') {
-                    return a.action.payload?.productId === product.id;
+                const actionType = (a as any).action?.type || (a as any).type;
+                const actionPayload = (a as any).action?.payload || (a as any).payload;
+                if (actionType === 'add-inventory-transaction') {
+                    return actionPayload?.productId === product.id;
                 }
-                if (a.action.type === 'update-product') {
-                    return a.action.payload?.productId === product.id && a.action.payload?.values?.stock !== undefined;
+                if (actionType === 'update-product') {
+                    return actionPayload?.productId === product.id && actionPayload?.values?.stock !== undefined;
                 }
                 return false;
             })
             .map(a => {
-                if (a.action.type === 'add-inventory-transaction') {
-                    const p = a.action.payload;
+                const actionType = (a as any).action?.type || (a as any).type;
+                const actionPayload = (a as any).action?.payload || (a as any).payload;
+                if (actionType === 'add-inventory-transaction') {
+                    const p = actionPayload || {};
                     return {
                         id: `pending-${a.id}`,
                         businessId: p.businessId || business?.id,
                         productId: p.productId,
                         type: p.type || 'in',
                         quantity: Number(p.quantity) || 0,
-                        date: new Date(a.createdAt || Date.now()),
+                        date: new Date((a as any).timestamp || (a as any).createdAt || Date.now()),
                         notes: p.notes || 'Pending Restock Movement',
                         createdBy: p.createdBy || currentUserProfile?.name || 'Local User',
                         _isPending: true,
                     };
                 }
-                const p = a.action.payload;
+                const p = actionPayload || {};
+                const stockVal = p.values ? p.values.stock : 0;
                 return {
                     id: `pending-${a.id}`,
                     businessId: business?.id,
                     productId: p.productId,
                     type: 'adjustment',
-                    quantity: Number(p.values.stock) || 0,
-                    closingStock: Number(p.values.stock) || 0,
-                    date: new Date(a.createdAt || Date.now()),
+                    quantity: Number(stockVal) || 0,
+                    closingStock: Number(stockVal) || 0,
+                    date: new Date((a as any).timestamp || (a as any).createdAt || Date.now()),
                     notes: a.description || 'Pending Product Update',
                     createdBy: currentUserProfile?.name || 'Local User',
                     _isPending: true,
