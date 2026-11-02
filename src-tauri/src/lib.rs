@@ -72,11 +72,17 @@ pub fn run() {
                     || url.contains("firebaseapp.com")
                     || url.contains("accounts.youtube.com");
 
-                let window = webview.window();
-                if is_auth_url {
-                    let _ = window.set_decorations(true);
-                } else if url.contains("localhost") || url.contains("tauri") {
-                    let _ = window.set_decorations(false);
+                #[cfg(desktop)]
+                {
+                    let window = webview.window();
+                    if is_auth_url {
+                        let _ = window.set_decorations(true);
+                    } else if url.contains("localhost") || url.contains("tauri") {
+                        let _ = window.set_decorations(false);
+                    }
+                }
+
+                if !is_auth_url && (url.contains("localhost") || url.contains("tauri")) {
                     if let Ok(mut last) = LAST_APP_URL.lock() {
                         *last = Some(url.to_string());
                     }
