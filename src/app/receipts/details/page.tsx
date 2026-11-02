@@ -296,10 +296,18 @@ function ReceiptContent() {
     <div className="flex flex-col items-center gap-6 py-4 min-h-screen">
       {user && (
         <div className="w-full max-w-2xl flex justify-start no-print">
-          <Button variant="ghost" asChild size="sm">
-            <Link href="/receipts">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to History
-            </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/receipts');
+              }
+            }}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
         </div>
       )}

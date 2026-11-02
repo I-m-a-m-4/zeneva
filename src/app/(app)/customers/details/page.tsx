@@ -491,7 +491,18 @@ function CustomerDetailContent() {
 
     return (
         <div className="space-y-6">
-            <Button variant="ghost" onClick={() => { NProgress.start(); router.push('/customers'); }} className="mb-4">
+            <Button
+                variant="ghost"
+                onClick={() => {
+                    NProgress.start();
+                    if (typeof window !== 'undefined' && window.history.length > 1) {
+                        router.back();
+                    } else {
+                        router.push('/customers');
+                    }
+                }}
+                className="mb-4"
+            >
                 <ArrowLeft className="mr-2 h-4 w-4" /> {t('customers.backToCustomers')}
             </Button>
 
