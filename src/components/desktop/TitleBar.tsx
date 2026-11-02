@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Minus, Square, Copy } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { X, Minus, Square, Copy, ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppConfig } from '@/lib/config';
 import { CachedImage } from '@/components/shared/cached-image';
 import { usePOS } from '@/context/pos-context';
 
 export function DesktopTitleBar() {
+  const router = useRouter();
   const { business } = usePOS();
   const [isTauri, setIsTauri] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -96,6 +98,37 @@ export function DesktopTitleBar() {
                <span className="text-[8px] font-semibold text-muted-foreground uppercase tracking-widest leading-none">Desktop v{AppConfig.version}</span>
                <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse"></div>
             </div>
+         </div>
+
+         {/* Navigation History Controls */}
+         <div 
+           className="flex items-center gap-1 ml-2 pl-2 border-l border-border/40"
+           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+         >
+           <button
+             onClick={() => {
+               if (typeof window !== 'undefined' && window.history.length > 1) {
+                 router.back();
+               }
+             }}
+             className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
+             title="Go Back"
+             aria-label="Go Back"
+           >
+             <ArrowLeft className="h-3.5 w-3.5" />
+           </button>
+           <button
+             onClick={() => {
+               if (typeof window !== 'undefined') {
+                 window.history.forward();
+               }
+             }}
+             className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
+             title="Go Forward"
+             aria-label="Go Forward"
+           >
+             <ArrowRight className="h-3.5 w-3.5" />
+           </button>
          </div>
       </div>
 
