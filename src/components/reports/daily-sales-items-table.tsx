@@ -157,7 +157,8 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
             imageUrl: product?.imageUrl || undefined,
             categoryType: product?.categoryType || 'product',
             category: product?.category || undefined,
-            customerName: r.customer?.name || undefined
+            customerName: r.customer?.name || undefined,
+            customerId: r.customerId || r.customer?.id || undefined
           });
         });
       }
@@ -190,6 +191,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   const customerSummary = React.useMemo(() => {
     const map = new Map<string, {
       customerName: string;
+      customerId?: string;
       receiptsCount: number;
       totalItemsCount: number;
       totalRevenue: number;
@@ -199,14 +201,17 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
 
     dailyReceipts.forEach(r => {
       const name = r.customerName;
+      const cId = r.customerId || r.customer?.id;
       const existing = map.get(name) || {
         customerName: name,
+        customerId: cId,
         receiptsCount: 0,
         totalItemsCount: 0,
         totalRevenue: 0,
         paymentMethods: new Set<string>(),
         lastTransactionTime: r.createdAtDate,
       };
+      if (!existing.customerId && cId) existing.customerId = cId;
 
       existing.receiptsCount += 1;
       existing.totalItemsCount += r.itemCount;
@@ -1003,16 +1008,24 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                       {currencySymbol}{item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="py-2">
-                      <Link href={`/receipts/details?id=${item.receiptId}`} className="group flex flex-col w-max">
-                        <span className="text-xs font-mono bg-muted group-hover:bg-primary/10 group-hover:text-primary py-0.5 px-1.5 rounded w-max text-foreground font-medium flex items-center gap-1 border border-border transition-colors">
-                          <FileText className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                          {item.receiptNumber}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground mt-0.5 group-hover:text-foreground transition-colors">
+                      <div className="flex flex-col w-max">
+                        <Link href={`/receipts/details?id=${item.receiptId}`} className="group w-max">
+                          <span className="text-xs font-mono bg-muted group-hover:bg-primary/10 group-hover:text-primary py-0.5 px-1.5 rounded w-max text-foreground font-medium flex items-center gap-1 border border-border transition-colors">
+                            <FileText className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                            {item.receiptNumber}
+                          </span>
+                        </Link>
+                        <span className="text-[10px] text-muted-foreground mt-0.5">
                           {item.paymentMethod}
-                          {item.customerName && ` • ${item.customerName}`}
+                          {item.customerName && (
+                            item.customerId ? (
+                              <> • <Link href={`/customers/details?id=${encodeURIComponent(item.customerId)}`} className="hover:underline hover:text-primary transition-colors font-medium text-foreground/80">{item.customerName}</Link></>
+                            ) : (
+                              ` • ${item.customerName}`
+                            )
+                          )}
                         </span>
-                      </Link>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground py-2 pr-6 w-[180px] min-w-[180px] whitespace-nowrap">
                       <div className="flex flex-col items-end">
@@ -1059,7 +1072,13 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                         <div className="h-8 w-8 rounded-full bg-orange-500/10 text-orange-600 flex items-center justify-center font-bold text-xs border border-orange-500/20">
                           <User className="h-4 w-4" />
                         </div>
-                        <span className="text-sm font-semibold">{cust.customerName}</span>
+                        {cust.customerId ? (
+                          <Link href={`/customers/details?id=${encodeURIComponent(cust.customerId)}`} className="text-sm font-semibold hover:underline hover:text-primary transition-colors">
+                            {cust.customerName}
+                          </Link>
+                        ) : (
+                          <span className="text-sm font-semibold">{cust.customerName}</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center font-semibold py-3 text-sm">
@@ -1130,7 +1149,13 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
                       </Link>
                     </TableCell>
                     <TableCell className="py-3 font-semibold text-sm text-foreground">
-                      {rec.customerName}
+                      {(rec.customerId || rec.customer?.id) ? (
+                        <Link href={`/customers/details?id=${encodeURIComponent(rec.customerId || rec.customer?.id)}`} className="hover:underline hover:text-primary transition-colors">
+                          {rec.customerName}
+                        </Link>
+                      ) : (
+                        rec.customerName
+                      )}
                     </TableCell>
                     <TableCell className="text-center font-bold py-3 text-sm">
                       {rec.itemCount} items

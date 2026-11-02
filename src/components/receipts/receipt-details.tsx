@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "../ui/separator";
 import type { BusinessInstance } from "@/types";
 import { safeToDate } from "@/lib/utils";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 
 interface ReceiptDetailsProps {
     receipt: Receipt;
@@ -25,6 +27,13 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
     ({ receipt, business, currencySymbol = '₦', isInvoice = false, amountReceived, showAdminDetails = false }, ref) => {
         const businessName = business?.name || 'Your Business';
         const businessAddress = business?.address || '';
+        const custId = receipt.customerId || receipt.customer?.id;
+
+        // Admin Profit / COGS calculations
+        const totalCost = (receipt.items || []).reduce((sum, it) => sum + ((it.costPrice || 0) * it.quantity), 0);
+        const hasCostData = (receipt.items || []).some(it => typeof it.costPrice === 'number' && it.costPrice > 0);
+        const basketProfit = receipt.total - totalCost;
+        const marginPct = receipt.total > 0 && hasCostData ? Math.round((basketProfit / receipt.total) * 100) : null;
 
         // If it's an invoice, we use a slightly more structured layout but keep it simple as requested
         if (isInvoice) {
@@ -51,7 +60,18 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                         <div className="grid grid-cols-2 gap-8 mb-8">
                             <div>
                                 <h3 className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Billed To:</h3>
-                                <p className="font-semibold text-sm">{receipt.customer?.name || 'Walk-in Customer'}</p>
+                                {custId ? (
+                                    <Link
+                                        href={`/customers/details?id=${encodeURIComponent(custId)}`}
+                                        className="font-semibold text-sm hover:underline hover:text-primary transition-colors inline-flex items-center gap-1 group/cust print:text-inherit print:no-underline print:pointer-events-none"
+                                        title="View Customer Profile & Debt Ledger"
+                                    >
+                                        <span>{receipt.customer?.name || 'Walk-in Customer'}</span>
+                                        <ExternalLink className="h-3 w-3 opacity-0 group-hover/cust:opacity-60 transition-opacity no-print shrink-0" />
+                                    </Link>
+                                ) : (
+                                    <p className="font-semibold text-sm">{receipt.customer?.name || 'Walk-in Customer'}</p>
+                                )}
                                 <p className="text-[11px] text-muted-foreground">{receipt.customer?.email || ''}</p>
                             </div>
                             <div className="text-right">
@@ -74,7 +94,23 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                                 {receipt.items.map((item, index) => (
                                     <tr key={item.productId + index}>
                                         <td className="py-3 font-medium">
-                                            {item.name}
+                                            {item.productId && item.productId !== 'custom' ? (
+                                                <Link
+                                                    href={`/inventory/details?id=${encodeURIComponent(item.productId)}`}
+                                                    className="hover:underline hover:text-primary transition-colors inline-flex items-center gap-1 group/link print:text-inherit print:no-underline print:pointer-events-none"
+                                                    title="View Product Details & Inventory"
+                                                >
+                                                    <span>{item.name}</span>
+                                                    <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover/link:opacity-60 transition-opacity no-print shrink-0" />
+                                                </Link>
+                                            ) : (
+                                                <span>{item.name}</span>
+                                            )}
+                                            {showAdminDetails && typeof item.costPrice === 'number' && item.costPrice > 0 && (
+                                                <div className="text-[10px] text-emerald-600 font-normal mt-0.5 no-print">
+                                                    Cost: {currencySymbol}{item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} • Margin: +{currencySymbol}{(item.price - item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })} ({Math.round(((item.price - item.costPrice) / item.price) * 100)}%)
+                                                </div>
+                                            )}
                                             {showAdminDetails && item.priceOverridden && (
                                                 <span className="ml-2 text-[9px] text-orange-500 font-normal bg-orange-50 dark:bg-orange-500/10 px-1 py-0.5 rounded no-print">
                                                     Overridden
@@ -125,6 +161,13 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                             </div>
                         </div>
 
+                        {showAdminDetails && hasCostData && (
+                            <div className="mb-8 p-3 bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs text-emerald-900 dark:text-emerald-300 flex justify-between items-center no-print">
+                                <span className="font-medium">Total Cost of Goods (COGS): {currencySymbol}{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                <span className="font-bold text-emerald-700 dark:text-emerald-400">Net Gross Profit: +{currencySymbol}{basketProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({marginPct}% margin)</span>
+                            </div>
+                        )}
+
                         {(business?.settings?.paymentBankName || business?.settings?.paymentInstructions) && (
                             <div className="mt-8 pt-6 border-t border-dashed">
                                 <h3 className="text-[11px] font-bold mb-2">Payment Details</h3>
@@ -162,17 +205,34 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                             <span className="text-gray-500">Receipt ID:</span>
                             <span className="font-mono">{receipt.receiptNumber || receipt.id.substring(0, 8).toUpperCase()}</span>
                         </div>
-                        <div className="flex justify-between mb-3">
+                        <div className="flex justify-between mb-1">
                             <span className="text-gray-500">Date:</span>
                             <span className="font-mono">{receipt.createdAt ? format(safeToDate(receipt.createdAt), 'dd/MM/yyyy HH:mm') : 'N/A'}</span>
                         </div>
+                        {receipt.cashierName && (
+                            <div className="flex justify-between mb-3">
+                                <span className="text-gray-500">Cashier:</span>
+                                <span className="font-medium text-gray-800">{receipt.cashierName}</span>
+                            </div>
+                        )}
 
                         {receipt.customer && (
                             <>
                                 <Separator className="my-2 border-dashed border-gray-300" />
                                 <div className="mb-2">
                                     <h3 className="font-semibold text-gray-500 uppercase text-[9px]">Billed To:</h3>
-                                    <p className="font-medium text-[11px]">{receipt.customer.name}</p>
+                                    {custId ? (
+                                        <Link
+                                            href={`/customers/details?id=${encodeURIComponent(custId)}`}
+                                            className="font-medium text-[11px] hover:underline hover:text-primary transition-colors inline-flex items-center gap-1 group/cust print:text-inherit print:no-underline print:pointer-events-none"
+                                            title="View Customer Profile & Debt Ledger"
+                                        >
+                                            <span>{receipt.customer.name}</span>
+                                            <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover/cust:opacity-60 transition-opacity no-print shrink-0" />
+                                        </Link>
+                                    ) : (
+                                        <p className="font-medium text-[11px]">{receipt.customer.name}</p>
+                                    )}
                                     <p className="text-gray-500 text-[9px]">{receipt.customer.email}</p>
                                 </div>
                             </>
@@ -185,13 +245,29 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                                 <div key={item.productId + index} className="flex justify-between items-start mb-1 text-[10px]">
                                     <div className="flex-1 pr-2">
                                         <p className="font-medium leading-tight">
-                                            {item.name}
+                                            {item.productId && item.productId !== 'custom' ? (
+                                                <Link
+                                                    href={`/inventory/details?id=${encodeURIComponent(item.productId)}`}
+                                                    className="hover:underline hover:text-primary transition-colors group/item inline-flex items-center gap-1 print:text-inherit print:no-underline print:pointer-events-none"
+                                                    title="View Product Details & Stock"
+                                                >
+                                                    <span>{item.name}</span>
+                                                    <ExternalLink className="h-2 w-2 opacity-0 group-hover/item:opacity-60 transition-opacity no-print shrink-0" />
+                                                </Link>
+                                            ) : (
+                                                <span>{item.name}</span>
+                                            )}
                                             {showAdminDetails && item.priceOverridden && (
                                                 <span className="ml-1 text-[8px] text-orange-500 font-normal no-print">
                                                     (Overridden)
                                                 </span>
                                             )}
                                         </p>
+                                        {showAdminDetails && typeof item.costPrice === 'number' && item.costPrice > 0 && (
+                                            <p className="text-emerald-700 text-[8px] font-normal mt-0.5 no-print leading-tight">
+                                                Cost: {currencySymbol}{item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • Margin: +{currencySymbol}{(item.price - item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({Math.round(((item.price - item.costPrice) / item.price) * 100)}%)
+                                            </p>
+                                        )}
                                         {showAdminDetails && item.priceOverridden && item.priceOverrideNote && (
                                             <p className="text-gray-500 text-[8px] italic mt-0.5 no-print leading-tight">
                                                 Note: {item.priceOverrideNote}
@@ -234,6 +310,13 @@ const ReceiptDetails = React.memo(React.forwardRef<HTMLDivElement, ReceiptDetail
                             <span>Total</span>
                             <span>{currencySymbol}{receipt.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
+
+                        {showAdminDetails && hasCostData && (
+                            <div className="my-2 p-1.5 bg-emerald-50 border border-emerald-200 rounded text-[9px] text-emerald-800 flex justify-between items-center no-print">
+                                <span>Gross Profit (COGS {currencySymbol}{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                                <span className="font-bold">+{currencySymbol}{basketProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({marginPct}%)</span>
+                            </div>
+                        )}
 
                         {receipt.paymentMethod === 'Cash' && amountReceived !== undefined && amountReceived > 0 && (
                             <div className="space-y-1 mt-3 pt-3 border-t border-dashed border-gray-300 text-[10px] font-medium text-gray-600">
