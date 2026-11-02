@@ -29,6 +29,17 @@ export const Markdown = React.memo(function Markdown({
   children: string;
   className?: string;
 }) {
+  const content = React.useMemo(() => {
+    if (typeof children !== 'string') return '';
+    // Normalize Unicode non-breaking and thin spaces that break CommonMark bold/italic delimiters
+    let text = children.replace(/[\u00A0\u2007\u202F\u200B]/g, ' ');
+    // Fix trailing spaces before closing bold asterisks: e.g. "**Net profit: **" -> "**Net profit:** "
+    text = text.replace(/\*\*([^\n*]+?)\s+\*\*/g, '**$1** ');
+    // Fix leading spaces after opening bold asterisks: e.g. "** Net profit**" -> " **Net profit**"
+    text = text.replace(/\*\*\s+([^\n*]+?)\*\*/g, ' **$1**');
+    return text;
+  }, [children]);
+
   return (
     <div className={cn('text-sm leading-relaxed text-foreground break-words', className)}>
       <ReactMarkdown
@@ -88,7 +99,7 @@ export const Markdown = React.memo(function Markdown({
           td: ({ children }) => <td className="px-2.5 py-1.5 border-t border-border/40">{children}</td>,
         }}
       >
-        {children}
+        {content}
       </ReactMarkdown>
     </div>
   );

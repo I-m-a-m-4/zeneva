@@ -627,7 +627,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
     // ═══════════════════════════════════════════════════════════════════════
 
     queryExpenses: tool({
-      description: 'Retrieve operating expenses logged by the business. Use this to read the expenses data.',
+      description: 'Retrieve operating expenses and profit deductions logged by the business. Includes totals deducted from revenue (overheads) vs deducted from net profit (capital outflow/rent/salary).',
       inputSchema: z.object({
         limit: z.number().min(1).max(200).default(50).describe('Max results to fetch.'),
       }),
@@ -637,8 +637,51 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
             .where('businessId', '==', businessId)
             .limit(limit)
             .get();
-          const expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          return { type: 'EXPENSES_LIST', total: expenses.length, expenses };
+
+          let totalExpensesAmount = 0;
+          let deductedFromRevenueAmount = 0;
+          let deductedFromNetProfitAmount = 0;
+
+          const expenses = snap.docs.map((d) => {
+            const data: any = d.data();
+            const amount = Number(data.amount) || 0;
+            totalExpensesAmount += amount;
+            if (data.deductionSource === 'net_profit') {
+              deductedFromNetProfitAmount += amount;
+            } else {
+              deductedFromRevenueAmount += amount;
+            }
+
+            let date = '';
+            if (data.date?._seconds) {
+              date = new Date(data.date._seconds * 1000).toISOString().split('T')[0];
+            } else if (data.date?.toDate) {
+              date = data.date.toDate().toISOString().split('T')[0];
+            } else if (typeof data.date === 'string') {
+              date = data.date.split('T')[0];
+            }
+
+            return {
+              id: d.id,
+              title: data.title || 'Expense',
+              amount,
+              category: data.category || 'general',
+              date,
+              paymentMethod: data.paymentMethod || 'cash',
+              deductFromCashDrawer: Boolean(data.deductFromCashDrawer),
+              deductionSource: data.deductionSource || (data.deductFromCashDrawer ? 'cash_drawer' : 'revenue'),
+            };
+          });
+
+          return {
+            type: 'EXPENSES_LIST',
+            total: expenses.length,
+            totalExpensesAmount: round2(totalExpensesAmount),
+            deductedFromRevenueAmount: round2(deductedFromRevenueAmount),
+            deductedFromNetProfitAmount: round2(deductedFromNetProfitAmount),
+            currency,
+            expenses,
+          };
         } catch (e: any) { return fail('Failed to query expenses', e); }
       }
     }),
@@ -654,8 +697,39 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
             .where('businessId', '==', businessId)
             .limit(limit)
             .get();
-          const purchases = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          return { type: 'PURCHASES_LIST', total: purchases.length, purchases };
+
+          let totalPurchasesAmount = 0;
+          const purchases = snap.docs.map((d) => {
+            const data: any = d.data();
+            const amount = Number(data.totalAmount ?? data.amount) || 0;
+            totalPurchasesAmount += amount;
+
+            let date = '';
+            if (data.createdAt?._seconds) {
+              date = new Date(data.createdAt._seconds * 1000).toISOString().split('T')[0];
+            } else if (data.date?._seconds) {
+              date = new Date(data.date._seconds * 1000).toISOString().split('T')[0];
+            } else if (typeof data.date === 'string') {
+              date = data.date.split('T')[0];
+            }
+
+            return {
+              id: d.id,
+              supplierName: data.supplierName || 'Supplier',
+              amount,
+              status: data.status || 'completed',
+              paymentStatus: data.paymentStatus || 'paid',
+              date,
+            };
+          });
+
+          return {
+            type: 'PURCHASES_LIST',
+            total: purchases.length,
+            totalPurchasesAmount: round2(totalPurchasesAmount),
+            currency,
+            purchases,
+          };
         } catch (e: any) { return fail('Failed to query purchases', e); }
       }
     }),

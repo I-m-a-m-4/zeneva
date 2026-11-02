@@ -44,6 +44,7 @@ interface UnsplashImagePickerProps {
     disabled?: boolean;
     autoSaveText?: string;
     isExistingProduct?: boolean;
+    trigger?: React.ReactNode;
 }
 
 const getQuerySuggestions = (raw: string): string[] => {
@@ -77,7 +78,7 @@ const getQuerySuggestions = (raw: string): string[] => {
     return suggestions.slice(0, 3);
 };
 
-export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', disabled = false, autoSaveText, isExistingProduct = false }: UnsplashImagePickerProps) {
+export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', disabled = false, autoSaveText, isExistingProduct = false, trigger }: UnsplashImagePickerProps) {
     const { business, currentUserProfile } = usePOS();
     const firestore = useFirestore();
     const isPro = hasProFeatures(business);
@@ -268,27 +269,42 @@ export function UnsplashImagePicker({ onImageSelect, initialSearchQuery = '', di
                 }}
             >
                 <DialogTrigger asChild>
-                    <Button 
-                        variant="outline" 
-                        type="button" 
-                        className="w-full gap-2 mt-2 justify-center relative group" 
-                        disabled={disabled}
-                        onClick={(e) => {
-                            if (!isPro) {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setShowUpgrade(true);
-                            }
-                        }}
-                    >
-                        <Search className="h-4 w-4" />
-                        <span>Search Web for Image</span>
-                        {!isPro && (
-                            <Badge variant="secondary" className="ml-1.5 text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0 h-4 uppercase tracking-wider">
-                                Pro
-                            </Badge>
-                        )}
-                    </Button>
+                    {trigger ? (
+                        <span
+                            onClick={(e) => {
+                                if (!isPro) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setShowUpgrade(true);
+                                }
+                            }}
+                            className={cn("inline-block cursor-pointer", disabled && "pointer-events-none opacity-50")}
+                        >
+                            {trigger}
+                        </span>
+                    ) : (
+                        <Button 
+                            variant="outline" 
+                            type="button" 
+                            className="w-full gap-2 mt-2 justify-center relative group" 
+                            disabled={disabled}
+                            onClick={(e) => {
+                                if (!isPro) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setShowUpgrade(true);
+                                }
+                            }}
+                        >
+                            <Search className="h-4 w-4" />
+                            <span>Search Web for Image</span>
+                            {!isPro && (
+                                <Badge variant="secondary" className="ml-1.5 text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0 h-4 uppercase tracking-wider">
+                                    Pro
+                                </Badge>
+                            )}
+                        </Button>
+                    )}
                 </DialogTrigger>
             <DialogContent 
                 hideScrollWrapper

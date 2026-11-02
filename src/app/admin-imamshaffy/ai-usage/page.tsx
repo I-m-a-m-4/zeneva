@@ -159,13 +159,37 @@ function extractMessageText(msg: any, defaultFallback?: string): string {
     // If no text parts, try to format any tool calls for visibility
     const toolCall = msg.parts.find((p: any) => (p.type && p.type.startsWith('tool-')) || p.toolCallId);
     if (toolCall) {
-      if (toolCall.output) return `[Tool Result: ${toolCall.type || 'Unknown'}]\n${JSON.stringify(toolCall.output, null, 2)}`;
-      if (toolCall.input) return `[Called Tool: ${toolCall.type || 'Unknown'}]\n${JSON.stringify(toolCall.input, null, 2)}`;
-      return `[Tool Call: ${toolCall.type || 'Unknown'}]`;
+      if (toolCall.output) {
+        const out = toolCall.output;
+        if (out?.type === 'EXPENSES_LIST') {
+          const totalAmt = out.totalExpensesAmount ? ' (Total: ' + (out.currency || '₦') + Number(out.totalExpensesAmount).toLocaleString() + ')' : '';
+          return '[Checked Expenses: ' + (out.total || out.expenses?.length || 0) + ' records' + totalAmt + ']';
+        }
+        if (out?.type === 'PURCHASES_LIST') {
+          const totalAmt = out.totalPurchasesAmount ? ' (Total: ' + (out.currency || '₦') + Number(out.totalPurchasesAmount).toLocaleString() + ')' : '';
+          return '[Checked Purchases: ' + (out.total || out.purchases?.length || 0) + ' records' + totalAmt + ']';
+        }
+        if (out?.type === 'PRODUCT_LIST') {
+          return '[Found Products: ' + (out.totalMatches || out.products?.length || 0) + ' items for "' + (out.title || '') + '"]';
+        }
+        if (out?.type === 'PROPOSAL') {
+          return '[Generated Proposal: ' + (out.title || out.proposalType || 'Action Proposal') + ']';
+        }
+        const summary = out?.title || out?.type || toolCall.type || 'Completed';
+        return '[Tool Result: ' + summary + ']';
+      }
+      if (toolCall.input) return '[Ran Tool: ' + (toolCall.type || 'Action') + ']';
+      return '[Tool: ' + (toolCall.type || 'Action') + ']';
     }
   }
+
+  // Handle messages stored with toolCalls array (from ai_sessions)
+  if (Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0) {
+    const tools = msg.toolCalls.map((t: any) => t.toolName || 'tool').join(', ');
+    return '[Checked ' + tools + ']';
+  }
   
-  return defaultFallback || JSON.stringify(msg, null, 2);
+  return defaultFallback || '';
 }
 
 function foldDays(docs: AiDailyStats[]): WindowTotals {

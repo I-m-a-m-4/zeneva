@@ -142,6 +142,27 @@ export function PricingPlans() {
                     </div>
                 </div>
             </div>
+
+            {/* Whop Global Storefront Banner */}
+            <div className="mt-12 p-5 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border-2 border-dashed border-orange-200/90 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-5 text-center sm:text-left max-w-4xl mx-auto shadow-sm">
+                <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-[#FF6243] text-white flex items-center justify-center font-black text-xl shrink-0 shadow-sm">
+                        W
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-sm sm:text-base text-slate-900">Prefer instant global access via Whop?</h4>
+                        <p className="text-xs sm:text-sm text-slate-600">Access Zeneva Retail OS with 1-click desktop downloads and VIP technical support.</p>
+                    </div>
+                </div>
+                <a
+                    href="https://whop.com/zeneva/zeneva-pos-inventory"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-xs transition-all hover:scale-105 active:scale-95 shadow-sm whitespace-nowrap"
+                >
+                    Claim on Whop &rarr;
+                </a>
+            </div>
         </div>
     );
 }

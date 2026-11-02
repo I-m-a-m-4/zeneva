@@ -146,6 +146,7 @@ export default function MarketingFooter() {
                   <li><Link href="/terminal" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkTerminal')}</Link></li>
                   <li><Link href="/use-cases" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkUseCases')}</Link></li>
                   <li><Link href="/pricing" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">{t('footer.linkPricing')}</Link></li>
+                  <li><a href="https://whop.com/zeneva/zeneva-pos-inventory" target="_blank" rel="noopener noreferrer" className="transition inline-flex items-center gap-2 text-neutral-300 hover:text-white">Whop Store <span className="text-[10px] bg-[#FF6243] text-white px-1.5 py-0.5 rounded font-bold">Claim</span></a></li>
                 </ul>
               </div>
               <div className="mt-6">

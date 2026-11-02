@@ -1086,7 +1086,34 @@ function EditProductContent() {
                                         name="name"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>{t('common.name')}</FormLabel>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <FormLabel>{t('common.name')}</FormLabel>
+                                                    <div className="flex items-center gap-2">
+                                                        {imagePreview && (
+                                                            <div className="relative w-7 h-7 rounded-md overflow-hidden border border-border shadow-2xs shrink-0">
+                                                                <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+                                                            </div>
+                                                        )}
+                                                        <UnsplashImagePicker 
+                                                            onImageSelect={handleWebImageSelect}
+                                                            initialSearchQuery={form.watch('name')}
+                                                            disabled={!canManageProduct}
+                                                            isExistingProduct={true}
+                                                            trigger={
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-7 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/10 hover:text-primary transition-all font-medium"
+                                                                    disabled={!canManageProduct}
+                                                                >
+                                                                    <Search className="h-3.5 w-3.5" />
+                                                                    <span>{imagePreview ? 'Change Web Image' : 'Search Web for Image'}</span>
+                                                                </Button>
+                                                            }
+                                                        />
+                                                    </div>
+                                                </div>
                                                 <FormControl>
                                                     <Input placeholder={t('inventory.namePlaceholder')} {...field} disabled={!canManageProduct} />
                                                 </FormControl>
