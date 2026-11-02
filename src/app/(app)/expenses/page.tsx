@@ -102,6 +102,7 @@ import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { safeToDate, cn } from '@/lib/utils';
 import { logAuditEvent } from '@/lib/audit';
 import { downloadCsv } from '@/lib/csv';
+import { logExportEvent } from '@/lib/export-telemetry';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -300,6 +301,8 @@ function ExpensesAndPurchasesContent() {
   const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
   
   const canViewPurchasesAndSuppliers = currentUserProfile?.role !== 'vendor_operator';
+  const userRole = currentUserProfile?.role;
+  const canExportData = (userRole === 'admin' || userRole === 'owner' || currentUserProfile?.permissions?.export_data === true) && business?.settings?.allowDataExport !== false;
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -1543,6 +1546,10 @@ function ExpensesAndPurchasesContent() {
 
   // Export Expenses
   const handleExportExpensesCsv = () => {
+    if (!canExportData) {
+      toast({ variant: 'destructive', title: 'Export Restricted', description: 'You do not have permission to export expenses.' });
+      return;
+    }
     if (filteredExpenses.length === 0) return;
     const rows: (string | number)[][] = [
       ['Date', 'Title', 'Category', 'Funding Source', 'Amount', 'Payment Method', 'Paid From Till', 'Recipient', 'Logged By', 'Notes']
@@ -1561,12 +1568,27 @@ function ExpensesAndPurchasesContent() {
         e.notes || ''
       ]);
     });
-    downloadCsv(`zeneva-expenses-${format(new Date(), 'yyyy-MM-dd')}.csv`, rows);
+    const filename = `zeneva-expenses-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    downloadCsv(filename, rows);
+    logExportEvent(firestore, {
+      businessId: business?.id || '',
+      businessName: business?.name,
+      userId: currentUserProfile?.uid || '',
+      userName: currentUserProfile?.name || '',
+      userEmail: currentUserProfile?.email || '',
+      exportType: 'expenses',
+      filename,
+      recordCount: filteredExpenses.length,
+    });
     toast({ title: 'Expenses Exported' });
   };
 
   // Export Purchases
   const handleExportPurchasesCsv = () => {
+    if (!canExportData) {
+      toast({ variant: 'destructive', title: 'Export Restricted', description: 'You do not have permission to export purchases.' });
+      return;
+    }
     if (filteredPurchases.length === 0) return;
     const rows: (string | number)[][] = [
       ['PO Number', 'Date', 'Supplier', 'Funding Source', 'Items Count', 'Total Amount', 'Amount Paid', 'Balance Due', 'Order Status', 'Payment Status', 'Notes']
@@ -1586,7 +1608,18 @@ function ExpensesAndPurchasesContent() {
         p.notes || ''
       ]);
     });
-    downloadCsv(`zeneva-purchases-${format(new Date(), 'yyyy-MM-dd')}.csv`, rows);
+    const filename = `zeneva-purchases-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    downloadCsv(filename, rows);
+    logExportEvent(firestore, {
+      businessId: business?.id || '',
+      businessName: business?.name,
+      userId: currentUserProfile?.uid || '',
+      userName: currentUserProfile?.name || '',
+      userEmail: currentUserProfile?.email || '',
+      exportType: 'purchases',
+      filename,
+      recordCount: filteredPurchases.length,
+    });
     toast({ title: 'Purchases Exported' });
   };
 

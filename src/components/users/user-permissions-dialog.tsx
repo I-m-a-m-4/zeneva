@@ -17,7 +17,7 @@ import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfile } from '@/types';
-import { Loader2, Shield, Layout, Package, Users, Tag, History, ShoppingBag, Lock, ShoppingCart, Trash2 } from 'lucide-react';
+import { Loader2, Shield, Layout, Package, Users, Tag, History, ShoppingBag, Lock, ShoppingCart, Trash2, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface PermissionItem {
@@ -81,6 +81,12 @@ const PERMISSIONS: PermissionItem[] = [
         label: 'Manage Online Orders',
         description: 'View and update status of orders from the web storefront.',
         icon: <ShoppingBag className="h-4 w-4" />
+    },
+    {
+        id: 'export_data',
+        label: 'Export Business Data',
+        description: 'Download customer lists, product catalogs, and accounting spreadsheets.',
+        icon: <Download className="h-4 w-4" />
     }
 ];
 
@@ -109,6 +115,7 @@ export default function UserPermissionsDialog({ isOpen, onOpenChange, user, onSu
             apply_discounts: ['admin', 'manager'],
             override_prices: ['admin', 'manager'],
             void_sales: ['admin', 'manager'],
+            export_data: ['admin', 'owner'],
         };
         
         return (defaults[permissionId] || []).includes(role);

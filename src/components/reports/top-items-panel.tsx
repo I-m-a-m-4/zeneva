@@ -66,6 +66,8 @@ import {
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { downloadCsv } from '@/lib/csv';
+import { logExportEvent } from '@/lib/export-telemetry';
+import { usePOS } from '@/context/pos-context';
 import { aggregateItems, rankItems, type ItemStat, type RankBy } from '@/lib/reports-aggregates';
 import { trackFeature } from '@/lib/product-telemetry';
 import { cn } from '@/lib/utils';
@@ -91,6 +93,7 @@ export default function TopItemsPanel({
   currencySymbol = '',
 }: TopItemsPanelProps) {
   const { t } = useI18n();
+  const { business, currentUserProfile, firestore } = usePOS();
   // Inside the component: every label below is translated, and there is no `t` at
   // module scope. `labelLower` is a key of its own rather than `.toLowerCase()` on
   // `label` — see the note on `tiByUnitsLower` in en.ts.
@@ -253,10 +256,18 @@ export default function TopItemsPanel({
       s.orders,
       s.lastSoldAt ? s.lastSoldAt.toISOString().slice(0, 10) : '',
     ]);
-    downloadCsv(`zeneva-top-${nounPlural}-${new Date().toISOString().slice(0, 10)}.csv`, [
-      header,
-      ...rows,
-    ]);
+    const filename = `zeneva-top-${nounPlural}-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, [header, ...rows]);
+    logExportEvent(firestore, {
+      businessId: business?.id || '',
+      businessName: business?.name,
+      userId: currentUserProfile?.id || '',
+      userName: currentUserProfile?.name || '',
+      userEmail: currentUserProfile?.email || '',
+      exportType: 'top_items',
+      filename,
+      recordCount: rows.length,
+    });
     trackFeature('reports_exported');
   };
 

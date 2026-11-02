@@ -57,6 +57,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerAnalyticsTab } from '@/components/customers/customer-analytics-tab';
 import { cn } from '@/lib/utils';
 import { downloadCsv } from '@/lib/csv';
+import { logExportEvent } from '@/lib/export-telemetry';
 import CustomerHealthPanel, { type HealthFilter } from '@/components/customers/customer-health-panel';
 import {
   computeCustomerHealth,
@@ -153,6 +154,8 @@ export default function CustomersPage() {
     isReadOnly
   } = usePOS();
   const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
+  const userRole = currentUser?.role as string | undefined;
+  const canExportData = (userRole === 'admin' || userRole === 'owner' || currentUser?.permissions?.export_data === true) && business?.settings?.allowDataExport !== false;
   const { toast } = useToast();
   const router = useRouter();
   const { t } = useI18n();
@@ -554,6 +557,10 @@ export default function CustomersPage() {
    * The header row says which filter produced the file.
    */
   const handleExportCsv = () => {
+    if (!canExportData) {
+      toast({ variant: 'destructive', title: 'Export Restricted', description: 'You do not have permission to export customer data.' });
+      return;
+    }
     const rows: (string | number)[][] = [
       [
         'Name',
@@ -605,7 +612,23 @@ export default function CustomersPage() {
       `Orders and outstanding are counted from the ${segmentData.summary.receiptCount} sales held on this device, covering ${segmentData.summary.coveredDays} days. Outstanding is a floor, not a total.`,
     ]);
 
-    downloadCsv(`zeneva-customers-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    const filename = `zeneva-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, rows);
+    logExportEvent(firestore, {
+      businessId: business?.id || '',
+      businessName: business?.name,
+      userId: currentUser?.uid || '',
+      userName: currentUser?.name || '',
+      userEmail: currentUser?.email || '',
+      exportType: 'customers',
+      filename,
+      recordCount: filtered.length,
+      metadata: {
+        segmentFilter,
+        tagFilter,
+        searchTerm,
+      },
+    });
     toast({ variant: 'success', title: 'Customers exported', description: `${filtered.length} rows saved.` });
   };
 

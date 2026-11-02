@@ -117,6 +117,7 @@ import { useBranch } from '@/context/branch-context';
 import { cn, safeToDate, smartSearchMatch } from '@/lib/utils';
 import { apiBase } from '@/lib/platform';
 import { trackFeature } from '@/lib/product-telemetry';
+import { logExportEvent } from '@/lib/export-telemetry';
 import GlobalStockHistory from '@/components/inventory/global-stock-history';
 import Papa from 'papaparse';
 import { logAuditEvent } from '@/lib/audit';
@@ -457,6 +458,7 @@ function InventoryPageContent() {
   const canViewCostPrice = userRole === 'admin' || userRole === 'owner' || 
     (userRole === 'manager' && business?.settings?.allowManagerCostPriceView !== false) ||
     currentUserProfile?.permissions?.view_cost_price === true;
+  const canExportData = (userRole === 'admin' || userRole === 'owner' || currentUserProfile?.permissions?.export_data === true) && business?.settings?.allowDataExport !== false;
 
   // Get IDs of products queued for deletion
   const queuedDeletionIds = React.useMemo(() => {
@@ -920,6 +922,14 @@ function InventoryPageContent() {
 
   const handleExport = async () => {
     if (!business?.id) return;
+    if (!canExportData) {
+      toast({
+        variant: 'destructive',
+        title: 'Export Restricted',
+        description: 'You do not have permission to export inventory data.',
+      });
+      return;
+    }
 
     trackFeature('reports_exported');
 
@@ -929,6 +939,7 @@ function InventoryPageContent() {
       const q = query(collection(firestore, 'products'), where('businessId', '==', business.id));
       const snap = await getDocs(q);
       const allProductsData = snap.docs.map(doc => doc.data() as Product);
+      const filename = `zeneva-products-export-${new Date().toISOString().split('T')[0]}.csv`;
 
       const csvData = Papa.unparse(
         allProductsData.map(p => ({
@@ -947,12 +958,24 @@ function InventoryPageContent() {
       reader.onloadend = () => {
         const url = reader.result as string;
         link.setAttribute('href', url);
-        link.setAttribute('download', `zeneva-products-export-${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       };
       reader.readAsDataURL(blob);
+
+      logExportEvent(firestore, {
+        businessId: business.id,
+        businessName: business.name,
+        userId: user?.uid || '',
+        userName: currentUserProfile?.name || user?.displayName || '',
+        userEmail: user?.email || '',
+        exportType: 'inventory',
+        filename,
+        recordCount: allProductsData.length,
+      });
+
       toast({
         variant: 'success',
         title: t('inventory.exportCompleteTitle'),
@@ -1215,10 +1238,12 @@ function InventoryPageContent() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
-              <Download className="h-3.5 w-3.5" />
-              <span className="sm:whitespace-nowrap">{t('common.export')}</span>
-            </Button>
+            {canExportData && (
+              <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => handleExport()}>
+                <Download className="h-3.5 w-3.5" />
+                <span className="sm:whitespace-nowrap">{t('common.export')}</span>
+              </Button>
+            )}
             {canManageStock && (
               <Button
                 size="sm"
@@ -1445,9 +1470,11 @@ function InventoryPageContent() {
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem onClick={() => handleExport()}>
-                  <Download className="me-2 h-4 w-4" /> {t('inventory.exportCsv')}
-                </DropdownMenuItem>
+                {canExportData && (
+                  <DropdownMenuItem onClick={() => handleExport()}>
+                    <Download className="me-2 h-4 w-4" /> {t('inventory.exportCsv')}
+                  </DropdownMenuItem>
+                )}
 
                 {canManageStock && (
                   <DropdownMenuItem onClick={() => setIsImportOpen(true)}>

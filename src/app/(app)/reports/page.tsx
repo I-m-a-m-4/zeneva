@@ -54,6 +54,7 @@ import {
     type KpiDelta,
 } from '@/lib/reports-aggregates';
 import { downloadCsv } from '@/lib/csv';
+import { logExportEvent } from '@/lib/export-telemetry';
 import { trackFeature } from '@/lib/product-telemetry';
 import { useI18n } from '@/context/i18n-context';
 import { collection, query, where, limit, getDocs, Timestamp } from 'firebase/firestore';
@@ -1260,7 +1261,18 @@ export default function ReportsDashboard() {
         rows.push([]);
         rows.push(['Note', 'Item and category revenue is the sum of price x quantity, so it excludes tax and is gross of receipt-level discounts. Headline revenue and team revenue are receipt totals. Blank cost, profit or margin means no cost price was recorded, which is unknown rather than zero.']);
 
-        downloadCsv(`zeneva-analytics-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+        const filename = `zeneva-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+        downloadCsv(filename, rows);
+        logExportEvent(firestore, {
+            businessId: business?.id || '',
+            businessName: business?.name,
+            userId: currentUserProfile?.id || '',
+            userName: currentUserProfile?.name || '',
+            userEmail: currentUserProfile?.email || '',
+            exportType: 'reports',
+            filename,
+            recordCount: rows.length,
+        });
         trackFeature('reports_exported');
         toast({ variant: 'success', title: t('reports.exportedTitle'), description: t('reports.exportedBody') });
     }, [deepReceipts, products, users, finalReportData, comparison, currencySymbol, business, date, toast, t]);

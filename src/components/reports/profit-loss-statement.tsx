@@ -17,6 +17,7 @@ import { safeToDate } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Search, Printer } from 'lucide-react';
 import { downloadCsv } from '@/lib/csv';
+import { logExportEvent } from '@/lib/export-telemetry';
 import { usePOS } from '@/context/pos-context';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/context/i18n-context';
@@ -159,7 +160,7 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
         };
     }, [receipts, products, expenses, t]);
 
-    const { business } = usePOS();
+    const { business, currentUserProfile, firestore } = usePOS();
     const { toast } = useToast();
 
     const [searchTerm, setSearchTerm] = React.useState('');
@@ -629,7 +630,18 @@ export default function ProfitLossStatement({ receipts, products, currencySymbol
                                     item.profit
                                 ])
                             ];
-                            downloadCsv('profit_statement.csv', rows);
+                            const filename = `zeneva-profit-statement-${new Date().toISOString().slice(0, 10)}.csv`;
+                            downloadCsv(filename, rows);
+                            logExportEvent(firestore, {
+                                businessId: business?.id || '',
+                                businessName: business?.name,
+                                userId: currentUserProfile?.id || '',
+                                userName: currentUserProfile?.name || '',
+                                userEmail: currentUserProfile?.email || '',
+                                exportType: 'profit_loss',
+                                filename,
+                                recordCount: rows.length,
+                            });
                         }}>
                             <Download className="mr-2 h-3.5 w-3.5" /> Export CSV
                         </Button>

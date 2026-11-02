@@ -722,7 +722,7 @@ export async function POST(req: Request) {
             : (Array.isArray(steps) ? steps.map((s: any) => s?.text).filter(Boolean).join('\n\n') : '');
 
           const toolNames = (toolCalls || []).map((t: any) => t?.toolName).filter(Boolean);
-          const fallbackContent = toolNames.length > 0 ? \`[Inspected \${toolNames.join(', ')}]\` : '';
+          const fallbackContent = toolNames.length > 0 ? `[Inspected ${toolNames.join(', ')}]` : '';
 
           if (assistantText || toolNames.length > 0) {
             formattedMessages.push({
