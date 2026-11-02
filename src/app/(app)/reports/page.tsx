@@ -316,41 +316,26 @@ function DataInsightModalContent({
                             <TableCell className="font-medium text-xs">Gross Sales Revenue</TableCell>
                             <TableCell className="text-right text-xs font-semibold text-emerald-600">{formatAmount(grossRev)}</TableCell>
                         </TableRow>
-                        {purchases > 0 ? (
-                            <>
-                                <TableRow>
-                                    <TableCell className="font-medium text-xs">Less: Supplier Purchases (Paid from Revenue)</TableCell>
-                                    <TableCell className="text-right text-xs font-medium text-amber-600">{formatAmount(purchases, { isDeduction: true })}</TableCell>
-                                </TableRow>
-                                <TableRow className="border-t bg-muted/10 font-semibold">
-                                    <TableCell className="text-xs text-foreground">Net Sales Revenue</TableCell>
-                                    <TableCell className="text-right text-xs font-semibold text-foreground">{formatAmount(netRev)}</TableCell>
-                                </TableRow>
-                            </>
-                        ) : (
-                            <>
-                                <TableRow>
-                                    <TableCell className="font-medium text-xs">Cost of Goods Sold (Unit Costs)</TableCell>
-                                    <TableCell className="text-right text-xs font-medium text-destructive">{formatAmount(receiptCost, { isDeduction: true })}</TableCell>
-                                </TableRow>
-                                <TableRow className="border-t bg-muted/10 font-semibold">
-                                    <TableCell className="text-xs text-foreground">Gross Profit</TableCell>
-                                    <TableCell className="text-right text-xs font-semibold text-foreground">{formatAmount(grossProfit)}</TableCell>
-                                </TableRow>
-                            </>
-                        )}
                         <TableRow>
-                            <TableCell className="font-medium text-xs">Operating Expenses (Overheads)</TableCell>
+                            <TableCell className="font-medium text-xs">Less: Cost of Goods Sold (Unit Costs)</TableCell>
+                            <TableCell className="text-right text-xs font-medium text-destructive">{formatAmount(receiptCost, { isDeduction: true })}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-t bg-muted/10 font-semibold">
+                            <TableCell className="text-xs text-foreground">Gross Profit from Sales</TableCell>
+                            <TableCell className={`text-right text-xs font-semibold ${grossProfit >= 0 ? 'text-foreground' : 'text-destructive'}`}>{formatAmount(grossProfit)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell className="font-medium text-xs">Less: Operating Expenses (Overheads)</TableCell>
                             <TableCell className="text-right text-xs font-medium text-destructive">{formatAmount(opex, { isDeduction: true })}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-t bg-muted/10">
+                            <TableCell className="font-semibold text-xs text-foreground">Operating Net Profit</TableCell>
+                            <TableCell className={`text-right text-xs font-semibold ${operatingProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>{formatAmount(operatingProfit)}</TableCell>
                         </TableRow>
                         {reinvested > 0 ? (
                             <>
-                                <TableRow className="border-t bg-muted/10">
-                                    <TableCell className="font-semibold text-xs text-foreground">Operating Net Profit</TableCell>
-                                    <TableCell className={`text-right text-xs font-semibold ${operatingProfit >= 0 ? 'text-foreground' : 'text-destructive'}`}>{formatAmount(operatingProfit)}</TableCell>
-                                </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium text-xs">Less: Profit Reinvestments (Capital Outflow)</TableCell>
+                                    <TableCell className="font-medium text-xs">Less: Profit Reinvestments (Capital Outflow / Rent)</TableCell>
                                     <TableCell className="text-right text-xs font-medium text-purple-600">{formatAmount(reinvested, { isDeduction: true })}</TableCell>
                                 </TableRow>
                                 <TableRow className="border-t-2 bg-primary/5">
@@ -358,17 +343,12 @@ function DataInsightModalContent({
                                     <TableCell className={`text-right text-xs font-bold ${profit >= 0 ? 'text-primary' : 'text-destructive'}`}>{formatAmount(profit)}</TableCell>
                                 </TableRow>
                             </>
-                        ) : (
-                            <TableRow className="border-t-2 bg-primary/5">
-                                <TableCell className="font-bold text-xs">Net Operating Profit</TableCell>
-                                <TableCell className={`text-right text-xs font-bold ${profit >= 0 ? 'text-primary' : 'text-destructive'}`}>{formatAmount(profit)}</TableCell>
-                            </TableRow>
-                        )}
+                        ) : null}
                     </TableBody>
                 </Table>
-                {purchases > 0 && receiptCost > 0 && (
+                {purchases > 0 && (
                     <p className="text-[11px] text-muted-foreground px-1 italic">
-                        * Unit Cost of Goods Sold across sold items was {formatAmount(receiptCost)}, which is covered by your recorded supplier purchases.
+                        * Supplier stock procurement orders during this period totaled {formatAmount(purchases)}. Procurement restocks your inventory; sales profit is calculated on items actually sold (COGS: {formatAmount(receiptCost)}).
                     </p>
                 )}
             </div>
