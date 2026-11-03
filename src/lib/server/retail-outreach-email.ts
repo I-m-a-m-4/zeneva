@@ -170,3 +170,4 @@ Unsubscribe: ${UNSUBSCRIBE_TOKEN}`;
 
   return { subject, html, text };
 }
+
