@@ -17,6 +17,7 @@ const IDLE_LINES = [
  */
 const TOOL_LINES: Record<string, string> = {
   queryProducts: 'Scanning inventory',
+  findMissingProductImages: 'Auditing missing product photos',
   findSimilarProducts: 'Matching product names',
   showProductImage: 'Fetching product photo',
   getProductDetails: 'Pulling product record',

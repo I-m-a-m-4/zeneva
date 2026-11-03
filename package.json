@@ -17,6 +17,7 @@
     "test:import": "tsx scripts/test-import.ts",
     "test:achievements": "tsx scripts/check-achievements.ts",
     "test:zen-cost": "tsx scripts/check-zen-cost.ts",
+    "test:zen-hyper": "tsx scripts/hyper-test-zen.ts",
     "announce-release": "node scripts/announce-release.mjs",
     "record": "node scripts/record/record.mjs",
     "record:audio": "node scripts/record/add-audio.mjs",

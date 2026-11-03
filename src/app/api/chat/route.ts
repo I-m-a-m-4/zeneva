@@ -198,6 +198,12 @@ const SYSTEM_PROMPT = `You are Zen AI, the retail business intelligence copilot 
 
 RATING_SECTION_TOKEN
 
+## Sales, Profits & Expenses
+- `getSalesMetrics`: Returns Revenue, Gross Profit (Revenue − Cost of Goods Sold), Operating Expenses, and True Net Profit (Gross Profit − Operating Expenses).
+- When asked "how much net profit did we make" or "check profit for this week / today / last month", call `getSalesMetrics`. Clearly distinguish Gross Profit from True Net Profit (Operating Net Profit after expenses).
+- When the user asks "minus expenses" or follows up about expense deductions, call `getSalesMetrics` (which already calculates Gross Profit, Expenses, and Net Profit for the period) or `queryExpenses` with that period (`period: 'last7days'`, `period: 'today'`, etc.). Always state the arithmetic: Gross Profit − Operating Expenses = True Net Profit.
+- When asked to "fetch images for all products" or audit products missing photos, call `findMissingProductImages` to audit missing photos and offer the 1-click Bulk Image Fetcher action card.
+
 ## App Navigation & How-To
 - To guide owners to screens ("open reports", "go to inventory"), call \`linkToPage\` with a valid route. Never invent URLs.
 - For feature walkthroughs ("how do I bulk import"), call \`explainHowTo\` to fetch real step-by-step guidance.

@@ -1654,6 +1654,131 @@ function PageActionCard({ result }: { result: any }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Expenses list card
+// ─────────────────────────────────────────────────────────────────────────────
+export function ExpensesListCard({ result }: { result: any }) {
+  if (!result || result.type !== 'EXPENSES_LIST') return null;
+  const currency = result.currency || '₦';
+  const cash = (n: number) => `${currency}${(n || 0).toLocaleString()}`;
+  const expenses = result.expenses || [];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="my-3 rounded-xl border border-border bg-card overflow-hidden shadow-sm max-w-xl"
+    >
+      <div className="px-4 py-3 bg-muted/40 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs">
+            💸
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">
+              Expenses {result.period ? `(${result.period})` : ''}
+            </h4>
+            <p className="text-[11px] text-muted-foreground">
+              {result.total} recorded expense{result.total === 1 ? '' : 's'}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs font-bold text-red-600 tabular-nums">
+            {cash(result.totalExpensesAmount)}
+          </div>
+          <div className="text-[10px] text-muted-foreground">Total Outflow</div>
+        </div>
+      </div>
+
+      <div className="p-3 divide-y divide-border/60 max-h-60 overflow-y-auto">
+        {expenses.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">No expenses recorded for this period.</p>
+        ) : (
+          expenses.map((exp: any) => (
+            <div key={exp.id} className="py-2 flex items-center justify-between text-xs gap-3">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground truncate">{exp.title}</p>
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <span className="capitalize">{exp.category}</span>
+                  {exp.date && <span>• {exp.date}</span>}
+                  <span className="px-1.5 py-0.5 rounded bg-muted text-[9px]">
+                    {exp.deductionSource === 'net_profit' ? 'Net Profit' : 'Revenue'}
+                  </span>
+                </div>
+              </div>
+              <div className="font-semibold text-foreground tabular-nums shrink-0">
+                {cash(exp.amount)}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <Link
+        href="/expenses"
+        className="flex items-center justify-between px-4 py-2.5 bg-muted/30 hover:bg-muted/60 transition-colors border-t border-border text-xs font-medium text-foreground"
+      >
+        <span>Open Expenses & Purchases</span>
+        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+      </Link>
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Missing images card
+// ─────────────────────────────────────────────────────────────────────────────
+export function MissingImagesCard({ result }: { result: any }) {
+  if (!result || result.type !== 'MISSING_IMAGES') return null;
+  const sample = result.sample || [];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="my-3 rounded-xl border border-border bg-card overflow-hidden shadow-sm max-w-xl"
+    >
+      <div className="px-4 py-3 bg-muted/40 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-xs">
+            🖼️
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">Catalog Image Audit</h4>
+            <p className="text-[11px] text-muted-foreground">
+              {result.missingCount} of {result.totalProducts} products missing photos
+            </p>
+          </div>
+        </div>
+        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">
+          {Math.round(((result.missingCount || 0) / (result.totalProducts || 1)) * 100)}% unpictured
+        </span>
+      </div>
+
+      {sample.length > 0 && (
+        <div className="p-3 max-h-52 overflow-y-auto divide-y divide-border/60">
+          {sample.map((p: any) => (
+            <div key={p.id} className="py-2 flex items-center justify-between text-xs">
+              <span className="font-medium text-foreground truncate">{p.name}</span>
+              <span className="text-[11px] text-muted-foreground shrink-0">{p.category || 'General'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Link
+        href={result.actionUrl || '/inventory?action=bulk_image_editor'}
+        className="flex items-center justify-between px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white transition-colors font-medium text-xs"
+      >
+        <span>{result.actionLabel || 'Launch Bulk Image Fetcher'}</span>
+        <ArrowRight className="w-3.5 h-3.5" />
+      </Link>
+    </motion.div>
+  );
+}
+
 export function ToolResult({ output, onApprove, onReject, onPick, onUpdateOutput }: {
   output: any;
   onApprove: (proposalId: string, action: any) => void;
@@ -1673,6 +1798,10 @@ export function ToolResult({ output, onApprove, onReject, onPick, onUpdateOutput
   }
 
   switch (output.type) {
+    case 'EXPENSES_LIST':
+      return <ExpensesListCard result={output} />;
+    case 'MISSING_IMAGES':
+      return <MissingImagesCard result={output} />;
     case 'RESTOCK_SHEET':
       return (
         <RestockSheetProposal

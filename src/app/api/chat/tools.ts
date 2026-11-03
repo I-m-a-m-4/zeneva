@@ -596,6 +596,31 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
     });
   }
 
+  let expenseCache: any[] | null = null;
+  async function getExpenses(): Promise<any[]> {
+    if (expenseCache) return expenseCache;
+    try {
+      const snap = await db.collection('expenses')
+        .where('businessId', '==', businessId)
+        .get();
+      expenseCache = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    } catch {
+      expenseCache = [];
+    }
+    return expenseCache;
+  }
+
+  /** Expenses inside an absolute window. */
+  async function expensesBetween(start: Date, end: Date): Promise<any[]> {
+    const all = await getExpenses();
+    const s = start.getTime();
+    const e = end.getTime();
+    return all.filter((exp: any) => {
+      const t = toMillis(exp.date ?? exp.createdAt);
+      return t >= s && t < e;
+    });
+  }
+
   /** Units sold per productId over `days`, for velocity maths. */
   async function unitsSold(days: number): Promise<Map<string, number>> {
     const rows = (await receiptsSince(days)).filter(isPaid);
@@ -627,23 +652,28 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
     // ═══════════════════════════════════════════════════════════════════════
 
     queryExpenses: tool({
-      description: 'Retrieve operating expenses and profit deductions logged by the business. Includes totals deducted from revenue (overheads) vs deducted from net profit (capital outflow/rent/salary).',
+      description: 'Retrieve operating expenses and profit deductions logged by the business. Can filter by period (today, yesterday, last7days, last30days, thisMonth, lastMonth, or all).',
       inputSchema: z.object({
+        period: z.enum(['today', 'yesterday', 'last7days', 'last30days', 'last90days', 'thisMonth', 'lastMonth', 'all']).default('all').describe('Time period for expenses. Defaults to all.'),
         limit: z.number().min(1).max(200).default(50).describe('Max results to fetch.'),
       }),
-      execute: async ({ limit }) => {
+      execute: async ({ period, limit }) => {
         try {
-          const snap = await db.collection('expenses')
-            .where('businessId', '==', businessId)
-            .limit(limit)
-            .get();
+          let rows: any[] = [];
+          let periodLabel = 'All Time';
+          if (period && period !== 'all') {
+            const { start, end, label } = periodRange(period);
+            periodLabel = label;
+            rows = await expensesBetween(start, end);
+          } else {
+            rows = await getExpenses();
+          }
 
           let totalExpensesAmount = 0;
           let deductedFromRevenueAmount = 0;
           let deductedFromNetProfitAmount = 0;
 
-          const expenses = snap.docs.map((d) => {
-            const data: any = d.data();
+          const expenses = rows.slice(0, limit).map((data: any) => {
             const amount = Number(data.amount) || 0;
             totalExpensesAmount += amount;
             if (data.deductionSource === 'net_profit') {
@@ -653,17 +683,14 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
             }
 
             let date = '';
-            if (data.date?._seconds) {
-              date = new Date(data.date._seconds * 1000).toISOString().split('T')[0];
-            } else if (data.date?.toDate) {
-              date = data.date.toDate().toISOString().split('T')[0];
-            } else if (typeof data.date === 'string') {
-              date = data.date.split('T')[0];
+            const t = toMillis(data.date ?? data.createdAt);
+            if (t > 0) {
+              date = new Date(t).toISOString().split('T')[0];
             }
 
             return {
-              id: d.id,
-              title: data.title || 'Expense',
+              id: data.id,
+              title: data.title || data.description || 'Expense',
               amount,
               category: data.category || 'general',
               date,
@@ -675,7 +702,9 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
 
           return {
             type: 'EXPENSES_LIST',
-            total: expenses.length,
+            period: periodLabel,
+            total: rows.length,
+            showing: expenses.length,
             totalExpensesAmount: round2(totalExpensesAmount),
             deductedFromRevenueAmount: round2(deductedFromRevenueAmount),
             deductedFromNetProfitAmount: round2(deductedFromNetProfitAmount),
@@ -771,6 +800,30 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
             products: products.slice(0, limit ?? 12).map(slimProduct),
           };
         } catch (e: any) { return fail('Failed to query products', e); }
+      },
+    }),
+
+    findMissingProductImages: tool({
+      description: 'Audit products in the catalog that are missing photos or images, and offer a 1-click action to fetch or bulk-edit them.',
+      inputSchema: z.object({
+        limit: z.number().min(1).max(50).default(10).describe('Max sample of missing products to display.'),
+      }),
+      execute: async ({ limit }) => {
+        try {
+          const products = await allProducts();
+          const missing = products.filter((p: any) => !p.imageUrl || String(p.imageUrl).trim() === '');
+          const sample = missing.slice(0, limit).map(slimProduct);
+
+          return {
+            type: 'MISSING_IMAGES',
+            totalProducts: products.length,
+            missingCount: missing.length,
+            withImageCount: products.length - missing.length,
+            sample,
+            actionUrl: '/inventory?action=bulk_image_editor',
+            actionLabel: 'Launch Bulk Image Fetcher',
+          };
+        } catch (e: any) { return fail('Failed to audit missing product images', e); }
       },
     }),
 
@@ -1287,16 +1340,22 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
     // ═══════════════════════════════════════════════════════════════════════
 
     getSalesMetrics: tool({
-      description: 'Revenue, profit, transaction count and average order value for a period.',
+      description: 'Revenue, gross profit, operating expenses, and net profit for a period. Use for sales performance or profit inquiries.',
       inputSchema: z.object({
         period: z.enum(['today', 'yesterday', 'last7days', 'last30days', 'last90days', 'thisMonth', 'lastMonth']),
       }),
       execute: async ({ period }) => {
         try {
           const { start, end, label } = periodRange(period);
-          const receipts = await paidBetween(start, end);
-          const revenue = receipts.reduce((s, r) => s + (r.total ?? 0), 0);
-          const profit = receipts.reduce((s, r) => s + (r.profit ?? 0), 0);
+          const [receipts, periodExpenses] = await Promise.all([
+            paidBetween(start, end),
+            expensesBetween(start, end),
+          ]);
+          const revenue = round2(receipts.reduce((s, r) => s + (r.total ?? 0), 0));
+          const grossProfit = round2(receipts.reduce((s, r) => s + (r.profit ?? 0), 0));
+          const operatingExpenses = round2(periodExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0));
+          const netProfit = round2(grossProfit - operatingExpenses);
+
           const byMethod: Record<string, number> = {};
           for (const r of receipts) {
             const m = r.paymentMethod ?? 'Unknown';
@@ -1304,13 +1363,21 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
           }
           return {
             type: 'METRICS',
-            title: `Sales — ${label}`,
+            title: `Sales & Profit — ${label}`,
+            period: label,
+            revenue,
+            grossProfit,
+            operatingExpenses,
+            netProfit,
+            expenseCount: periodExpenses.length,
             tiles: [
               money('Revenue', revenue),
-              money('Profit', profit),
+              money('Gross Profit', grossProfit, 'Revenue − Cost of Goods'),
+              money('Expenses', operatingExpenses, `${periodExpenses.length} logged expense${periodExpenses.length === 1 ? '' : 's'}`),
+              money('Net Profit', netProfit, 'Gross Profit − Operating Expenses'),
               count('Transactions', receipts.length),
-              money('Avg order', receipts.length ? revenue / receipts.length : 0),
-              percent('Margin', revenue > 0 ? (profit / revenue) * 100 : 0),
+              money('Avg order', receipts.length ? round2(revenue / receipts.length) : 0),
+              percent('Net Margin', revenue > 0 ? round2((netProfit / revenue) * 100) : 0),
             ],
             byPaymentMethod: byMethod,
           };
@@ -1327,7 +1394,7 @@ function buildZenTools({ db, businessId, currency, ratingEnabled }: Ctx) {
       description:
         "Daily trading report card: takings, profit, transaction count, payment split. Use for 'how did we do today' or 'daily report'.",
       inputSchema: z.object({
-        date: z.string().optional().describe('YYYY-MM-DD. Defaults to today.'),
+        date: z.string().nullable().optional().describe('YYYY-MM-DD. Defaults to today.'),
       }),
       execute: async ({ date }) => {
         try {
