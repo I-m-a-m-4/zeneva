@@ -128,3 +128,24 @@ export async function manuallySetBusinessPlan(params: {
         expiresAt: (plan === 'lifetime' ? new Date('2099-12-31') : newExpiry).toISOString()
     };
 }
+/**
+ * Super Admin action to verify and reconcile any Paystack payment reference directly.
+ */
+export async function reconcilePaystackTransaction(params: {
+    idToken?: string;
+    reference: string;
+    businessId?: string;
+    planId?: string;
+}) {
+    const { idToken, reference, businessId, planId } = params;
+    await requireSuperAdmin(idToken);
+
+    const { verifyAndApplySubscription } = await import('@/lib/server/subscription-service');
+    return await verifyAndApplySubscription({
+        reference,
+        businessId,
+        planId,
+        source: 'admin-manual-reconcile',
+    });
+}
+

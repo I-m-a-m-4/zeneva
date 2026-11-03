@@ -223,6 +223,7 @@ import {
     type UsageSession,
 } from '@/components/admin/user-detail/usage-insights';
 import NotificationEngagement from '@/components/admin/usage/notification-engagement';
+import { PaymentReconciler } from './components/payment-reconciler';
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -683,6 +684,10 @@ function SaaSMetricsDetailDialog({ open, onOpenChange, validPurchases, checkoutA
                             <p className="text-[10px] text-muted-foreground">Calculated as: Subscription Revenue / Paying Customers</p>
                         </CardContent>
                     </Card>
+                </div>
+
+                <div className="mt-6 mb-2">
+                    <PaymentReconciler />
                 </div>
                 
                 <Tabs defaultValue="transactions" className="w-full mt-4">

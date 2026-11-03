@@ -129,7 +129,7 @@ const stubs = [
     // the component surfaces a warning that the accounts survived the purge.
     {
         path: 'src/actions/admin-actions.ts',
-        content: `export async function deleteBusinessUsersAuth() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function revokeUserSessions() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function manuallySetBusinessPlan() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n`,
+        content: `export async function deleteBusinessUsersAuth() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function revokeUserSessions() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function manuallySetBusinessPlan() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function reconcilePaystackTransaction() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n`,
     },
 
     // admin-imamshaffy/page.tsx dynamically imports broadcastNotification;
@@ -164,12 +164,12 @@ const stubs = [
         content: `export type UninstallChannelStat = {\n  channel: string;\n  total: number;\n  uninstalled: number;\n  rate: number;\n};\n\nexport type UninstallScanResult = {\n  scannedAt: string;\n  totalTokens: number;\n  totalUninstalled: number;\n  byChannel: UninstallChannelStat[];\n};\n\nexport async function scanForUninstalls() {\n  throw new Error(${JSON.stringify(WEB_ONLY)});\n}\n\nexport async function getUninstallStats(): Promise<UninstallScanResult | null> {\n  return null;\n}\n`,
     },
 
-    // settings/subscription-section.tsx dynamically imports this. It was already
-    // broken in native builds (the folder is wiped and nothing replaced it); the
-    // stub turns an unresolved-module crash into a message the user can act on.
+    // settings/subscription-section.tsx dynamically imports this.
+    // In native desktop/mobile builds, server actions cannot run directly;
+    // this stub proxies subscription activation over HTTPS to the hosted API.
     {
         path: 'src/actions/subscription.ts',
-        content: `export type UpgradeResult = { ok: true; plan: string; expiresAt: string } | { ok: false; error: string };\n\nexport async function activateSubscription(): Promise<UpgradeResult> {\n  return { ok: false, error: 'Please complete your upgrade at zeneva.space.' };\n}\n`,
+        content: `import { apiBase } from '@/lib/platform';\n\nexport type UpgradeResult = { ok: true; plan: string; expiresAt: string } | { ok: false; error: string };\n\nexport async function activateSubscription(params: any): Promise<UpgradeResult> {\n  try {\n    const res = await fetch(\\`\\${apiBase()}/api/subscription/activate\\`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        ...(params?.idToken ? { Authorization: \\`Bearer \\${params.idToken}\\` } : {}),\n      },\n      body: JSON.stringify(params || {}),\n    });\n    const data = await res.json();\n    return data;\n  } catch (err: any) {\n    return { ok: false, error: err.message || 'Network error during upgrade verification.' };\n  }\n}\n`,
     },
 
     // src/actions/referral.ts

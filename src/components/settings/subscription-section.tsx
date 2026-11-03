@@ -221,6 +221,8 @@ const PaystackSubscriptionButton = ({
             console.warn("Failed to track checkout start event:", trackErr);
         }
 
+        const paymentReference = `z-${businessInstance.id.substring(0, 6)}-${Date.now()}`;
+
         // Log checkout attempt to Firestore for Admin Dashboard visibility
         try {
             addDoc(collection(firestore, 'checkout_attempts'), {
@@ -230,10 +232,13 @@ const PaystackSubscriptionButton = ({
                 businessId: businessInstance.id,
                 businessName: businessInstance.name || '',
                 plan: plan.name,
+                planId: plan.planId,
                 cycle: cycle.label,
+                cycleId: cycle.id,
                 amount: finalAmount,
                 currency: currency,
                 gateway: 'Paystack',
+                reference: paymentReference,
                 timestamp: serverTimestamp(),
                 status: 'initiated'
             });
@@ -246,8 +251,11 @@ const PaystackSubscriptionButton = ({
             email: userProfile.email,
             amount: Math.round(finalAmount * 100), // Ensure it's an integer
             currency: currency,
-            reference: `z-${businessInstance.id.substring(0, 6)}-${Date.now()}`,
+            reference: paymentReference,
             metadata: {
+                business_id: businessInstance.id,
+                plan: plan.planId,
+                cycle: cycle.id,
                 custom_fields: [
                     {
                         display_name: "Business ID",
@@ -257,7 +265,7 @@ const PaystackSubscriptionButton = ({
                     {
                         display_name: "Plan",
                         variable_name: "plan",
-                        value: plan.name
+                        value: plan.planId
                     }
                 ]
             },
