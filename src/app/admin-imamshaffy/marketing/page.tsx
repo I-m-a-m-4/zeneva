@@ -3,8 +3,9 @@
 import * as React from 'react';
 import {
   Clapperboard, Download, Loader2, ImageDown, AlertTriangle, Info, X, Film,
-  Sun, Moon, Bot, PenTool,
+  Sun, Moon, Bot, PenTool, Sparkles,
 } from 'lucide-react';
+import { LeadGenerationStudio } from '@/components/admin/lead-generation-studio';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -123,14 +124,21 @@ export default function MarketingStudioPage() {
       </div>
 
       <Tabs defaultValue="record" className="space-y-4">
-        <TabsList className="grid w-full max-w-lg grid-cols-2">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="record" className="gap-2">
             <Bot className="h-4 w-4" /> Record the real app
           </TabsTrigger>
           <TabsTrigger value="drawn" className="gap-2">
             <PenTool className="h-4 w-4" /> Drawn demos
           </TabsTrigger>
+          <TabsTrigger value="leads" className="gap-2 font-bold text-orange-600 data-[state=active]:bg-orange-600 data-[state=active]:text-white">
+            <Sparkles className="h-4 w-4" /> Client Discovery (Exa)
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="leads" className="mt-0">
+          <LeadGenerationStudio />
+        </TabsContent>
 
         {/* The bot: signs in, clicks through a coded flow, records it with sound. */}
         <TabsContent value="record" className="mt-0">

@@ -224,6 +224,7 @@ import {
 } from '@/components/admin/user-detail/usage-insights';
 import NotificationEngagement from '@/components/admin/usage/notification-engagement';
 import { PaymentReconciler } from './components/payment-reconciler';
+import { LeadGenerationStudio } from '@/components/admin/lead-generation-studio';
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -4408,11 +4409,19 @@ function AdminDashboardContent({
                         <Store className="h-4 w-4" />
                         Storefronts & Orders ({onlineOrdersTotal ?? onlineOrders.length})
                     </TabsTrigger>
+                    <TabsTrigger value="ai-leads" className="gap-2 snap-start shrink-0 font-bold text-orange-600 data-[state=active]:bg-orange-600 data-[state=active]:text-white">
+                        <Sparkles className="h-4 w-4" />
+                        Client Discovery (Exa AI)
+                    </TabsTrigger>
                     <TabsTrigger value="usage" className="gap-2 snap-start shrink-0">
                         <Timer className="h-4 w-4" />
                         Usage Analytics
                     </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="ai-leads" className="space-y-6">
+                    <LeadGenerationStudio />
+                </TabsContent>
 
                 <TabsContent value="overview" className="space-y-6">
                     <Card>
