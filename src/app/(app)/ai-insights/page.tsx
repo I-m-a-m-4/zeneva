@@ -1439,7 +1439,7 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
                 const streaming = isLoading && !isUser && i === messages.length - 1;
 
                 return (
-                  <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  <motion.div key={m.id ? `${m.id}-${i}` : `msg-${i}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                     className={`flex gap-3 ${isUser ? 'justify-end' : ''}`}>
                     {!isUser && (
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden p-1.5 bg-card border border-border shadow-sm">

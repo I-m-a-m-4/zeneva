@@ -1501,7 +1501,16 @@ function EditProductContent() {
                                                         <Input
                                                             type="date"
                                                             disabled={!canManageProduct}
-                                                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                                            value={(() => {
+                                                                if (!field.value) return '';
+                                                                try {
+                                                                    const raw = field.value;
+                                                                    const d = typeof raw?.toDate === 'function' ? raw.toDate() : (raw instanceof Date ? raw : new Date(raw));
+                                                                    return !isNaN(d.getTime()) ? format(d, 'yyyy-MM-dd') : '';
+                                                                } catch {
+                                                                    return '';
+                                                                }
+                                                            })()}
                                                             onChange={(e) => {
                                                                 const val = e.target.value;
                                                                 field.onChange(val ? new Date(val) : undefined);

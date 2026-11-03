@@ -408,7 +408,9 @@ export async function POST(req: Request) {
 
   let modelMessages;
   try {
-    modelMessages = await convertToModelMessages(slimHistory(normalised) as UIMessage[]);
+    // Keep conversation window bounded to prevent exceeding strict token-per-minute (TPM) limits on free/on-demand tiers
+    const recentNormalised = normalised.length > 8 ? normalised.slice(-8) : normalised;
+    modelMessages = await convertToModelMessages(slimHistory(recentNormalised) as UIMessage[]);
   } catch (e: any) {
     console.error('Failed to convert chat history:', e);
     recordBlocked(db, 'bad_history', todayStr);
