@@ -992,27 +992,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isDesktopApp) secureStorage.setItem('pos_synced_products', syncedProducts);
+    // Large collections belong strictly in IndexedDB (idb) or SQLite, never in localStorage
     if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_products', syncedProducts);
-  }, [syncedProducts, isDesktopApp, sqliteOk]);
+  }, [syncedProducts, sqliteOk]);
 
   useEffect(() => {
-    if (!isDesktopApp) secureStorage.setItem('pos_synced_customers', syncedCustomers);
     if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_customers', syncedCustomers);
-  }, [syncedCustomers, isDesktopApp, sqliteOk]);
+  }, [syncedCustomers, sqliteOk]);
 
   useEffect(() => {
-    if (!isDesktopApp) secureStorage.setItem('pos_synced_receipts', syncedReceipts);
     if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_receipts', syncedReceipts);
-  }, [syncedReceipts, isDesktopApp, sqliteOk]);
+  }, [syncedReceipts, sqliteOk]);
 
   useEffect(() => {
-    if (!isDesktopApp) secureStorage.setItem('pos_synced_users', syncedUsers);
-  }, [syncedUsers, isDesktopApp]);
+    if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_users', syncedUsers);
+  }, [syncedUsers, sqliteOk]);
 
   useEffect(() => {
-    if (!isDesktopApp) secureStorage.setItem('pos_synced_audit_logs', syncedAuditLogs);
-  }, [syncedAuditLogs, isDesktopApp]);
+    if (!isNativeApp() || !sqliteOk) idb.set('pos_synced_audit_logs', syncedAuditLogs);
+  }, [syncedAuditLogs, sqliteOk]);
 
   useEffect(() => {
     if (initialBusiness) secureStorage.setItem(BUSINESS_INSTANCE_KEY, initialBusiness);
@@ -2287,15 +2285,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
             }).catch(console.error);
 
             // Dispatch to custom external integration if configured
-            if (business?.settings?.customPushUrl && business?.settings?.customApiKey) {
+            const bSettings = (business?.settings || {}) as any;
+            if (bSettings.customPushUrl && bSettings.customApiKey) {
               const updates = updatedProducts.map(p => ({
                 id: p.id,
                 stock_quantity: p.stock || 0,
                 stock_status: (p.stock || 0) > 0 ? 'instock' : 'outofstock'
               }));
-              fetch(business.settings.customPushUrl, {
+              fetch(bSettings.customPushUrl, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': business.settings.customApiKey },
+                headers: { 'Content-Type': 'application/json', 'x-api-key': bSettings.customApiKey },
                 body: JSON.stringify({ updates })
               }).catch(console.error);
             }

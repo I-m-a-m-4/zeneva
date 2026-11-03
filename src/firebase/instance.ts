@@ -2,7 +2,8 @@
 
 import { firebaseConfig } from './config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
+import { getAuth, setPersistence, indexedDBLocalPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
+import { purgeBloatedLocalStorage } from '@/lib/storage-hygiene';
 import {
   initializeFirestore,
   getFirestore,
@@ -112,10 +113,19 @@ try {
   }
 }
 
-// Explicitly set persistence to LOCAL (persists across sessions/tabs)
+// Clean up bloated caches on client boot to keep localStorage below mobile quotas
+if (!isServer) {
+  purgeBloatedLocalStorage();
+}
+
+// Prefer IndexedDB for auth persistence (evades 5MB localStorage quota on mobile).
+// Fall back to browserLocalPersistence if IndexedDB is blocked or unavailable.
 if (!isServer && hasConfig) {
-  setPersistence(auth, browserLocalPersistence)
-    .catch((err) => console.error("Firebase Auth persistence error:", err));
+  setPersistence(auth, indexedDBLocalPersistence).catch(() => {
+    return setPersistence(auth, browserLocalPersistence).catch((err) =>
+      console.error("Firebase Auth persistence error:", err)
+    );
+  });
 }
 
 // --- Exports ---

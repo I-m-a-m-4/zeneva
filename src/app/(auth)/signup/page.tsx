@@ -14,6 +14,7 @@ import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import { usePOS } from '@/context/pos-context';
+import { purgeBloatedLocalStorage } from '@/lib/storage-hygiene';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader, ChevronLeft, ChevronRight, Building, UserCheck, Play, Pause, Sparkles, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -364,7 +365,17 @@ function SignupPageContent() {
     setIsLoading(true);
     void trackLaunchStage('signup_started', 'password');
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+    } catch (createErr: any) {
+      if (createErr?.message?.toLowerCase().includes('quota') || createErr?.message?.toLowerCase().includes('setitem')) {
+        purgeBloatedLocalStorage();
+        userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      } else {
+        throw createErr;
+      }
+    }
       // The account now exists, so the signup itself has succeeded even if the
       // profile write below does not. Recorded here rather than at the end so a
       // `signup_succeeded` *and* a `signup_failed: profile:*` on the same install
@@ -698,6 +709,9 @@ function SignupPageContent() {
 }
 
 export default function SignupPage() {
+  useEffect(() => {
+    purgeBloatedLocalStorage();
+  }, []);
   return (
     <React.Suspense fallback={
       <div className="flex h-screen w-full items-center justify-center flex-col gap-2 bg-background">

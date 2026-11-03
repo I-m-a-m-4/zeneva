@@ -15,6 +15,7 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 import { trackLaunchStage } from "@/lib/launch-telemetry";
+import { purgeBloatedLocalStorage } from "@/lib/storage-hygiene";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useI18n } from "@/context/i18n-context";
 
@@ -61,6 +62,11 @@ export default function LoginPage() {
   };
 
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // Ensure storage hygiene on mount so existing full mobile storages are cleaned upfront
+  useEffect(() => {
+    purgeBloatedLocalStorage();
+  }, []);
 
   // Handle getRedirectResult when the page mounts after a Google redirect login
   useEffect(() => {
@@ -213,7 +219,7 @@ export default function LoginPage() {
     });
   }, [currentSlide]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth) {
       toast({
@@ -224,8 +230,10 @@ export default function LoginPage() {
     }
     setIsLoading(true);
     void trackLaunchStage('login_attempted', 'password');
-    signInWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
+
+    const executeSignIn = async (isRetry = false): Promise<void> => {
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         void trackLaunchStage('login_succeeded', 'password');
         const isSuperAdmin = user.email === 'belloimam431@gmail.com';
@@ -235,11 +243,22 @@ export default function LoginPage() {
           const enrolledFactors = (user as any).multiFactor?.enrolledFactors || [];
           if (enrolledFactors.length === 0) {
               console.warn("MFA Requirement: Super Admin must enroll in MFA.");
-              // We'll handle redirection in the AuthLayout or here if preferred.
           }
         }
-      })
-      .catch((error) => {
+      } catch (error: any) {
+        // If storage quota error blocked Firebase session write, purge bloated cache and retry once
+        const isQuotaError = 
+          error?.name === 'QuotaExceededError' ||
+          error?.code === 22 ||
+          error?.message?.toLowerCase().includes('quota') ||
+          error?.message?.toLowerCase().includes('setitem');
+
+        if (isQuotaError && !isRetry) {
+          console.warn("Storage quota exceeded during login. Purging bloated caches and retrying...");
+          purgeBloatedLocalStorage();
+          return executeSignIn(true);
+        }
+
         let description = t('auth.invalidCredentials');
         if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
           description = t('auth.invalidCredentialsDetailed');
@@ -252,19 +271,18 @@ export default function LoginPage() {
         } else if (error?.message) {
           description = error.message;
         }
-        // The code, never the email or password. This endpoint is
-        // unauthenticated, so nothing identifying may leave the device — and
-        // `auth/invalid-api-key` versus `auth/invalid-credential` is the whole
-        // difference between a broken build and a genuine wrong password, which
-        // the toast above shows identically.
+
         void trackLaunchStage('login_failed', `password:${error?.code ?? 'unknown'}`);
         toast({
           variant: 'destructive',
           title: t('auth.loginFailedTitle'),
           description: description,
         });
-        setIsLoading(false); // Only set loading to false on failure.
-      });
+        setIsLoading(false);
+      }
+    };
+
+    await executeSignIn();
   };
 
   return (

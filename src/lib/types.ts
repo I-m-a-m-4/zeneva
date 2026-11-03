@@ -5,6 +5,7 @@ export interface Product {
     businessId: string;
     name: string;
     sku: string;
+    barcode?: string;
     category: string;
     price: number;
     costPrice?: number;
