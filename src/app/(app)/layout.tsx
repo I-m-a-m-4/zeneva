@@ -241,6 +241,18 @@ export default function AuthenticatedLayout({
   const isReadOnly = businessInstance ? isCoreFeatureBlocked(businessInstance) : false;
   const trialDaysRemaining = businessInstance ? getTrialDaysRemaining(businessInstance) : null;
   const showTrialWarning = !isPremium && !isReadOnly && trialDaysRemaining !== null && trialDaysRemaining > 0 && trialDaysRemaining <= 7;
+  const [isDesktopApp, setIsDesktopApp] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isTauri = !!(window as any).__TAURI_INTERNALS__;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isTauri && !isMobile) {
+        setIsDesktopApp(true);
+      }
+    }
+  }, []);
+
   const [isTrialWarningDismissed, setIsTrialWarningDismissed] = React.useState(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -1673,48 +1685,52 @@ export default function AuthenticatedLayout({
               <header className="no-print flex h-16 shrink-0 items-center gap-2 sm:gap-4 border-b bg-background px-2 sm:px-6 z-10">
                 <div className="flex items-center gap-1 shrink-0">
                   <SidebarTrigger className="hidden md:flex" />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg transition-colors"
-                        onClick={() => {
-                          if (typeof window !== 'undefined' && window.history.length > 1) {
-                            router.back();
-                          }
-                        }}
-                        title="Go Back"
-                        aria-label="Go Back"
-                      >
-                        <ArrowLeft className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p>Go Back</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hidden sm:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg transition-colors"
-                        onClick={() => {
-                          if (typeof window !== 'undefined') {
-                            window.history.forward();
-                          }
-                        }}
-                        title="Go Forward"
-                        aria-label="Go Forward"
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p>Go Forward</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {!isDesktopApp && (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg transition-colors"
+                            onClick={() => {
+                              if (typeof window !== 'undefined' && window.history.length > 1) {
+                                router.back();
+                              }
+                            }}
+                            title="Go Back"
+                            aria-label="Go Back"
+                          >
+                            <ArrowLeft className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>Go Back</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="hidden sm:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg transition-colors"
+                            onClick={() => {
+                              if (typeof window !== 'undefined') {
+                                window.history.forward();
+                              }
+                            }}
+                            title="Go Forward"
+                            aria-label="Go Forward"
+                          >
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>Go Forward</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
                 </div>
                 <BusinessHealthIndicator />
                 {isMounted && <Badge variant="outline" className="hidden md:inline-flex text-[10px] h-5 bg-muted/50 font-mono opacity-60 hover:opacity-100 transition-opacity">v{AppConfig.version}</Badge>}
