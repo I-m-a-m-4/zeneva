@@ -43,12 +43,16 @@ export function TransactionDetailsModal({ transaction, users, open, onOpenChange
         }
     }
 
-    let creatorName = transaction.createdBy || 'System / Unknown';
+    let creatorName = (transaction as any).cashierName || transaction.createdBy || 'System / Unknown';
     if (transaction.createdBy && users) {
-        const user = users.find(u => u.id === transaction.createdBy);
+        const user = users.find(u => u.id === transaction.createdBy || (u as any).uid === transaction.createdBy);
         if (user) {
             creatorName = user.name || user.email || creatorName;
         }
+    }
+    // Clean fallback if it still looks like a raw Firebase Auth UID
+    if (/^[a-zA-Z0-9_-]{20,36}$/.test(creatorName.trim())) {
+        creatorName = 'Staff';
     }
 
     return (

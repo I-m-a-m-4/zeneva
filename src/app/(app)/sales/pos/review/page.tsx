@@ -280,6 +280,7 @@ function ReviewPageContent() {
             createdAt: backdatedAt || new Date(),
             isBackdated: !!backdatedAt,
             createdBy: user.uid,
+            cashierName: activeProfile?.name || user.displayName || 'Staff',
             flagged: isOutsideHours ? { reason: 'outside_operating_hours', openTime: operatingHours?.openTime, closeTime: operatingHours?.closeTime } : null,
             wasScanned,
             isOffline: !navigator.onLine,

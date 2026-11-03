@@ -2406,7 +2406,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
                   date: dateVal,
                   notes: action.payload.receiptData.receiptNumber ? `Sale (Receipt #${action.payload.receiptData.receiptNumber})` : 'Sale',
                   referenceId: action.payload.receiptData.id,
-                  createdBy: action.payload.receiptData.createdBy || '',
+                  createdBy: action.payload.receiptData.cashierName || action.payload.receiptData.createdBy || '',
+                  createdById: action.payload.receiptData.createdBy || '',
+                  cashierName: action.payload.receiptData.cashierName || '',
                   priceOverridden: !!item.priceOverridden,
                   priceOverrideNote: item.priceOverrideNote || null
                 });

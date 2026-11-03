@@ -166,7 +166,7 @@ function EditProductContent() {
     const productId = searchParams.get('id');
 
     const { toast } = useToast();
-    const { currentUserProfile, business, queuedActions, addToQueue, products } = usePOS();
+    const { currentUserProfile, business, queuedActions, addToQueue, products, users, receipts } = usePOS();
     const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
     const { t } = useI18n();
     const firestore = useFirestore();
@@ -199,6 +199,56 @@ function EditProductContent() {
     const [isLogsLoading, setIsLogsLoading] = React.useState(true);
     const [quantityToAddInput, setQuantityToAddInput] = React.useState<string>('');
     const [isVisualStockDialogOpen, setIsVisualStockDialogOpen] = React.useState(false);
+
+    // User resolution map for clean cashier/staff display
+    const userMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        if (users && Array.isArray(users)) {
+            users.forEach((u: any) => {
+                const name = u.name || u.displayName || (u.email ? u.email.split('@')[0] : '');
+                if (u.id && name) map.set(u.id, name);
+                if (u.uid && name) map.set(u.uid, name);
+            });
+        }
+        if (receipts && Array.isArray(receipts)) {
+            receipts.forEach((r: any) => {
+                if (r.createdBy && r.cashierName) {
+                    map.set(r.createdBy, r.cashierName);
+                }
+            });
+        }
+        if (business?.ownerId) {
+            const ownerName = business.ownerName || business.name || 'Owner';
+            map.set(business.ownerId, ownerName);
+        }
+        if (currentUserProfile) {
+            const myId = currentUserProfile.id || (currentUserProfile as any).uid;
+            if (myId && currentUserProfile.name) {
+                map.set(myId, currentUserProfile.name);
+            }
+        }
+        return map;
+    }, [users, receipts, business?.ownerId, business?.ownerName, business?.name, currentUserProfile]);
+
+    const resolveUserName = React.useCallback((val: string | undefined): string => {
+        if (!val || val === 'System') return 'System';
+        
+        // If it's already a readable human name (has spaces, doesn't match standard 20-36 char Firebase Auth UID)
+        const isLikelyUid = /^[a-zA-Z0-9_-]{20,36}$/.test(val.trim());
+        if (!isLikelyUid) return val;
+
+        if (userMap.has(val)) {
+            return userMap.get(val)!;
+        }
+
+        // If it's current user
+        if (currentUserProfile && ((currentUserProfile as any).uid === val || currentUserProfile.id === val)) {
+            return currentUserProfile.name ? `${currentUserProfile.name}` : 'You';
+        }
+
+        // Clean fallback: instead of printing cryptic UID hashes like Vq5t1C7PtQOIvKh7L7kN3L8Wvi82
+        return 'Staff';
+    }, [userMap, currentUserProfile]);
 
     // Category Management
     const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = React.useState(false);
@@ -286,6 +336,10 @@ function EditProductContent() {
                 let type = 'adjustment';
                 if (log.action === 'product.sale') type = 'out';
                 else type = rawAdj >= 0 ? 'in' : 'out';
+
+                const rawReceiptMatch = (details.receiptId || details.reason || '')
+                    .toString()
+                    .match(/rec-[a-zA-Z0-9]+/i)?.[0]?.toLowerCase() || null;
                 
                 return {
                     id: log.id,
@@ -297,8 +351,10 @@ function EditProductContent() {
                     date: log.createdAt,
                     notes: details.reason || log.action,
                     createdBy: log.userName || 'System',
-                    referenceId: log.id,
-                    _isLegacy: true
+                    referenceId: rawReceiptMatch || log.id,
+                    receiptRef: rawReceiptMatch,
+                    _isLegacy: true,
+                    _isAuditSale: log.action === 'product.sale' || (details.reason && String(details.reason).toLowerCase().includes('sold in sale'))
                 };
             }).filter((l: any) => l.quantity > 0 || l.type === 'adjustment'); // keep 0 adjustments just in case
             
@@ -315,20 +371,47 @@ function EditProductContent() {
                 return 0;
             };
 
-            const txRefs = new Set(txLogs.map(t => t.referenceId).filter(Boolean));
-            const filteredLegacy = mappedLegacy.filter((l: any) => {
-                // 1. Exact referenceId match (original dedup)
-                if (txRefs.has(l.id)) return false;
+            const txReceiptIds = new Set<string>();
+            txLogs.forEach((t: any) => {
+                if (t.referenceId) txReceiptIds.add(String(t.referenceId).toLowerCase());
+                const match = t.notes?.match(/rec-[a-zA-Z0-9]+/i);
+                if (match) txReceiptIds.add(match[0].toLowerCase());
+            });
 
-                // 2. Full Edit Page or Quick Restock duplicate check:
-                // These always queue an inventory transaction alongside the audit log.
-                // If an inventory transaction matches this product and quantity within a time window, drop the audit log.
+            const filteredLegacy = mappedLegacy.filter((l: any) => {
+                // 1. If this legacy log is a sale (action === 'product.sale' or 'Sold in Sale'):
+                // Since complete-sale always logs directly to inventory_transactions, any sale audit log
+                // that matches an existing inventory transaction MUST be discarded to prevent duplicate display and balance decay.
+                if (l._isAuditSale) {
+                    if (l.receiptRef && txReceiptIds.has(l.receiptRef)) return false;
+                    const legacySec = toSec(l.date);
+                    const matchingTx = txLogs.some((tx: any) => {
+                        if (tx.productId && tx.productId !== l.productId) return false;
+                        if (l.receiptRef && (String(tx.referenceId).toLowerCase() === l.receiptRef || tx.notes?.toLowerCase().includes(l.receiptRef))) {
+                            return true;
+                        }
+                        if (tx.type === 'out' && Math.abs(tx.quantity) === l.quantity) {
+                            const txSec = toSec(tx.date);
+                            if (legacySec > 0 && txSec > 0 && Math.abs(txSec - legacySec) < 86400) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+                    if (matchingTx) return false;
+                }
+
+                // 2. Exact referenceId or receipt match
+                if (l.receiptRef && txReceiptIds.has(l.receiptRef)) return false;
+                if (txReceiptIds.has(String(l.id).toLowerCase())) return false;
+
+                // 3. Manual restocks or edits that were queued to both inventory_transactions and audit_logs:
                 const legacySec = toSec(l.date);
                 const isDuplicate = txLogs.some((tx: any) => {
-                    if (tx.productId !== l.productId) return false;
+                    if (tx.productId && tx.productId !== l.productId) return false;
                     if (Math.abs(tx.quantity) !== l.quantity) return false;
                     const txSec = toSec(tx.date);
-                    return legacySec > 0 && txSec > 0 && Math.abs(txSec - legacySec) < 60;
+                    return legacySec > 0 && txSec > 0 && Math.abs(txSec - legacySec) < 1800;
                 });
                 if (isDuplicate) return false;
 
@@ -2016,7 +2099,9 @@ function EditProductContent() {
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs">{tx.createdBy || 'System'}</span>
+                                                            <span className="text-xs font-medium text-foreground/90">
+                                                                {resolveUserName(tx.cashierName || tx.userName || tx.createdBy)}
+                                                            </span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right text-[10px] text-muted-foreground px-4">
