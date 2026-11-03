@@ -113,6 +113,7 @@ import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { getIndustryConfig } from '@/lib/industry';
 import { ProductStockHistoryChart } from '@/components/inventory/product-stock-history-chart';
+import { TransactionDetailsModal } from '@/components/inventory/transaction-details-modal';
 
 const makeProductSchema = (t: (key: string) => string) => z.object({
     name: z.string().min(3, t('inventory.valNameMin')),
@@ -199,6 +200,13 @@ function EditProductContent() {
     const [isLogsLoading, setIsLogsLoading] = React.useState(true);
     const [quantityToAddInput, setQuantityToAddInput] = React.useState<string>('');
     const [isVisualStockDialogOpen, setIsVisualStockDialogOpen] = React.useState(false);
+    
+    // Transaction detail modal state
+    const [selectedTx, setSelectedTx] = React.useState<any | null>(null);
+    const [isTxModalOpen, setIsTxModalOpen] = React.useState(false);
+
+    // Dynamic resolution cache for UIDs that aren't in POS cache
+    const [resolvedUserNames, setResolvedUserNames] = React.useState<Record<string, string>>({});
 
     // User resolution map for clean cashier/staff display
     const userMap = React.useMemo(() => {
@@ -217,6 +225,17 @@ function EditProductContent() {
                 }
             });
         }
+        // Map from stock logs and audit logs in memory (e.g. legacy logs that have actorName / cashierName)
+        if (stockLogs && Array.isArray(stockLogs)) {
+            stockLogs.forEach((l: any) => {
+                if (l.actorId && l.actorName) {
+                    map.set(l.actorId, l.actorName);
+                }
+                if (l.createdBy && (l.cashierName || l.userName)) {
+                    map.set(l.createdBy, l.cashierName || l.userName);
+                }
+            });
+        }
         if (business?.ownerId) {
             const ownerName = business.ownerName || business.name || 'Owner';
             map.set(business.ownerId, ownerName);
@@ -227,28 +246,71 @@ function EditProductContent() {
                 map.set(myId, currentUserProfile.name);
             }
         }
+        // Merge dynamically resolved names from server
+        Object.entries(resolvedUserNames).forEach(([uid, name]) => {
+            if (uid && name) {
+                map.set(uid, name);
+            }
+        });
         return map;
-    }, [users, receipts, business?.ownerId, business?.ownerName, business?.name, currentUserProfile]);
+    }, [users, receipts, stockLogs, business?.ownerId, business?.ownerName, business?.name, currentUserProfile, resolvedUserNames]);
+
+    // Background batch resolver: automatically fetch real names for any unresolved UIDs
+    React.useEffect(() => {
+        if (!business?.id || !stockLogs.length) return;
+        const uidsToResolve: string[] = [];
+
+        stockLogs.forEach((l: any) => {
+            const candidate = l.cashierName || l.userName || l.actorId || l.createdBy;
+            if (candidate && typeof candidate === 'string') {
+                const trimmed = candidate.trim();
+                // Check if it's a raw 20-36 char Firebase UID and not yet resolved
+                if (/^[a-zA-Z0-9_-]{20,36}$/.test(trimmed) && !userMap.has(trimmed) && !resolvedUserNames[trimmed]) {
+                    uidsToResolve.push(trimmed);
+                }
+            }
+        });
+
+        if (uidsToResolve.length === 0) return;
+        const uniqueUids = Array.from(new Set(uidsToResolve));
+
+        fetch('/api/users/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ businessId: business.id, uids: uniqueUids }),
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.users) {
+                    setResolvedUserNames(prev => ({ ...prev, ...data.users }));
+                }
+            })
+            .catch(() => {});
+    }, [stockLogs, business?.id, userMap, resolvedUserNames]);
 
     const resolveUserName = React.useCallback((val: string | undefined): string => {
         if (!val || val === 'System') return 'System';
         
+        const trimmed = val.trim();
         // If it's already a readable human name (has spaces, doesn't match standard 20-36 char Firebase Auth UID)
-        const isLikelyUid = /^[a-zA-Z0-9_-]{20,36}$/.test(val.trim());
-        if (!isLikelyUid) return val;
+        const isLikelyUid = /^[a-zA-Z0-9_-]{20,36}$/.test(trimmed);
+        if (!isLikelyUid) return trimmed;
 
-        if (userMap.has(val)) {
-            return userMap.get(val)!;
+        if (userMap.has(trimmed)) {
+            return userMap.get(trimmed)!;
+        }
+
+        if (resolvedUserNames[trimmed]) {
+            return resolvedUserNames[trimmed];
         }
 
         // If it's current user
-        if (currentUserProfile && ((currentUserProfile as any).uid === val || currentUserProfile.id === val)) {
+        if (currentUserProfile && ((currentUserProfile as any).uid === trimmed || currentUserProfile.id === trimmed)) {
             return currentUserProfile.name ? `${currentUserProfile.name}` : 'You';
         }
 
-        // Clean fallback: instead of printing cryptic UID hashes like Vq5t1C7PtQOIvKh7L7kN3L8Wvi82
         return 'Staff';
-    }, [userMap, currentUserProfile]);
+    }, [userMap, resolvedUserNames, currentUserProfile]);
 
     // Category Management
     const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = React.useState(false);
@@ -2041,7 +2103,14 @@ function EditProductContent() {
                                             const isAddition = tx.type === 'in' || tx.type === 'return' || (tx.type === 'adjustment' && tx.quantity > 0);
                                             
                                             return (
-                                                <TableRow key={tx.id} className="hover:bg-muted/20">
+                                                <TableRow 
+                                                    key={tx.id} 
+                                                    className="hover:bg-muted/40 cursor-pointer transition-colors group"
+                                                    onClick={() => {
+                                                        setSelectedTx(tx);
+                                                        setIsTxModalOpen(true);
+                                                    }}
+                                                >
                                                     <TableCell className="px-4">
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-2">
@@ -2100,12 +2169,27 @@ function EditProductContent() {
                                                     <TableCell>
                                                         <div className="flex flex-col">
                                                             <span className="text-xs font-medium text-foreground/90">
-                                                                {resolveUserName(tx.cashierName || tx.userName || tx.createdBy)}
+                                                                {resolveUserName(tx.cashierName || tx.userName || tx.actorName || tx.createdBy)}
                                                             </span>
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-right text-[10px] text-muted-foreground px-4">
-                                                        {tx.date ? formatDistanceToNow(typeof tx.date?.toDate === 'function' ? tx.date.toDate() : (tx.date instanceof Date ? tx.date : new Date(tx.date)), { addSuffix: true }) : t('inventory.justNow')}
+                                                    <TableCell className="text-right px-4">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-xs font-semibold text-foreground">
+                                                                {tx.date ? (() => {
+                                                                    const d = typeof tx.date?.toDate === 'function' ? tx.date.toDate() : (tx.date instanceof Date ? tx.date : new Date(tx.date));
+                                                                    return !isNaN(d.getTime()) ? format(d, 'dd MMM yyyy, HH:mm') : '-';
+                                                                })() : t('inventory.justNow')}
+                                                            </span>
+                                                            {tx.date && (
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    {(() => {
+                                                                        const d = typeof tx.date?.toDate === 'function' ? tx.date.toDate() : (tx.date instanceof Date ? tx.date : new Date(tx.date));
+                                                                        return !isNaN(d.getTime()) ? `(${formatDistanceToNow(d, { addSuffix: true })})` : '';
+                                                                    })()}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                 </TableRow>
                                             );
@@ -2203,6 +2287,14 @@ function EditProductContent() {
                 </AlertDialogContent>
             </AlertDialog>
             <UpgradeOverlay open={showUpgradeOverlay} onOpenChange={setShowUpgradeOverlay} />
+            <TransactionDetailsModal
+                open={isTxModalOpen}
+                onOpenChange={setIsTxModalOpen}
+                transaction={selectedTx ? { ...selectedTx, productName: product?.name } : null}
+                users={users}
+                userMap={userMap}
+                resolveName={resolveUserName}
+            />
         </Form>
     );
 }

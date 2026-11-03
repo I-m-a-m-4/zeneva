@@ -24,6 +24,7 @@ import { useI18n } from '@/context/i18n-context';
 import { trackFeature } from '@/lib/product-telemetry';
 import { formatNumber, formatDateTime } from '@/lib/i18n/format';
 import { qualifyReferralOnSale } from '@/actions/referral';
+import { getSynchronizedNow } from '@/lib/server-time';
 
 
 function ReviewPageContent() {
@@ -99,7 +100,7 @@ function ReviewPageContent() {
         total,
         paymentMethod: paymentMethod as 'Cash' | 'Card' | 'Bank Transfer' | 'Invoice',
         status: (paymentMethod === 'Invoice' ? 'unpaid' : 'paid') as 'pending' | 'unpaid' | 'paid',
-        createdAt: backdatedAt || new Date(), // Use a real date for optimistic display
+        createdAt: backdatedAt || getSynchronizedNow(), // Synchronized server-clock time
     }), [stableReceiptNumber, business?.id, cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, backdatedAt]);
 
     const isAutoPromptedRef = React.useRef(false);
@@ -277,7 +278,7 @@ function ReviewPageContent() {
             profit,
             paymentMethod,
             status,
-            createdAt: backdatedAt || new Date(),
+            createdAt: backdatedAt || getSynchronizedNow(),
             isBackdated: !!backdatedAt,
             createdBy: user.uid,
             cashierName: activeProfile?.name || user.displayName || 'Staff',

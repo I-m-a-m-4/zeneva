@@ -860,6 +860,10 @@ a, button, select, input, [role="button"], .clickable {
 /* Hide browser-only topbar history navigation buttons when inside the Tauri desktop shell */
 .is-desktop .desktop-app-hidden,
 .is-desktop-tauri .desktop-app-hidden,
-[data-tauri-desktop="true"] .desktop-app-hidden {
+[data-tauri-desktop="true"] .desktop-app-hidden,
+html.is-desktop .desktop-app-hidden,
+html.is-desktop-tauri .desktop-app-hidden,
+body.is-desktop .desktop-app-hidden,
+body.is-desktop-tauri .desktop-app-hidden {
   display: none !important;
 }

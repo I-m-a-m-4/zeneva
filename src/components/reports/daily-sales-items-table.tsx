@@ -26,6 +26,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Printer, Image as ImageIcon, FileSpreadsheet, Check, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useI18n } from '@/context/i18n-context';
+import { getSynchronizedNow } from '@/lib/server-time';
 
 interface DailySalesItemsTableProps {
   receipts: Receipt[];
@@ -38,7 +39,7 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   const { toast } = useToast();
   const tableRef = React.useRef<HTMLDivElement>(null);
 
-  const [selectedDate, setSelectedDate] = React.useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = React.useState<Date>(() => getSynchronizedNow());
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
   const [viewBy, setViewBy] = React.useState<'items' | 'customers' | 'receipts'>('items');
@@ -52,6 +53,17 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
   const firestore = useFirestore();
   const { currentUserProfile, business } = usePOS();
   const [dailyTransferReceived, setDailyTransferReceived] = React.useState(0);
+
+  // Intelligently find latest recorded receipt date to guard against laptop clock skew
+  const latestReceiptDate = React.useMemo(() => {
+    if (!receipts || receipts.length === 0) return null;
+    let maxTime = 0;
+    for (const r of receipts) {
+      const t = safeToDate(r.createdAt).getTime();
+      if (!isNaN(t) && t > maxTime) maxTime = t;
+    }
+    return maxTime > 0 ? new Date(maxTime) : null;
+  }, [receipts]);
 
   // Compute Cash, Transfers, and Card for the selected day
   const { dailyCash, dailyTransferExpected, dailyCard } = React.useMemo(() => {
@@ -809,9 +821,9 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
               >
                 <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-white transition-colors" />
                 {selectedDate ? (
-                  isSameDay(selectedDate, new Date()) ? (
+                  isSameDay(selectedDate, getSynchronizedNow()) ? (
                     t('reports.dsiToday', { date: format(selectedDate, 'EEEE, PP') })
-                  ) : isSameDay(selectedDate, subDays(new Date(), 1)) ? (
+                  ) : isSameDay(selectedDate, subDays(getSynchronizedNow(), 1)) ? (
                     t('reports.dsiYesterday', { date: format(selectedDate, 'EEEE, PP') })
                   ) : (
                     format(selectedDate, 'EEEE, PP')
@@ -835,6 +847,31 @@ export default function DailySalesItemsTable({ receipts, products, currencySymbo
               />
             </PopoverContent>
           </Popover>
+        </div>
+
+        {/* Quick Date Jumps: Guards against laptop clock drift */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Button
+            type="button"
+            variant={isSameDay(selectedDate, getSynchronizedNow()) ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-9 px-2.5 text-xs font-medium"
+            onClick={() => setSelectedDate(getSynchronizedNow())}
+          >
+            Today
+          </Button>
+          {latestReceiptDate && !isSameDay(selectedDate, latestReceiptDate) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 px-2.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 transition-colors"
+              onClick={() => setSelectedDate(latestReceiptDate)}
+              title="Jump to latest recorded sales date"
+            >
+              Latest Sales ({format(latestReceiptDate, 'dd MMM')})
+            </Button>
+          )}
         </div>
 
         <div className="relative flex-1 min-w-[240px] group">

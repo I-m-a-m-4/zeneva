@@ -207,7 +207,8 @@ export default function AuthenticatedLayout({
     isSubscriptionActive,
     onlineOrders,
     isImpersonating,
-    stopImpersonation
+    stopImpersonation,
+    isDesktopApp: posIsDesktop,
   } = usePOS();
 
   // Track how long this user is actively using the app
@@ -276,6 +277,8 @@ export default function AuthenticatedLayout({
       checkDesktop();
     }
   }, []);
+
+  const isEffectiveDesktop = isDesktopApp || posIsDesktop;
 
   const [isTrialWarningDismissed, setIsTrialWarningDismissed] = React.useState(() => {
     if (typeof window !== 'undefined') {
@@ -1709,7 +1712,7 @@ export default function AuthenticatedLayout({
               <header className="no-print flex h-16 shrink-0 items-center gap-2 sm:gap-4 border-b bg-background px-2 sm:px-6 z-10">
                 <div className="flex items-center gap-1 shrink-0">
                   <SidebarTrigger className="hidden md:flex" />
-                  {!isDesktopApp && (
+                  {!isEffectiveDesktop && (
                     <div className="desktop-app-hidden flex items-center gap-1">
                       <Tooltip>
                         <TooltipTrigger asChild>
