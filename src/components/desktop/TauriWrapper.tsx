@@ -36,8 +36,33 @@ export function TauriLayoutWrapper({ children }: { children: React.ReactNode }) 
   const darkTopInset = DARK_TOP_INSET_ROUTES.has(pathname ?? '');
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-      setIsTauri(true);
+    if (typeof window !== 'undefined') {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isTauriEnv = !!(window as any).isTauri || 
+                         !!(window as any).__TAURI__ || 
+                         !!(window as any).__TAURI_INTERNALS__ || 
+                         window.location.origin.includes('tauri.localhost') || 
+                         window.location.origin.includes('tauri://');
+
+      if (isTauriEnv) {
+        setIsTauri(true);
+        if (!isMobile) {
+          document.documentElement.classList.add('is-desktop-tauri');
+          document.documentElement.setAttribute('data-tauri-desktop', 'true');
+          document.body.classList.add('is-desktop', 'is-desktop-tauri');
+        }
+      } else {
+        import('@tauri-apps/api/window').then(m => {
+          if (m.getCurrentWindow()) {
+            setIsTauri(true);
+            if (!isMobile) {
+              document.documentElement.classList.add('is-desktop-tauri');
+              document.documentElement.setAttribute('data-tauri-desktop', 'true');
+              document.body.classList.add('is-desktop', 'is-desktop-tauri');
+            }
+          }
+        }).catch(() => {});
+      }
     }
   }, []);
 

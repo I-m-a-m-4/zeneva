@@ -245,11 +245,35 @@ export default function AuthenticatedLayout({
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      const isTauri = !!(window as any).__TAURI_INTERNALS__;
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      if (isTauri && !isMobile) {
-        setIsDesktopApp(true);
-      }
+      if (isMobile) return;
+
+      const checkDesktop = async () => {
+        const isTauriEnv = !!(window as any).isTauri || 
+                           !!(window as any).__TAURI__ || 
+                           !!(window as any).__TAURI_INTERNALS__ || 
+                           window.location.origin.includes('tauri.localhost') || 
+                           window.location.origin.includes('tauri://') ||
+                           document.body.classList.contains('is-desktop') ||
+                           document.documentElement.classList.contains('is-desktop-tauri') ||
+                           document.documentElement.getAttribute('data-tauri-desktop') === 'true';
+
+        if (isTauriEnv) {
+          setIsDesktopApp(true);
+          return;
+        }
+
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          if (getCurrentWindow()) {
+            setIsDesktopApp(true);
+          }
+        } catch {
+          // Web environment
+        }
+      };
+
+      checkDesktop();
     }
   }, []);
 
@@ -1686,7 +1710,7 @@ export default function AuthenticatedLayout({
                 <div className="flex items-center gap-1 shrink-0">
                   <SidebarTrigger className="hidden md:flex" />
                   {!isDesktopApp && (
-                    <>
+                    <div className="desktop-app-hidden flex items-center gap-1">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -1729,7 +1753,7 @@ export default function AuthenticatedLayout({
                           <p>Go Forward</p>
                         </TooltipContent>
                       </Tooltip>
-                    </>
+                    </div>
                   )}
                 </div>
                 <BusinessHealthIndicator />

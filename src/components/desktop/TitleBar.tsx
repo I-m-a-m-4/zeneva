@@ -28,6 +28,11 @@ export function DesktopTitleBar() {
             return;
           }
           setIsTauri(true);
+          if (typeof document !== 'undefined') {
+            document.documentElement.classList.add('is-desktop-tauri');
+            document.documentElement.setAttribute('data-tauri-desktop', 'true');
+            document.body.classList.add('is-desktop', 'is-desktop-tauri');
+          }
           const win = getCurrentWindow();
           setIsMaximized(await win.isMaximized());
         }

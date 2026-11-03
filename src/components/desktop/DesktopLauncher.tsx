@@ -7,13 +7,32 @@ import { useEffect } from 'react';
  */
 export function DesktopLauncher() {
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      if (isMobile) return;
+    if (typeof window === 'undefined') return;
 
-      // Mark as desktop environment
-      document.body.classList.add('is-desktop');
-      
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) return;
+
+    const isTauriEnv = !!(window as any).isTauri || 
+                       !!(window as any).__TAURI__ || 
+                       !!(window as any).__TAURI_INTERNALS__ || 
+                       window.location.origin.includes('tauri.localhost') || 
+                       window.location.origin.includes('tauri://');
+
+    const markDesktop = () => {
+      document.body.classList.add('is-desktop', 'is-desktop-tauri');
+      document.documentElement.classList.add('is-desktop-tauri');
+      document.documentElement.setAttribute('data-tauri-desktop', 'true');
+    };
+
+    if (isTauriEnv) {
+      markDesktop();
+    } else {
+      import('@tauri-apps/api/window').then(m => {
+        if (m.getCurrentWindow()) markDesktop();
+      }).catch(() => {});
+    }
+
+    if (isTauriEnv || document.body.classList.contains('is-desktop')) {
       const updateBackground = () => {
         const root = document.documentElement;
         const body = document.body;

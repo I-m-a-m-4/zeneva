@@ -855,3 +855,11 @@ a, button, select, input, [role="button"], .clickable {
 }
 
 
+
+
+/* Hide browser-only topbar history navigation buttons when inside the Tauri desktop shell */
+.is-desktop .desktop-app-hidden,
+.is-desktop-tauri .desktop-app-hidden,
+[data-tauri-desktop="true"] .desktop-app-hidden {
+  display: none !important;
+}
