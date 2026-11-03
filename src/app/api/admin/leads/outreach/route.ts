@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '@/actions/admin-guard';
 import { sendEmail } from '@/lib/server/resend';
 import { generateRetailOutreachHtml } from '@/lib/server/retail-outreach-email';
 import { adminFirestore } from '@/firebase/admin';
+import { validateEmailWithZeroBounce } from '@/lib/server/zerobounce';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,30 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { ok: false, error: 'A valid recipient email address is required.' },
           { status: 400, headers: corsHeaders }
+        );
+      }
+
+      // Pre-flight deliverability check via ZeroBounce to protect domain reputation
+      const verification = await validateEmailWithZeroBounce(email);
+      if (!verification.canSend) {
+        if (leadId) {
+          try {
+            await db.collection('discovered_leads').doc(leadId).update({
+              status: 'invalid_email',
+              emailValidationStatus: verification.status,
+              emailValidationReason: verification.reason,
+              verifiedAt: new Date().toISOString(),
+            });
+          } catch (_) {}
+        }
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Email deliverability blocked: ${verification.reason}`,
+            validation: verification,
+          },
+          { status: 422, headers: corsHeaders }
         );
       }
 
@@ -146,10 +171,30 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const results: { leadId: string; email: string; success: boolean; error?: string }[] = [];
+      const results: { leadId: string; email: string; success: boolean; error?: string; skipped?: boolean }[] = [];
 
       for (const lead of leadsWithEmail) {
         try {
+          // ZeroBounce pre-check in batch to prevent domain reputation damage
+          const verification = await validateEmailWithZeroBounce(lead.email);
+          if (!verification.canSend) {
+            await db.collection('discovered_leads').doc(lead.id).update({
+              status: 'invalid_email',
+              emailValidationStatus: verification.status,
+              emailValidationReason: verification.reason,
+              verifiedAt: new Date().toISOString(),
+            });
+
+            results.push({
+              leadId: lead.id,
+              email: lead.email,
+              success: false,
+              skipped: true,
+              error: `Skipped: ZeroBounce flagged as ${verification.status} (${verification.reason})`,
+            });
+            continue;
+          }
+
           const generated = generateRetailOutreachHtml({
             businessName: lead.title || lead.companyName || 'Retail Partner',
             category: lead.category || 'General Retail',
