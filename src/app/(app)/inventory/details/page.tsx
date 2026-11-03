@@ -167,7 +167,7 @@ function EditProductContent() {
     const productId = searchParams.get('id');
 
     const { toast } = useToast();
-    const { currentUserProfile, business, queuedActions, addToQueue, products, users, receipts } = usePOS();
+    const { currentUserProfile, business, queuedActions, addToQueue, products, users, receipts, auditLogs } = usePOS();
     const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
     const { t } = useI18n();
     const firestore = useFirestore();
@@ -223,22 +223,43 @@ function EditProductContent() {
                 if (r.createdBy && r.cashierName) {
                     map.set(r.createdBy, r.cashierName);
                 }
+                if (r.createdById && r.cashierName) {
+                    map.set(r.createdById, r.cashierName);
+                }
+                if (r.userId && r.cashierName) {
+                    map.set(r.userId, r.cashierName);
+                }
             });
         }
-        // Map from stock logs and audit logs in memory (e.g. legacy logs that have actorName / cashierName)
+        // Map from global audit logs in memory (includes actorName and actorId for every employee event)
+        if (auditLogs && Array.isArray(auditLogs)) {
+            auditLogs.forEach((a: any) => {
+                const name = a.actorName || a.userName || '';
+                if (a.actorId && name) map.set(a.actorId, name);
+                if (a.userId && name) map.set(a.userId, name);
+                if (a.createdBy && name) map.set(a.createdBy, name);
+            });
+        }
+        // Map from stock logs in memory (e.g. legacy logs that have actorName / cashierName)
         if (stockLogs && Array.isArray(stockLogs)) {
             stockLogs.forEach((l: any) => {
-                if (l.actorId && l.actorName) {
-                    map.set(l.actorId, l.actorName);
-                }
-                if (l.createdBy && (l.cashierName || l.userName)) {
-                    map.set(l.createdBy, l.cashierName || l.userName);
+                const name = l.actorName || l.cashierName || l.userName;
+                if (l.actorId && name) map.set(l.actorId, name);
+                if (l.createdById && name) map.set(l.createdById, name);
+                if (l.createdBy && name && !/^[a-zA-Z0-9_-]{20,36}$/.test(name.trim())) {
+                    map.set(l.createdBy, name);
                 }
             });
         }
         if (business?.ownerId) {
             const ownerName = business.ownerName || business.name || 'Owner';
             map.set(business.ownerId, ownerName);
+        }
+        if (business?.settings?.staff && Array.isArray(business.settings.staff)) {
+            business.settings.staff.forEach((s: any) => {
+                if (s.id && s.name) map.set(s.id, s.name);
+                if (s.uid && s.name) map.set(s.uid, s.name);
+            });
         }
         if (currentUserProfile) {
             const myId = currentUserProfile.id || (currentUserProfile as any).uid;
@@ -253,7 +274,7 @@ function EditProductContent() {
             }
         });
         return map;
-    }, [users, receipts, stockLogs, business?.ownerId, business?.ownerName, business?.name, currentUserProfile, resolvedUserNames]);
+    }, [users, receipts, auditLogs, stockLogs, business?.ownerId, business?.ownerName, business?.name, business?.settings?.staff, currentUserProfile, resolvedUserNames]);
 
     // Background batch resolver: automatically fetch real names for any unresolved UIDs
     React.useEffect(() => {
@@ -274,7 +295,7 @@ function EditProductContent() {
         if (uidsToResolve.length === 0) return;
         const uniqueUids = Array.from(new Set(uidsToResolve));
 
-        fetch('/api/users/resolve', {
+        fetch(`${apiBase()}/api/users/resolve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ businessId: business.id, uids: uniqueUids }),
@@ -309,8 +330,18 @@ function EditProductContent() {
             return currentUserProfile.name ? `${currentUserProfile.name}` : 'You';
         }
 
+        // Search in stockLogs for any reference to this UID having a cashierName or actorName
+        for (const l of stockLogs as any[]) {
+            if ((l.createdBy === trimmed || l.createdById === trimmed || l.actorId === trimmed) && (l.cashierName || l.actorName || l.userName)) {
+                const foundName = l.cashierName || l.actorName || l.userName;
+                if (foundName && !/^[a-zA-Z0-9_-]{20,36}$/.test(foundName.trim())) {
+                    return foundName.trim();
+                }
+            }
+        }
+
         return 'Staff';
-    }, [userMap, resolvedUserNames, currentUserProfile]);
+    }, [userMap, resolvedUserNames, currentUserProfile, stockLogs]);
 
     // Category Management
     const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = React.useState(false);
@@ -412,7 +443,9 @@ function EditProductContent() {
                     closingStock: details.newStock !== undefined ? Number(details.newStock) : undefined,
                     date: log.createdAt,
                     notes: details.reason || log.action,
-                    createdBy: log.userName || 'System',
+                    createdBy: log.actorName || log.userName || log.actorId || log.userId || 'System',
+                    actorName: log.actorName || log.userName || '',
+                    actorId: log.actorId || log.userId || '',
                     referenceId: rawReceiptMatch || log.id,
                     receiptRef: rawReceiptMatch,
                     _isLegacy: true,

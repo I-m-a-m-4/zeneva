@@ -108,3 +108,4 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
+

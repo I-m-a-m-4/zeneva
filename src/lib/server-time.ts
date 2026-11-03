@@ -4,6 +4,8 @@
  * (e.g. wrong date/time setting, dead CMOS battery, or daylight savings offset).
  */
 
+import { apiBase } from '@/lib/platform';
+
 const STORAGE_KEY = 'zeneva_clock_offset_ms';
 
 let clockOffsetMs: number = (() => {
@@ -61,7 +63,7 @@ export async function syncServerTime(force = false): Promise<number> {
 
   try {
     const startTime = Date.now();
-    const res = await fetch('/api/time', {
+    const res = await fetch(`${apiBase()}/api/time`, {
       method: 'GET',
       cache: 'no-store',
     });
@@ -107,3 +109,4 @@ if (typeof window !== 'undefined') {
   window.addEventListener('focus', () => syncServerTime());
   window.addEventListener('online', () => syncServerTime(true));
 }
+

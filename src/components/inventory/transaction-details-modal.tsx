@@ -75,6 +75,11 @@ export function TransactionDetailsModal({
         }
     }
 
+    // Safety guard: never display a raw Firebase UID string to end-users
+    if (typeof creatorName === 'string' && /^[a-zA-Z0-9_-]{20,36}$/.test(creatorName.trim())) {
+        creatorName = 'Staff';
+    }
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md w-[95vw] p-0 overflow-hidden rounded-2xl border shadow-xl">

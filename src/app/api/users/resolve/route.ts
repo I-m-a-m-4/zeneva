@@ -61,38 +61,31 @@ export async function POST(req: NextRequest) {
             return;
           }
 
+          // 1. Direct user profile lookup in Firestore
           const uDoc = await db.collection('users').doc(uid).get();
           if (uDoc.exists) {
             const data = uDoc.data();
-            const name = data?.name || data?.displayName || (data?.email ? data.email.split('@')[0] : null);
+            const name = data?.name || data?.displayName || data?.fullName || (data?.firstName ? `${data.firstName} ${data?.lastName || ''}`.trim() : null) || (data?.email ? data.email.split('@')[0] : null);
             if (name) {
               resolvedMap[uid] = name;
               return;
             }
           }
 
-          // 2. Fallback: check business audit logs where this user was the actor
-          const auditSnap = await db
-            .collection('businessInstances')
-            .doc(businessId)
-            .collection('auditLogs')
-            .where('actorId', '==', uid)
-            .limit(1)
-            .get();
-
-          if (!auditSnap.empty) {
-            const auditData = auditSnap.docs[0].data();
-            if (auditData?.actorName) {
-              resolvedMap[uid] = auditData.actorName;
+          // 2. Fallback: check business owner
+          const bizDoc = await db.collection('businessInstances').doc(businessId).get();
+          if (bizDoc.exists) {
+            const bData = bizDoc.data();
+            if (bData?.ownerId === uid) {
+              resolvedMap[uid] = bData.ownerName || bData.name || 'Owner';
               return;
             }
           }
 
-          // 3. Fallback: check business receipts where this user was cashier
+          // 3. Fallback: check receipts collection (root level) where this user was cashier
           const receiptSnap = await db
-            .collection('businessInstances')
-            .doc(businessId)
             .collection('receipts')
+            .where('businessId', '==', businessId)
             .where('createdBy', '==', uid)
             .limit(1)
             .get();
@@ -105,7 +98,56 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // 4. Fallback: check Firebase Auth user record
+          // Also check by createdById
+          const receiptSnap2 = await db
+            .collection('receipts')
+            .where('businessId', '==', businessId)
+            .where('createdById', '==', uid)
+            .limit(1)
+            .get();
+
+          if (!receiptSnap2.empty) {
+            const rData = receiptSnap2.docs[0].data();
+            if (rData?.cashierName) {
+              resolvedMap[uid] = rData.cashierName;
+              return;
+            }
+          }
+
+          // 4. Fallback: check business audit logs where this user was actor
+          const auditSnap = await db
+            .collection('businessInstances')
+            .doc(businessId)
+            .collection('auditLogs')
+            .where('actorId', '==', uid)
+            .limit(1)
+            .get();
+
+          if (!auditSnap.empty) {
+            const auditData = auditSnap.docs[0].data();
+            if (auditData?.actorName || auditData?.userName) {
+              resolvedMap[uid] = auditData.actorName || auditData.userName;
+              return;
+            }
+          }
+
+          // 5. Fallback: check inventory_transactions where cashierName was stamped
+          const invSnap = await db
+            .collection('inventory_transactions')
+            .where('businessId', '==', businessId)
+            .where('createdById', '==', uid)
+            .limit(1)
+            .get();
+
+          if (!invSnap.empty) {
+            const invData = invSnap.docs[0].data();
+            if (invData?.cashierName) {
+              resolvedMap[uid] = invData.cashierName;
+              return;
+            }
+          }
+
+          // 6. Fallback: check Firebase Auth user record
           if (adminAuth) {
             try {
               const authUser = await adminAuth.getUser(uid);
@@ -128,3 +170,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: error?.message || 'Failed to resolve users' }, { status: 500 });
   }
 }
+

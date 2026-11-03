@@ -132,7 +132,7 @@ export default function MarketingStudioPage() {
             <PenTool className="h-4 w-4" /> Drawn demos
           </TabsTrigger>
           <TabsTrigger value="leads" className="gap-2 font-bold text-orange-600 data-[state=active]:bg-orange-600 data-[state=active]:text-white">
-            <Sparkles className="h-4 w-4" /> Client Discovery (Exa)
+            <Sparkles className="h-4 w-4" /> Client Discovery & Outreach
           </TabsTrigger>
         </TabsList>
 
