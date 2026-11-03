@@ -408,8 +408,9 @@ export async function POST(req: Request) {
 
   let modelMessages;
   try {
-    // Keep conversation window bounded to prevent exceeding strict token-per-minute (TPM) limits on free/on-demand tiers
-    const recentNormalised = normalised.length > 8 ? normalised.slice(-8) : normalised;
+    // Cap conversation memory to the last 4 turns (2 user queries + 2 assistant responses)
+    // to keep request payloads lightweight and stay safely within Groq's 8,000 TPM limit.
+    const recentNormalised = normalised.length > 4 ? normalised.slice(-4) : normalised;
     modelMessages = await convertToModelMessages(slimHistory(recentNormalised) as UIMessage[]);
   } catch (e: any) {
     console.error('Failed to convert chat history:', e);
