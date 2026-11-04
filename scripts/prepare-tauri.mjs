@@ -169,7 +169,29 @@ const stubs = [
     // this stub proxies subscription activation over HTTPS to the hosted API.
     {
         path: 'src/actions/subscription.ts',
-        content: `import { apiBase } from '@/lib/platform';\n\nexport type UpgradeResult = { ok: true; plan: string; expiresAt: string } | { ok: false; error: string };\n\nexport async function activateSubscription(params: any): Promise<UpgradeResult> {\n  try {\n    const res = await fetch(\\`\\${apiBase()}/api/subscription/activate\\`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        ...(params?.idToken ? { Authorization: \\`Bearer \\${params.idToken}\\` } : {}),\n      },\n      body: JSON.stringify(params || {}),\n    });\n    const data = await res.json();\n    return data;\n  } catch (err: any) {\n    return { ok: false, error: err.message || 'Network error during upgrade verification.' };\n  }\n}\n`,
+        content: `import { apiBase } from '@/lib/platform';
+
+export type UpgradeResult = { ok: true; plan: string; expiresAt: string } | { ok: false; error: string };
+
+export async function activateSubscription(params: any): Promise<UpgradeResult> {
+  try {
+    const base = apiBase();
+    const url = (base || '') + '/api/subscription/activate';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(params?.idToken ? { 'Authorization': 'Bearer ' + params.idToken } : {}),
+      },
+      body: JSON.stringify(params || {}),
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { ok: false, error: err.message || 'Network error during upgrade verification.' };
+  }
+}
+`,
     },
 
     // src/actions/referral.ts
