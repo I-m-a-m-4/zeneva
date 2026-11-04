@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-const isTauri = process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true';
+const isTauri = Boolean(process.env.TAURI_PLATFORM || process.env.IS_TAURI === 'true');
 
 // Single source of truth for the version the running app reports. Read from
 // package.json at build time so AppConfig.version cannot drift from the real
@@ -71,12 +71,6 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: false,
   },
   images: {
     unoptimized: isTauri ? true : undefined,
