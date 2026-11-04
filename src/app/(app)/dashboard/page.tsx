@@ -28,9 +28,18 @@ import {
   ShoppingBag, // for units sold
   TrendingDown,
   FileText,
+  Wallet,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import type { TopSellingItem, BusinessAnalysisOutput, Receipt } from '@/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import type { TopSellingItem, BusinessAnalysisOutput, Receipt, Expense } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -54,6 +63,8 @@ import { CachedImage } from '@/components/shared/cached-image';
 import { CurrencyAmount } from '@/components/shared/currency-amount';
 import { useI18n } from '@/context/i18n-context';
 import { DashboardBodySkeleton } from './skeleton';
+import { collection, query, where, getDocs, Timestamp, limit } from 'firebase/firestore';
+
 
 const OverviewChart = dynamic(() => import('@/components/dashboard/overview-chart'), {
   ssr: false,
@@ -73,7 +84,7 @@ const CategoryPieChart = dynamic(() => import('@/components/dashboard/category-p
 function DashboardSkeleton({ restricted }: { restricted: boolean }) {
   return (
     <DashboardBodySkeleton
-      cards={restricted ? 3 : 8}
+      cards={restricted ? 3 : 9}
       charts={!restricted}
       className="bg-background p-1 pb-10 sm:pb-1"
     />
@@ -87,8 +98,10 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = React.useState(false);
+  const [isNetCashModalOpen, setIsNetCashModalOpen] = React.useState(false);
 
-  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats, fetchReceiptsInRange } = usePOS();
+
+  const { products, receipts, customers, isLoading: isPosLoading, currencySymbol, business, onlineOrders, stats, fetchReceiptsInRange, firestore } = usePOS();
   const { activeBranchId } = useBranch();
 
   // Date range state, defaults to today
@@ -99,6 +112,8 @@ export default function DashboardPage() {
 
 
   const [dashboardBatchReceipts, setDashboardBatchReceipts] = React.useState<Receipt[]>([]);
+  const [dashboardExpenses, setDashboardExpenses] = React.useState<Expense[]>([]);
+
   const [isFetchingBatch, setIsFetchingBatch] = React.useState(false);
 
   const isNative = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
@@ -319,6 +334,39 @@ export default function DashboardPage() {
 
     const useGlobalStats = showLifetime && (!activeBranchId || activeBranchId === 'all');
 
+        const isPurchaseExpense = (e: Expense) => {
+      if (!e) return false;
+      const cat = String(e.category || '').toLowerCase().trim();
+      const type = String((e as any).type || '').toLowerCase().trim();
+      const expType = String((e as any).expenseType || '').toLowerCase().trim();
+      return (
+        cat === 'supplier_payment' || 
+        cat === 'procurement' || 
+        cat === 'inventory_procurement' ||
+        cat === 'purchase' ||
+        cat === 'purchases' ||
+        type === 'purchase' ||
+        expType === 'purchase'
+      );
+    };
+
+    const realizedExpenses = dashboardExpenses.filter(e => (e as any)?.status !== 'pending');
+    let totalRestockPaid = 0;
+    let totalOperatingExpenses = 0;
+
+    realizedExpenses.forEach(e => {
+      const amt = Number(e.amount) || 0;
+      if (isPurchaseExpense(e)) {
+        totalRestockPaid += amt;
+      } else {
+        totalOperatingExpenses += amt;
+      }
+    });
+
+    const totalCashOutflow = totalRestockPaid + totalOperatingExpenses;
+    const finalRevenueForNet = useGlobalStats ? (stats?.totalRevenue || 0) : totalRevenue;
+    const netCashInHand = finalRevenueForNet - totalCashOutflow;
+
     return {
       totalStock,
       uniqueSkus,
@@ -340,9 +388,14 @@ export default function DashboardPage() {
       serviceUnitsSold,
       productUnitsSold,
       serviceRevenue,
-      productRevenue
+      productRevenue,
+      totalCashOutflow,
+      totalRestockPaid,
+      totalOperatingExpenses,
+      netCashInHand,
+      realizedExpenses
     };
-  }, [products, receipts, customers, onlineOrders, date, stats, dashboardBatchReceipts, activeBranchId]);
+  }, [products, receipts, customers, onlineOrders, date, stats, dashboardBatchReceipts, activeBranchId, dashboardExpenses]);
 
   // Surgical Analytics for Date Range
   const [rangeStats, setRangeStats] = React.useState<{ revenue: number, count: number, customers: number } | null>(null);
@@ -404,6 +457,27 @@ export default function DashboardPage() {
           // Also fetch the actual receipts for Top Selling Items calculation
           const BatchRes = await fetchReceiptsInRange(startOfDay(parsedFrom), endOfDay(parsedTo), 500);
           setDashboardBatchReceipts(BatchRes);
+
+          // Fetch expenses for cash outflow in this range
+          if (business?.id && firestore) {
+            try {
+              const expQ = query(
+                collection(firestore, 'expenses'),
+                where('businessId', '==', business.id),
+                where('date', '>=', Timestamp.fromDate(startOfDay(parsedFrom))),
+                where('date', '<=', Timestamp.fromDate(endOfDay(parsedTo))),
+                limit(1000)
+              );
+              const expSnap = await getDocs(expQ);
+              const exps = expSnap.docs.map(d => ({ ...d.data(), id: d.id } as Expense));
+              setDashboardExpenses(exps);
+            } catch (err) {
+              console.warn("Dashboard expenses fetch failed:", err);
+              setDashboardExpenses([]);
+            }
+          } else {
+            setDashboardExpenses([]);
+          }
         } catch (err) {
           console.error("Dashboard range fetch failed:", err);
         } finally {
@@ -414,9 +488,10 @@ export default function DashboardPage() {
     } else {
       setRangeStats(null);
       setDashboardBatchReceipts([]);
+      setDashboardExpenses([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFromTime, dateToTime, fetchDetailedAnalytics, fetchReceiptsInRange]);
+  }, [dateFromTime, dateToTime, fetchDetailedAnalytics, fetchReceiptsInRange, business?.id, firestore]);
 
   // Merge range stats into dashboard calculations
   const finalDashboardData = React.useMemo(() => {
@@ -434,8 +509,11 @@ export default function DashboardPage() {
       finalServiceRevenue = sRatio * rangeStats.revenue;
     }
 
+    const netCashInHand = rangeStats.revenue - (dashboardData.totalCashOutflow || 0);
+
     return {
       ...dashboardData,
+      netCashInHand,
       totalRevenue: rangeStats.revenue,
       totalSalesValue: rangeStats.revenue,
       totalReceipts: rangeStats.count,
@@ -487,7 +565,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton restricted={isRestricted} />;
   }
 
-  const { totalRevenue, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold, serviceRevenue, productRevenue, recentSalesItems } = finalDashboardData;
+  const { totalRevenue, netCashInHand, totalCashOutflow, totalRestockPaid, totalOperatingExpenses, realizedExpenses, newCustomersCount, totalUnitsSold, totalStock, uniqueSkus, lowStockItems, totalSalesValue, totalReceipts, totalOnlineSalesValue, totalOnlineOrdersCount, topSellingItems, topLoyaltyCustomers, isLoyaltyEnabled, debtItemsCount, totalDebtUnits, serviceUnitsSold, productUnitsSold, serviceRevenue, productRevenue, recentSalesItems } = finalDashboardData;
 
 
   return (
@@ -513,6 +591,19 @@ export default function DashboardPage() {
             icon={currencySymbol}
             description={t('dashboard.totalTransactions', { count: ((totalReceipts || 0) + (totalOnlineOrdersCount || 0)).toLocaleString() })}
             href="/reports"
+          />
+        )}
+        {!isRestricted && (totalCashOutflow || 0) > 0 && (
+          <SummaryCard
+            title={t('dashboard.netCashInHand')}
+            value={<CurrencyAmount symbol={currencySymbol} amount={netCashInHand || 0} />}
+            icon={Wallet}
+            description={
+              t('dashboard.netCashWithOutflow', {
+                outflow: `${currencySymbol}${(totalCashOutflow || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+              })
+            }
+            onClick={() => setIsNetCashModalOpen(true)}
           />
         )}
         {!isRestricted && (

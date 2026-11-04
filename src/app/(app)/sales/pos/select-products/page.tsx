@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { usePOS } from "@/context/pos-context";
-import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock, Shirt, Smartphone, Pill, Coffee, GripVertical } from "lucide-react";
+import { PlusCircle, Search, ShoppingCart, Trash2, Package, PackageOpen, Columns, Loader2, ChevronsUp, ListFilter, Archive, History, Clock, Shirt, Smartphone, Pill, Coffee, GripVertical, QrCode, Sparkles } from "lucide-react";
 import { CachedImage } from "@/components/shared/cached-image";
 import Link from "next/link";
 import * as React from "react";
@@ -23,7 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner";
-import { QrCode } from "lucide-react";
+import { VisualProductScanner } from "@/components/pos/visual-product-scanner";
+
 import { ImageDialog } from "@/components/shared/image-dialog";
 import { CatalogUnavailable } from "@/components/shared/catalog-unavailable";
 import HeldSalesDrawer from "@/components/pos/held-sales-drawer";
@@ -552,6 +553,7 @@ export default function SelectProductsPage() {
 
     const [isNavigating, setIsNavigating] = React.useState(false);
     const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+    const [isVisionScannerOpen, setIsVisionScannerOpen] = React.useState(false);
     
     // Custom drag resize logic for the cart
     const [cartWidth, setCartWidth] = React.useState(350);
@@ -733,6 +735,32 @@ export default function SelectProductsPage() {
         }
     }, [addToCart, products, isReadOnly, toast]);
 
+    const handleVisionProductSelect = React.useCallback((product: Product) => {
+        if (isReadOnly) {
+            toast({
+                title: "Plan Expired",
+                description: "Your 30-day trial or plan has ended. Please upgrade your plan to record new sales.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        if (product.isArchived) {
+            toast({
+                variant: "destructive",
+                title: "Product Discontinued / Archived",
+                description: `${product.name} is archived. Restore it in Inventory to sell.`
+            });
+            return;
+        }
+
+        handleAddToCart(product);
+        toast({
+            title: "Added via AI Vision",
+            description: `${product.name} added to cart`,
+        });
+    }, [handleAddToCart, isReadOnly, toast]);
+
     const handleScan = (sku: string) => {
         if (isReadOnly) {
             toast({
@@ -819,6 +847,16 @@ export default function SelectProductsPage() {
                             aria-label={t('pos.scanBarcode')}
                         >
                             <QrCode className="h-6 w-6" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-11 w-11 shrink-0 border-orange-500/30 text-orange-600 dark:text-orange-400 bg-orange-500/5 hover:bg-orange-500/10"
+                            onClick={() => setIsVisionScannerOpen(true)}
+                            title="AI Visual Product Scanner"
+                            aria-label="AI Visual Product Scanner"
+                        >
+                            <Sparkles className="h-5 w-5" />
                         </Button>
                         <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
@@ -1130,6 +1168,15 @@ export default function SelectProductsPage() {
                     isOpen={isScannerOpen}
                     onClose={() => setIsScannerOpen(false)}
                     onScan={handleScan}
+                />
+            )}
+            {isVisionScannerOpen && (
+                <VisualProductScanner
+                    isOpen={isVisionScannerOpen}
+                    onClose={() => setIsVisionScannerOpen(false)}
+                    products={products || []}
+                    onProductSelect={handleVisionProductSelect}
+                    currencySymbol={business?.settings?.currency || '₦'}
                 />
             )}
             <ImageDialog

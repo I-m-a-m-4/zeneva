@@ -93,7 +93,7 @@ export function TransactionDetailsModal({
                                     ? 'text-emerald-700 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400' 
                                     : 'text-rose-700 border-rose-300 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-400'
                             }`}>
-                                {transaction.type === 'in' ? 'Stock Added' : transaction.type === 'out' ? 'Stock Out (Sale / Adjustment)' : transaction.type === 'return' ? 'Customer Return' : 'Adjustment'}
+                                {transaction.type === 'in' ? 'Stock Added' : transaction.type === 'out' ? 'Stock Out (Sale / Adjustment)' : transaction.type === 'return' ? 'Customer Return' : transaction.type === 'edit' ? 'Product Details Edit' : 'Adjustment'}
                             </Badge>
                             <div className="flex items-center text-xs font-medium text-muted-foreground">
                                 <Calendar className="h-3.5 w-3.5 mr-1 text-primary/70" />

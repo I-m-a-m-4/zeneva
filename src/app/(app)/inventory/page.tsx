@@ -38,7 +38,8 @@ import {
   List,
   Camera,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  QrCode
 } from "lucide-react";
 import { ReorderInvoiceModal } from '@/components/inventory/reorder-invoice-modal';
 import InventoryDepletionCard from '@/components/reports/inventory-depletion-card';
@@ -125,7 +126,7 @@ import BulkEditDialog from '@/components/inventory/bulk-edit-dialog';
 import { BulkImageEditor } from '@/components/inventory/bulk-image-editor';
 import BarcodeDialog from '@/components/inventory/barcode-dialog';
 import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
-import { QrCode } from 'lucide-react';
+import { VisualProductScanner } from '@/components/pos/visual-product-scanner';
 import { ImageDialog } from "@/components/shared/image-dialog";
 import { CatalogUnavailable } from "@/components/shared/catalog-unavailable";
 import { InventoryBodySkeleton } from './skeleton';
@@ -329,6 +330,7 @@ function InventoryPageContent() {
   const [quickRestockProduct, setQuickRestockProduct] = React.useState<Product | null>(null);
   const [barcodeProduct, setBarcodeProduct] = React.useState<Product | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+  const [isVisionScannerOpen, setIsVisionScannerOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('all');
   const [healthFilter, setHealthFilter] = React.useState<'all'|'missing-image'|'out-of-stock'|'low-stock'|'negative'|'missing-cost-price'>('all');
   const [analyticsPeriod, setAnalyticsPeriod] = React.useState<'30d' | '90d' | '6m' | '1y' | 'all'>('30d');
@@ -1275,6 +1277,18 @@ function InventoryPageContent() {
                     Management Tools
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setIsVisionScannerOpen(true)} className="flex items-center gap-2.5 p-2 cursor-pointer rounded-md focus:bg-orange-500/10 focus:text-orange-600 dark:focus:text-orange-400 group">
+                    <Sparkles className="h-4 w-4 text-orange-500 group-hover:scale-110 transition-transform" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
+                        AI Vision Scanner
+                        <span className="text-[9px] bg-orange-500/10 text-orange-600 px-1 rounded font-mono">EDGE</span>
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Point camera to identify product
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsCostPriceOpen(true)} className="flex items-center gap-2.5 p-2 cursor-pointer rounded-md focus:bg-primary/10 focus:text-primary group">
                     <Coins className="h-4 w-4 text-muted-foreground group-focus:text-primary transition-colors" />
                     <span className="font-medium text-xs">Cost Prices</span>
@@ -2742,6 +2756,19 @@ function InventoryPageContent() {
             setSearchTerm(sku);
             setIsScannerOpen(false);
           }}
+        />
+      )}
+
+      {isVisionScannerOpen && (
+        <VisualProductScanner
+          isOpen={isVisionScannerOpen}
+          onClose={() => setIsVisionScannerOpen(false)}
+          products={products || []}
+          onProductSelect={(product) => {
+            setSearchTerm(product.name);
+            setIsVisionScannerOpen(false);
+          }}
+          currencySymbol={business?.settings?.currency || '₦'}
         />
       )}
       <ImageDialog 

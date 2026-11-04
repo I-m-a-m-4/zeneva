@@ -6,7 +6,7 @@ import { useBranch } from '@/context/branch-context';
 import type { Receipt, Customer, Expense, Product } from '@/types';
 import PageTitle from '@/components/shared/page-title';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Sparkles, AlertCircle, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { DollarSign, FileText, Package, ShoppingCart, Users, Download, Loader2, BarChart, Bot, Layers, TrendingUp, Coins, Sparkles, AlertCircle, ArrowUp, ArrowDown, Minus, Wallet } from 'lucide-react';
 import SalesOverTimeChart from '@/components/reports/sales-over-time-chart';
 import TopItemsPanel from '@/components/reports/top-items-panel';
 import { DateRangePicker } from '@/components/reports/date-range-picker';
@@ -162,6 +162,22 @@ function ReportStatCard({ title, value, icon: Icon, description, delta, onClick 
 
 
 
+export const isPurchaseExpense = (e: Expense) => {
+    if (!e) return false;
+    const cat = String(e.category || '').toLowerCase().trim();
+    const type = String((e as any).type || '').toLowerCase().trim();
+    const expType = String((e as any).expenseType || '').toLowerCase().trim();
+    return (
+        cat === 'supplier_payment' || 
+        cat === 'procurement' || 
+        cat === 'inventory_procurement' ||
+        cat === 'purchase' ||
+        cat === 'purchases' ||
+        type === 'purchase' ||
+        expType === 'purchase'
+    );
+};
+
 function DataInsightModalContent({
     insightModal,
     reportBatchReceipts,
@@ -169,7 +185,8 @@ function DataInsightModalContent({
     products,
     finalReportData,
     comparison,
-    currencySymbol
+    currencySymbol,
+    expenses = []
 }: {
     insightModal: any,
     reportBatchReceipts: Receipt[],
@@ -177,14 +194,20 @@ function DataInsightModalContent({
     products: Product[],
     finalReportData: any,
     comparison: any,
-    currencySymbol: string
+    currencySymbol: string,
+    expenses?: Expense[]
 }) {
     const [page, setPage] = React.useState(0);
-    const rowsPerPage = 5;
+    const [costBreakdownTab, setCostBreakdownTab] = React.useState<'cogs' | 'purchases'>('cogs');
+    const rowsPerPage = 6;
     
     React.useEffect(() => {
         setPage(0);
-    }, [insightModal?.id]);
+        if (insightModal?.id === 'net-cost') {
+            const hasPurchases = Number((finalReportData as any)?.totalPurchases || 0) > 0;
+            setCostBreakdownTab(hasPurchases ? 'purchases' : 'cogs');
+        }
+    }, [insightModal?.id, finalReportData?.totalPurchases]);
 
     let tableContent = null;
     let totalItems = 0;
@@ -272,25 +295,220 @@ function DataInsightModalContent({
             );
         }
     } else if (insightModal?.id === 'net-cost') {
-        const costMap = new Map<string, {name: string, totalCost: number}>();
+        const cogsMap = new Map<string, { name: string; quantity: number; costPrice: number; totalCost: number }>();
         reportBatchReceipts.forEach(r => {
             (r.items || []).forEach(item => {
-                const existing = costMap.get(item.productId) || { name: item.name, totalCost: 0 };
-                existing.totalCost += (item.costPrice || 0) * item.quantity;
-                costMap.set(item.productId, existing);
+                const existing = cogsMap.get(item.productId) || {
+                    name: item.name || 'Unknown Item',
+                    quantity: 0,
+                    costPrice: Number(item.costPrice) || 0,
+                    totalCost: 0
+                };
+                const qty = Number(item.quantity) || 0;
+                const cost = Number(item.costPrice) || 0;
+                existing.quantity += qty;
+                existing.totalCost += (cost * qty);
+                if (!existing.costPrice && cost > 0) existing.costPrice = cost;
+                cogsMap.set(item.productId, existing);
             });
         });
-        const costList = Array.from(costMap.values()).sort((a, b) => b.totalCost - a.totalCost);
-        totalItems = costList.length;
-        const pageData = costList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+        const productCogsList = Array.from(cogsMap.values()).sort((a, b) => b.totalCost - a.totalCost);
+        const totalReceiptCogs = (finalReportData as any)?.receiptCost ?? productCogsList.reduce((s, p) => s + p.totalCost, 0);
 
-        tableHeaders = ['Product', 'Total COGS'];
-        tableRows = pageData.map((item, idx) => (
-            <TableRow key={idx}>
-                <TableCell className="font-medium text-xs truncate max-w-[120px]" title={item.name}>{item.name}</TableCell>
-                <TableCell className="text-right text-xs font-medium text-destructive">{formatCurrency(item.totalCost)}</TableCell>
-            </TableRow>
-        ));
+        const realized = (expenses || []).filter(e => (e as any)?.status !== 'pending' && (e as any)?.deductionSource !== 'excluded');
+        const supplierPurchasesList = realized
+            .filter(e => isPurchaseExpense(e))
+            .sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+        const totalPurchasesAmt = (finalReportData as any)?.totalPurchases ?? supplierPurchasesList.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+        const activeList = costBreakdownTab === 'purchases' && supplierPurchasesList.length > 0 ? supplierPurchasesList : productCogsList;
+        totalItems = activeList.length;
+        const pagePurchases = supplierPurchasesList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+        const pageCogs = productCogsList.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+        tableContent = (
+            <div className="flex flex-col h-full gap-4">
+                {/* Cost Component Breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted/20 rounded-lg text-xs border border-border/60">
+                    <div className="space-y-1">
+                        <span className="text-muted-foreground block text-[11px] font-medium">Supplier Restock Invoices</span>
+                        <span className="text-sm font-bold text-amber-600">{formatAmount(totalPurchasesAmt)}</span>
+                        <p className="text-[10px] text-muted-foreground">Cash paid to restock inventory from suppliers</p>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-muted-foreground block text-[11px] font-medium">Sold Items COGS (Unit Costs)</span>
+                        <span className="text-sm font-bold text-destructive">{formatAmount(totalReceiptCogs)}</span>
+                        <p className="text-[10px] text-muted-foreground">Direct cost price of items actually sold to customers</p>
+                    </div>
+                </div>
+
+                <div className="text-[11px] bg-amber-500/10 text-amber-900 dark:text-amber-200 p-2.5 rounded border border-amber-500/20 leading-relaxed">
+                    {totalPurchasesAmt > 0 ? (
+                        <span>
+                            <strong>How Net Cost is Calculated:</strong> Because your store logged <strong>{formatAmount(totalPurchasesAmt)}</strong> in supplier procurement on the Expenses tab, Net Cost reflects your actual cash procurement spend to acquire inventory. Items sold to customers during this period had a direct cost of <strong>{formatAmount(totalReceiptCogs)}</strong> (COGS).
+                        </span>
+                    ) : (
+                        <span>
+                            <strong>How Net Cost is Calculated:</strong> Net Cost is your <strong>Cost of Goods Sold (COGS)</strong> totaling <strong>{formatAmount(totalReceiptCogs)}</strong>. This is derived from each sold product&apos;s cost price multiplied by units sold to customers.
+                        </span>
+                    )}
+                </div>
+
+                {supplierPurchasesList.length > 0 && (
+                    <div className="flex items-center gap-2 border-b pb-2">
+                        <Button
+                            type="button"
+                            variant={costBreakdownTab === 'purchases' ? 'default' : 'outline'}
+                            size="sm"
+                            className="h-8 text-xs font-medium"
+                            onClick={() => {
+                                setCostBreakdownTab('purchases');
+                                setPage(0);
+                            }}
+                        >
+                            Supplier Restock Invoices ({supplierPurchasesList.length})
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={costBreakdownTab === 'cogs' ? 'default' : 'outline'}
+                            size="sm"
+                            className="h-8 text-xs font-medium"
+                            onClick={() => {
+                                setCostBreakdownTab('cogs');
+                                setPage(0);
+                            }}
+                        >
+                            Sold Items COGS ({productCogsList.length})
+                        </Button>
+                    </div>
+                )}
+
+                {costBreakdownTab === 'purchases' && supplierPurchasesList.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-xs">Date</TableHead>
+                                <TableHead className="text-xs">Supplier / Description</TableHead>
+                                <TableHead className="text-xs">Payment</TableHead>
+                                <TableHead className="text-right text-xs">Cost Amount</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {pagePurchases.map((exp: any, idx: number) => {
+                                const expDate = safeToDate(exp.date);
+                                return (
+                                    <TableRow key={exp.id || idx}>
+                                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                            {format(expDate, 'dd MMM yyyy')}
+                                        </TableCell>
+                                        <TableCell className="text-xs font-medium">
+                                            <div className="truncate max-w-[200px]" title={exp.description || exp.title || exp.recipient || 'Supplier Purchase'}>
+                                                {exp.description || exp.title || exp.recipient || 'Supplier Purchase'}
+                                            </div>
+                                            {exp.recipient && exp.description && (
+                                                <div className="text-[10px] text-muted-foreground">{exp.recipient}</div>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-xs capitalize text-muted-foreground">
+                                            {exp.paymentMethod || 'cash'}
+                                        </TableCell>
+                                        <TableCell className="text-right text-xs font-semibold text-destructive whitespace-nowrap">
+                                            {formatAmount(exp.amount)}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-xs">Product</TableHead>
+                                <TableHead className="text-center text-xs">Qty Sold</TableHead>
+                                <TableHead className="text-right text-xs">Unit Cost</TableHead>
+                                <TableHead className="text-right text-xs">Total COGS</TableHead>
+                                <TableHead className="text-right text-xs">% of COGS</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {pageCogs.map((item, idx) => {
+                                const pct = totalReceiptCogs > 0 ? ((item.totalCost / totalReceiptCogs) * 100).toFixed(1) : '0';
+                                return (
+                                    <TableRow key={idx}>
+                                        <TableCell className="font-medium text-xs">
+                                            <div className="truncate max-w-[180px]" title={item.name}>
+                                                {item.name}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-center text-xs font-medium">
+                                            {item.quantity.toLocaleString()}
+                                        </TableCell>
+                                        <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                                            {formatAmount(item.costPrice)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-xs font-semibold text-destructive whitespace-nowrap">
+                                            {formatAmount(item.totalCost)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-xs text-muted-foreground font-mono">
+                                            {pct}%
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                )}
+            </div>
+        );
+    } else if (insightModal?.id === 'net-cash-in-hand') {
+        const grossRev = (finalReportData as any)?.grossRevenue ?? (finalReportData?.totalRevenue ?? 0);
+        const purchases = (finalReportData as any)?.totalPurchases ?? 0;
+        const opex = (finalReportData as any)?.totalOperatingExpenses ?? 0;
+        const reinvested = (finalReportData as any)?.totalProfitReinvested ?? 0;
+        const totalOutflows = (finalReportData as any)?.totalOutflows ?? (purchases + opex + reinvested);
+        const netCash = (finalReportData as any)?.netCashInHand ?? (grossRev - totalOutflows);
+
+        tableContent = (
+            <div className="flex flex-col h-full gap-4">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Cash Flow Component</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell className="font-medium text-xs">Total Sales (Cash Inflow)</TableCell>
+                            <TableCell className="text-right text-xs font-semibold text-emerald-600">+{formatAmount(grossRev)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell className="font-medium text-xs">Less: Inventory Restock & Purchases</TableCell>
+                            <TableCell className="text-right text-xs font-medium text-amber-600">-{formatAmount(purchases)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell className="font-medium text-xs">Less: Operating Expenses (Fuel, Bills, Rent, Wages)</TableCell>
+                            <TableCell className="text-right text-xs font-medium text-rose-600">-{formatAmount(opex)}</TableCell>
+                        </TableRow>
+                        {reinvested > 0 ? (
+                            <TableRow>
+                                <TableCell className="font-medium text-xs">Less: Capital Reinvestments & Drawings</TableCell>
+                                <TableCell className="text-right text-xs font-medium text-purple-600">-{formatAmount(reinvested)}</TableCell>
+                            </TableRow>
+                        ) : null}
+                        <TableRow className="border-t-2 bg-primary/5">
+                            <TableCell className="font-bold text-xs text-foreground">Net Cash in Hand (Liquid Position)</TableCell>
+                            <TableCell className={`text-right text-xs font-bold ${netCash >= 0 ? 'text-primary' : 'text-destructive'}`}>{formatAmount(netCash)}</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+                <p className="text-[11px] text-muted-foreground px-1 italic">
+                    * Formula: Gross Sales Inflow ({formatAmount(grossRev)}) minus Total Cash Outflows ({formatAmount(totalOutflows)}). This reveals your real liquid balance left in hand.
+                </p>
+            </div>
+        );
+        totalItems = 1;
     } else if (insightModal?.id === 'net-profit') {
         const grossRev = (finalReportData as any)?.grossRevenue ?? (finalReportData?.totalRevenue ?? 0);
         const purchases = (finalReportData as any)?.totalPurchases ?? 0;
@@ -729,6 +947,8 @@ export default function ReportsDashboard() {
         const operatingProfit = grossProfit - totalOperatingExpenses;
         const totalProfitReinvested = purchasesFromProfit + expensesFromProfit;
         const totalProfit = operatingProfit - totalProfitReinvested;
+        const totalOutflows = totalOperatingExpenses + totalPurchases + totalProfitReinvested;
+        const netCashInHand = grossSalesRevenue - totalOutflows;
 
         return {
             totalRevenue: grossSalesRevenue,
@@ -783,7 +1003,9 @@ export default function ReportsDashboard() {
             totalCost: totalPurchases > 0 ? totalPurchases : receiptCost,
             totalPurchases,
             totalOperatingExpenses,
-            grossProfit
+            grossProfit,
+            totalOutflows,
+            netCashInHand
         };
     }, [reportBatchReceipts, receipts, products, customers, reportBatchExpenses, activeBranchId, stats?.totalCustomers]);
 
@@ -1147,6 +1369,7 @@ export default function ReportsDashboard() {
             productRevenue: periodDelta(finalReportData?.totalProductRevenue || 0, priorProductRevenue),
             serviceRevenue: periodDelta(finalReportData?.totalServiceRevenue || 0, priorServiceRevenue),
             cost: periodDelta(finalReportData?.totalCost || 0, effectivePriorCost),
+            netCashInHand: periodDelta(finalReportData?.netCashInHand ?? 0, (prior.revenue - (prior.totalExpenses + (priorPurchases > 0 ? priorPurchases : 0) + prior.totalProfitReinvested))),
         };
     }, [previousReceipts, deepReceipts, products, previousExpenses, reportBatchExpenses, finalReportData]);
 
@@ -1318,7 +1541,7 @@ export default function ReportsDashboard() {
                     <>
                         <TabsContent value="analytics" className="space-y-6 mt-0">
                             <Dialog open={!!insightModal} onOpenChange={(open) => !open && setInsightModal(null)}>
-                                <DialogContent className={['sales', 'unique-products', 'customers', 'net-profit'].includes(insightModal?.id || '') ? "max-w-4xl" : ""}>
+                                <DialogContent className={['sales', 'unique-products', 'customers', 'net-profit', 'net-cost', 'net-cash-in-hand'].includes(insightModal?.id || '') ? "max-w-4xl" : ""}>
                                     <DialogHeader>
                                         <DialogTitle>{insightModal?.title} Insights</DialogTitle>
                                     </DialogHeader>
@@ -1330,6 +1553,7 @@ export default function ReportsDashboard() {
                                         finalReportData={finalReportData}
                                         comparison={comparison}
                                         currencySymbol={currencySymbol || '$'}
+                                        expenses={reportBatchExpenses}
                                     />
                                 </DialogContent>
                             </Dialog>
@@ -1353,6 +1577,21 @@ export default function ReportsDashboard() {
                                             : t('reports.kpiRevenueHint')
                                     })}
                                 />
+                                {finalReportData && (finalReportData.totalOutflows || 0) > 0 && (
+                                <ReportStatCard
+                                    title={t('reports.kpiNetCashInHand')}
+                                    value={formatKpiCurrency(finalReportData?.netCashInHand)}
+                                    icon={Wallet}
+                                    description="Net Liquid Cash (Sales minus all cash outflows)"
+                                    delta={comparison?.netCashInHand}
+                                    onClick={() => setInsightModal({
+                                        id: 'net-cash-in-hand',
+                                        title: t('reports.kpiNetCashInHand'),
+                                        value: formatKpiCurrency(finalReportData?.netCashInHand),
+                                        description: 'Detailed breakdown of how Net Cash in Hand is calculated.'
+                                    })}
+                                />
+                                )}
                                 <ReportStatCard
                                     title={t('reports.kpiNetCost')}
                                     value={formatKpiCurrency(finalReportData?.totalCost)}
@@ -1360,13 +1599,17 @@ export default function ReportsDashboard() {
                                     description={
                                         finalReportData && finalReportData.totalPurchases > 0
                                             ? `Supplier purchases (Unit COGS: ${formatKpiCurrency(finalReportData.receiptCost)})`
-                                            : t('reports.kpiNetCostHint')
+                                            : `${t('reports.kpiNetCostHint')} (Click for breakdown)`
                                     }
                                     delta={comparison?.cost}
-                                    onClick={() => {
-                                        setActiveTab('profit-loss');
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
+                                    onClick={() => setInsightModal({
+                                        id: 'net-cost',
+                                        title: t('reports.kpiNetCost'),
+                                        value: formatKpiCurrency(finalReportData?.totalCost),
+                                        description: finalReportData && finalReportData.totalPurchases > 0
+                                            ? 'Detailed breakdown of inventory supplier restock and unit costs of goods sold.'
+                                            : 'Detailed breakdown of unit costs of goods sold across items sold in this period.'
+                                    })}
                                 />
                                 <ReportStatCard
                                     title={t('reports.kpiNetProfit')}

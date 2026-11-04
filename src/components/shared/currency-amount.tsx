@@ -18,8 +18,11 @@ export function CurrencyAmount({
   fractionClassName = "text-[0.65em] font-medium opacity-80 ml-[0.05em]",
   hideFraction = false
 }: CurrencyAmountProps) {
+  const isNegative = (Number(amount) || 0) < 0;
+  const absAmount = Math.abs(Number(amount) || 0);
+
   // Always format to 2 decimal places to guarantee a dot unless we specifically want to hide fractions
-  const formatted = amount.toLocaleString(undefined, { 
+  const formatted = absAmount.toLocaleString(undefined, { 
     minimumFractionDigits: hideFraction ? 0 : 2, 
     maximumFractionDigits: hideFraction ? 0 : 2 
   });
@@ -30,6 +33,7 @@ export function CurrencyAmount({
   if (parts.length === 1 || hideFraction) {
     return (
       <span className={cn("inline-flex items-baseline", className)}>
+        {isNegative && <span className="mr-0.5 font-medium">-</span>}
         <span className={symbolClassName}>{symbol}</span>
         <span>{formatted}</span>
       </span>
@@ -47,6 +51,7 @@ export function CurrencyAmount({
   if (separatorIndex === -1) {
     return (
       <span className={cn("inline-flex items-baseline", className)}>
+        {isNegative && <span className="mr-0.5 font-medium">-</span>}
         <span className={symbolClassName}>{symbol}</span>
         <span>{formatted}</span>
       </span>
@@ -58,6 +63,7 @@ export function CurrencyAmount({
 
   return (
     <span className={cn("inline-flex items-baseline", className)}>
+      {isNegative && <span className="mr-0.5 font-medium">-</span>}
       <span className={symbolClassName}>{symbol}</span>
       <span>{integerPart}</span>
       <span className={fractionClassName}>{fractionPart}</span>

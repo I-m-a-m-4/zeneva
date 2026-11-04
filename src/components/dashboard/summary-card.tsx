@@ -11,9 +11,10 @@ interface SummaryCardProps {
   trend?: string;
   trendDirection?: 'up' | 'down';
   href?: string;
+  onClick?: () => void;
 }
 
-const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, description, icon, trend, trendDirection, href }) => {
+const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, description, icon, trend, trendDirection, href, onClick }) => {
   const Icon = typeof icon !== 'string' ? icon : null;
   const iconStr = typeof icon === 'string' ? icon : null;
 
@@ -39,11 +40,30 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, description, ic
     </Card>
   );
 
+  if (onClick) {
+    return (
+      <div 
+        onClick={onClick} 
+        role="button" 
+        tabIndex={0} 
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className="block h-full cursor-pointer focus:outline-none"
+      >
+        {cardContent}
+      </div>
+    );
+  }
+
   if (href) {
     return (
-        <Link href={href} className="block h-full">
-            {cardContent}
-        </Link>
+      <Link href={href} className="block h-full">
+        {cardContent}
+      </Link>
     );
   }
 

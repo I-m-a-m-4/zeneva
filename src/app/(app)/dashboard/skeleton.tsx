@@ -29,12 +29,12 @@ import {
 
 export function DashboardBodySkeleton({
   /**
-   * Summary cards. An owner sees eight (revenue, product revenue, service
-   * revenue, units, new customers, POS sales, online sales, low stock) plus a
-   * ninth when there are recorded debts. A member of staff without
+   * Summary cards. An owner sees nine (revenue, net cash in hand, product revenue,
+   * service revenue, units, new customers, POS sales, online sales, low stock) plus a
+   * tenth when there are recorded debts. A member of staff without
    * `view_reports` sees only the three that quote no money.
    */
-  cards = 8,
+  cards = 9,
   /** The chart row is behind the same `view_reports` permission as the money cards. */
   charts = true,
   className,

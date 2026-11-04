@@ -167,7 +167,7 @@ function EditProductContent() {
     const productId = searchParams.get('id');
 
     const { toast } = useToast();
-    const { currentUserProfile, business, queuedActions, addToQueue, products, users, receipts, auditLogs } = usePOS();
+    const { currentUserProfile, business, queuedActions, addToQueue, products, users, receipts, auditLogs, currencySymbol } = usePOS();
     const isReadOnly = business ? isCoreFeatureBlocked(business) : false;
     const { t } = useI18n();
     const firestore = useFirestore();
@@ -416,9 +416,7 @@ function EditProductContent() {
             // Map legacy logs to the new format
             const mappedLegacy = legacyLogs.filter((log: any) => {
                 if (log.action === 'product.stock_adjustment' || log.action === 'product.create' || log.action === 'product.sale') return true;
-                if (log.action === 'product.update' || log.action === 'product.bulk_update') {
-                    return log.details?.adjustment !== undefined || log.details?.newStock !== undefined || log.details?.stock !== undefined;
-                }
+                if (log.action === 'product.update' || log.action === 'product.bulk_update') return true;
                 return false;
             }).map((log: any) => {
                 const details = log.details || {};
@@ -428,12 +426,30 @@ function EditProductContent() {
                 
                 let type = 'adjustment';
                 if (log.action === 'product.sale') type = 'out';
+                else if (log.action === 'product.update' || log.action === 'product.bulk_update') {
+                    if (details.changes || (details.adjustment === undefined && details.newStock === undefined && details.stock === undefined)) {
+                        type = 'edit';
+                    } else {
+                        type = rawAdj >= 0 ? 'in' : 'out';
+                    }
+                }
                 else type = rawAdj >= 0 ? 'in' : 'out';
 
                 const rawReceiptMatch = (details.receiptId || details.reason || '')
                     .toString()
                     .match(/rec-[a-zA-Z0-9]+/i)?.[0]?.toLowerCase() || null;
                 
+                let editSummary = '';
+                if (type === 'edit' && details.changes) {
+                    const parts: string[] = [];
+                    if (details.changes.name) parts.push(`Name: "${details.changes.name.from}" → "${details.changes.name.to}"`);
+                    if (details.changes.price) parts.push(`Price: ${details.changes.price.from} → ${details.changes.price.to}`);
+                    if (details.changes.costPrice) parts.push(`Cost: ${details.changes.costPrice.from} → ${details.changes.costPrice.to}`);
+                    if (details.changes.sku) parts.push(`SKU: "${details.changes.sku.from}" → "${details.changes.sku.to}"`);
+                    if (details.changes.category) parts.push(`Category: "${details.changes.category.from}" → "${details.changes.category.to}"`);
+                    editSummary = parts.join(' · ');
+                }
+
                 return {
                     id: log.id,
                     businessId: business.id,
@@ -442,7 +458,8 @@ function EditProductContent() {
                     quantity: Math.abs(rawAdj || 0),
                     closingStock: details.newStock !== undefined ? Number(details.newStock) : undefined,
                     date: log.createdAt,
-                    notes: details.reason || log.action,
+                    notes: editSummary || details.reason || log.action,
+                    changes: details.changes || null,
                     createdBy: log.actorName || log.userName || log.actorId || log.userId || 'System',
                     actorName: log.actorName || log.userName || '',
                     actorId: log.actorId || log.userId || '',
@@ -451,7 +468,7 @@ function EditProductContent() {
                     _isLegacy: true,
                     _isAuditSale: log.action === 'product.sale' || (details.reason && String(details.reason).toLowerCase().includes('sold in sale'))
                 };
-            }).filter((l: any) => l.quantity > 0 || l.type === 'adjustment'); // keep 0 adjustments just in case
+            }).filter((l: any) => l.quantity > 0 || l.type === 'adjustment' || l.type === 'edit'); // keep 0 adjustments just in case
             
             const toSec = (d: any): number => {
                 if (!d) return 0;
@@ -660,6 +677,8 @@ function EditProductContent() {
     const [logFilter, setLogFilter] = React.useState('all');
     const [logSearchTerm, setLogSearchTerm] = React.useState('');
     const [salesPeriod, setSalesPeriod] = React.useState<'30d' | '90d' | '6m' | '1y' | 'all'>('6m');
+    const [chartMetric, setChartMetric] = React.useState<'both' | 'revenue' | 'profit' | 'units'>('both');
+
 
     const filteredLogs = React.useMemo(() => {
         let result = combinedLogs;
@@ -670,6 +689,7 @@ function EditProductContent() {
                 if (logFilter === 'out') return log.type === 'out';
                 if (logFilter === 'return') return log.type === 'return';
                 if (logFilter === 'adjustment') return log.type === 'adjustment';
+                if (logFilter === 'edit') return log.type === 'edit';
                 return true;
             });
         }
@@ -685,63 +705,98 @@ function EditProductContent() {
         return result;
     }, [combinedLogs, logFilter, logSearchTerm]);
 
+    // Index receipts by id for lookup of exact historical selling price and cost
+    const receiptMap = React.useMemo(() => {
+        const map = new Map<string, any>();
+        (receipts || []).forEach(r => {
+            if (r?.id) map.set(String(r.id).toLowerCase(), r);
+            if (r?.receiptNumber) map.set(String(r.receiptNumber).toLowerCase(), r);
+        });
+        return map;
+    }, [receipts]);
+
     const salesData = React.useMemo(() => {
         const salesLogs = combinedLogs.filter((log: any) => log.type === 'out');
-        const dataMap: Record<string, number> = {};
+        const dataMap: Record<string, { sold: number; revenue: number; profit: number }> = {};
+
+        const initBucket = (key: string) => {
+            dataMap[key] = { sold: 0, revenue: 0, profit: 0 };
+        };
 
         if (salesPeriod === '30d') {
             for (let i = 29; i >= 0; i--) {
                 const d = subDays(new Date(), i);
-                dataMap[format(d, 'dd MMM')] = 0;
+                initBucket(format(d, 'dd MMM'));
             }
-            salesLogs.forEach((log: any) => {
-                const dateVal = log.date || log.createdAt;
-                if (!dateVal) return;
-                const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
-                const key = format(d, 'dd MMM');
-                if (dataMap[key] !== undefined) {
-                    const soldQty = log.quantity ? Math.abs(log.quantity) : 0;
-                    dataMap[key] += soldQty;
-                }
-            });
         } else if (salesPeriod === '90d') {
             for (let i = 11; i >= 0; i--) {
                 const d = subDays(new Date(), i * 7);
-                dataMap[format(d, 'dd MMM')] = 0;
+                initBucket(format(d, 'dd MMM'));
             }
-            salesLogs.forEach((log: any) => {
-                const dateVal = log.date || log.createdAt;
-                if (!dateVal) return;
-                const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
-                const key = format(d, 'dd MMM');
-                if (dataMap[key] !== undefined) {
-                    const soldQty = log.quantity ? Math.abs(log.quantity) : 0;
-                    dataMap[key] += soldQty;
-                }
-            });
         } else {
             const numMonths = salesPeriod === '6m' ? 5 : salesPeriod === '1y' ? 11 : 23;
             for (let i = numMonths; i >= 0; i--) {
                 const d = subMonths(new Date(), i);
-                dataMap[format(d, 'MMM yy')] = 0;
+                initBucket(format(d, 'MMM yy'));
             }
-            salesLogs.forEach((log: any) => {
-                const dateVal = log.date || log.createdAt;
-                if (!dateVal) return;
-                const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
-                const key = format(d, 'MMM yy');
-                if (dataMap[key] !== undefined) {
-                    const soldQty = log.quantity ? Math.abs(log.quantity) : 0;
-                    dataMap[key] += soldQty;
-                }
-            });
         }
+
+        salesLogs.forEach((log: any) => {
+            const dateVal = log.date || log.createdAt;
+            if (!dateVal) return;
+            const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
+            const key = (salesPeriod === '30d' || salesPeriod === '90d') ? format(d, 'dd MMM') : format(d, 'MMM yy');
+            
+            if (dataMap[key] !== undefined) {
+                const soldQty = log.quantity ? Math.abs(log.quantity) : 0;
+                
+                // Determine selling price and cost price
+                let itemPrice = Number(product?.price) || 0;
+                let itemCost = Number(product?.costPrice) || 0;
+
+                const ref = log.referenceId || log.receiptRef;
+                if (ref) {
+                    const r = receiptMap.get(String(ref).toLowerCase());
+                    if (r && Array.isArray(r.items)) {
+                        const matchedItem = r.items.find((it: any) => it.productId === product?.id);
+                        if (matchedItem) {
+                            if (matchedItem.price !== undefined) itemPrice = Number(matchedItem.price) || 0;
+                            if (matchedItem.costPrice !== undefined) itemCost = Number(matchedItem.costPrice) || 0;
+                        }
+                    }
+                }
+
+                const rev = soldQty * itemPrice;
+                const cost = soldQty * itemCost;
+                const profit = rev - cost;
+
+                dataMap[key].sold += soldQty;
+                dataMap[key].revenue += rev;
+                dataMap[key].profit += profit;
+            }
+        });
 
         return Object.keys(dataMap).map(key => ({
             name: key,
-            sold: dataMap[key]
+            sold: dataMap[key].sold,
+            revenue: Math.round(dataMap[key].revenue),
+            profit: Math.round(dataMap[key].profit),
         }));
-    }, [combinedLogs, salesPeriod]);
+    }, [combinedLogs, salesPeriod, product?.id, product?.price, product?.costPrice, receiptMap]);
+
+    // Aggregate totals for the selected period
+    const periodTotals = React.useMemo(() => {
+        let units = 0;
+        let revenue = 0;
+        let profit = 0;
+        salesData.forEach(d => {
+            units += d.sold;
+            revenue += d.revenue;
+            profit += d.profit;
+        });
+        const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
+        return { units, revenue, profit, marginPct };
+    }, [salesData]);
 
 
 
@@ -986,12 +1041,19 @@ function EditProductContent() {
             // the price-swap (drop the price, sell it cheap, put it back). Both
             // edits leave the catalogue looking untouched, so this pair of logs
             // is the only trace it happened. See src/lib/forensics.ts, check S7.
+            const nameMoved = values.name !== product.name;
             const priceMoved = values.price !== product.price;
             const costMoved = (values.costPrice ?? 0) !== (product.costPrice ?? 0);
-            if (priceMoved || costMoved) {
+            const skuMoved = (values.sku ?? '') !== (product.sku ?? '');
+            const categoryMoved = (values.category ?? '') !== (product.category ?? '');
+
+            if (nameMoved || priceMoved || costMoved || skuMoved || categoryMoved) {
                 const changes: Record<string, { from: any; to: any }> = {};
+                if (nameMoved) changes.name = { from: product.name, to: values.name };
                 if (priceMoved) changes.price = { from: product.price ?? 0, to: values.price };
                 if (costMoved) changes.costPrice = { from: product.costPrice ?? 0, to: values.costPrice ?? 0 };
+                if (skuMoved) changes.sku = { from: product.sku ?? '', to: values.sku ?? '' };
+                if (categoryMoved) changes.category = { from: product.category ?? '', to: values.category ?? '' };
 
                 addToQueue({
                     type: 'add-audit-log',
@@ -2010,34 +2072,96 @@ function EditProductContent() {
                                 <div className="space-y-1">
                                     <CardTitle className="text-base flex items-center gap-2">
                                         <HistoryIcon className="h-4 w-4 text-primary" />
-                                        {salesPeriod === '30d' ? '30-Day Sales Volume Trend' : salesPeriod === '90d' ? '90-Day Sales Volume Trend' : salesPeriod === '6m' ? '6-Month Sales Volume Trend' : salesPeriod === '1y' ? '1-Year Sales Volume Trend' : 'All-Time Sales Volume Trend'}
+                                        Sales Performance & Profit Trend
                                     </CardTitle>
                                     <CardDescription className="text-xs">
-                                        {salesPeriod === '30d' ? 'Track daily units sold over the last 30 days' : salesPeriod === '90d' ? 'Track weekly units sold over the last 90 days' : salesPeriod === '6m' ? 'Track units sold month-by-month over the last 6 months' : salesPeriod === '1y' ? 'Track units sold month-by-month over the last 12 months' : 'Track historical units sold over time'}
+                                        Track revenue, net profit, and units sold over the selected timeline.
                                     </CardDescription>
                                 </div>
-                                <div className="flex items-center gap-1 bg-background/80 p-1 rounded-lg border text-xs self-start sm:self-auto">
-                                    {[
-                                        { id: '30d', label: '30 Days' },
-                                        { id: '90d', label: '90 Days' },
-                                        { id: '6m', label: '6 Months' },
-                                        { id: '1y', label: '1 Year' },
-                                        { id: 'all', label: 'All Time' },
-                                    ].map((p) => (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            onClick={() => setSalesPeriod(p.id as any)}
-                                            className={cn(
-                                                "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all",
-                                                salesPeriod === p.id 
-                                                    ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
-                                                    : "text-muted-foreground hover:text-foreground"
-                                            )}
-                                        >
-                                            {p.label}
-                                        </button>
-                                    ))}
+                                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                                    {/* Metric Mode Filter */}
+                                    <div className="flex items-center gap-1 bg-background p-1 rounded-lg border text-xs">
+                                        {[
+                                            { id: 'both', label: 'Revenue & Profit' },
+                                            { id: 'revenue', label: 'Revenue' },
+                                            { id: 'profit', label: 'Profit' },
+                                            { id: 'units', label: 'Units Sold' },
+                                        ].map((m) => (
+                                            <button
+                                                key={m.id}
+                                                type="button"
+                                                onClick={() => setChartMetric(m.id as any)}
+                                                className={cn(
+                                                    "px-2 py-0.5 rounded text-[11px] font-medium transition-all",
+                                                    chartMetric === m.id 
+                                                        ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                )}
+                                            >
+                                                {m.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Time Period Filter */}
+                                    <div className="flex items-center gap-1 bg-background/80 p-1 rounded-lg border text-xs">
+                                        {[
+                                            { id: '30d', label: '30D' },
+                                            { id: '90d', label: '90D' },
+                                            { id: '6m', label: '6M' },
+                                            { id: '1y', label: '1Y' },
+                                            { id: 'all', label: 'All' },
+                                        ].map((p) => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => setSalesPeriod(p.id as any)}
+                                                className={cn(
+                                                    "px-2 py-0.5 rounded text-[11px] font-medium transition-all",
+                                                    salesPeriod === p.id 
+                                                        ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                )}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Product Profit & Revenue KPI Strip */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-border/50">
+                                <div className="p-2.5 rounded-lg bg-background/90 border border-border/60">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">Total Revenue</span>
+                                    <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                                        {currencySymbol}{periodTotals.revenue.toLocaleString()}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground block">Gross sales value</span>
+                                </div>
+
+                                <div className="p-2.5 rounded-lg bg-background/90 border border-border/60">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">Total Profit</span>
+                                    <span className={cn("text-base font-bold block mt-0.5", periodTotals.profit >= 0 ? "text-indigo-600 dark:text-indigo-400" : "text-destructive")}>
+                                        {currencySymbol}{periodTotals.profit.toLocaleString()}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground block">Profit after unit cost</span>
+                                </div>
+
+                                <div className="p-2.5 rounded-lg bg-background/90 border border-border/60">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">Units Sold</span>
+                                    <span className="text-base font-bold text-foreground block mt-0.5">
+                                        {periodTotals.units.toLocaleString()}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground block">Total quantity moved</span>
+                                </div>
+
+                                <div className="p-2.5 rounded-lg bg-background/90 border border-border/60">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">Profit Margin</span>
+                                    <span className={cn("text-base font-bold block mt-0.5", periodTotals.marginPct >= 0 ? "text-foreground" : "text-destructive")}>
+                                        {periodTotals.marginPct.toFixed(1)}%
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground block">Margin on sales</span>
                                 </div>
                             </div>
                         </CardHeader>
@@ -2049,14 +2173,57 @@ function EditProductContent() {
                                     </div>
                                 ) : (
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={salesData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
+                                        <LineChart data={salesData} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
                                             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tickMargin={8} stroke="#888888" />
-                                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}`} stroke="#888888" />
+                                            <YAxis 
+                                                fontSize={12} 
+                                                tickLine={false} 
+                                                axisLine={false} 
+                                                tickFormatter={(val) => chartMetric === 'units' ? `${val}` : `${currencySymbol}${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`} 
+                                                stroke="#888888" 
+                                            />
                                             <RechartsTooltip 
                                                 cursor={{ stroke: '#2563eb', strokeWidth: 1, strokeDasharray: '4 4' }}
                                                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                formatter={(value: any, name: string) => {
+                                                    const num = Number(value) || 0;
+                                                    if (name === 'Units Sold') return [num.toLocaleString(), name];
+                                                    return [`${currencySymbol}${num.toLocaleString()}`, name];
+                                                }}
                                             />
-                                            <Line type="monotone" dataKey="sold" name="Quantity Sold" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: 'white' }} activeDot={{ r: 6, stroke: '#2563eb', strokeWidth: 2, fill: '#2563eb' }} />
+                                            {(chartMetric === 'both' || chartMetric === 'revenue') && (
+                                                <Line 
+                                                    type="monotone" 
+                                                    dataKey="revenue" 
+                                                    name="Revenue" 
+                                                    stroke="#10b981" 
+                                                    strokeWidth={3} 
+                                                    dot={{ r: 4, strokeWidth: 2, fill: 'white' }} 
+                                                    activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: '#10b981' }} 
+                                                />
+                                            )}
+                                            {(chartMetric === 'both' || chartMetric === 'profit') && (
+                                                <Line 
+                                                    type="monotone" 
+                                                    dataKey="profit" 
+                                                    name="Profit" 
+                                                    stroke="#6366f1" 
+                                                    strokeWidth={3} 
+                                                    dot={{ r: 4, strokeWidth: 2, fill: 'white' }} 
+                                                    activeDot={{ r: 6, stroke: '#6366f1', strokeWidth: 2, fill: '#6366f1' }} 
+                                                />
+                                            )}
+                                            {chartMetric === 'units' && (
+                                                <Line 
+                                                    type="monotone" 
+                                                    dataKey="sold" 
+                                                    name="Units Sold" 
+                                                    stroke="#2563eb" 
+                                                    strokeWidth={3} 
+                                                    dot={{ r: 4, strokeWidth: 2, fill: 'white' }} 
+                                                    activeDot={{ r: 6, stroke: '#2563eb', strokeWidth: 2, fill: '#2563eb' }} 
+                                                />
+                                            )}
                                         </LineChart>
                                     </ResponsiveContainer>
                                 )}
@@ -2100,7 +2267,7 @@ function EditProductContent() {
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" size="sm" className="w-[150px] h-8 text-[11px] justify-between bg-background font-normal">
                                             <span>
-                                                {logFilter === 'all' ? 'All Transactions' : logFilter === 'in' ? 'Stock In (Restocks)' : logFilter === 'out' ? 'Stock Out (Sales)' : logFilter === 'return' ? 'Returns (Voided)' : 'Adjustments'}
+                                                {logFilter === 'all' ? 'All Transactions' : logFilter === 'in' ? 'Stock In (Restocks)' : logFilter === 'out' ? 'Stock Out (Sales)' : logFilter === 'return' ? 'Returns (Voided)' : logFilter === 'edit' ? 'Product Edits' : 'Adjustments'}
                                             </span>
                                             <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-1" />
                                         </Button>
@@ -2111,6 +2278,7 @@ function EditProductContent() {
                                         <DropdownMenuItem onClick={() => setLogFilter('out')}>Stock Out (Sales)</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setLogFilter('return')}>Returns (Voided)</DropdownMenuItem>
                                         {categoryType === 'product' && <DropdownMenuItem onClick={() => setLogFilter('adjustment')}>{t('inventory.logFilterAdjustments')}</DropdownMenuItem>}
+                                        <DropdownMenuItem onClick={() => setLogFilter('edit')}>Product Edits (Audit Log)</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                                 </div>
@@ -2157,7 +2325,7 @@ function EditProductContent() {
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs font-medium capitalize">
-                                                                    {tx.type === 'in' ? 'Stock In' : tx.type === 'out' ? 'Stock Out' : tx.type === 'return' ? 'Return' : 'Adjustment'}
+                                                                    {tx.type === 'in' ? 'Stock In' : tx.type === 'out' ? 'Stock Out' : tx.type === 'return' ? 'Return' : tx.type === 'edit' ? 'Product Edit' : 'Adjustment'}
                                                                 </span>
                                                                 {tx._isPending && (
                                                                     <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 text-[9px] py-0 px-1.5 h-4">
@@ -2171,23 +2339,29 @@ function EditProductContent() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className={cn(
-                                                            "flex items-center gap-1 font-bold text-sm",
-                                                            isAddition ? "text-green-600" : "text-red-600"
-                                                        )}>
-                                                            {isAddition ? (
-                                                                <ArrowDownLeft className="h-4 w-4" />
-                                                            ) : (
-                                                                <ArrowUpRight className="h-4 w-4" />
-                                                            )}
-                                                            <span>{Math.abs(tx.quantity)}</span>
-                                                        </div>
+                                                        {tx.type === 'edit' ? (
+                                                            <div className="flex items-center gap-1 font-medium text-xs text-blue-600 dark:text-blue-400">
+                                                                <span>Modified</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className={cn(
+                                                                "flex items-center gap-1 font-bold text-sm",
+                                                                isAddition ? "text-green-600" : "text-red-600"
+                                                            )}>
+                                                                {isAddition ? (
+                                                                    <ArrowDownLeft className="h-4 w-4" />
+                                                                ) : (
+                                                                    <ArrowUpRight className="h-4 w-4" />
+                                                                )}
+                                                                <span>{Math.abs(tx.quantity)}</span>
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="font-medium text-sm flex flex-col gap-1">
                                                             <div className="flex items-center gap-1">
                                                                 <span className={tx.computedBalance < 0 ? "text-red-500 font-bold" : ""}>
-                                                                    {tx.computedBalance !== undefined ? tx.computedBalance : '-'}
+                                                                    {tx.type === 'edit' ? '-' : (tx.computedBalance !== undefined ? tx.computedBalance : '-')}
                                                                 </span>
                                                                 {tx.anomalies && tx.anomalies.length > 0 && (
                                                                     <TooltipProvider>
