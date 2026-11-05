@@ -633,15 +633,39 @@ function EditProductContent() {
             return getMs(b.date) - getMs(a.date);
         });
 
+        // Check if there is an unlogged discrepancy between the latest recorded transaction and live product stock
+        const liveStock = Number(product?.stock) || 0;
+        let listWithReconcile = [...sorted];
+        const latestTx = sorted[0];
+
+        if (latestTx && latestTx.closingStock !== undefined && Number(latestTx.closingStock) !== liveStock) {
+            const unloggedDiff = liveStock - Number(latestTx.closingStock);
+            if (unloggedDiff !== 0) {
+                listWithReconcile.unshift({
+                    id: `reconcile-gap-${product?.id || 'live'}`,
+                    businessId: business?.id,
+                    productId: product?.id,
+                    type: unloggedDiff > 0 ? 'in' : 'out',
+                    quantity: Math.abs(unloggedDiff),
+                    closingStock: liveStock,
+                    date: (product as any)?.updatedAt || new Date(),
+                    notes: `Catalogue Adjustment / Stock Take (${unloggedDiff > 0 ? '+' : ''}${unloggedDiff})`,
+                    createdBy: 'System Reconciliation',
+                    _isReconciled: true,
+                    anomalies: ['Unlogged stock adjustment detected between ledger transactions and live catalogue.']
+                });
+            }
+        }
+
         // Compute running balance backwards
-        let currentBalance = product?.stock || 0;
+        let currentBalance = liveStock;
         
-        const mapped = sorted.map((tx: any) => {
+        const mapped = listWithReconcile.map((tx: any) => {
             let balanceAfter = currentBalance;
-            let anomalies: string[] = [];
+            let anomalies: string[] = [...(tx.anomalies || [])];
 
             if (tx.closingStock !== undefined) {
-                if (currentBalance !== tx.closingStock && tx.id !== sorted[0]?.id) {
+                if (currentBalance !== tx.closingStock && tx.id !== listWithReconcile[0]?.id) {
                     anomalies.push('Balance discrepancy detected against logged closing stock.');
                 }
                 balanceAfter = tx.closingStock;
@@ -652,7 +676,7 @@ function EditProductContent() {
                 anomalies.push('Stock was oversold (balance dropped below zero).');
             }
 
-            if ((tx.type === 'in' || tx.type === 'out') && !tx.referenceId && !tx.notes?.includes('Initial') && !tx.notes?.includes('Manual adjustment') && !tx.notes?.includes('Quick restock')) {
+            if ((tx.type === 'in' || tx.type === 'out') && !tx.referenceId && !tx.notes?.includes('Initial') && !tx.notes?.includes('Manual adjustment') && !tx.notes?.includes('Quick restock') && !tx._isReconciled) {
                 anomalies.push('Missing transaction reference ID.');
             }
 

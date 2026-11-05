@@ -36,7 +36,7 @@ export default function BulkEditDialog({
   initialMode = 'grid',
   initialInstruction = '',
 }: BulkEditDialogProps) {
-  const { products, currentUserProfile, currencySymbol, triggerRefresh } = usePOS();
+  const { products, currentUserProfile, currencySymbol, triggerRefresh, addToQueue } = usePOS();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { t } = useI18n();
@@ -80,7 +80,7 @@ export default function BulkEditDialog({
   };
 
   const handleSaveChanges = async () => {
-    if (!firestore || !currentUserProfile || !productsToEdit || productsToEdit.length === 0) return;
+    if (!currentUserProfile || !productsToEdit || productsToEdit.length === 0) return;
 
     // Safety check
     const canManage = currentUserProfile.role === 'admin' || currentUserProfile.role === 'manager';
@@ -90,31 +90,38 @@ export default function BulkEditDialog({
     }
 
     setIsSaving(true);
-    const batch = writeBatch(firestore);
-
-    productsToEdit.forEach(product => {
-      if (product) {
-        const updatedValues = editedProducts[product.id];
-        if (updatedValues) {
-          const productRef = doc(firestore, 'products', product.id);
-          batch.update(productRef, {
-            stock: updatedValues.stock,
-            price: updatedValues.price,
-            updatedAt: serverTimestamp(),
-          });
-        }
-      }
-    });
 
     try {
-      await batch.commit();
+      productsToEdit.forEach(product => {
+        if (product) {
+          const updatedValues = editedProducts[product.id];
+          if (updatedValues) {
+            const hasStockChange = updatedValues.stock !== product.stock;
+            const hasPriceChange = updatedValues.price !== product.price;
+            if (hasStockChange || hasPriceChange) {
+              addToQueue({
+                type: 'update-product',
+                payload: {
+                  productId: product.id,
+                  values: {
+                    stock: updatedValues.stock,
+                    price: updatedValues.price,
+                  }
+                }
+              }, `Bulk edit: ${product.name}`);
+            }
+          }
+        }
+      });
 
       // Log audit event
-      await logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
-        action: 'product.bulk_update',
-        entity: { type: 'Product', id: 'multiple', name: `${productsToEdit.length} products` },
-        details: { productCount: productsToEdit.length, ids: productIds }
-      });
+      if (firestore && currentUserProfile?.businessId) {
+        logAuditEvent(firestore, currentUserProfile.businessId, currentUserProfile, {
+          action: 'product.bulk_update',
+          entity: { type: 'Product', id: 'multiple', name: `${productsToEdit.length} products` },
+          details: { productCount: productsToEdit.length, ids: productIds }
+        }).catch(() => {});
+      }
 
       toast({
         variant: 'success',

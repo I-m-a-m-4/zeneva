@@ -33,7 +33,7 @@ import { apiBase } from '@/lib/platform';
 type Mode = 'idle' | 'camera' | 'preview';
 
 export default function VisualStockTakePage() {
-  const { products, updateProduct, isReadOnly, business } = usePOS();
+  const { products, addToQueue, isReadOnly, business } = usePOS();
   const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
   const { toast } = useToast();
   const router = useRouter();
@@ -225,11 +225,17 @@ export default function VisualStockTakePage() {
       return;
     }
     try {
-      await Promise.all(
-        scanResults
-          .filter((r) => r.expected !== r.counted)
-          .map((r) => updateProduct(r.id, { stock: r.counted })),
-      );
+      scanResults
+        .filter((r) => r.expected !== r.counted)
+        .forEach((r) => {
+          addToQueue({
+            type: 'update-product',
+            payload: {
+              productId: r.id,
+              values: { stock: r.counted }
+            }
+          }, `Visual Stock Take: ${r.name} reconciled to ${r.counted} (was ${r.expected})`);
+        });
       toast({
         title: 'Reconciliation Complete',
         description: 'Stock levels have been updated to match the shelf count.',

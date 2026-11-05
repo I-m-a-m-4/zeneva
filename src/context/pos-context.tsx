@@ -2782,8 +2782,44 @@ export function POSProvider({ children }: { children: ReactNode }) {
                   }
                 };
                 break;
-              case 'update-product':
+              case 'update-product': {
                 batch.update(doc(firestore, 'products', action.payload.productId), { ...action.payload.values, updatedAt: serverTimestamp() });
+
+                // Automatic Stock Ledger Integrity:
+                // If this update alters stock and no separate add-inventory-transaction was queued in the batch,
+                // auto-record a stock movement so the product's history and balance never desync.
+                if (action.payload.values?.stock !== undefined && !action.payload.skipAutoStockLog) {
+                  const targetId = action.payload.productId;
+                  const hasExplicitTx = queuedActionsRef.current.some(a => {
+                    const aType = (a as any).action?.type || (a as any).type;
+                    const aPayload = (a as any).action?.payload || (a as any).payload;
+                    return aType === 'add-inventory-transaction' && aPayload?.productId === targetId;
+                  });
+
+                  if (!hasExplicitTx) {
+                    const currentProd = syncedProductsRef.current.find(p => p.id === targetId);
+                    const oldStock = Number(currentProd?.stock) || 0;
+                    const newStock = Number(action.payload.values.stock) || 0;
+                    const diff = newStock - oldStock;
+                    if (diff !== 0) {
+                      const invTransRef = doc(collection(firestore, 'inventory_transactions'));
+                      batch.set(invTransRef, {
+                        businessId,
+                        productId: targetId,
+                        productName: currentProd?.name || 'Product',
+                        type: diff > 0 ? 'in' : 'out',
+                        quantity: Math.abs(diff),
+                        previousStock: oldStock,
+                        closingStock: newStock,
+                        date: serverTimestamp(),
+                        notes: action.description || (diff > 0 ? `Stock restocked (+${diff})` : `Stock reduced (${diff})`),
+                        referenceId: action.id || invTransRef.id,
+                        createdBy: effectiveProfile?.name || currentUserProfile?.name || 'System'
+                      });
+                    }
+                  }
+                }
+
                 applyLocal = () => {
                   setSyncedProducts(prev => prev.map(p => p.id === action.payload.productId ? { ...p, ...action.payload.values } : p));
                   if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
@@ -2795,10 +2831,38 @@ export function POSProvider({ children }: { children: ReactNode }) {
                   }
                 };
                 break;
-              case 'bulk-update-products':
+              }
+              case 'bulk-update-products': {
                 action.payload.productIds.forEach((id: string) => {
                   batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
                 });
+
+                // Automatic Stock Ledger Integrity for bulk updates
+                if (action.payload.values?.stock !== undefined && !action.payload.skipAutoStockLog) {
+                  const newStock = Number(action.payload.values.stock) || 0;
+                  action.payload.productIds.forEach((id: string) => {
+                    const currentProd = syncedProductsRef.current.find(p => p.id === id);
+                    const oldStock = Number(currentProd?.stock) || 0;
+                    const diff = newStock - oldStock;
+                    if (diff !== 0) {
+                      const invTransRef = doc(collection(firestore, 'inventory_transactions'));
+                      batch.set(invTransRef, {
+                        businessId,
+                        productId: id,
+                        productName: currentProd?.name || 'Product',
+                        type: diff > 0 ? 'in' : 'out',
+                        quantity: Math.abs(diff),
+                        previousStock: oldStock,
+                        closingStock: newStock,
+                        date: serverTimestamp(),
+                        notes: action.description || `Bulk stock update (${diff > 0 ? '+' : ''}${diff})`,
+                        referenceId: action.id || invTransRef.id,
+                        createdBy: effectiveProfile?.name || currentUserProfile?.name || 'System'
+                      });
+                    }
+                  });
+                }
+
                 applyLocal = () => {
                   setSyncedProducts(prev => prev.map(p => action.payload.productIds.includes(p.id) ? { ...p, ...action.payload.values } : p));
                   if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
@@ -2810,6 +2874,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                   }
                 };
                 break;
+              }
               case 'add-audit-log': {
                 const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
                 batch.set(doc(auditLogRef), { ...action.payload, createdAt: serverTimestamp() });
