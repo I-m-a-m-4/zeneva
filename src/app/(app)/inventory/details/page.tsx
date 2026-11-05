@@ -1215,6 +1215,8 @@ function EditProductContent() {
                     price: product?.price ?? 0,
                     costPrice: product?.costPrice ?? 0,
                     sku: product?.sku ?? null,
+                    reason: 'Delete from Product Details',
+                    productSnapshot: product ? JSON.parse(JSON.stringify(product)) : null,
                 }
             }
         }, `Logging deletion of ${product?.name}`);

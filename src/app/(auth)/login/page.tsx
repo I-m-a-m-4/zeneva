@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/firebase";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, getAdditionalUserInfo, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, getAdditionalUserInfo, signOut, setPersistence, browserLocalPersistence, inMemoryPersistence } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader, ChevronLeft } from "lucide-react";
 import { AppConfig } from "@/lib/config";
@@ -246,16 +246,31 @@ export default function LoginPage() {
           }
         }
       } catch (error: any) {
-        // If storage quota error blocked Firebase session write, purge bloated cache and retry once
+        // If storage quota error or indexedDB backing store error blocked Firebase session write,
+        // switch persistence to browserLocalPersistence (or in-memory) and retry once
         const isQuotaError = 
           error?.name === 'QuotaExceededError' ||
           error?.code === 22 ||
           error?.message?.toLowerCase().includes('quota') ||
           error?.message?.toLowerCase().includes('setitem');
 
-        if (isQuotaError && !isRetry) {
-          console.warn("Storage quota exceeded during login. Purging bloated caches and retrying...");
-          purgeBloatedLocalStorage();
+        const isIndexedDbError =
+          /backing store|indexeddb|internal error opening/i.test(error?.message || '');
+
+        if ((isQuotaError || isIndexedDbError) && !isRetry) {
+          console.warn("Storage or IndexedDB error during login. Switching persistence and retrying...", error);
+          if (isQuotaError) {
+            purgeBloatedLocalStorage();
+          }
+          if (auth) {
+            try {
+              await setPersistence(auth, browserLocalPersistence);
+            } catch {
+              try {
+                await setPersistence(auth, inMemoryPersistence);
+              } catch {}
+            }
+          }
           return executeSignIn(true);
         }
 

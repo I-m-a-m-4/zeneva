@@ -129,6 +129,7 @@ import { BarcodeScanner } from '@/components/inventory/barcode-scanner';
 import { VisualProductScanner } from '@/components/pos/visual-product-scanner';
 import { ImageDialog } from "@/components/shared/image-dialog";
 import { CatalogUnavailable } from "@/components/shared/catalog-unavailable";
+import { DeletedProductsDialog } from '@/components/inventory/deleted-products-dialog';
 import { InventoryBodySkeleton } from './skeleton';
 
 
@@ -340,6 +341,7 @@ function InventoryPageContent() {
   const [showHealthModal, setShowHealthModal] = React.useState(false);
   const [isReorderInvoiceModalOpen, setIsReorderInvoiceModalOpen] = React.useState(false);
   const [isBulkImageEditorOpen, setIsBulkImageEditorOpen] = React.useState(false);
+  const [isDeletedProductsOpen, setIsDeletedProductsOpen] = React.useState(false);
   const [bulkImageEditorMode, setBulkImageEditorMode] = React.useState<'missing' | 'selected' | 'all'>('missing');
   const [expandedParentIds, setExpandedParentIds] = React.useState<string[]>([]);
 
@@ -845,6 +847,7 @@ function InventoryPageContent() {
             costPrice: deleted?.costPrice ?? 0,
             sku: deleted?.sku ?? null,
             reason: 'Bulk delete from Inventory',
+            productSnapshot: deleted ? JSON.parse(JSON.stringify(deleted)) : null,
           }
         }
       }, `Logging deletion of ${deleted?.name ?? id}`);
@@ -1222,10 +1225,17 @@ function InventoryPageContent() {
                     {archiveFilter === 'archived' ? 'Discontinued / Archived' : (archiveFilter === 'all' ? 'All (Active & Archived)' : 'Active Products')}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
-                    <DropdownMenuRadioGroup value={archiveFilter} onValueChange={(v) => setArchiveFilter(v as any)}>
+                    <DropdownMenuRadioGroup value={archiveFilter} onValueChange={(v) => {
+                      if (v === 'deleted') {
+                        setIsDeletedProductsOpen(true);
+                        return;
+                      }
+                      setArchiveFilter(v as any);
+                    }}>
                       <DropdownMenuRadioItem value="active">Active Products Only</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="archived">Discontinued / Archived</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="all">All Items</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="deleted" className="text-orange-600 font-medium">Deleted Products (Archive)...</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
@@ -1304,6 +1314,17 @@ function InventoryPageContent() {
                       <Camera className="h-4 w-4 text-muted-foreground group-focus:text-primary transition-colors" />
                       <span className="font-medium text-xs">Visual Stock Take</span>
                     </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsDeletedProductsOpen(true)} className="flex items-center gap-2.5 p-2 cursor-pointer rounded-md focus:bg-orange-500/10 focus:text-orange-600 dark:focus:text-orange-400 group">
+                    <Trash2 className="h-4 w-4 text-orange-500 group-hover:scale-110 transition-transform" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-xs flex items-center gap-1 text-foreground">
+                        Deleted Products
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-normal">
+                        Audit & restore deleted items
+                      </span>
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -2780,6 +2801,10 @@ function InventoryPageContent() {
       <ReorderInvoiceModal
           isOpen={isReorderInvoiceModalOpen}
           onOpenChange={setIsReorderInvoiceModalOpen}
+      />
+      <DeletedProductsDialog
+        open={isDeletedProductsOpen}
+        onOpenChange={setIsDeletedProductsOpen}
       />
       <BulkImageEditor
         open={isBulkImageEditorOpen}

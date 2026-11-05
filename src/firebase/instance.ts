@@ -2,7 +2,7 @@
 
 import { firebaseConfig } from './config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, setPersistence, indexedDBLocalPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
+import { getAuth, setPersistence, indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence, type Auth } from 'firebase/auth';
 import { purgeBloatedLocalStorage } from '@/lib/storage-hygiene';
 import {
   initializeFirestore,
@@ -118,14 +118,23 @@ if (!isServer) {
   purgeBloatedLocalStorage();
 }
 
-// Prefer IndexedDB for auth persistence (evades 5MB localStorage quota on mobile).
-// Fall back to browserLocalPersistence if IndexedDB is blocked or unavailable.
+// On Desktop (Tauri/WebView2 on Windows/macOS), prefer browserLocalPersistence to completely evade
+// WebView2's "Internal error opening backing store for indexedDB.open" file-lock/corruption crashes.
+// On Mobile/Web browsers, prefer indexedDBLocalPersistence to evade the 5MB localStorage quota limit.
 if (!isServer && hasConfig) {
-  setPersistence(auth, indexedDBLocalPersistence).catch(() => {
-    return setPersistence(auth, browserLocalPersistence).catch((err) =>
-      console.error("Firebase Auth persistence error:", err)
-    );
-  });
+  const isDesktop =
+    typeof window !== 'undefined' &&
+    (!!(window as any).__TAURI_INTERNALS__ ||
+      window.location.protocol === 'tauri:' ||
+      window.location.hostname === 'tauri.localhost');
+
+  const primaryPersistence = isDesktop ? browserLocalPersistence : indexedDBLocalPersistence;
+  const secondaryPersistence = isDesktop ? indexedDBLocalPersistence : browserLocalPersistence;
+
+  setPersistence(auth, primaryPersistence)
+    .catch(() => setPersistence(auth, secondaryPersistence))
+    .catch(() => setPersistence(auth, inMemoryPersistence))
+    .catch((err) => console.error("Firebase Auth persistence error:", err));
 }
 
 // --- Exports ---

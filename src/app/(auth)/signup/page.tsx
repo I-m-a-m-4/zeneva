@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { useAuth, useFirestore } from '@/firebase';
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 import { createUserProfileDocument, waitForUserProfile } from '@/firebase/users';
 import { usePOS } from '@/context/pos-context';
 import { purgeBloatedLocalStorage } from '@/lib/storage-hygiene';
@@ -369,8 +369,15 @@ function SignupPageContent() {
     try {
       userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
     } catch (createErr: any) {
-      if (createErr?.message?.toLowerCase().includes('quota') || createErr?.message?.toLowerCase().includes('setitem')) {
-        purgeBloatedLocalStorage();
+      const isQuota = createErr?.message?.toLowerCase().includes('quota') || createErr?.message?.toLowerCase().includes('setitem');
+      const isIdb = /backing store|indexeddb|internal error opening/i.test(createErr?.message || '');
+      if (isQuota || isIdb) {
+        if (isQuota) purgeBloatedLocalStorage();
+        try {
+          await setPersistence(auth, browserLocalPersistence);
+        } catch {
+          try { await setPersistence(auth, inMemoryPersistence); } catch {}
+        }
         userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       } else {
         throw createErr;
