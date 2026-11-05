@@ -27,6 +27,12 @@ export function QuickRestockModal({
     const [quantityToAdd, setQuantityToAdd] = React.useState('');
     const [backdate, setBackdate] = React.useState('');
     const [isSaving, setIsSaving] = React.useState(false);
+    const isSavingRef = React.useRef(false);
+
+    React.useEffect(() => {
+        isSavingRef.current = false;
+        setIsSaving(false);
+    }, [product]);
 
     // Demand Forecast Horizons (7d, 14d, 30d) calculated purely from store sales velocity
     const forecast7d = React.useMemo(() => {
@@ -49,6 +55,7 @@ export function QuickRestockModal({
     const newTotal = currentStock + addedAmount;
 
     const handleSave = () => {
+        if (isSavingRef.current || isSaving) return;
         if (!product) return;
         if (isReadOnlyStore) {
             toast({
@@ -63,6 +70,7 @@ export function QuickRestockModal({
             return;
         }
 
+        isSavingRef.current = true;
         setIsSaving(true);
         const customDate = backdate ? new Date(backdate) : new Date();
         const dateDesc = backdate ? ` (Backdated to ${customDate.toLocaleDateString()})` : '';
@@ -117,6 +125,7 @@ export function QuickRestockModal({
         });
         
         setIsSaving(false);
+        isSavingRef.current = false;
         onClose();
     };
 

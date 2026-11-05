@@ -5,7 +5,7 @@ import { useUser } from '@/firebase';
 import Link from "next/link";
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { LayoutGrid, Menu, X, LogOut, Loader2, ChevronDown, Bot, Video } from 'lucide-react';
+import { LayoutGrid, Menu, X, LogOut, Loader2, ChevronDown, BrainCircuit, Sparkles, ScanEye, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -151,8 +151,8 @@ export default function MarketingHeader() {
 
                     {/* Floating Dropdown Card */}
                     {zenAiDropdownOpen && (
-                      <div className="absolute top-full -left-6 w-[390px] pt-2 z-50">
-                        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-2.5 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="absolute top-full -left-6 w-[410px] pt-2 z-50">
+                        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-none shadow-2xl p-2.5 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
                           <div className="px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center justify-between">
                             <span>Zen AI Ecosystem</span>
                             <span className="text-[10px] font-mono text-[#EA580C] font-normal">Next-Gen Retail</span>
@@ -162,21 +162,34 @@ export default function MarketingHeader() {
                             href="/zen-ai"
                             onClick={() => setZenAiDropdownOpen(false)}
                             className={cn(
-                              "flex items-start gap-3.5 p-3 rounded-xl transition-all group/item",
-                              pathname === '/zen-ai' ? "bg-orange-50/80 border border-orange-200/60" : "hover:bg-slate-50"
+                              "flex items-start gap-3.5 p-3 rounded-none transition-all group/item border",
+                              pathname === '/zen-ai' 
+                                ? "bg-orange-50/80 border-orange-200/60" 
+                                : "border-transparent hover:bg-slate-50 hover:border-slate-100"
                             )}
                           >
-                            <div className="w-10 h-10 rounded-xl bg-orange-100/90 border border-orange-200 text-[#EA580C] flex items-center justify-center shrink-0 group-hover/item:scale-105 group-hover/item:bg-[#EA580C] group-hover/item:text-white transition-all shadow-xs">
-                              <Bot className="w-5 h-5" />
+                            <div className="relative w-11 h-11 rounded-none bg-slate-900 text-white flex items-center justify-center shrink-0 border border-slate-800 group-hover/item:border-orange-500/70 group-hover/item:bg-slate-950 transition-all duration-300 shadow-sm overflow-hidden">
+                              {/* Signature Corner Accents */}
+                              <div className="absolute top-0 right-0 w-1.5 h-1.5 border-t border-r border-orange-500/70 pointer-events-none" />
+                              <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-b border-l border-orange-500/70 pointer-events-none" />
+                              {/* Ambient gradient glow on hover */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/25 via-transparent to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                              <div className="relative flex items-center justify-center">
+                                <BrainCircuit className="w-5 h-5 text-orange-400 group-hover/item:text-orange-300 transition-colors" />
+                                <Sparkles className="w-2.5 h-2.5 text-orange-300 absolute -top-1 -right-1 group-hover/item:scale-125 transition-transform" />
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-slate-900 group-hover/item:text-[#EA580C] transition-colors">
-                                  Zen AI Copilot
-                                </span>
-                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold">
-                                  AVAILABLE
-                                </span>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-slate-900 group-hover/item:text-[#EA580C] transition-colors">
+                                    Zen AI Copilot
+                                  </span>
+                                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-none bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-semibold">
+                                    AVAILABLE
+                                  </span>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-slate-300 -translate-x-1 opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:text-[#EA580C] transition-all shrink-0" />
                               </div>
                               <p className="text-xs text-slate-500 mt-0.5 leading-relaxed font-dm-sans">
                                 Conversational retail copilot. Predictive restocks, trapped capital recovery &amp; sales velocity.
@@ -190,21 +203,37 @@ export default function MarketingHeader() {
                             href="/zen-ai/cameras"
                             onClick={() => setZenAiDropdownOpen(false)}
                             className={cn(
-                              "flex items-start gap-3.5 p-3 rounded-xl transition-all group/item",
-                              pathname.startsWith('/zen-ai/cameras') ? "bg-orange-50/80 border border-orange-200/60" : "hover:bg-slate-50"
+                              "flex items-start gap-3.5 p-3 rounded-none transition-all group/item border",
+                              pathname.startsWith('/zen-ai/cameras') 
+                                ? "bg-orange-50/80 border-orange-200/60" 
+                                : "border-transparent hover:bg-slate-50 hover:border-slate-100"
                             )}
                           >
-                            <div className="w-10 h-10 rounded-xl bg-amber-100/90 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 group-hover/item:scale-105 group-hover/item:bg-amber-600 group-hover/item:text-white transition-all shadow-xs">
-                              <Video className="w-5 h-5" />
+                            <div className="relative w-11 h-11 rounded-none bg-slate-900 text-white flex items-center justify-center shrink-0 border border-slate-800 group-hover/item:border-amber-500/70 group-hover/item:bg-slate-950 transition-all duration-300 shadow-sm overflow-hidden">
+                              {/* Signature Corner Accents */}
+                              <div className="absolute top-0 right-0 w-1.5 h-1.5 border-t border-r border-amber-500/70 pointer-events-none" />
+                              <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-b border-l border-amber-500/70 pointer-events-none" />
+                              {/* Ambient gradient glow on hover */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/25 via-transparent to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                              <div className="relative flex items-center justify-center">
+                                <ScanEye className="w-5 h-5 text-amber-400 group-hover/item:text-amber-300 transition-colors" />
+                                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-none bg-amber-400 opacity-75" />
+                                  <span className="relative inline-flex h-2 w-2 rounded-none bg-amber-500" />
+                                </span>
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-slate-900 group-hover/item:text-[#EA580C] transition-colors">
-                                  Zen Vision Stream Server
-                                </span>
-                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-orange-100 text-[#EA580C] border border-orange-200 font-bold">
-                                  NEW
-                                </span>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-slate-900 group-hover/item:text-[#EA580C] transition-colors">
+                                    Zen Vision Stream Server
+                                  </span>
+                                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-none bg-orange-100 text-[#EA580C] border border-orange-200 font-bold">
+                                    NEW
+                                  </span>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-slate-300 -translate-x-1 opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:text-[#EA580C] transition-all shrink-0" />
                               </div>
                               <p className="text-xs text-slate-500 mt-0.5 leading-relaxed font-dm-sans">
                                 Turn dumb CCTV into an intelligent stream server. Foot traffic, dwell heatmaps &amp; loss prevention.
@@ -288,24 +317,28 @@ export default function MarketingHeader() {
                       <Link
                         href="/zen-ai"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center justify-between p-3 rounded-xl bg-slate-50 text-slate-900 font-medium text-base hover:bg-orange-50 hover:text-[#EA580C] transition-colors"
+                        className="flex items-center justify-between p-3 rounded-none bg-slate-50 text-slate-900 font-medium text-base hover:bg-orange-50 hover:text-[#EA580C] transition-colors border border-slate-100"
                       >
                         <div className="flex items-center gap-2.5">
-                          <Bot className="w-5 h-5 text-[#EA580C]" />
+                          <div className="relative w-8 h-8 rounded-none bg-slate-900 text-orange-400 flex items-center justify-center border border-slate-800 shrink-0">
+                            <BrainCircuit className="w-4 h-4" />
+                          </div>
                           <span>Zen AI Copilot</span>
                         </div>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Available</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-none bg-emerald-100 text-emerald-800 font-semibold">Available</span>
                       </Link>
                       <Link
                         href="/zen-ai/cameras"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center justify-between p-3 rounded-xl bg-slate-50 text-slate-900 font-medium text-base hover:bg-orange-50 hover:text-[#EA580C] transition-colors"
+                        className="flex items-center justify-between p-3 rounded-none bg-slate-50 text-slate-900 font-medium text-base hover:bg-orange-50 hover:text-[#EA580C] transition-colors border border-slate-100"
                       >
                         <div className="flex items-center gap-2.5">
-                          <Video className="w-5 h-5 text-amber-600" />
+                          <div className="relative w-8 h-8 rounded-none bg-slate-900 text-amber-400 flex items-center justify-center border border-slate-800 shrink-0">
+                            <ScanEye className="w-4 h-4" />
+                          </div>
                           <span>Zen Vision Stream Server</span>
                         </div>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-100 text-[#EA580C] font-bold">NEW</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-none bg-orange-100 text-[#EA580C] font-bold">NEW</span>
                       </Link>
                     </div>
                   </div>

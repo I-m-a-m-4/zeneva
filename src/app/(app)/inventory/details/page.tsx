@@ -483,8 +483,27 @@ function EditProductContent() {
                 return 0;
             };
 
+            // Deduplicate inventory_transactions in case duplicates exist in Firestore or local cache
+            const seenTxKeys = new Set<string>();
+            const deduplicatedTxLogs: any[] = [];
+            for (const t of txLogs) {
+                const rawReceiptMatch = t.referenceId || t.notes?.match(/rec-[a-zA-Z0-9]+/i)?.[0];
+                let dupeKey: string;
+                if (rawReceiptMatch) {
+                    dupeKey = `receipt_${String(rawReceiptMatch).toLowerCase()}_${t.productId || ''}`;
+                } else {
+                    const sec = toSec(t.date);
+                    // 120-second bucket for quick restocks/adjustments with same notes, type, and quantity
+                    const bucket = Math.floor(sec / 120);
+                    dupeKey = `manual_${t.productId || ''}_${t.type || ''}_${t.quantity || 0}_${t.notes || ''}_${bucket}`;
+                }
+                if (seenTxKeys.has(dupeKey)) continue;
+                seenTxKeys.add(dupeKey);
+                deduplicatedTxLogs.push(t);
+            }
+
             const txReceiptIds = new Set<string>();
-            txLogs.forEach((t: any) => {
+            deduplicatedTxLogs.forEach((t: any) => {
                 if (t.referenceId) txReceiptIds.add(String(t.referenceId).toLowerCase());
                 const match = t.notes?.match(/rec-[a-zA-Z0-9]+/i);
                 if (match) txReceiptIds.add(match[0].toLowerCase());
@@ -497,7 +516,7 @@ function EditProductContent() {
                 if (l._isAuditSale) {
                     if (l.receiptRef && txReceiptIds.has(l.receiptRef)) return false;
                     const legacySec = toSec(l.date);
-                    const matchingTx = txLogs.some((tx: any) => {
+                    const matchingTx = deduplicatedTxLogs.some((tx: any) => {
                         if (tx.productId && tx.productId !== l.productId) return false;
                         if (l.receiptRef && (String(tx.referenceId).toLowerCase() === l.receiptRef || tx.notes?.toLowerCase().includes(l.receiptRef))) {
                             return true;
@@ -519,7 +538,7 @@ function EditProductContent() {
 
                 // 3. Manual restocks or edits that were queued to both inventory_transactions and audit_logs:
                 const legacySec = toSec(l.date);
-                const isDuplicate = txLogs.some((tx: any) => {
+                const isDuplicate = deduplicatedTxLogs.some((tx: any) => {
                     if (tx.productId && tx.productId !== l.productId) return false;
                     if (Math.abs(tx.quantity) !== l.quantity) return false;
                     const txSec = toSec(tx.date);
@@ -530,7 +549,7 @@ function EditProductContent() {
                 return true;
             });
             
-            setStockLogs([...txLogs, ...filteredLegacy] as any);
+            setStockLogs([...deduplicatedTxLogs, ...filteredLegacy] as any);
             setIsLogsLoading(false);
         };
 

@@ -532,6 +532,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const queueFallbackActiveRef = useRef(false);
   const [queueMirrorChecked, setQueueMirrorChecked] = useState(false);
   const [isQueueProcessing, setIsQueueProcessing] = useState(false);
+  const isProcessingQueueRef = useRef(false);
   const [syncedProducts, setSyncedProducts] = useState<Product[]>(() => bootCache<Product[]>('pos_synced_products') || []);
   const [syncedCustomers, setSyncedCustomers] = useState<Customer[]>(() => bootCache<Customer[]>('pos_synced_customers') || []);
   const [syncedReceipts, setSyncedReceipts] = useState<Receipt[]>(() => bootCache<Receipt[]>('pos_synced_receipts') || []);
@@ -2264,11 +2265,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const processQueue = useCallback(async () => {
     const effectiveProfile = currentUserProfile || offlineProfile;
-    if (isQueueProcessing || !isRealOnline || !firestore || !businessId || !effectiveProfile) return;
+    if (isProcessingQueueRef.current || isQueueProcessing || !isRealOnline || !firestore || !businessId || !effectiveProfile) return;
     const currentQueue = queuedActionsRef.current.length > 0 ? queuedActionsRef.current : queuedActions;
     const pending = currentQueue.filter(a => a.status === 'pending');
     if (pending.length === 0) return;
+    isProcessingQueueRef.current = true;
     setIsQueueProcessing(true);
+
+    // Synchronously mark pending actions as 'processing' so immediate re-triggers cannot re-process them
+    const pendingIds = new Set(pending.map(a => a.id));
+    queuedActionsRef.current = queuedActionsRef.current.map(a => 
+      pendingIds.has(a.id) ? { ...a, status: 'processing' as const } : a
+    );
     
     try {
       const dispatchWebhooksForProducts = async (productIds: Set<string>) => {
@@ -2392,10 +2400,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 createdAt: dateVal 
               });
 
-              // Log Stock Movements
+              // Log Stock Movements (Idempotent write keyed by receipt ID and product ID)
               action.payload.receiptData.items?.forEach((item: any) => {
                 if (!item.productId) return;
-                const txRef = doc(collection(firestore, 'inventory_transactions'));
+                const txDocId = `sale_${action.payload.receiptData.id}_${item.productId}`;
+                const txRef = doc(firestore, 'inventory_transactions', txDocId);
                 batch.set(txRef, {
                   businessId,
                   productId: item.productId,
@@ -2877,12 +2886,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
               }
               case 'add-audit-log': {
                 const auditLogRef = collection(firestore, 'businessInstances', businessId, 'auditLogs');
-                batch.set(doc(auditLogRef), { ...action.payload, createdAt: serverTimestamp() });
+                const logDocId = action.id ? `audit_${action.id}` : undefined;
+                const docRef = logDocId ? doc(firestore, 'businessInstances', businessId, 'auditLogs', logDocId) : doc(auditLogRef);
+                batch.set(docRef, { ...action.payload, createdAt: serverTimestamp() });
                 break;
               }
               case 'add-inventory-transaction': {
                 const invTransRef = collection(firestore, 'inventory_transactions');
-                batch.set(doc(invTransRef), { ...action.payload, date: serverTimestamp() });
+                const txDocId = action.id ? `inv_${action.id}` : undefined;
+                const docRef = txDocId ? doc(firestore, 'inventory_transactions', txDocId) : doc(invTransRef);
+                batch.set(docRef, { ...action.payload, date: serverTimestamp() });
                 break;
               }
               case 'delete-receipt': {
@@ -2901,8 +2914,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
                       });
                     }
 
-                    // Log Stock Movement
-                    const txRef = doc(collection(firestore, 'inventory_transactions'));
+                    // Log Stock Movement (Idempotent write keyed by voided receipt and productId)
+                    const txDocId = `void_${action.payload.receiptId}_${item.productId}`;
+                    const txRef = doc(firestore, 'inventory_transactions', txDocId);
                     batch.set(txRef, {
                       businessId,
                       productId: item.productId,
@@ -2983,8 +2997,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
 
       // State Resolution Phase
+      const successes = new Set(successfullyCommitIds);
+      // Synchronously filter queuedActionsRef.current so subsequent ticks see the committed items removed
+      queuedActionsRef.current = queuedActionsRef.current.filter(a => !successes.has(a.id));
+
       setQueuedActions(prev => {
-        const successes = new Set(successfullyCommitIds);
         const failCount = pending.length - successfullyCommitIds.length;
 
         if (failCount > 0) {
@@ -3001,6 +3018,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       });
 
     } finally {
+      isProcessingQueueRef.current = false;
       setIsQueueProcessing(false);
     }
   }, [isQueueProcessing, queuedActions, firestore, businessId, currentUserProfile, offlineProfile, products, syncedProducts, toast, isRealOnline]);
@@ -3084,6 +3102,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     }
     const actionWithBranch = { ...action, payload: updatedPayload };
+
+    // Deduplication Shield: Never allow duplicate complete-sale actions with the same receipt ID
+    if (action.type === 'complete-sale' && updatedPayload?.receiptData?.id) {
+      const receiptId = updatedPayload.receiptData.id;
+      const alreadyQueued = queuedActionsRef.current.some(
+        a => a.type === 'complete-sale' && (a.payload?.receiptData?.id === receiptId || a.payload?.id === receiptId)
+      );
+      if (alreadyQueued) {
+        console.warn(`[POS Queue] Prevented duplicate complete-sale queueing for receipt ${receiptId}`);
+        return null;
+      }
+    }
 
     const id = uuidv4();
     const newAction: QueuedAction = { ...actionWithBranch, description, id, timestamp: Date.now(), status: 'pending' };

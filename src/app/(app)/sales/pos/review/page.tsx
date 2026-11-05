@@ -110,17 +110,27 @@ function ReviewPageContent() {
     const canCompleteSale = !!business && !!user && cart.length > 0 && !!products && !!currentUserProfile;
 
     const handleCompleteSale = React.useCallback(() => {
+        if (checkoutStartedRef.current || isCompleting) return;
+        checkoutStartedRef.current = true;
+        setIsCompleting(true);
+
         if (isCoreFeatureBlocked(business)) {
+            checkoutStartedRef.current = false;
+            setIsCompleting(false);
             setShowUpgradeOverlay(true);
             return;
         }
 
         if (!canCompleteSale) {
+            checkoutStartedRef.current = false;
+            setIsCompleting(false);
             toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
             return;
         }
 
         if (isReadOnlyStore) {
+            checkoutStartedRef.current = false;
+            setIsCompleting(false);
             toast({
                 title: t('pos.readOnlyTitle', 'Read-Only Mode'),
                 description: t('pos.readOnlyDesc', 'Your trial or subscription has expired. Please upgrade to record sales.'),
@@ -129,16 +139,12 @@ function ReviewPageContent() {
             return;
         }
 
-        setIsCompleting(true);
-        if (checkoutStartedRef.current) return;
-
         if (!business || !user || cart.length === 0 || !products || !currentUserProfile) {
-            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
+            checkoutStartedRef.current = false;
             setIsCompleting(false);
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
             return;
         }
-
-        checkoutStartedRef.current = true;
 
         // 1. Validations (Backorder & Operating Hours)
         for (const cartItem of cart) {
