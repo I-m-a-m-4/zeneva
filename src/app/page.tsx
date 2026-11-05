@@ -145,7 +145,6 @@ const businessTypes = [
 export default function Home() {
     const microsoftStoreUrl = "https://apps.microsoft.com/detail/9nvn0f8njwmj?hl=en-US&gl=NG&ocid=pdpshare";
     const googlePlayStoreUrl = "https://play.google.com/store/apps/details?id=com.zeneva.app&hl=en-US&ah=8ZdJB3DBf5hWEO6U2hBOws2DuyY";
-    const whopStoreUrl = "https://whop.com/zeneva/zeneva-pos-inventory";
 
     const structuredData = {
         "@context": "https://schema.org",
@@ -301,17 +300,6 @@ export default function Home() {
                                             {/* Text */}
                                             <text x="48" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em"><T k="landing.getItOn" /></text>
                                             <text x="48" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="19" fontWeight="600" letterSpacing="-0.2px"><T k="landing.googlePlay" /></text>
-                                        </svg>
-                                    </a>
-                                    <a href={whopStoreUrl} target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-[1.02] active:scale-[0.98] rounded-[2px] overflow-hidden flex-shrink-0">
-                                        <svg className="w-[145px] h-[44px] sm:w-[180px] sm:h-[54px] block" viewBox="0 0 180 54" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect x="0.5" y="0.5" width="179" height="53" rx="2" fill="#f1dfd1" stroke="#d8c5b7" strokeWidth="1" />
-                                            <g transform="translate(14, 11)">
-                                                <rect x="1" y="2" width="28" height="28" rx="6" fill="#FF6243" />
-                                                <path d="M7 10h3l2.5 8 2.5-8h2l2.5 8 2.5-8h3l-4 12h-3l-2.5-7.5L12.5 22h-3L7 10z" fill="white" />
-                                            </g>
-                                            <text x="50" y="21" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="9.5" fontWeight="500" letterSpacing="0.05em">CLAIM ACCESS ON</text>
-                                            <text x="50" y="38" fill="#1e293b" fontFamily="system-ui, -apple-system, sans-serif" fontSize="18" fontWeight="700" letterSpacing="-0.2px">Whop</text>
                                         </svg>
                                     </a>
                                 </div>
