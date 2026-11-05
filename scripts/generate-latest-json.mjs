@@ -17,7 +17,7 @@ async function main() {
     console.log(`Generating ${OUTPUT_FILE} for version ${version}...`);
 
     const latestJson = {
-      version: tagName,
+      version: version,
       notes: `Zeneva Desktop v${version} release.`,
       pub_date: new Date().toISOString(),
       platforms: {}

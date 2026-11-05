@@ -736,9 +736,15 @@ function SettingsPageContent() {
                 if (isTauri) {
                     toast({
                         title: 'Update Available!',
-                        description: `Zeneva v${latestTag} is available. The in-app updater is downloading in the background. Look for the top banner to restart.`,
+                        description: `Zeneva v${latestTag} is available. Starting download...`,
+                        action: (
+                            <Button size="sm" onClick={() => openExternal(downloadUrl)}>
+                                Download Installer
+                            </Button>
+                        ),
                         duration: 8000,
                     });
+                    await openExternal(downloadUrl);
                 } else {
                     toast({
                         title: 'Update Available!',
