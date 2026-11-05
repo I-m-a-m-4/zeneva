@@ -342,17 +342,59 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {(post as any).tableData.rows.map((row: string[], i: number) => (
-                              <tr key={i} className="hover:bg-slate-50/30 transition-colors">
-                                {row.map((cell: string, j: number) => (
-                                  <td key={j} className="px-6 py-4 font-medium text-slate-600">
-                                    {cell}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
+                            {(post as any).tableData.rows.map((row: string[], i: number) => {
+                              const isZeneva = row[0]?.toLowerCase().includes('zeneva');
+                              return (
+                                <tr 
+                                  key={i} 
+                                  className={cn(
+                                    "transition-colors",
+                                    isZeneva ? "bg-orange-50/70 border-l-4 border-l-primary font-medium" : "hover:bg-slate-50/30"
+                                  )}
+                                >
+                                  {row.map((cell: string, j: number) => (
+                                    <td key={j} className={cn("px-6 py-4 font-medium", isZeneva && j === 0 ? "font-bold text-slate-950" : "text-slate-600")}>
+                                      {j === 0 && isZeneva ? (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span>{cell}</span>
+                                          <span className="text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                                            Recommended
+                                          </span>
+                                        </div>
+                                      ) : cell}
+                                    </td>
+                                  ))}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
+                      </div>
+                    </div>
+
+                    {/* Quick-Action Callout Card directly under comparison table */}
+                    <div className="mt-4 p-5 sm:p-6 bg-gradient-to-br from-orange-50/90 via-amber-50/60 to-orange-50/90 border border-orange-200/90 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left shadow-sm">
+                      <div>
+                        <div className="flex items-center justify-center sm:justify-start gap-2 mb-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider bg-primary text-white px-2 py-0.5 rounded-full">Free 1-User Plan</span>
+                          <span className="text-xs text-slate-600 font-medium">• No credit card needed</span>
+                        </div>
+                        <h5 className="font-bold text-slate-950 text-base sm:text-lg">Ready to test Zeneva on your shop counter?</h5>
+                        <p className="text-slate-600 text-xs sm:text-sm mt-0.5">Works 100% offline, tracks costs and margins, and prints receipts on any thermal printer or WhatsApp.</p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto shrink-0">
+                        <Link 
+                          href="/signup" 
+                          className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-orange-600 active:scale-95 text-white rounded-xl font-bold text-xs shadow-sm transition-all whitespace-nowrap text-center"
+                        >
+                          Create Free Account &rarr;
+                        </Link>
+                        <Link 
+                          href="/download" 
+                          className="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl font-semibold text-xs shadow-sm transition-all whitespace-nowrap text-center"
+                        >
+                          Download App
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -581,6 +623,25 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
           </div>
         </main>
         
+        {/* Sticky Mobile Floating Conversion Bar for Readers */}
+        <aside aria-label="Quick sign-up" className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-4 py-2.5 sm:hidden shadow-[0_-4px_25px_rgba(0,0,0,0.08)] flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+              <p className="text-xs font-bold text-slate-950 truncate">Zeneva Retail POS</p>
+            </div>
+            <p className="text-[10px] text-slate-500 truncate">Free 1-user plan &bull; Works offline</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/signup"
+              className="px-4 py-2 bg-primary hover:bg-orange-600 active:scale-95 text-white font-bold text-xs rounded-lg shadow-sm transition-transform"
+            >
+              Start Free &rarr;
+            </Link>
+          </div>
+        </aside>
+
         <MarketingFooter />
       </div>
     </ThemeProvider>

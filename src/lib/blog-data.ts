@@ -1661,6 +1661,9 @@ We make this one, so treat the section as a statement of intent rather than an i
 
 **What it is not:** the strongest social-commerce storefront in this market — that is a fair characterisation of Bumpa, which we set out honestly in the [Zeneva vs Bumpa comparison](/blog/zeneva-vs-bumpa-comparison-nigeria). If your orders mostly arrive as Instagram DMs, that is a different shape of problem to the one we optimise for.
 
+> ✦ **Try Zeneva Free**: 1 user, full offline POS, no trial clock, and no credit card required.  
+> [**Create your free account &rarr;**](/signup) &nbsp;•&nbsp; [**Download Desktop & Android App &rarr;**](/download)
+
 ---
 
 ## How the free tiers actually differ

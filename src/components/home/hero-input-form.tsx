@@ -53,47 +53,60 @@ export function HeroInputForm() {
     }, [charIndex, isDeleting, phraseIndex, phrases]);
 
     return (
-        <div className="flex flex-row w-full gap-2 items-stretch max-w-md mx-auto lg:mx-0">
-            <Input
-                type="email"
-                placeholder={placeholder || t('landing.heroEmailPlaceholder')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                aria-label={t('landing.heroEmailAria')}
-                className="
-                    !h-auto
-                    !min-h-[4rem]
-                    !py-3
-                    !leading-tight
-                    placeholder-slate-400
-                    focus:outline-none
-                    focus:ring-2 focus:ring-primary/20
-                    focus:border-primary
-                    transition-all
-                    text-base
-                    text-slate-900
-                    tracking-tight
-                    font-dm-sans
-                    bg-white
-                    border border-slate-200
-                    rounded-md
-                    px-4
-                    shadow-sm
-                    flex-1
-                    w-auto
-                "
-            />
+        <div className="w-full max-w-md mx-auto lg:mx-0">
+            <div className="flex flex-row w-full gap-2 items-stretch">
+                <Input
+                    type="email"
+                    placeholder={placeholder || t('landing.heroEmailPlaceholder')}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    aria-label={t('landing.heroEmailAria')}
+                    className="
+                        !h-auto
+                        !min-h-[4rem]
+                        !py-3
+                        !leading-tight
+                        placeholder-slate-400
+                        focus:outline-none
+                        focus:ring-2 focus:ring-primary/20
+                        focus:border-primary
+                        transition-all
+                        text-base
+                        text-slate-900
+                        tracking-tight
+                        font-dm-sans
+                        bg-white
+                        border border-slate-200
+                        rounded-md
+                        px-4
+                        shadow-sm
+                        flex-1
+                        w-auto
+                    "
+                />
 
-            <div className="cta-buttons-container flex gap-4 rounded-md items-center justify-center shrink-0">
-                <div className="inline-block rounded-md h-full">
-                    <div className="codepen-button rounded-md h-full">
-                        <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'} className="h-full block">
-                            <span className="flex items-center justify-center w-full text-center bg-[#1e293b] text-white hover:bg-[#0f172a] transition-colors text-sm font-semibold tracking-wide font-dm-sans rounded-md py-2 px-5 shadow-sm whitespace-nowrap h-full min-h-[4rem] leading-tight">
-                                {t('landing.heroGetStarted')}
-                            </span>
-                        </Link>
+                <div className="cta-buttons-container flex gap-4 rounded-md items-center justify-center shrink-0">
+                    <div className="inline-block rounded-md h-full">
+                        <div className="codepen-button rounded-md h-full">
+                            <Link href={email ? `/signup?email=${encodeURIComponent(email)}` : '/signup'} className="h-full block">
+                                <span className="flex items-center justify-center w-full text-center bg-[#1e293b] text-white hover:bg-[#0f172a] transition-colors text-sm font-semibold tracking-wide font-dm-sans rounded-md py-2 px-5 shadow-sm whitespace-nowrap h-full min-h-[4rem] leading-tight">
+                                    {t('landing.heroGetStarted')}
+                                </span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="mt-2.5 flex items-center justify-center lg:justify-start gap-2.5 text-[11px] sm:text-xs text-slate-500 font-medium tracking-tight">
+                <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                    <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                    Free 1-User Plan
+                </span>
+                <span className="text-slate-300">•</span>
+                <span>No card needed</span>
+                <span className="text-slate-300">•</span>
+                <span>Setup in 2 mins</span>
             </div>
         </div>
     );
