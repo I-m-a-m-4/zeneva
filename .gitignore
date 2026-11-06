@@ -43,7 +43,15 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# android signing material — must never be committed. Upload key lives in the
+# ANDROID_KEYSTORE_BASE64 repository secret; local copies stay untracked.
 android-keystore-backup.json
+*.keystore
+*.jks
+trigger-keystore
+backup_keys.mjs
+generate_keystore.mjs
 
 # marketing recorder output (videos + raw frame sequences)
 /marketing-out

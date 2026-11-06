@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil, ChevronDown, Download, Tag as TagIcon } from "lucide-react";
+import { PlusCircle, User, Upload, ChevronRight, Loader2, Trash2, Award, ChevronLeft, Pencil, ChevronDown, Download, RefreshCw, Tag as TagIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -148,6 +148,7 @@ export default function CustomersPage() {
     currentUserProfile: currentUser, 
     triggerRefresh, 
     isFullSyncingCustomers,
+    refreshCustomers,
     searchCustomers,
     allCustomersUnfiltered,
     addToQueue,
@@ -904,6 +905,26 @@ export default function CustomersPage() {
                 );
               })()}
 
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-8 gap-1" 
+                onClick={async () => {
+                  try {
+                    await refreshCustomers?.();
+                    toast({ title: "Customers refreshed" });
+                  } catch (e) {
+                    toast({ variant: "destructive", title: "Refresh failed" });
+                  }
+                }} 
+                disabled={isFullSyncingCustomers}
+                title="Refresh customer database"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", isFullSyncingCustomers && "animate-spin")} />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Refresh
+                </span>
+              </Button>
               <Button size="sm" variant="outline" className="h-8 gap-1" onClick={handleExportCsv} disabled={filtered.length === 0}>
                 <Download className="h-3.5 w-3.5" />
                 <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">

@@ -513,7 +513,12 @@ service cloud.firestore {
                                 isRequestingUserManager() &&
                                 hasPermission('record_sales') &&
                                 isRequestingUserMemberOf(resource.data.get('businessId', null)) &&
-                                fieldsUnchanged(['businessId'].toSet()) &&
+                                // Only the invoice "mark as paid" flow updates a
+                                // receipt. Sales are immutable once written: a
+                                // replay that re-sends the same receipt must not
+                                // be able to rewrite it while the batch also
+                                // re-applies the stock decrement.
+                                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
                                 isSubscriptionActive(resource.data.get('businessId', null)));
         allow delete: if isSuperAdmin() || (isUserAuthenticated() && (resource == null || (
                                 isRequestingUserManager() &&

@@ -50,6 +50,12 @@ export function VisualProductScanner({
     const animationFrameRef = useRef<number | null>(null);
     const lastScanTimeRef = useRef<number>(0);
     const isProcessingRef = useRef<boolean>(false);
+    // Guards against overlapping getUserMedia/play() calls: the play() promise
+    // rejects with AbortError when a newer session swaps srcObject mid-flight.
+    const cameraSessionRef = useRef<number>(0);
+    // Hysteresis so one product is auto-added only once until it leaves frame.
+    const autoAddArmedRef = useRef<boolean>(true);
+    const missCountRef = useRef<number>(0);
 
     // States
     const [cameraActive, setCameraActive] = useState(false);
@@ -102,6 +108,7 @@ export function VisualProductScanner({
 
     // 2. Camera stream lifecycle
     const startCamera = useCallback(async () => {
+        const session = ++cameraSessionRef.current;
         setCameraError(null);
         setCameraActive(false);
 
@@ -125,11 +132,24 @@ export function VisualProductScanner({
                 audio: false
             });
 
+            if (session !== cameraSessionRef.current) {
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
+
             streamRef.current = stream;
 
             if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                await videoRef.current.play();
+                const video = videoRef.current;
+                video.srcObject = stream;
+                try {
+                    await video.play();
+                } catch (playErr) {
+                    // A newer startCamera() replaced srcObject — this session is stale.
+                    if ((playErr as DOMException)?.name !== 'AbortError') throw playErr;
+                    return;
+                }
+                if (session !== cameraSessionRef.current) return;
                 setCameraActive(true);
             }
 
@@ -138,6 +158,9 @@ export function VisualProductScanner({
             const capabilities = (track as unknown as { getCapabilities?: () => { torch?: boolean } }).getCapabilities?.();
             setTorchSupported(!!capabilities?.torch);
         } catch (err: unknown) {
+            // Stale or aborted attempts must not paint an error over a healthy stream.
+            if (session !== cameraSessionRef.current) return;
+            if ((err as DOMException)?.name === 'AbortError') return;
             console.error('[VisionScanner] Camera error:', err);
             const msg = err instanceof Error ? err.message : 'Unable to connect to camera.';
             setCameraError(msg.includes('Permission') ? 'Camera permission was denied. Please allow camera access in browser settings.' : msg);
@@ -146,9 +169,12 @@ export function VisualProductScanner({
 
     useEffect(() => {
         if (isOpen) {
+            autoAddArmedRef.current = true;
+            missCountRef.current = 0;
             startCamera();
         } else {
             // Cleanup
+            cameraSessionRef.current++;
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
                 streamRef.current = null;
@@ -163,6 +189,7 @@ export function VisualProductScanner({
         }
 
         return () => {
+            cameraSessionRef.current++;
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
                 streamRef.current = null;
@@ -190,6 +217,8 @@ export function VisualProductScanner({
 
     // 4. Handle adding the product
     const handleConfirmAdd = useCallback((product: Product) => {
+        // Require the product to leave the frame before auto-add fires again.
+        autoAddArmedRef.current = false;
         playCheckoutBeep('success');
         onProductSelect(product);
         setAddedFeedback(product.name);
@@ -245,8 +274,9 @@ export function VisualProductScanner({
                         // 1. Parallel check: Did we see a barcode?
                         const barcodeMatch = await checkNativeBarcode(video);
                         if (barcodeMatch && isRunning) {
+                            missCountRef.current = 0;
                             setTopMatch({ product: barcodeMatch, confidence: 0.99 });
-                            if (autoAdd) {
+                            if (autoAdd && autoAddArmedRef.current) {
                                 handleConfirmAdd(barcodeMatch);
                                 // Pause scanning briefly
                                 await new Promise(r => setTimeout(r, 1200));
@@ -286,16 +316,25 @@ export function VisualProductScanner({
                                 }
 
                                 if (bestProduct && isRunning) {
+                                    missCountRef.current = 0;
                                     setTopMatch({
                                         product: bestProduct,
                                         confidence: Math.round(highestScore * 100) / 100
                                     });
 
                                     // Auto add if threshold is very solid (>83%)
-                                    if (autoAdd && highestScore >= 0.83 && !addedFeedback) {
+                                    if (autoAdd && highestScore >= 0.83 && autoAddArmedRef.current) {
                                         handleConfirmAdd(bestProduct);
                                         // Pause for 1.2s to prevent duplicate adds
                                         await new Promise(r => setTimeout(r, 1200));
+                                    }
+                                } else {
+                                    // Three consecutive misses (~840ms) re-arm auto-add and
+                                    // drop stale cards; a single jitter frame must not.
+                                    missCountRef.current += 1;
+                                    if (missCountRef.current >= 3) {
+                                        autoAddArmedRef.current = true;
+                                        setTopMatch(null);
                                     }
                                 }
                             }
@@ -321,7 +360,7 @@ export function VisualProductScanner({
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, [cameraActive, isOpen, autoAdd, checkNativeBarcode, handleConfirmAdd, products, addedFeedback]);
+    }, [cameraActive, isOpen, autoAdd, checkNativeBarcode, handleConfirmAdd, products]);
 
     return (
         <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>

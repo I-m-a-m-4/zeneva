@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { usePOS } from '@/context/pos-context';
 import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { apiBase } from '@/lib/platform';
 import type { InventoryTransaction } from '@/types';
 import { format } from 'date-fns';
 import { ArrowUp, ArrowDown, Package, Loader2, ArrowRightLeft, HistoryIcon, ChevronDown, Download } from 'lucide-react';
@@ -68,11 +70,23 @@ export default function GlobalStockHistory() {
         const syncKey = `synced_history_${business.id}`;
         if (!sessionStorage.getItem(syncKey)) {
             sessionStorage.setItem(syncKey, 'true'); // Set immediately to prevent multiple calls
-            fetch('/api/inventory/backfill-history', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ businessId: business.id })
-            }).catch(console.error);
+            (async () => {
+                // The route verifies this token and the caller's tenant server-side.
+                const token = await getAuth().currentUser?.getIdToken();
+                if (!token) {
+                    // No session yet — allow the next mount to retry.
+                    sessionStorage.removeItem(syncKey);
+                    return;
+                }
+                await fetch(`${apiBase()}/api/inventory/backfill-history`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ businessId: business.id })
+                });
+            })().catch(console.error);
         }
 
         const txQuery = query(
@@ -97,6 +111,24 @@ export default function GlobalStockHistory() {
     // Hooks must be declared before any early returns
 
     const processedTransactions = React.useMemo(() => {
+        const getMs = (d: any): number => {
+            if (!d) return 0;
+            if (typeof d.toMillis === 'function') return d.toMillis();
+            if (typeof d.toDate === 'function') return d.toDate().getTime();
+            if (typeof d.getTime === 'function') return d.getTime();
+            if (typeof d.seconds === 'number') return d.seconds * 1000;
+            const parsed = new Date(d).getTime();
+            return isNaN(parsed) ? 0 : parsed;
+        };
+        // The running balance must follow the order the rows were written;
+        // `date` can be backdated (or shifted by an offline sync), which used to
+        // make a restock look newer than the sale that followed it and flag a
+        // balance discrepancy that never happened.
+        const recordedMs = (tx: any): number => {
+            const written = getMs(tx.recordedAt);
+            return written > 0 ? written : getMs(tx.date);
+        };
+
         const byProduct: Record<string, any[]> = {};
         transactions.forEach(tx => {
             if (!tx.productId) return;
@@ -108,7 +140,7 @@ export default function GlobalStockHistory() {
         Object.keys(byProduct).forEach(productId => {
             const product = products?.find(p => p.id === productId);
             let currentBalance = product?.stock || 0;
-            const productTxs = byProduct[productId];
+            const productTxs = [...byProduct[productId]].sort((a, b) => recordedMs(b) - recordedMs(a));
 
             const mapped = productTxs.map((tx: any) => {
                 let balanceAfter = currentBalance;

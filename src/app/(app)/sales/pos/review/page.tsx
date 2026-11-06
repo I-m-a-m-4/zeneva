@@ -30,7 +30,7 @@ import { getSynchronizedNow } from '@/lib/server-time';
 function ReviewPageContent() {
     const router = useRouter();
     const { toast } = useToast();
-    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, amountReceived, currencySymbol, resetPOS, products, currentUserProfile, offlineProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale, isReadOnly } = usePOS();
+    const { cart, selectedCustomer, subtotal, tax, discount, total, paymentMethod, amountReceived, currencySymbol, resetPOS, products, currentUserProfile, customers, autoPrint, setAutoPrint, addToQueue, holdCurrentSale, isReadOnly } = usePOS();
     const firestore = useFirestore();
     const business = useBusiness();
     const isReadOnlyStore = isReadOnly || (business ? isCoreFeatureBlocked(business) : false);
@@ -132,8 +132,8 @@ function ReviewPageContent() {
             checkoutStartedRef.current = false;
             setIsCompleting(false);
             toast({
-                title: t('pos.readOnlyTitle', 'Read-Only Mode'),
-                description: t('pos.readOnlyDesc', 'Your trial or subscription has expired. Please upgrade to record sales.'),
+                title: 'Read-Only Mode',
+                description: 'Your trial or subscription has expired. Please upgrade to record sales.',
                 variant: 'destructive',
             });
             return;
@@ -146,6 +146,7 @@ function ReviewPageContent() {
             return;
         }
 
+        try {
         // 1. Validations (Backorder & Operating Hours)
         for (const cartItem of cart) {
             const productFromCache = products.find(p => p.id === cartItem.product.id);
@@ -186,6 +187,9 @@ function ReviewPageContent() {
         }
 
         setIsCompleting(true);
+
+        // Resolve user profile early — needed for both receipt data and audit logs
+        const activeProfile = currentUserProfile;
 
         // 2. Prepare Data for Queue (Securely Recalculate)
         const newReceiptId = uuidv4();
@@ -336,7 +340,6 @@ function ReviewPageContent() {
         }, t('pos.queueRecordingSale', { number: receiptData.receiptNumber }));
 
         // Queue audit logs for stock adjustment due to sales
-        const activeProfile = currentUserProfile || offlineProfile;
 
         // The backdate control promises "this action will be flagged in the audit
         // log", so record it. Queued rather than written directly so it survives
@@ -519,6 +522,13 @@ function ReviewPageContent() {
         // to prevent the auto-submit useEffect from re-firing.
         // It will be reset when the component unmounts or POS is reset.
 
+        } catch (error) {
+            console.error('[POS Checkout] Unexpected error during sale completion:', error);
+            checkoutStartedRef.current = false;
+            setIsCompleting(false);
+            toast({ variant: 'destructive', title: t('errors.genericTitle'), description: t('pos.completeSaleFailed') });
+        }
+
     }, [business, user, cart, products, currentUserProfile, subtotal, tax, discount, total, paymentMethod, currencySymbol, amountReceived, resetPOS, router, autoPrint, backdatedAt, shouldSendEmail, toast, addToQueue, displayReceipt.receiptNumber, selectedCustomer, t, locale]);
 
     // **Auto-Submit Logic**
@@ -555,7 +565,7 @@ function ReviewPageContent() {
         <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
                 <h2 className="text-2xl font-bold mb-4 font-headline no-print">{t('pos.reviewYourSale')}</h2>
-                <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt} business={business} currencySymbol={currencySymbol} amountReceived={amountReceived} showAdminDetails={isAdmin} />
+                <ReceiptDetails ref={receiptContentRef} receipt={displayReceipt as any} business={business} currencySymbol={currencySymbol} amountReceived={amountReceived} showAdminDetails={isAdmin} />
             </div>
             <div className="no-print">
                 <div className="p-4 rounded-lg bg-card border space-y-4">

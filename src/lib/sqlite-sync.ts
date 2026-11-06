@@ -31,6 +31,92 @@ export function offlineDbUsable(): boolean | null {
   return dbUsable;
 }
 
+/**
+ * Current additive schema version.
+ *
+ * There was no migration path at all: `CREATE TABLE IF NOT EXISTS` cannot change
+ * a table that already exists, so `sync_queue` could never gain the tenant column
+ * and indexes could never be added to an installed database. Each step below is
+ * additive and idempotent - no table is rebuilt and no row is deleted.
+ */
+const SCHEMA_VERSION = 1;
+
+async function ensureSchema(loadedDb: Database) {
+  try {
+    const queueColumns = await loadedDb.select<any[]>('PRAGMA table_info(sync_queue)');
+    if (!queueColumns.some((c) => c.name === 'business_id')) {
+      await loadedDb.execute('ALTER TABLE sync_queue ADD COLUMN business_id TEXT');
+    }
+  } catch (err) {
+    console.error('SQLite Migration Error (sync_queue.business_id):', err);
+  }
+
+  /*
+   * Every lookup the app makes addressed these tables by `business_id` with no
+   * supporting index, so each read was a table scan plus a temporary B-tree. The
+   * receipts index also covers `ORDER BY created_at DESC`, which is the receipts
+   * page and the monthly-revenue query.
+   *
+   * The customer index is an expression index over the JSON payload because
+   * `getCachedCustomerReceipts` filters on `$.customer.id`; it is partial so a
+   * malformed blob cannot abort index creation, and each statement is guarded so
+   * one unsupported index never takes the store down.
+   */
+  const statements = [
+    'CREATE INDEX IF NOT EXISTS idx_products_business ON products(business_id)',
+    'CREATE INDEX IF NOT EXISTS idx_customers_business ON customers(business_id)',
+    'CREATE INDEX IF NOT EXISTS idx_receipts_business_created ON receipts(business_id, created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id)',
+    'CREATE INDEX IF NOT EXISTS idx_audit_logs_business ON audit_logs(business_id)',
+    'CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status)',
+    'CREATE INDEX IF NOT EXISTS idx_sync_queue_business_status ON sync_queue(business_id, status)',
+    "CREATE INDEX IF NOT EXISTS idx_receipts_customer ON receipts(business_id, json_extract(data, '$.customer.id')) WHERE json_valid(data)",
+  ];
+  for (const sql of statements) {
+    try {
+      await loadedDb.execute(sql);
+    } catch (err) {
+      console.error('SQLite Index Creation Error:', err);
+    }
+  }
+
+  try {
+    await loadedDb.execute(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  } catch (err) {
+    console.error('SQLite user_version Error:', err);
+  }
+
+  /*
+   * WAL hygiene. The live database was carrying a WAL more than six times the
+   * size of the database itself because `journal_size_limit` was unset (-1) and
+   * nothing ever checkpointed explicitly, so every clear/sync left the WAL to grow
+   * without reclaiming the file. Truncating at startup is safe: it runs before
+   * hydration opens a read snapshot.
+   */
+  try {
+    await loadedDb.execute('PRAGMA journal_size_limit = 4194304');
+  } catch (err) {
+    console.error('SQLite journal_size_limit Error:', err);
+  }
+  try {
+    await loadedDb.execute('PRAGMA busy_timeout = 5000');
+  } catch (err) {
+    console.error('SQLite busy_timeout Error:', err);
+  }
+  try {
+    await loadedDb.execute('PRAGMA optimize');
+  } catch (err) {
+    console.error('SQLite optimize Error:', err);
+  }
+  try {
+    await loadedDb.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+  } catch (err) {
+    // Busy here only means another connection is reading; the limit above still
+    // caps future growth.
+    console.error('SQLite WAL checkpoint Error:', err);
+  }
+}
+
 export async function getOfflineDb() {
   if (db) return db;
   if (typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__) return null;
@@ -91,7 +177,8 @@ export async function getOfflineDb() {
           payload TEXT,
           description TEXT,
           timestamp INTEGER,
-          status TEXT DEFAULT 'pending'
+          status TEXT DEFAULT 'pending',
+          business_id TEXT
         );
 
         CREATE TABLE IF NOT EXISTS profiles (
@@ -115,6 +202,8 @@ export async function getOfflineDb() {
         );
       `);
       
+      await ensureSchema(loadedDb);
+
       db = loadedDb;
       dbUsable = true;
       return db;
@@ -165,6 +254,15 @@ async function upsertRows(
     });
 
     // updated_at is omitted so its DEFAULT CURRENT_TIMESTAMP applies per row.
+    /*
+     * One multi-row INSERT is itself atomic in SQLite, which is the guarantee
+     * that matters here: a chunk either applies completely or not at all.
+     *
+     * Do not wrap this in `BEGIN`/`COMMIT`. The Tauri plugin hands each `execute`
+     * to a sqlx connection pool, so the two statements can land on different
+     * connections - the transaction would then hold a write lock on one while the
+     * insert waits on another, blocking the till until `busy_timeout` expires.
+     */
     await db.execute(
       `INSERT OR REPLACE INTO ${table} (${columnList}) VALUES ${placeholders.join(', ')}`,
       binds
@@ -205,8 +303,11 @@ export async function syncProductsToOffline(businessId: string, products: any[])
   if (products.length === 0) return true;
 
   try {
+    // A caller can hand us a mixed page (e.g. a stale in-memory collection that
+    // still holds the previous tenant's rows). Filing those under `businessId`
+    // is how the column and the payload end up disagreeing, so drop them here.
     const rows = products
-      .filter(p => p?.id)
+      .filter(p => p?.id && (!p.businessId || p.businessId === businessId))
       .map(p => [p.id, businessId, JSON.stringify(p)]);
     await upsertRows(db, 'products', ['id', 'business_id', 'data'], rows);
     return true;
@@ -455,7 +556,7 @@ export async function syncUsersToOffline(businessId: string, users: any[]) {
 
   try {
     const rows = users
-      .filter(u => u?.id)
+      .filter(u => u?.id && (!u.businessId || u.businessId === businessId))
       .map(u => [u.id, businessId, JSON.stringify(u)]);
     await upsertRows(db, 'users', ['id', 'business_id', 'data'], rows);
   } catch (err) {
@@ -469,7 +570,15 @@ export async function getCachedUsers(businessId: string) {
 
   try {
     const result: any[] = await db.select('SELECT data FROM users WHERE business_id = $1', [businessId]);
-    return result.map(r => JSON.parse(r.data));
+    const rows: any[] = [];
+    for (const r of result) {
+      try {
+        rows.push(JSON.parse(r.data));
+      } catch {
+        // One corrupt row must not lose the rest of the staff list.
+      }
+    }
+    return rows;
   } catch (err) {
     console.error('SQLite Retrieval Error (Users):', err);
     return [];
@@ -482,7 +591,7 @@ export async function syncAuditLogsToOffline(businessId: string, logs: any[]) {
 
   try {
     const rows = logs
-      .filter(l => l?.id)
+      .filter(l => l?.id && (!l.businessId || l.businessId === businessId))
       .map(l => [l.id, businessId, JSON.stringify(l)]);
     await upsertRows(db, 'audit_logs', ['id', 'business_id', 'data'], rows);
   } catch (err) {
@@ -496,7 +605,15 @@ export async function getCachedAuditLogs(businessId: string) {
 
   try {
     const result: any[] = await db.select('SELECT data FROM audit_logs WHERE business_id = $1', [businessId]);
-    return result.map(r => JSON.parse(r.data));
+    const rows: any[] = [];
+    for (const r of result) {
+      try {
+        rows.push(JSON.parse(r.data));
+      } catch {
+        // One corrupt row must not lose the rest of the audit trail.
+      }
+    }
+    return rows;
   } catch (err) {
     console.error('SQLite Retrieval Error (Audit Logs):', err);
     return [];
@@ -551,7 +668,7 @@ export async function syncCustomersToOffline(businessId: string, customers: any[
 
   try {
     const rows = customers
-      .filter(c => c?.id)
+      .filter(c => c?.id && (!c.businessId || c.businessId === businessId))
       .map(c => [c.id, businessId, JSON.stringify(c)]);
     await upsertRows(db, 'customers', ['id', 'business_id', 'data'], rows);
     return true;
@@ -587,17 +704,29 @@ function receiptCreatedAtSeconds(receipt: any): number {
   return isNaN(parsed.getTime()) ? nowSeconds : Math.floor(parsed.getTime() / 1000);
 }
 
-export async function syncReceiptsToOffline(businessId: string, receipts: any[]) {
+/**
+ * Mirror receipts to SQLite, reporting whether the page reached disk.
+ *
+ * Same contract as `syncProductsToOffline`: the caller stamps
+ * `full_receipts_sync`, and that stamp suppresses the next 24 hours of syncing.
+ * This used to return `void` and swallow its error, so a failed write was
+ * stamped as a successful full sync - the exact defect fixed for products and
+ * customers, one collection over.
+ */
+export async function syncReceiptsToOffline(businessId: string, receipts: any[]): Promise<boolean> {
   const db = await getOfflineDb();
-  if (!db || receipts.length === 0) return;
+  if (!db) return typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__;
+  if (receipts.length === 0) return true;
 
   try {
     const rows = receipts
-      .filter(r => r?.id)
+      .filter(r => r?.id && (!r.businessId || r.businessId === businessId))
       .map(r => [r.id, businessId, JSON.stringify(r), receiptCreatedAtSeconds(r)]);
     await upsertRows(db, 'receipts', ['id', 'business_id', 'data', 'created_at'], rows);
+    return true;
   } catch (err) {
     console.error('SQLite Sync Error (Receipts):', err);
+    return false;
   }
 }
 
@@ -637,7 +766,16 @@ export async function getCachedReceipts(businessId: string, limit: number = 50) 
       'SELECT data FROM receipts WHERE business_id = $1 ORDER BY created_at DESC LIMIT $2', 
       [businessId, limit]
     );
-    return result.map(r => JSON.parse(r.data));
+    // One corrupt row must not lose the rest of the sales history.
+    const rows: any[] = [];
+    for (const r of result) {
+      try {
+        rows.push(JSON.parse(r.data));
+      } catch {
+        // skip
+      }
+    }
+    return rows;
   } catch (err) {
     console.error('SQLite Retrieval Error (Receipts):', err);
     return [];
@@ -649,48 +787,103 @@ export async function getCachedCustomerReceipts(businessId: string, customerId: 
   if (!db) return [];
   
   try {
+    /*
+     * `json_valid` in the predicate matters: a single malformed blob used to
+     * abort the whole query with "malformed JSON", so one corrupt receipt hid
+     * every receipt for that customer. The expression index above carries the
+     * same predicate, so the query remains eligible for it.
+     */
     const result: any[] = await db.select(
       `SELECT data FROM receipts 
        WHERE business_id = $1 
+       AND json_valid(data)
        AND json_extract(data, '$.customer.id') = $2
        ORDER BY created_at DESC`, 
       [businessId, customerId]
     );
-    return result.map(r => JSON.parse(r.data));
+    const rows: any[] = [];
+    for (const r of result) {
+      try {
+        rows.push(JSON.parse(r.data));
+      } catch {
+        // skip the single corrupt row
+      }
+    }
+    return rows;
   } catch (err) {
     console.error('SQLite Customer Receipts Error:', err);
     return [];
   }
 }
 
-export async function saveActionToOfflineQueue(action: any) {
+/**
+ * Persist a queued mutation with the tenant that created it.
+ *
+ * The queue was global: every pending write on the machine was replayed by
+ * whoever logged in next, under that session's active `businessId`. Tagging the
+ * row is what lets `getOfflineQueue` and `processQueue` leave another tenant's
+ * work pending until its owner signs back in, instead of writing it into the
+ * wrong business.
+ */
+export async function saveActionToOfflineQueue(action: any, businessId?: string) {
   const db = await getOfflineDb();
   if (!db) return;
   
   try {
     await db.execute(
-      'INSERT OR REPLACE INTO sync_queue (id, action_type, payload, description, timestamp, status) VALUES ($1, $2, $3, $4, $5, $6)',
-      [action.id, action.type, JSON.stringify(action.payload), action.description, action.timestamp, action.status]
+      'INSERT OR REPLACE INTO sync_queue (id, action_type, payload, description, timestamp, status, business_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [action.id, action.type, JSON.stringify(action.payload), action.description, action.timestamp, action.status, businessId || null]
     );
   } catch (err) {
     console.error('SQLite Queue Save Error:', err);
   }
 }
 
-export async function getOfflineQueue() {
+/**
+ * Pending writes belonging to `businessId`.
+ *
+ * Legacy rows (written before the tenant column existed) have no `business_id`.
+ * They are attributed from the payload when it names a tenant, and otherwise
+ * kept - dropping them would lose a queued sale that was never sent anywhere,
+ * which is a worse outcome than the pre-existing behaviour. Corrupt payloads are
+ * skipped rather than failing the whole read.
+ */
+export async function getOfflineQueue(businessId?: string) {
   const db = await getOfflineDb();
   if (!db) return [];
   
   try {
     const result: any[] = await db.select('SELECT * FROM sync_queue WHERE status != $1 ORDER BY timestamp ASC', ['synced']);
-    return result.map(r => ({
-      id: r.id,
-      type: r.action_type,
-      payload: JSON.parse(r.payload),
-      description: r.description,
-      timestamp: r.timestamp,
-      status: r.status
-    }));
+    const queue: any[] = [];
+    for (const r of result) {
+      let payload: any;
+      try {
+        payload = JSON.parse(r.payload);
+      } catch {
+        console.error('SQLite Queue Retrieval Error: unparsable payload for action', r.id);
+        continue;
+      }
+
+      if (businessId) {
+        const owner =
+          r.business_id ||
+          payload?.businessId ||
+          payload?.receiptData?.businessId ||
+          payload?.product?.businessId ||
+          payload?.customer?.businessId;
+        if (owner && owner !== businessId) continue;
+      }
+
+      queue.push({
+        id: r.id,
+        type: r.action_type,
+        payload,
+        description: r.description,
+        timestamp: r.timestamp,
+        status: r.status
+      });
+    }
+    return queue;
   } catch (err) {
     console.error('SQLite Queue Retrieval Error:', err);
     return [];
@@ -709,6 +902,7 @@ export async function getMonthlyRevenue(businessId: string, monthCount: number =
         SUM(CAST(json_extract(data, '$.total') AS REAL)) as revenue
       FROM receipts 
       WHERE business_id = $1
+      AND json_valid(data)
       GROUP BY month
       ORDER BY month DESC
       LIMIT $2
@@ -735,22 +929,130 @@ export async function removeActionFromOfflineQueue(actionId: string) {
   }
 }
 
-export async function clearAllTables() {
+/**
+ * Repair the mirror's tenancy, for the business that just signed in.
+ *
+ * Two misfilings are possible and both were observed in the live database,
+ * because the continuity write used to file the whole in-memory state under the
+ * freshly selected business:
+ *
+ *  - a row whose payload names this business but which was filed under another
+ *    business's column - it is adopted, so the current tenant's cache is whole;
+ *  - a row filed under this business's column whose payload names a different
+ *    tenant - it is re-filed to its real owner, not deleted. The payload is the
+ *    authoritative tenant, and re-filing repairs the other tenant's cache as a
+ *    side effect instead of forcing it to re-sync what it already had locally.
+ *
+ * Rows with no `businessId` in the payload are left untouched: there is no
+ * evidence about who they belong to, and guessing is how data gets destroyed.
+ */
+export async function purgeForeignRows(businessId: string): Promise<number> {
   const db = await getOfflineDb();
-  if (!db) return;
-  
+  if (!db || !businessId) return 0;
+
+  const tables = ['products', 'customers', 'receipts', 'users', 'audit_logs'];
+  let affected = 0;
+
+  /*
+   * Each statement is atomic on its own. No explicit transaction: the Tauri
+   * plugin executes through a connection pool, so `BEGIN` and `COMMIT` are not
+   * guaranteed to use the same connection. Both statements are idempotent, so a
+   * failure between them simply retries on the next launch.
+   */
   try {
-    await db.execute('DELETE FROM products');
-    await db.execute('DELETE FROM customers');
-    await db.execute('DELETE FROM receipts');
-    await db.execute('DELETE FROM business');
-    await db.execute('DELETE FROM sync_metadata');
-    await db.execute('DELETE FROM stats');
-    await db.execute('DELETE FROM profiles');
-    await db.execute('DELETE FROM users');
-    await db.execute('DELETE FROM audit_logs');
-    console.log("SQLite: All tables cleared.");
+    for (const table of tables) {
+      const adopted: any = await db.execute(
+        `UPDATE ${table} SET business_id = $1
+         WHERE json_valid(data)
+           AND json_extract(data, '$.businessId') = $1
+           AND (business_id IS NULL OR business_id <> $1)`,
+        [businessId]
+      );
+      if (typeof adopted?.rowsAffected === 'number') affected += adopted.rowsAffected;
+
+      const refiled: any = await db.execute(
+        `UPDATE ${table} SET business_id = json_extract(data, '$.businessId')
+         WHERE business_id = $1
+           AND json_valid(data)
+           AND json_extract(data, '$.businessId') IS NOT NULL
+           AND json_extract(data, '$.businessId') <> $1`,
+        [businessId]
+      );
+      if (typeof refiled?.rowsAffected === 'number') affected += refiled.rowsAffected;
+    }
+  } catch (err) {
+    console.error('SQLite Tenancy Repair Error:', err);
+    return affected;
+  }
+
+  return affected;
+}
+
+/**
+ * Wipe cached rows - all of them, or just one tenant's.
+ *
+ * Scoped mode exists for impersonation end: the impersonated tenant's rows are
+ * removed (including any that were misfiled under the admin's column) while the
+ * admin's own cache is left intact. The queue is never deleted: pending writes
+ * are real work that has not reached the server, and it is now tenant-scoped at
+ * read and replay time instead.
+ *
+ * There is deliberately no explicit transaction. The Tauri plugin executes
+ * through a sqlx pool, so `BEGIN` and `COMMIT` are not guaranteed to run on the
+ * same connection; the wipe stops at the first failed table and reports it, and
+ * every step is a plain delete that is safe to repeat.
+ */
+export async function clearAllTables(businessId?: string): Promise<boolean> {
+  const db = await getOfflineDb();
+  if (!db) return typeof window === 'undefined' || !(window as any).__TAURI_INTERNALS__;
+
+  const statements: Array<[string, any[]]> = [];
+  const collection = (table: string): [string, any[]] =>
+    businessId
+      ? [
+          /*
+           * Delete by payload ownership, not by the column alone. A row filed
+           * under this column but owned by another tenant is not this tenant's
+           * to delete - it is left for that owner's `purgeForeignRows` to re-file.
+           * Rows with no readable payload tenant fall back to the column.
+           */
+          `DELETE FROM ${table}
+           WHERE (json_valid(data) AND json_extract(data, '$.businessId') = $1)
+              OR (business_id = $1
+                  AND (NOT json_valid(data) OR json_extract(data, '$.businessId') IS NULL))`,
+          [businessId],
+        ]
+      : [`DELETE FROM ${table}`, []];
+
+  for (const table of ['products', 'customers', 'receipts', 'users', 'audit_logs']) {
+    statements.push(collection(table));
+  }
+
+  statements.push(
+    businessId ? ['DELETE FROM business WHERE id = $1', [businessId]] : ['DELETE FROM business', []]
+  );
+  statements.push(
+    businessId ? ['DELETE FROM stats WHERE id = $1', [businessId]] : ['DELETE FROM stats', []]
+  );
+  statements.push(
+    businessId
+      ? ['DELETE FROM sync_metadata WHERE business_id = $1', [businessId]]
+      : ['DELETE FROM sync_metadata', []]
+  );
+  statements.push(
+    businessId
+      ? [`DELETE FROM profiles WHERE json_valid(data) AND json_extract(data, '$.businessId') = $1`, [businessId]]
+      : ['DELETE FROM profiles', []]
+  );
+
+  try {
+    for (const [sql, args] of statements) {
+      await db.execute(sql, args);
+    }
+    console.log(businessId ? `SQLite: Cleared rows for ${businessId}.` : 'SQLite: All tables cleared.');
+    return true;
   } catch (err) {
     console.error('SQLite Clear Error:', err);
+    return false;
   }
 }

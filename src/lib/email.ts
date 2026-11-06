@@ -1,6 +1,7 @@
 'use client';
 
 import emailjs from '@emailjs/browser';
+import { getAuth } from 'firebase/auth';
 import { apiBase } from '@/lib/platform';
 
 // --- For User Invitations & General Contact ---
@@ -14,10 +15,17 @@ export interface ContactEmailParams {
 
 export const sendInvitationEmail = async (params: ContactEmailParams) => {
     try {
+        // The route only sends for a verified admin of the inviting business.
+        const token = await getAuth().currentUser?.getIdToken();
+        if (!token) {
+            throw new Error('You must be signed in to send invitations.');
+        }
+
         const response = await fetch(`${apiBase()}/api/emails/invite`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(params),
         });

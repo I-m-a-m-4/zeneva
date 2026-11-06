@@ -13,6 +13,11 @@ export function ClientSideInitializer() {
   React.useEffect(() => {
     setIsMounted(true);
 
+    // React is alive, so the inline boot fallback in the root layout is no
+    // longer the safety net. Clear its flag and remove any card it painted.
+    (window as any).__ZENEVA_READY__ = true;
+    document.getElementById('zeneva-boot-error')?.remove();
+
     // next-pwa is disabled in dev, but it does not clean up after itself: a
     // `npm run build` leaves a production `public/sw.js` behind, and Next then
     // serves that file on the dev server. The worker precaches the *built*

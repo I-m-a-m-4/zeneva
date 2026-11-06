@@ -6,17 +6,25 @@ export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
   try {
+    // Resolving names by UID reads other users' profiles, so this is a
+    // tenant-scoped endpoint: a verified caller, and their business must match
+    // (or they must be the platform super-admin). No anonymous path.
+    if (!adminAuth) {
+      return NextResponse.json({ success: false, error: 'Server authentication is not configured' }, { status: 503 });
+    }
+
     const authHeader = req.headers.get('authorization') || '';
     const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (!bearer) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
 
-    let callerUid: string | null = null;
-    if (adminAuth && bearer) {
-      try {
-        const decoded = await adminAuth.verifyIdToken(bearer);
-        callerUid = decoded.uid;
-      } catch (_) {
-        // Token verification failed or expired
-      }
+    let callerUid: string;
+    try {
+      const decoded = await adminAuth.verifyIdToken(bearer, true);
+      callerUid = decoded.uid;
+    } catch {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -34,19 +42,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Database unavailable' }, { status: 500 });
     }
 
-    // Tenant check: verify caller is member of this business or admin
-    if (callerUid) {
-      try {
-        const userDoc = await db.collection('users').doc(callerUid).get();
-        if (userDoc.exists) {
-          const userData = userDoc.data();
-          if (userData?.role !== 'super-admin' && userData?.businessId !== businessId) {
-            return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-          }
-        }
-      } catch (_) {
-        // Proceed if check fails non-critically
-      }
+    const userDoc = await db.collection('users').doc(callerUid).get();
+    if (!userDoc.exists) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+    const userData = userDoc.data() || {};
+    if (userData.status === 'suspended' ||
+        (userData.role !== 'super-admin' && userData.businessId !== businessId)) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
     const resolvedMap: Record<string, string> = {};

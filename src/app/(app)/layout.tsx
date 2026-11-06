@@ -18,7 +18,7 @@ import { ProductTour } from '@/components/ProductTour';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowLeft, ArrowRight, ShieldCheck, Bug, Wallet, Gift, Clock
+  Bell, LogOut, Package, Search as SearchIcon, Home, ShoppingCart, Users, FileText, Settings, LifeBuoy, ShieldAlert, CreditCard, Bot, Calculator as CalculatorIcon, Globe, Loader, BarChart2, UserCog, FileDigit, ShieldQuestion, Truck, Building, History as HistoryIcon, Paintbrush, Award, UserRound, X, Trash, AlertTriangle, CheckCircle2, ChevronRight, Zap, ArrowLeft, ArrowRight, ShieldCheck, Bug, Wallet, Gift, Clock, Crown
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -69,7 +69,7 @@ import HeldSalesDrawer from '@/components/pos/held-sales-drawer';
 import { History } from 'lucide-react';
 import { BranchSwitcher } from '@/components/layout/branch-switcher';
 import { useSessionTracker } from '@/hooks/use-session-tracker';
-import { logErrorToFirestore } from '@/lib/error-logger';
+import { setErrorContext } from '@/lib/error-context';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { UpdateRequiredModal } from '@/components/layout/update-required-modal';
 import AchievementCelebration from '@/components/achievements/achievement-celebration';
@@ -123,6 +123,12 @@ const bottomLinks = [
 const moreNavLinks: { href: string; icon: React.ElementType; label: string; labelKey: string; roles: string[]; }[] = [
   // This is intentionally left empty as items are now in the main nav.
 ];
+
+/*
+ * The badge marks the account, not the business: a founding merchant's staff
+ * sign in under their own emails and must not inherit the founder's badge.
+ */
+const FOUNDING_MERCHANT_EMAILS = new Set(['umahivictor2100@gmail.com']);
 
 // Helper component for full-screen loading
 function AppLoader({ text }: { text: string }) {
@@ -410,22 +416,11 @@ export default function AuthenticatedLayout({
     return () => errorEmitter.off('permission-error', handlePermissionError);
   }, [toast]);
 
+  // Uncaught window errors and promise rejections are logged by the root
+  // GlobalErrorCatcher so every route is covered; it reads tenant attribution
+  // from here rather than registering its own per-shell listeners.
   React.useEffect(() => {
-    const handleWindowError = (event: ErrorEvent) => {
-      logErrorToFirestore(event.error || new Error(event.message), 'window', { userId: user?.uid, businessId: businessInstance?.id });
-    };
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      logErrorToFirestore(event.reason instanceof Error ? event.reason : new Error(String(event.reason)), 'unhandled_rejection', { userId: user?.uid, businessId: businessInstance?.id });
-    };
-
-    window.addEventListener('error', handleWindowError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('error', handleWindowError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
+    setErrorContext({ userId: user?.uid, businessId: businessInstance?.id });
   }, [user?.uid, businessInstance?.id]);
 
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
@@ -542,6 +537,11 @@ export default function AuthenticatedLayout({
   }, [currentUserProfile, user, businessInstance]);
 
   const fallbackInitials = getInitials(resolvedUserName) || (currentUserProfile?.email || user?.email || 'U').charAt(0).toUpperCase();
+
+  const isFoundingMerchant = React.useMemo(
+    () => FOUNDING_MERCHANT_EMAILS.has((currentUserProfile?.email || user?.email || '').toLowerCase()),
+    [currentUserProfile?.email, user?.email]
+  );
 
   // Helper: resolve a navigation link for each notification.
   //
@@ -1484,7 +1484,7 @@ export default function AuthenticatedLayout({
   }
 
   return (
-    <ErrorBoundary userId={user?.uid} businessId={businessInstance?.id}>
+    <ErrorBoundary userId={user?.uid} businessId={businessInstance?.id} resetKey={pathname}>
       <>
       <TooltipProvider>
         <SidebarProvider defaultOpen={true} className="h-full">
@@ -1877,6 +1877,19 @@ export default function AuthenticatedLayout({
                     </DropdownMenuContent>
                   </DropdownMenu>
 
+                  {isFoundingMerchant && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge className="inline-flex items-center gap-1 h-6 px-1.5 sm:px-2 text-[10px] font-semibold whitespace-nowrap border-amber-500/60 bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm">
+                          <Crown className="h-3 w-3" />
+                          <span className="hidden sm:inline">Founding Merchant</span>
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Founding Merchant</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="relative h-9 w-9 rounded-full flex justify-center items-center p-0">

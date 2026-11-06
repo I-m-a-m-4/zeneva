@@ -302,16 +302,20 @@ function SignupPageContent() {
         await waitForUserProfile(firestore, user.uid);
         triggerRefresh();
 
-        // Send welcome email asynchronously
-        fetch('/api/emails/welcome', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: user.email,
-            firstName: user.displayName?.split(' ')[0] || '',
-            businessName: invitationDetails?.businessName || ''
-          })
-        }).catch(err => console.error('Failed to send welcome email:', err));
+        // Send welcome email asynchronously (the route sends only to this token's address)
+        user.getIdToken()
+          .then(token => fetch('/api/emails/welcome', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              firstName: user.displayName?.split(' ')[0] || '',
+              businessName: invitationDetails?.businessName || ''
+            })
+          }))
+          .catch(err => console.error('Failed to send welcome email:', err));
 
         // Brief pause so the POS context has time to pick up the new auth state
         await new Promise(resolve => setTimeout(resolve, 1200));
@@ -396,16 +400,20 @@ function SignupPageContent() {
 
       triggerRefresh();
 
-      // Send welcome email asynchronously
-      fetch('/api/emails/welcome', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: userCredential.user.email,
-          firstName: '',
-          businessName: invitationDetails?.businessName || ''
-        })
-      }).catch(err => console.error('Failed to send welcome email:', err));
+      // Send welcome email asynchronously (the route sends only to this token's address)
+      userCredential.user.getIdToken()
+        .then(token => fetch('/api/emails/welcome', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            firstName: '',
+            businessName: invitationDetails?.businessName || ''
+          })
+        }))
+        .catch(err => console.error('Failed to send welcome email:', err));
 
       await new Promise(resolve => setTimeout(resolve, 1500));
       router.push(invitationCode ? '/sales/pos/select-products' : '/onboarding');

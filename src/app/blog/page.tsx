@@ -6,14 +6,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import {
   ArrowRight,
-  Calendar,
-  User,
   Search,
-  BookOpen,
-  Newspaper,
-  TrendingUp,
-  Loader2,
-  ChevronRight,
   LayoutGrid,
   List,
   Clock,
@@ -46,7 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeProvider } from '@/components/theme-provider';
 import { InteractiveGrid } from '@/components/interactive-grid';
-import { allBlogPosts, StaticBlogPost } from '@/lib/blog-data';
+import { allBlogPosts, getPostDate, getReadingMinutes } from '@/lib/blog-data';
 
 function BlogCardSkeleton() {
   return (
@@ -80,28 +73,23 @@ export default function BlogLandingPage() {
 
   const { data: posts, isLoading } = useCollection<BlogPost>(blogQuery);
 
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const postsPerPage = 20;
-
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
-
   const filteredPosts = React.useMemo(() => {
-    // Convert static posts to match Firestore BlogPost type roughly
+    // Convert static posts to match Firestore BlogPost type roughly. `content`
+    // is carried so the card can compute a real reading time — it used to be
+    // left empty, which made every authored article show "2 min read".
     const staticAsBlogPosts: BlogPost[] = allBlogPosts.map(staticPost => ({
       id: staticPost.slug,
       title: staticPost.title,
       slug: staticPost.slug,
-      content: '', // Content is handled by specific pages or the detail page
+      content: staticPost.content || '',
       excerpt: staticPost.excerpt,
       imageUrl: staticPost.imageUrl,
       authorId: 'admin',
-      authorName: 'Zeneva Editorial',
+      authorName: staticPost.authorName || 'Zeneva Editorial',
       published: true,
       category: staticPost.category,
-      createdAt: { toDate: () => new Date('2026-04-19') },
-      updatedAt: { toDate: () => new Date('2026-04-19') }
+      createdAt: { toDate: () => getPostDate(staticPost) },
+      updatedAt: { toDate: () => getPostDate(staticPost) }
     }));
 
     // Merge both, preferring Firestore if ID/Slug matches
@@ -126,20 +114,21 @@ export default function BlogLandingPage() {
       }
     });
 
-    if (!searchQuery.trim()) return combined;
+    // Newest first. The migrated archive shares one date, so new posts sort
+    // above it without reordering the source file.
+    const sorted = [...combined].sort((a, b) => {
+      const aTime = a.createdAt?.toDate?.()?.getTime?.() ?? 0;
+      const bTime = b.createdAt?.toDate?.()?.getTime?.() ?? 0;
+      return bTime - aTime;
+    });
+
+    if (!searchQuery.trim()) return sorted;
     const q = searchQuery.toLowerCase();
-    return combined.filter(post =>
+    return sorted.filter(post =>
       post.title.toLowerCase().includes(q) ||
       post.excerpt?.toLowerCase().includes(q)
     );
   }, [posts, searchQuery]);
-
-  const paginatedPosts = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * postsPerPage;
-    return filteredPosts.slice(startIndex, startIndex + postsPerPage);
-  }, [filteredPosts, currentPage]);
-
-  const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
 
   return (
     <ThemeProvider forcedTheme="light">
@@ -277,8 +266,8 @@ export default function BlogLandingPage() {
 
               {/* Posts Grid/List */}
               <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' : 'flex flex-col gap-6'}`}>
-                {paginatedPosts.length > 0 ? (
-                  paginatedPosts.map((post) => (
+                {filteredPosts.length > 0 ? (
+                  filteredPosts.map((post) => (
                     <article key={post.id} className="flex flex-col h-full">
                       <Link
                         href={`/blog/${post.slug || post.id}`}
@@ -292,11 +281,11 @@ export default function BlogLandingPage() {
                         <div className="flex flex-col flex-1 p-5">
                           <div className="flex items-center gap-3 mb-3">
                             <Badge variant="secondary" className="bg-slate-100 text-slate-900 border-none px-3 py-0.5 rounded-lg text-xs font-bold uppercase tracking-tighter">
-                              Category
+                              {post.category || 'Insights'}
                             </Badge>
                             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
                               <Clock className="h-3 w-3" />
-                              <span>{Math.ceil(post.content.length / 1000) + 2} MIN READ</span>
+                              <span>{getReadingMinutes(post.content)} MIN READ</span>
                             </div>
                           </div>
 
@@ -313,7 +302,7 @@ export default function BlogLandingPage() {
                               <span className="text-xs font-bold text-slate-950 uppercase tracking-tighter">{post.authorName}</span>
                               <span className="text-slate-300">·</span>
                               <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">
-                                {post.createdAt ? format(post.createdAt.toDate(), 'MMM d, yyyy') : 'Recently'}
+                                {format(post.createdAt?.toDate?.() ?? getPostDate({}), 'MMM d, yyyy')}
                               </span>
                             </div>
                             <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
@@ -338,40 +327,10 @@ export default function BlogLandingPage() {
                 )}
               </div>
 
-              {/* Pagination */}
-              {!isLoading && filteredPosts.length > postsPerPage && (
-                <div className="mt-20 flex items-center justify-center gap-4">
-                  <Button
-                    variant="outline"
-                    disabled={currentPage === 1}
-                    onClick={() => {
-                      setCurrentPage(prev => Math.max(1, prev - 1));
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="rounded-xl border-slate-200 text-slate-900 font-bold uppercase tracking-widest text-[10px] h-12 px-6"
-                  >
-                    Previous
-                  </Button>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Page</span>
-                    <span className="h-10 w-10 flex border border-slate-200 items-center justify-center rounded-xl bg-white text-slate-950 font-black text-sm">{currentPage}</span>
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">of {totalPages}</span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    disabled={currentPage === totalPages}
-                    onClick={() => {
-                      setCurrentPage(prev => Math.min(totalPages, prev + 1));
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="rounded-xl border-slate-200 text-slate-900 font-bold uppercase tracking-widest text-[10px] h-12 px-6"
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
+              {/* Every post is rendered in the initial HTML. The previous
+                  20-per-page control only existed in client state, so posts 21+
+                  were never linked from /blog and never crawled — 15 articles
+                  were orphaned. Search still filters the full list in place. */}
             </div>
 
 

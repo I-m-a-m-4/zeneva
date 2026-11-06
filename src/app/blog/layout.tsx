@@ -1,8 +1,13 @@
 import { Metadata } from 'next';
 
+const blogTitle = 'Blog - Retail Operations, Inventory & POS Insights | Zeneva';
+const blogDescription = 'Guides on retail operations, inventory control, POS systems and profit in Nigeria — from the team building Zeneva, the offline-first retail OS.';
+
 export const metadata: Metadata = {
-  title: 'Blog | Retail Insights & Business Growth',
-  description: 'Stay updated with the latest retail trends, inventory management tips, and success stories from the Zeneva community. Expert advice for Nigerian businesses.',
+  // Absolute so the root `%s | Zeneva` template does not append a second brand
+  // and push the title past the ~60-character SERP cut-off.
+  title: { absolute: blogTitle },
+  description: blogDescription,
   keywords: [
     'retail case studies nigeria',
     'how to manage boutique inventory',
@@ -17,9 +22,27 @@ export const metadata: Metadata = {
     canonical: '/blog'
   },
   openGraph: {
-    title: 'Zeneva Blog - Master Your Retail Business',
-    description: 'Expert insights on growth, operations, and inventory intelligence.',
-  }
+    title: blogTitle,
+    description: blogDescription,
+    url: '/blog',
+    siteName: 'Zeneva',
+    locale: 'en_US',
+    type: 'website',
+    images: [
+      {
+        url: '/zeneva-blog-hero.webp',
+        width: 1535,
+        height: 1024,
+        alt: 'Zeneva Retail Insights',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: blogTitle,
+    description: blogDescription,
+    images: ['/zeneva-blog-hero.webp'],
+  },
 };
 
 import { Bricolage_Grotesque, Inter } from 'next/font/google';

@@ -1,16 +1,57 @@
 import { NextResponse } from 'next/server';
+import { adminAuth, adminFirestore } from '@/firebase/admin';
 import { sendEmail } from '@/lib/server/resend';
+
+export const dynamic = 'force-dynamic';
+
+// These values end up inside the HTML body, so escape them rather than trust
+// the client. The recipient is always the address on the verified token.
+const escapeHtml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 export async function POST(req: Request) {
   try {
-    const { email, firstName, businessName } = await req.json();
-
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    // This sends from our verified domain with the server's Resend key. The
+    // caller is the account that just signed up; the body cannot choose the
+    // recipient.
+    if (!adminAuth) {
+      return NextResponse.json({ error: 'Server authentication is not configured.' }, { status: 503 });
     }
 
-    const name = firstName || email.split('@')[0];
-    const bName = businessName || 'your business';
+    const authHeader = req.headers.get('authorization') || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (!bearer) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let decoded;
+    try {
+      decoded = await adminAuth.verifyIdToken(bearer, true);
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const firstName = typeof body?.firstName === 'string' ? body.firstName.trim().slice(0, 100) : '';
+    const businessName = typeof body?.businessName === 'string' ? body.businessName.trim().slice(0, 100) : '';
+
+    let email = decoded.email;
+    if (!email && adminFirestore) {
+      const userSnap = await adminFirestore.collection('users').doc(decoded.uid).get();
+      email = userSnap.exists ? userSnap.data()?.email : undefined;
+    }
+
+    if (!email || typeof email !== 'string') {
+      return NextResponse.json({ error: 'No email address is linked to this account.' }, { status: 400 });
+    }
+
+    const name = escapeHtml(firstName || email.split('@')[0]);
+    const bName = escapeHtml(businessName || 'your business');
 
     const bodyHtml = `
       <h2 style="font-size: 24px; font-weight: bold; color: #1f2937; margin-bottom: 16px; text-align: center;">

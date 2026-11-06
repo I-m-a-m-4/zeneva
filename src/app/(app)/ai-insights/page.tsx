@@ -301,8 +301,10 @@ function ZenAIChat({ businessId, user, firestore }: { businessId: string; user: 
         formData.append('file', audioBlob, 'audio.webm');
 
         try {
+          const token = await getAuth().currentUser?.getIdToken();
           const res = await fetch(`${apiBase()}/api/transcribe`, {
             method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             body: formData,
           });
 

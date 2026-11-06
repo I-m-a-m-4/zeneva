@@ -1,8 +1,14 @@
 import { MetadataRoute } from 'next';
 import { adminFirestore } from '@/firebase/admin';
-import { allBlogPosts } from '@/lib/blog-data';
+import { allBlogPosts, BLOG_ARCHIVE_DATE, getPostDate } from '@/lib/blog-data';
 
 const baseUrl = 'https://zeneva.space';
+
+// Every URL used to be stamped with `new Date()` on each request, so the whole
+// file reported "changed" daily. Crawlers learn to discard a lastmod that never
+// holds still. Bump this when the marketing routes actually change; posts carry
+// their own date.
+const SITE_LAST_MODIFIED = new Date('2026-11-06');
 
 // Only routes that render real content to an anonymous visitor belong here.
 // Auth-gated app routes and the /store/* rewrite target are excluded — see
@@ -39,11 +45,9 @@ const CORE_ROUTES: { path: string; priority: number; changeFrequency: MetadataRo
 const STANDALONE_POSTS = ['/blog/mastering-retail-operations-with-zeneva'];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
-
   const routes: MetadataRoute.Sitemap = CORE_ROUTES.map(({ path, priority, changeFrequency }) => ({
     url: `${baseUrl}${path}`,
-    lastModified: now,
+    lastModified: SITE_LAST_MODIFIED,
     changeFrequency,
     priority,
   }));
@@ -56,7 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     seenSlugs.add(post.slug);
     return {
       url: `${baseUrl}/blog/${post.slug}`,
-      lastModified: now,
+      lastModified: getPostDate(post),
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     };
@@ -64,7 +68,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const standaloneRoutes: MetadataRoute.Sitemap = STANDALONE_POSTS.map(path => ({
     url: `${baseUrl}${path}`,
-    lastModified: now,
+    lastModified: new Date(BLOG_ARCHIVE_DATE),
     changeFrequency: 'monthly' as const,
     priority: 0.7,
   }));
@@ -85,7 +89,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           seenSlugs.add(slug);
           acc.push({
             url: `${baseUrl}/blog/${slug}`,
-            lastModified: data.updatedAt?.toDate() || now,
+            lastModified: data.updatedAt?.toDate() || new Date(BLOG_ARCHIVE_DATE),
             changeFrequency: 'monthly' as const,
             priority: 0.6,
           });

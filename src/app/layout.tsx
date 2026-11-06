@@ -23,6 +23,7 @@ import { TauriLayoutWrapper } from '@/components/desktop/TauriWrapper';
 import { ChunkErrorListener } from '@/components/shared/chunk-error-listener';
 import { FirestoreRecovery } from '@/components/shared/firestore-recovery';
 import { ClientSideInitializer } from '@/components/shared/client-initializer';
+import { GlobalErrorCatcher } from '@/components/shared/global-error-catcher';
 import { LaunchTelemetry } from '@/components/shared/launch-telemetry';
 import { PushClickTracker } from '@/components/shared/push-click-tracker';
 import { NativeNotificationListener } from '@/components/shared/native-notification-listener';
@@ -218,6 +219,83 @@ const jsonLd = {
 
 import Script from 'next/script';
 
+/**
+ * If a deploy replaces chunks while a client still has the old document (or a
+ * stale service worker serves a mix), the app can fail before React hydrates.
+ * In that window no error boundary exists, so users get a blank page. This
+ * script catches asset-load failures only and paints the same crash screen
+ * inline. `ClientSideInitializer` removes it once React is alive, at which
+ * point the real boundaries take over.
+ */
+const bootErrorFallbackScript = `
+(function () {
+  if (window.__zenevaBootFallback) return;
+  window.__zenevaBootFallback = true;
+  var shown = false;
+  function showBootError() {
+    if (shown || window.__ZENEVA_READY__) return;
+    if (document.getElementById('zeneva-boot-error')) return;
+    if (!document.body) {
+      document.addEventListener('DOMContentLoaded', showBootError, { once: true });
+      return;
+    }
+    shown = true;
+    // No React and no Firebase yet, so queue the log for the next successful
+    // launch; ClientSideInitializer flushes failed_logs on mount.
+    try {
+      var queue = JSON.parse(localStorage.getItem('failed_logs') || '[]');
+      queue.push({
+        payload: {
+          message: 'App assets failed to load before Zeneva booted (stale cache or failed deploy)',
+          stack: 'Boot fallback: ' + location.href,
+          url: location.href,
+          userAgent: navigator.userAgent,
+          userId: 'unknown',
+          businessId: 'unknown',
+          type: 'window',
+          createdAt: new Date().toISOString()
+        },
+        error: 'boot-asset-load-failed',
+        timestamp: Date.now()
+      });
+      localStorage.setItem('failed_logs', JSON.stringify(queue.slice(-20)));
+    } catch (e) {}
+    var el = document.createElement('div');
+    el.id = 'zeneva-boot-error';
+    el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:24px;background:#f9f8f6;color:#1e293b;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center';
+    el.innerHTML = '<div style="max-width:420px">' +
+      '<div style="width:56px;height:56px;border-radius:9999px;background:rgba(239,68,68,.1);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:26px;line-height:1">\\u26A0</div>' +
+      '<h1 style="font-size:1.5rem;margin:0 0 8px">Something went wrong</h1>' +
+      '<p style="color:#64748b;font-size:.9rem;line-height:1.5;margin:0 0 24px">We&#39;ve automatically logged this issue and our team will investigate it. Please try refreshing the page or navigating back.</p>' +
+      '<button id="zeneva-boot-reload" style="padding:12px 20px;border-radius:12px;border:0;background:#f47125;color:#fff;font-weight:600;font-size:.9rem;cursor:pointer">Reload Page</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    document.getElementById('zeneva-boot-reload').addEventListener('click', function () {
+      window.location.reload();
+    });
+  }
+  window.addEventListener('error', function (e) {
+    var target = e && e.target;
+    if (target && target.tagName === 'SCRIPT' && /_next\\/static|chunks/.test(target.src || '')) {
+      showBootError();
+      return;
+    }
+    var message = (e && (e.message || (e.error && e.error.message))) || '';
+    if (/ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module/i.test(message)) {
+      showBootError();
+    }
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var reason = e && e.reason;
+    var text = (reason && (reason.name + ' ' + reason.message)) || String(reason || '');
+    if (/ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module/i.test(text)) {
+      showBootError();
+    }
+  });
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -239,6 +317,7 @@ export default function RootLayout({
         {/* Dark status bar on Android Chrome and desktop browsers */}
         <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)" />
+        <script dangerouslySetInnerHTML={{ __html: bootErrorFallbackScript }} />
         <Script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js" strategy="afterInteractive" />
         
         {/* Google Analytics */}
@@ -323,6 +402,7 @@ export default function RootLayout({
             <I18nProvider>
             <SplashScreen />
             <ClientSideInitializer />
+            <GlobalErrorCatcher />
             {/* Outside FirebaseClientProvider on purpose — it measures people who
                 never sign in, and it has to keep reporting on a build where the
                 Firebase config itself is the fault. */}

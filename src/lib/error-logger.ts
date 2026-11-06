@@ -9,6 +9,82 @@ let errorCount = 0;
 const MAX_ERRORS_PER_SESSION = 10;
 let isLogging = false;
 
+// Filter out benign or expected errors — network noise, Firestore internals, browser quirks.
+// Shared by the logger and the crash UI so an error is never shown to a user
+// that we have deliberately decided is noise.
+const NOISE_PATTERNS = [
+  // Permissions (handled separately)
+  'Missing or insufficient permissions',
+  'permission-denied',
+  // Network connectivity noise
+  'network error',
+  'Failed to fetch',
+  'ERR_CONNECTION_CLOSED',
+  'ERR_CONNECTION_REFUSED',
+  'ERR_NETWORK_CHANGED',
+  'ERR_INTERNET_DISCONNECTED',
+  'net::ERR_',
+  // Firestore internal transport errors
+  'webchannel',
+  'firestore.googleapis.com',
+  'Listen/channel',
+  'Bad Request',
+  '400',
+  'INTERNAL ASSERTION FAILED',
+  // Font / favicon / CDN noise
+  'fonts.googleapis.com',
+  'favicon.ico',
+  '404 (Not Found)',
+  // React dev mode / Browser noise
+  'Fast Refresh',
+  'ResizeObserver loop completed with undelivered notifications.',
+  // Generic offline noise
+  'Failed to load resource',
+  // Admin cyber-shield — intentionally caught & handled errors
+  'Entity not found in current grid',
+  'Termination failed',
+  'Termination aborted',
+];
+
+export const isNoiseError = (error: unknown): boolean => {
+  const errorMsg = error instanceof Error ? error.message || String(error) : String(error ?? '');
+  const errorStack = error instanceof Error ? error.stack || '' : '';
+  return NOISE_PATTERNS.some((p) => errorMsg.includes(p) || errorStack.includes(p));
+};
+
+/**
+ * Decides whether an uncaught client error should replace the screen with the
+ * crash card. Everything the logger classifies as noise is silently ignored,
+ * as are errors that have their own recovery path (chunk reloads, aborts) and
+ * errors thrown by browser extensions.
+ */
+export const isSurfaceableError = (error: unknown): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  if (isNoiseError(error)) return false;
+
+  const err = error instanceof Error ? error : new Error(String(error ?? ''));
+  if (!err.message || err.message === '[object Object]') return false;
+  if (
+    err.name === 'AbortError' ||
+    err.name === 'ChunkLoadError' ||
+    err.name === 'NotAllowedError' ||
+    err.name === 'NotSupportedError'
+  ) {
+    return false;
+  }
+  if (/^Script error\.?$/i.test(err.message)) return false;
+  if (
+    /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Refused to execute script/i.test(
+      err.message
+    )
+  ) {
+    return false;
+  }
+  if (/^(chrome|moz|safari-web)-extension:\/\//.test(err.stack || '')) return false;
+  return true;
+};
+
 interface ErrorLogPayload {
   message: string;
   stack?: string;
@@ -35,43 +111,8 @@ export const logErrorToFirestore = async (
 
   // Filter out benign or expected errors — network noise, Firestore internals, browser quirks
   const errorMsg = error.message || String(error);
-  const errorStack = error.stack || '';
 
-  const NOISE_PATTERNS = [
-    // Permissions (handled separately)
-    'Missing or insufficient permissions',
-    'permission-denied',
-    // Network connectivity noise
-    'network error',
-    'Failed to fetch',
-    'ERR_CONNECTION_CLOSED',
-    'ERR_CONNECTION_REFUSED',
-    'ERR_NETWORK_CHANGED',
-    'ERR_INTERNET_DISCONNECTED',
-    'net::ERR_',
-    // Firestore internal transport errors
-    'webchannel',
-    'firestore.googleapis.com',
-    'Listen/channel',
-    'Bad Request',
-    '400',
-    'INTERNAL ASSERTION FAILED',
-    // Font / favicon / CDN noise
-    'fonts.googleapis.com',
-    'favicon.ico',
-    '404 (Not Found)',
-    // React dev mode / Browser noise
-    'Fast Refresh',
-    'ResizeObserver loop completed with undelivered notifications.',
-    // Generic offline noise
-    'Failed to load resource',
-    // Admin cyber-shield — intentionally caught & handled errors
-    'Entity not found in current grid',
-    'Termination failed',
-    'Termination aborted',
-  ];
-
-  if (NOISE_PATTERNS.some(p => errorMsg.includes(p) || errorStack.includes(p))) {
+  if (isNoiseError(error)) {
     return;
   }
 

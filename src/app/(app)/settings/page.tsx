@@ -320,15 +320,19 @@ function SettingsPageContent() {
                 exportReason: 'GDPR Right to Portability'
             };
 
+            // The route sends only to the account on this token.
+            const token = await getAuth().currentUser?.getIdToken();
+            if (!token) {
+                throw new Error('You must be signed in to export your data.');
+            }
+
             const response = await fetch('/api/export-data', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    email: currentUserProfile.email,
-                    data
-                }),
+                body: JSON.stringify({ data }),
             });
 
             const result = await response.json();

@@ -28,6 +28,15 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai', 'genkitx-groq', 'groq-sdk', 'google-auth-library', '@google-cloud/logging', '@google-cloud/storage', '@opentelemetry/api', '@opentelemetry/sdk-node'],
   redirects: isTauri ? undefined : async () => {
     return [
+      // www answers 200 today with a canonical pointing at the apex, so Google
+      // treats the pair as duplicates until it processes the canonical. A host
+      // redirect removes the duplicate at the edge instead of asking politely.
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.zeneva.space' }],
+        destination: 'https://zeneva.space/:path*',
+        permanent: true,
+      },
       {
         source: '/industries/:path*',
         destination: '/use-cases',

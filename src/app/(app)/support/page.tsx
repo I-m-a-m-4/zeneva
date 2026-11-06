@@ -620,6 +620,25 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
     const audioChunksRef = React.useRef<Blob[]>([]);
     const prevMessageCountRef = React.useRef(0);
 
+    // Fire-and-forget admin notification. The route authenticates this token
+    // and derives the sender name from the caller's profile.
+    const notifySupport = React.useCallback(async (text: string) => {
+        try {
+            const token = await idToken();
+            if (!token) return;
+            await fetch('/api/support/notify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ message: text }),
+            });
+        } catch (error) {
+            console.error('Error calling notify API:', error);
+        }
+    }, []);
+
     /**
      * Object URLs handed to an <img>, released only when this page unmounts.
      *
@@ -887,17 +906,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                 text: typedCaption || '📷 Sent an image'
             });
 
-            try {
-                fetch('/api/support/notify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        message: typedCaption || '📷 Sent an image', 
-                        userName: userProfile.name || currentBusiness?.name || 'Unknown User', 
-                        businessName: currentBusiness?.name 
-                    })
-                }).catch(e => console.error("Error calling notify API:", e));
-            } catch(e) {}
+            void notifySupport(typedCaption || '📷 Sent an image');
 
             // Update thread snippet metadata
             const threadRef = doc(firestore, 'supportThreads', currentThread.id);
@@ -969,17 +978,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
 
             await addDoc(messageRef, payload);
 
-            try {
-                fetch('/api/support/notify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        message, 
-                        userName: userProfile.name || currentBusiness?.name || 'Unknown User', 
-                        businessName: currentBusiness?.name 
-                    })
-                }).catch(e => console.error("Error calling notify API:", e));
-            } catch(e) {}
+            void notifySupport(message);
 
             const threadRef = doc(firestore, 'supportThreads', currentThread.id);
             await setDoc(threadRef, {
@@ -1090,17 +1089,7 @@ function UserSupportChat({ userProfile }: { userProfile: UserProfile }) {
                             createdAt: serverTimestamp(),
                         });
 
-                        try {
-                            fetch('/api/support/notify', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    message: `🎙️ Voice note (${recordingSeconds}s)`, 
-                                    userName: userProfile.name || currentBusiness?.name || 'Unknown User', 
-                                    businessName: currentBusiness?.name 
-                                })
-                            }).catch(e => console.error("Error calling notify API:", e));
-                        } catch(e) {}
+                        void notifySupport(`🎙️ Voice note (${recordingSeconds}s)`);
 
                         const threadRef = doc(firestore, 'supportThreads', currentThread.id);
                         await setDoc(threadRef, {

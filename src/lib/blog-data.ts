@@ -7,6 +7,12 @@ export type StaticBlogPost = {
   category: string;
   /** Byline. Ten posts already set this; it was never on the type. */
   authorName?: string;
+  /**
+   * ISO date (`YYYY-MM-DD`). Optional because the archive was migrated in one
+   * batch and carries no per-post history. Undated posts fall back to
+   * BLOG_ARCHIVE_DATE below rather than inventing a date.
+   */
+  publishedAt?: string;
   // SEO & Rich Content Fields
   directAnswer?: string;
   faq?: { question: string; answer: string }[];
@@ -5097,6 +5103,514 @@ The system surfaces these anomalies directly to the business owner's dashboard, 
 
 By combining AI-driven physical stock counts, fraud-proof payments, and forensic auditing, Zeneva provides an impenetrable shield for your retail business.
 `
+  },
+  {
+    slug: 'pos-system-price-nigeria-2026',
+    title: "POS System Prices in Nigeria (2026): What You Actually Pay",
+    excerpt: "A POS quote hides more than it shows. Here is the full cost of running one in Nigeria — software, hardware, power, data and payment fees.",
+    imageUrl: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?q=80&w=2070&auto=format&fit=crop',
+    category: 'Buying Guides',
+    authorName: 'Zeneva Editorial',
+    publishedAt: '2026-11-06',
+    directAnswer: "A POS in Nigeria costs four things: software, hardware, power and connectivity, and card fees. Zeneva has a zero-cost Starter tier, then ₦10,000/$10 a month on Pro and ₦30,000/$30 on Business. A shop that already owns a Windows PC should budget roughly ₦150,000–₦300,000 for a thermal printer, scanner and UPS, then data and card fees monthly.",
+    faq: [
+      { question: "Is there a free POS in Nigeria?", answer: "Yes. Zeneva has a zero-cost Starter tier with one staff account, unlimited sales and receipts, and no card required to start. Check the pricing page for the current allowance; the paid tiers differ mainly in staff accounts and monthly Zen AI credits." },
+      { question: "Do I pay per device or per shop?", answer: "Zeneva is priced per business, not per terminal. Adding a second till in the same shop does not add a software fee. Check any vendor on this point specifically, because per-terminal pricing multiplies quietly as you grow." },
+      { question: "Can I use my existing laptop and printer?", answer: "If it is a Windows machine with a USB port, the Zeneva desktop app should run on it. The printer must be an ESC/POS thermal receipt printer; a standard office inkjet will not print a till receipt correctly and costs more per page." },
+      { question: "What happens when the internet goes down?", answer: "The POS keeps selling offline and queues the transactions, then syncs when the connection returns. Do not take this on trust from any vendor: turn your data off mid-sale during a trial and confirm the receipt still prints." },
+      { question: "Are card fees part of the POS price?", answer: "No. Card processing is charged by your payment provider, typically around 1.5% plus a small fixed fee for local cards, with some providers capping the fee. That cost applies with any POS and should be budgeted separately from the software." },
+      { question: "How much should I budget for hardware?", answer: "If you already own the till device, budget roughly ₦150,000 to ₦300,000 for a thermal printer, barcode scanner and UPS. Prices move with the exchange rate and differ by brand, so get two local quotes before committing." },
+      { question: "Do I need a barcode scanner on day one?", answer: "No. Searching by product name works for a small catalogue. A scanner pays for itself once a queue forms and typing names slows the till, so it is a sensible second-week purchase rather than a launch requirement." },
+      { question: "What should I refuse to pay for?", answer: "Per-receipt charges, setup fees for a standard retail install, mandatory training fees, and any contract that stops you exporting your own products, customers and sales. Those four terms turn a cheap POS into an expensive one." }
+    ],
+    tableData: {
+      title: "The Real Cost of a POS, Line by Line",
+      headers: ["Cost line", "What it covers", "Typical budget", "Where shops get it wrong"],
+      rows: [
+        ["Software", "Till, inventory, reports, staff accounts", "Free to ₦30,000/month", "Paying per device when per business is enough"],
+        ["Receipt printer", "58mm or 80mm thermal printing", "₦60,000–₦150,000 one-off", "Buying inkjet or a flaky Bluetooth printer"],
+        ["Barcode scanner", "1D or 2D scanning", "₦25,000–₦70,000 one-off", "Buying 2D for a shop that only uses 1D labels"],
+        ["Till device", "Windows PC or Android tablet", "₦0 if owned, else ₦120,000–₦350,000", "Buying a tablet that cannot survive a full shift"],
+        ["Power backup", "UPS or inverter for the till", "₦80,000–₦250,000 one-off", "Discovering the gap during the first outage"],
+        ["Data", "SIM or store broadband", "₦5,000–₦20,000/month", "Assuming the till stops selling when data does"],
+        ["Card fees", "Processor charge per card sale", "About 1.5% + fixed fee", "Forgetting it when setting prices"],
+        ["Stock loss", "Untracked shrinkage", "Often the largest line", "Comparing software price but not stock visibility"]
+      ]
+    },
+    content: `
+## The Quote Is Not the Price
+
+A vendor quotes ₦60,000 for a POS licence and you budget ₦60,000. Three months later the till has cost you the licence, a printer, a scanner, a UPS, a data plan, card processing fees and two days of setup — and the printer is the only part that ever printed a receipt.
+
+This is not dishonesty, mostly. Software is the only line the vendor sells, so it is the only line in the quote. Everything else is your side of the counter, and it is where the budget actually goes.
+
+The useful number is not the sticker price. It is the first-year cost of running one till, and then the monthly cost after that.
+
+## The Four Cost Lines
+
+Every retail POS costs the same four things, whatever the brand.
+
+**1. Software.** The till app, inventory, staff accounts and reports. This is the line vendors compete on. It can be free, a monthly subscription, a one-off licence, or a small fee per transaction. The pricing model matters more than the number — a cheap per-terminal plan gets expensive the day you add a second till.
+
+**2. Hardware.** A receipt printer, a barcode scanner, and something to run the till on. If you already own a Windows laptop, the largest hardware line disappears. If you want a counter-mounted tablet, it does not.
+
+**3. Power and connectivity.** A till that dies during an outage stops the queue. An inverter or small UPS is part of the cost of a POS, not an optional extra. Data is cheap per month and expensive per year, and it is the line everyone forgets when comparing plans.
+
+**4. Payment processing.** Card fees are charged by the processor, not the POS vendor, but they are a real percentage of every card sale. A shop doing a large share of sales on cards is paying this whether or not the software is free.
+
+## What Zeneva Actually Costs
+
+Zeneva is deliberately simple to price:
+
+- **Starter:** zero-cost. One staff account, unlimited sales and receipts, and a monthly Zen AI credit allowance. No card required to start.
+- **Pro:** ₦10,000 or $10 a month. Five staff accounts and 150 Zen AI credits a month.
+- **Business:** ₦30,000 or $30 a month. Unlimited staff accounts and 600 Zen AI credits a month.
+
+There is no charge per receipt, per device or per branch, and no setup fee. The full comparison is on the [pricing page](/pricing), and you can [start on Starter](/signup) without entering a card.
+
+The trade-off is the single staff account, not a hidden fee. A one-person counter fits Starter. The moment a second person covers a shift you need Pro, and the purchase you are actually making is attribution: two people, two logins, and a record of who did what.
+
+## Hardware: What to Buy and What to Skip
+
+Hardware prices move with the exchange rate, so treat any figure as a budget line and get two local quotes.
+
+- **Receipt printer.** A 58mm thermal printer is enough for most shops; 80mm gives a wider receipt and costs more. Buy thermal, not inkjet — inkjet receipts smudge and the cartridges are a recurring cost. Budget roughly ₦60,000 to ₦150,000.
+- **Barcode scanner.** A basic 1D USB scanner reads ordinary product barcodes and costs a fraction of a 2D scanner. Buy 2D only if you scan QR codes or screen-based vouchers.
+- **Till device.** The cheapest POS is the PC or tablet you already own. If you are buying, buy for a full day of trading and a power cut, not for the lowest price on the shelf.
+- **Power.** A small UPS or inverter for the till and printer. This is the difference between a two-hour outage and a two-hour closure.
+
+What you can skip on day one: a cash drawer (a lockable box works), a customer-facing display, and biometric logins. None of them sell a single item.
+
+## The Hidden Cost: Work You Cannot See
+
+The largest POS cost never appears on an invoice: the sales and stock you cannot see.
+
+If a shop turns over ₦6 million a month and loses 3% to untracked stock — a plausible figure in a shop with no stock control — that is ₦180,000 a month. The software line is a rounding error beside it. The point is not that every shop loses 3%; it is that without a system, you cannot know whether yours loses 1% or 8%.
+
+Downtime has the same shape. A till that cannot sell offline during a two-hour network outage at ₦80,000 an hour in sales is a ₦160,000 afternoon. Offline-first selling is not a feature to compare on a grid; it is the difference between trading and not trading.
+
+## Questions That Expose an Expensive POS
+
+Ask these before you sign anything:
+
+1. Do I pay per device, per user, or per business?
+2. Can it sell with no internet, or does it need a local server?
+3. What happens to the price in year two?
+4. Can I export my products, customers and sales?
+5. Am I charged per receipt or per transaction?
+6. Is training included, or is it a paid add-on?
+7. Does support cost extra, and who answers at 8pm?
+8. What happens if I stop paying — do I lose my data?
+
+A vendor who answers all eight plainly is cheaper than one who answers three and changes the subject.
+
+## A Worked Example: One Mini-Mart
+
+Assume the shop already owns a Windows PC and sells about ₦6 million a month, with 30% of it on cards.
+
+- Printer and scanner: about ₦125,000, one-off.
+- UPS: about ₦120,000, one-off.
+- Pro software: ₦120,000 a year.
+- Data: about ₦96,000 a year.
+- Card fees: about 1.5% on ₦1.8 million of monthly card sales, roughly ₦27,000 a month or ₦324,000 a year.
+
+First-year total: roughly ₦785,000, of which the software is about 15%. After year one, the run rate is about ₦540,000 a year, dominated by data and card fees you would pay with any system.
+
+Now compare that with one month of invisible stock loss. The POS does not need to be cheap; it needs to be cheaper than the loss it prevents.
+
+## What to Do This Week
+
+Do not start by buying hardware. Start by proving the workflow on the device you already have.
+
+1. Create a [free Starter account](/signup) and add 20 real products with their cost prices.
+2. Ring up a week of real sales on the POS alongside your current method.
+3. Count five SKUs at the end of the week and compare them with the system.
+4. If the numbers agree, buy the printer and scanner and [install the desktop app](/download).
+
+You will know more after one week of real trading than after any number of vendor demos. For the operational side of the switch, the [Excel migration guide](/blog/excel-to-pos-migration-guide) covers the import and opening count in detail.
+`
+  },
+  {
+    slug: 'free-pos-system-small-shop-nigeria',
+    title: "Free POS for a Small Shop: What Free Should Actually Include",
+    excerpt: "Free POS software is real, but the limits decide whether it works. Here is what a free plan must do, what it may cap, and when a shop outgrows it.",
+    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=2070&auto=format&fit=crop',
+    category: 'Buying Guides',
+    authorName: 'Zeneva Editorial',
+    publishedAt: '2026-11-06',
+    directAnswer: "A free POS is only worth using if it sells offline, tracks real stock, issues receipts and lets you export your data. Zeneva has a zero-cost Starter tier with no card required and no per-receipt charge; the paid tiers add staff accounts and monthly Zen AI credits. Check the pricing page for the current allowance.",
+    faq: [
+      { question: "Is a free POS really free?", answer: "Free should mean no card and no monthly fee on the entry tier. Zeneva's Starter tier meets that, with no per-receipt charge. What separates free tiers is what they cap — staff accounts, AI credits or catalogue size — and whether the cap is visible before you invest your product list." },
+      { question: "What is the catch with free POS software?", answer: "Usually one of three models: advertising, a cut of card transactions, or a feature cap. Advertising puts someone else's brand on your counter, transaction pricing ties your till to one payment provider, and a cap is the honest version — you know exactly when you will outgrow it." },
+      { question: "Can a free plan handle a real shop?", answer: "Yes for a boutique, provision store or single-counter shop run by one person. The limit that matters most is staff accounts: the moment two people share a counter, you need two logins, and that is usually where a paid tier becomes necessary. A supermarket with thousands of SKUs needs deeper catalogue handling, so check the current limits." },
+      { question: "Does the free plan work without internet?", answer: "It should. Offline selling is the feature that matters most in Nigeria, and it is not a premium upgrade on Zeneva. Turn your data off during a test sale and confirm the receipt still prints before you trust any free vendor." },
+      { question: "Do I need a card to sign up?", answer: "Not with Zeneva. Starter requires no card to start. If a free plan demands card details up front, treat it as a trial that has been renamed." },
+      { question: "What happens when I need a second staff login?", answer: "You upgrade to Pro and keep the same account, products, customers and sales history. There is no re-entry and no migration. The staff limit is a pricing boundary, not a wall." },
+      { question: "Can I print receipts on the free plan?", answer: "Yes, and there is no per-receipt charge. The printer is hardware you buy separately; the free plan does not tax you every time you hand a customer proof of purchase." },
+      { question: "Can I take my data if I leave?", answer: "You should be able to export your products, customers and sales in a usable file. A POS that holds your catalogue hostage is not free at any price, so check export before you import anything." }
+    ],
+    tableData: {
+      title: "What to Check Before You Trust a Free POS",
+      headers: ["Check", "Why it matters", "What a good free plan does", "Zeneva Starter"],
+      rows: [
+        ["Offline selling", "Networks fail during trading hours", "Records locally, syncs later", "Yes"],
+        ["Catalogue limit", "The cap decides when you start paying", "Published before you import", "Check pricing page"],
+        ["User limit", "Shared logins destroy accountability", "At least one named login", "1 user"],
+        ["Receipts", "Proof of purchase and returns", "Print or send without a fee", "Unlimited"],
+        ["Data export", "Your data must be able to leave", "Export of products and sales", "Yes"],
+        ["Card required", "A card gate is a trial, not a free plan", "No card to start", "No card"],
+        ["Expiry", "Countdowns interrupt trading", "No trial clock", "Check current terms"],
+        ["Receipt branding", "Your shop, not the vendor's", "Optional branding", "Clean receipts"]
+      ]
+    },
+    content: `
+## "Free" Means Three Different Things
+
+Free POS software is not one product, and the differences matter more than the price.
+
+The first model is **advertising**. The software is free because your counter becomes a billboard: a vendor logo on every receipt, a dashboard prompt to upgrade, a branded customer screen. This can be acceptable, but it is not free — you are paying with your shop's identity.
+
+The second is **transaction-tied**. The software is free because the vendor earns a slice of every card payment. That can be a fair trade if you were going to use that payment provider anyway. It becomes a trap when changing providers means changing your till, or when cash sales are quietly steered toward a card processor.
+
+The third is a **feature cap**. The software is free within limits — a number of products, users or AI questions — and paid above them. This is the honest model, because you can see exactly where the boundary is and what crossing it costs.
+
+Zeneva uses the third, and the caps sit where a small shop actually feels them: staff accounts and AI credits. The catalogue is not capped. The question is not whether "free" is genuine. It is whether the free tier is shaped in a way that lets a real shop operate.
+
+## The Four Things That Must Be Free
+
+A free plan can ration almost anything except these four things.
+
+**1. Offline selling.** A till that stops when the network drops is not a till. It is a card terminal with extra steps. Offline-first selling must be in the base plan, because an outage does not care which subscription you are on.
+
+**2. Stock truth.** The system must deduct stock when you sell and let you count it when you check. A free POS that only records revenue and ignores inventory is a cash register, not a retail system.
+
+**3. Receipts.** Printing or sending a WhatsApp receipt is part of completing a sale. A per-receipt charge turns your busiest day into your most expensive one.
+
+**4. Export.** You must be able to take your product list, customers and sales with you. Without export, the free plan is a roach motel: easy to enter, impossible to leave.
+
+If a free tier fails any of these four, the price is not the issue. The product is.
+
+## The Limits That Actually Bite
+
+Not every cap is equal. These are the ones that decide whether a shop can live inside the free tier.
+
+**The catalogue cap.** If a plan caps products, count your distinct sellable units before you commit. A boutique with 12 styles in four sizes each is already 48 items, and a mini-mart passes a small cap in a week. Not every plan caps the catalogue; the ones that do should publish the number before you import anything.
+
+**The user cap.** One login is enough for an owner working the counter. It stops being enough the moment a second person covers a shift, because shared credentials make every sale anonymous. Zeneva Starter includes one staff account; Pro includes five. That is the cap most small shops hit first, and it is better hit on purpose than by accident.
+
+**The AI cap.** Zeneva gives Starter 3 credits a month, Pro 150 and Business 600. A credit funds a turn, and heavier analysis can cost more than one credit, so treat the entry allowance as enough to try the assistant, not enough to run a shop on. Do not let an AI quota decide a purchase you are making for inventory control.
+
+**The receipt cap.** There should not be one. A free plan that charges per receipt is charging you for the busiest, most necessary part of the job.
+
+## A One-Week Test That Tells You the Truth
+
+Do not evaluate a free POS from a feature page. Run it for one week with real transactions.
+
+1. Install it on the device you already own and enter 20 real products with cost prices.
+2. Sell for three days alongside your current method.
+3. On day four, turn off your data for twenty minutes and ring up a sale. The receipt must still print and the sale must survive.
+4. Count five SKUs and compare them with the system.
+5. Export your product list and open the file. If it is unreadable or incomplete, that is your exit route.
+6. Ask support one real question and time the reply.
+
+A shop that passes all six is worth keeping. A shop that fails step three cannot be trusted with a busy Saturday.
+
+## When Free Stops Being Enough
+
+The signals are specific, and none of them is "the vendor sent an upgrade email".
+
+- **A second person works the counter.** You need named logins and an audit trail.
+- **You need the assistant for real work.** The entry allowance is for trying Zen, not for running daily analysis. If you rely on it, move up a tier.
+- **You open a second location.** You need branch-level stock and reporting.
+- **You start checking profit by category.** You need cost prices and margin reporting across the catalogue.
+- **You want to know what to reorder.** You need more than a low-stock flag; you need demand history and forecasting.
+- **You need to reconcile cash per shift.** You need staff-level reporting and audit logs.
+
+Upgrading for any one of these is cheaper than running a shop that cannot answer the question.
+
+## Upgrading Without Re-Entering Your Catalogue
+
+A good free tier is a doorway, not a trap. When you move from Starter to Pro, the account stays the same: same products, same customers, same sales history, same login. The plan changes, the data does not move.
+
+That matters because the alternative — exporting, reformatting and re-importing into a different product — costs a weekend and usually loses something. Ask any vendor how an upgrade works before you invest a catalogue in their free plan. If the answer involves re-entering products, the free tier is a demo.
+
+## What Free Should Never Cost You
+
+Free software can cost you in three ways that no invoice shows:
+
+- **Wrong stock.** If the free tier is too thin to track inventory properly, you are paying in shrinkage.
+- **Lost customer history.** A customer list is an asset. If it cannot be exported, you do not own it.
+- **Vendor lock-in.** The moment re-entering your catalogue is too painful to contemplate, the price stops being negotiable.
+
+The test is simple. A free POS earns its place if you could leave it tomorrow without losing your products or your sales. Anything less is a trial with better marketing.
+
+If you want to see where the caps sit before you start, the [pricing page](/pricing) lists every limit. You can [open a Starter account](/signup) with no card, or [install the desktop app](/download) first and decide afterwards.
+`
+  },
+  {
+    slug: 'excel-to-pos-migration-guide',
+    title: "Excel to POS: A Migration Guide That Doesn't Lose Your Stock",
+    excerpt: "Moving from spreadsheets to a POS fails at the opening stock count, not the import. A practical sequence for cleaning, importing and reconciling without closing the shop.",
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2026&auto=format&fit=crop',
+    category: 'Operations',
+    authorName: 'Zeneva Editorial',
+    publishedAt: '2026-11-06',
+    directAnswer: "Migrate from Excel in this order: freeze the sheet, remove duplicate and dead SKUs, standardise one unit per product, import a clean CSV, then count opening stock once after closing and reconcile before the first sale. Run the POS and the sheet in parallel for one week.",
+    faq: [
+      { question: "How long does an Excel to POS migration take?", answer: "For a shop under 500 SKUs, plan one evening to clean the file, one to import and check it, and one week of parallel running. The catalogue import is fast; the cleaning and the opening count are the work." },
+      { question: "Can I import my existing product list?", answer: "Yes, through a CSV with one row per sellable unit. Minimum columns are name, SKU, unit, cost price, selling price and opening quantity. Do a dry run with ten rows before importing the full catalogue." },
+      { question: "What do I do with years of sales history?", answer: "Keep the old spreadsheet read-only and do not import years of transactions. Bring across products, customers, outstanding debts and opening stock. Old sales belong in the archive, not in a new till." },
+      { question: "Why doesn't my stock match after importing?", answer: "Almost always one of three reasons: duplicate SKUs under different names, the same product recorded in bottles and cartons, or sales made while the count was in progress. Count after closing and reconcile differences deliberately." },
+      { question: "Should I count stock before or after importing?", answer: "Import the catalogue first, then count physical stock once, after the shop closes, before the first POS sale. That count becomes opening stock. Counting before the catalogue exists means counting twice." },
+      { question: "What if staff call the same product different names?", answer: "Give every sellable unit one code and one name, and merge the duplicates in the spreadsheet before import. If a barcode exists, use it as the tie-breaker. Two names for one product creates two stock records that can never reconcile." },
+      { question: "Can I keep using Excel alongside the POS?", answer: "For one week, yes — but read-only. The sheet is a reference for comparison, not a second place to record sales. Two live systems produce two truths and no way to tell which is wrong." },
+      { question: "What is the biggest migration mistake?", answer: "Adjusting the new system to match a wrong spreadsheet. The physical count is the truth. If the sheet and the shelf disagree, investigate before you overwrite either one." }
+    ],
+    tableData: {
+      title: "The Migration Checklist",
+      headers: ["Step", "Do this", "Common failure", "Fix before cutover"],
+      rows: [
+        ["Freeze", "Export a read-only copy and stop edits", "Two people editing the live file", "Name one owner for the sheet"],
+        ["Clean SKUs", "One code per sellable unit", "Two names for the same product", "Merge duplicates"],
+        ["Standardise units", "Decide bottle, pack or carton", "Counts that can never reconcile", "One unit per SKU"],
+        ["Add costs", "Cost and selling price per SKU", "No cost means no margin report", "Backfill before import"],
+        ["Import", "Map CSV columns and dry-run ten rows", "Columns in the wrong order", "Check ten rows first"],
+        ["Opening count", "Count once, after closing", "Counting spread over several days", "One session, two counters"],
+        ["Parallel run", "Sell on POS, compare daily", "Two truths and no reconciliation", "One week, read-only sheet"],
+        ["Cutover", "Disable editing on the sheet", "Staff quietly using the old file", "Archive it read-only"]
+      ]
+    },
+    content: `
+## Excel Is a Ledger, Not a System
+
+Spreadsheets are excellent at what they were built for: calculations, planning and one person's view of the numbers. Many shops run for years on a well-kept workbook, and that is not a failure of ambition.
+
+Excel stops working for a specific reason: it has no idea who changed what. A cashier can overwrite a stock figure, a second user can save over the first, and a formula can be dragged across a column and quietly break a total. None of those acts leaves a trail, so the sheet cannot answer the questions a growing shop needs answered.
+
+The migration is not about moving data from one place to another. It is about replacing a document with a system that records transactions. That distinction is why the import is the easy part and the opening stock count is where most migrations fail.
+
+## What Excel Does Well — and Where It Stops
+
+Keep the honest version. Excel is good for pricing decisions, one-off analysis, budgets and planning. It is bad at concurrent use, stock attribution, audit trails and selling.
+
+The moment you need to know which cashier sold the missing item, or what stock was on hand at 3pm on Saturday, the spreadsheet has no answer. It was never designed to have one.
+
+## Before You Export: Six Checks
+
+Cleaning the file is the highest-return hour in the whole migration. Do these six checks first.
+
+**1. Duplicate SKUs.** Search for the same product under two names — "Coke 50cl" and "Coca-Cola 50cl" are one product. Merge them into one row with one code.
+
+**2. Unit chaos.** Decide whether a carton is one sellable unit or 24 bottles, and apply it everywhere. A shop that buys cartons and sells bottles needs both units defined explicitly, not inferred by whoever is counting.
+
+**3. Missing cost prices.** Without a cost per unit, the POS cannot report margin. Backfill costs before import, even approximately, and mark the ones you are unsure about for later review.
+
+**4. Dead and seasonal SKUs.** Archive products you have not sold in a year rather than importing clutter. A clean catalogue makes search faster and stock counts shorter.
+
+**5. Negative stock.** A negative quantity in the sheet is a symptom, not a number to fix. Note it, investigate it, then correct it deliberately during the opening count.
+
+**6. Customer debts.** If you sell on credit, export customers and outstanding balances separately. These must be entered before you stop using the sheet, or the debts disappear with it.
+
+## Build the Import File
+
+The POS needs one row per sellable unit. A workable minimum set of columns is:
+
+- Product name
+- SKU or product code
+- Barcode, if you have one
+- Unit (piece, pack, carton)
+- Cost price
+- Selling price
+- Opening quantity
+- Reorder point
+- Category
+
+Two rules prevent most import failures. First, keep one row per unit you actually sell; do not model a carton as a row and a bottle as a formula. Second, do not merge cells, add totals rows or leave blank header columns. Import tools read the file literally, and literal files import cleanly.
+
+Run ten rows through first. Check that prices landed in the price field, costs in the cost field, and barcodes are not stored as scientific notation. Then import the rest.
+
+## The Opening Stock Count Is the Migration
+
+This is the step shops rush, and it is the one that decides whether the new system is trusted.
+
+Count after the shop closes, in one session. Two people counting together is better than two people counting separately: one counts, one records, and both agree on the number before moving on. Count shelf by shelf, in a fixed order, so a missed section is obvious.
+
+Then reconcile the count against the spreadsheet. Where they differ, investigate rather than overwrite. A difference is usually one of four things: a duplicate SKU, a mixed unit, an unrecorded sale, or a delivery entered incorrectly. Each of those is useful information. "Adjusting it to match" throws that information away and teaches staff that the system is negotiable.
+
+The count becomes opening stock. Do not sell anything on the POS until it is entered and agreed.
+
+## Run Both Systems for One Week
+
+Parallel running is not indecision; it is insurance. For one week, sell on the POS and keep the spreadsheet read-only for comparison.
+
+Compare three things daily:
+
+1. **Cash taken** — does the POS total match the cash and transfers in the drawer?
+2. **Top sellers** — do the same products lead in both systems?
+3. **Ten stock counts** — pick ten SKUs and count them each evening. A mismatch tells you where the process is leaking.
+
+Investigate every gap the same day. By the end of the week you will know whether the catalogue is clean, the staff can use the till, and the numbers can be trusted.
+
+## Cutover Day
+
+Cutover is a switch, not a gradual fade.
+
+- Disable editing on the spreadsheet and move it to an archive folder.
+- Confirm every staff member has their own login, not a shared one.
+- Agree the script for the three awkward actions: a return, a void and a manual discount. Who is allowed to do each, and where it is recorded?
+- Keep a printed one-page cheat sheet at the counter for the first week.
+
+The old sheet stays available for reference. It does not stay available for selling.
+
+## What to Do With History
+
+Do not import five years of transactions. A new POS needs a clean opening position, not an archive of every sale since 2019.
+
+Bring across products, customers, outstanding debts and opening stock. Keep the old workbook read-only for tax records and historical questions. If you need a year-on-year comparison later, the old file can still answer it without polluting the new system.
+
+## Three Reports That Prove It Worked
+
+A migration is finished when three reports agree with reality:
+
+- **Daily cash reconciliation:** sales recorded equals cash plus transfers plus card settlements.
+- **Stock variance:** the ten SKUs you counted still match after a week of sales.
+- **Gross margin:** selling price minus cost, across a category, looks like the margin you intended.
+
+If those three hold, the system is working. If one drifts, fix the process before adding another branch, another till or another product line.
+
+Ready to run the migration without paying anything? [Create a Starter account](/signup), import your cleaned CSV, and keep the spreadsheet read-only for one week. The [pricing page](/pricing) lists the limits on each tier.
+`
+  },
+  {
+    slug: 'zeneva-vs-loyverse-odoo-quickbooks-pos',
+    title: "Zeneva vs Loyverse, Odoo and QuickBooks POS: 8 Questions That Decide It",
+    excerpt: "Feature grids are marketing. These eight questions expose whether a POS fits a Nigerian shop — offline selling, per-branch cost, stock depth and data ownership.",
+    imageUrl: 'https://images.unsplash.com/photo-1551288049-bbbda536ad89?q=80&w=2070&auto=format&fit=crop',
+    category: 'Comparisons',
+    authorName: 'Zeneva Editorial',
+    publishedAt: '2026-11-06',
+    directAnswer: "Compare POS systems on eight things: offline selling, pricing model, inventory depth, staff accountability, receipts, data export, add-on dependency and support. Zeneva answers them as a retail-first system priced per business. If you need table-service restaurant features or manufacturing MRP, a broader ERP such as Odoo is the better fit.",
+    faq: [
+      { question: "Is Zeneva cheaper than Loyverse?", answer: "It depends on how you count. Zeneva costs nothing on Starter, ₦10,000 or $10 a month on Pro, and ₦30,000 or $30 on Business, priced per business rather than per terminal. Per-device pricing looks cheaper with one till and multiplies with three, so compare the annual cost for your actual number of counters and verify each vendor's current pricing directly." },
+      { question: "Can I import data from another POS?", answer: "Yes, through a CSV of products, prices and opening stock. Bring products, customers and debts first, run both systems in parallel for one week, then stop using the old one. Do not import years of old transactions." },
+      { question: "Does Zeneva work offline?", answer: "Yes. Sales are recorded locally and queued for sync when the connection returns. That is the first thing to test in any trial: turn the data off mid-sale and confirm the receipt still prints." },
+      { question: "Which is better for a supermarket?", answer: "If the requirement is retail-only — barcode selling, stock control, branches and reporting — Zeneva Business is the simpler fit. If you also need manufacturing, complex accounting or custom modules, a broader ERP such as Odoo covers more ground at more implementation cost. Decide by requirement, not by brand." },
+      { question: "Do I still need QuickBooks?", answer: "Not to run the shop, but your accountant may still want an accounting ledger for statutory reporting. Zeneva exports products and sales so a bookkeeper can post the numbers. It is a retail operating system, not a replacement for full double-entry accounting." },
+      { question: "Can I run multiple branches?", answer: "Yes. Branches are managed from one account with branch-scoped staff access, stock transfers, and consolidated reporting. A transfer is recorded as a movement out of one branch and into another, rather than two unrelated adjustments." },
+      { question: "Is there a contract or lock-in?", answer: "Zeneva is billed monthly, and Starter needs no card. Check the current terms on the pricing page before you commit, and ask any vendor what happens to your data if you stop paying." },
+      { question: "What happens if I want to leave?", answer: "You should be able to export your products, customers and sales. Test the export during the trial. A system that will not let your catalogue leave is not a system you own." }
+    ],
+    tableData: {
+      title: "The Eight Questions That Matter More Than a Feature Grid",
+      headers: ["Question", "Why it decides the purchase", "What Zeneva does"],
+      rows: [
+        ["Does it sell offline?", "Networks fail during trading hours", "Local-first sales, syncs when online"],
+        ["Per device, user or business?", "Per-terminal fees multiply as you grow", "Priced per business, not per till"],
+        ["How deep is inventory?", "Stock control is the reason you are buying", "Costs, variants, reorder points, transfers"],
+        ["Can actions be attributed?", "Shared logins hide who did what", "Named logins and an audit trail"],
+        ["Can it print and send receipts?", "Proof of purchase and returns", "Thermal printing and WhatsApp receipts"],
+        ["Can you export your data?", "Your catalogue must be able to leave", "Export of products, customers and sales"],
+        ["How many add-ons are needed?", "Each add-on is another bill and failure point", "Retail workflow built in"],
+        ["Who supports you at 8pm?", "Business hours are not retail hours", "Support channel and implementation help"]
+      ]
+    },
+    content: `
+## Why Feature Grids Mislead
+
+Every POS vendor publishes a comparison in which their product has more ticks. The exercise is close to useless, for three reasons.
+
+First, vendors define the same feature differently. "Offline mode" can mean a full local database that reconciles later, or a screen that says "connection lost" and refuses to sell. Both get a tick.
+
+Second, prices change. A comparison written last year may be wrong about every dollar figure in it, including the competitor's.
+
+Third, implementation matters more than the feature list. A system with fewer features that your staff can actually use will outperform a richer one that requires a consultant to configure.
+
+The questions below are the ones that survive those problems. Ask them of every vendor, including Zeneva, and insist on a concrete answer rather than a demo.
+
+## 1. Does It Sell When the Internet Is Down?
+
+This is the first question because it disqualifies more systems than any other in Nigeria.
+
+Ask the vendor to switch off the network and ring up a sale in front of you. The sale must be recorded, the receipt must print, and the transaction must appear in the reports after reconnection. A system that needs a live connection is a remote control for a till, not a till.
+
+Zeneva records sales locally and queues them for sync. That is the design, not a setting.
+
+## 2. Do You Pay per Device, per User or per Business?
+
+Pricing models shape behaviour. A per-terminal price discourages you from adding a second till during a busy period. A per-user price discourages you from giving each cashier their own login, which is the opposite of accountability.
+
+A per-business price is the simplest to plan around: adding a counter does not add a software bill. Zeneva prices the business, not the screen. Check the [pricing page](/pricing) for the exact limits, and ask competitors what a third till and a fifth user would cost.
+
+## 3. How Deep Is Inventory?
+
+"Stock management" can mean a quantity field. That is not inventory control.
+
+Ask whether the system stores cost price per unit, supports variants such as size and colour, sets reorder points, records stocktakes with a variance, and moves stock between branches as one transfer rather than two unrelated adjustments. Ask what happens when a supplier delivers 90 units against an order for 100.
+
+The depth of the inventory model determines whether the system can answer "what should I reorder" or only "what did I sell".
+
+## 4. Can Every Action Be Attributed to a Person?
+
+If two staff share one login, every void, discount and stock adjustment belongs to "cashier". That makes investigation impossible and suspicion arbitrary.
+
+Named logins plus an audit trail are the minimum. Ask to see how a voided sale appears in the log, who can approve a refund, and whether a price change is recorded. If the answer is a settings page you cannot demonstrate, the feature does not exist in practice.
+
+## 5. How Do Receipts Reach the Customer?
+
+Some shops need thermal receipts. Some need to send a receipt on WhatsApp because the printer is down or the customer is buying remotely. Most need both eventually.
+
+Ask what happens when the printer is offline: does the sale stop, or can the receipt be sent another way? Ask whether receipts are charged per copy. A POS that taxes every receipt makes your best trading day your most expensive one.
+
+## 6. Can You Take Your Data Out?
+
+Export is not a technical detail; it is your exit route and your insurance.
+
+Ask for a full export of products, customers and sales, and open it during the trial. If the export is incomplete or unreadable, you have found the lock-in. A vendor that will not let your catalogue leave is telling you what the price will be in year three.
+
+## 7. How Many Add-Ons Does It Need?
+
+Every required add-on adds a bill, a login, a failure point and a support boundary. Ask which of these are included and which are separate: inventory, multi-branch, barcode scanning, receipt printing, customer debts, staff permissions, reporting, card payments.
+
+A system with fewer modules that covers the retail workflow is easier to run than a platform where each capability is another subscription.
+
+## 8. Who Supports You at 8pm on a Saturday?
+
+Retail support happens when the shop is busy, which is rarely during office hours. Ask how support is reached, how long a reply usually takes, and whether the person answering knows the product or reads from a script.
+
+Ask one real question during the trial and time the answer. That is the most honest support benchmark you will get.
+
+## Where Zeneva Fits — and Where It Does Not
+
+Zeneva is built for physical retail: mini-marts, boutiques, pharmacies, electronics shops, provision stores and multi-branch retailers. It is strongest when the core problem is stock truth, offline selling, staff accountability and knowing your margin.
+
+It is not the right choice if you need table-service restaurant workflows, manufacturing MRP, complex warehouse logistics or a full statutory accounting ledger. Those are broader problems, and a broader ERP such as Odoo is designed for them. Buying more software than the shop needs is its own kind of expensive.
+
+The honest comparison is not "which has more features". It is "which product was built for the problem I actually have".
+
+## The Seven-Day Decision Script
+
+Do not decide from a sales call. Decide from a week of use.
+
+- **Day 1:** Import 20 real products with cost prices.
+- **Day 2:** Sell a normal day on the system.
+- **Day 3:** Turn off the internet for twenty minutes and sell through it.
+- **Day 4:** Count five SKUs and compare them with the system.
+- **Day 5:** Export your products and open the file.
+- **Day 6:** Give a second staff member their own login and check the audit trail.
+- **Day 7:** Ask support a real question and measure the reply.
+
+Any system that survives that week is a serious candidate. Most will not survive day three.
+
+## Compare Cost Fairly
+
+The annual cost of a POS is not the subscription. It is:
+
+**software for twelve months + hardware + required add-ons + card fees + the staff hours spent working around the system.**
+
+Run that sum for your actual number of tills, users and branches. A plan that looks cheaper per month often loses once the second terminal and the third add-on are included.
+
+Start on the [Starter tier](/signup) if you want to run the seven-day script without spending anything, or [install the desktop app](/download) and test the offline path first. If you need the multi-branch detail, the [multi-branch guide](/blog/mastering-multi-branch-management) covers transfers, reporting and branch permissions.
+`
   }
 ];
 
@@ -5108,6 +5622,41 @@ By combining AI-driven physical stock counts, fraud-proof payments, and forensic
 // `redirects` block in next.config.ts. If you reintroduce templating, each
 // output needs genuinely distinct research, not a find-and-replace.
 export const allBlogPosts = [...blogPosts];
+
+// The date the migrated archive went live. Every static post without its own
+// `publishedAt` resolves to this, which keeps the visible <time>, the JSON-LD
+// dates and the sitemap lastmod identical instead of stamping `new Date()` on
+// every request — a lastmod that changes daily teaches crawlers to ignore it.
+export const BLOG_ARCHIVE_DATE = '2026-04-19';
+
+export function getPostDate(post: Pick<StaticBlogPost, 'publishedAt'>): Date {
+  const parsed = new Date(post.publishedAt || BLOG_ARCHIVE_DATE);
+  return Number.isNaN(parsed.getTime()) ? new Date(BLOG_ARCHIVE_DATE) : parsed;
+}
+
+/** Rough reading time at ~220 words per minute, markdown syntax stripped. */
+export function getReadingMinutes(content?: string): number {
+  if (!content) return 1;
+  const words = content
+    .replace(/[#*_>`~\[\]()!|]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return Math.max(1, Math.round(words / 220));
+}
+
+/**
+ * Meta descriptions are cut at a word boundary. Several archive excerpts run
+ * past 200 characters and were being emitted whole, so Google truncated them
+ * mid-sentence in the SERP.
+ */
+export function truncateMeta(text: string, max = 155): string {
+  const clean = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  const body = lastSpace > 90 ? cut.slice(0, lastSpace) : cut;
+  return `${body.replace(/[.,;:\s]+$/, '')}…`;
+}
 
 // Helper to get related posts.
 //

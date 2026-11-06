@@ -270,10 +270,10 @@ const CartItemRow = ({ item, cartItemId, currencySymbol, updateQuantity, removeF
     return (
         <div className="flex justify-between items-center py-1">
             <div className="flex-1 me-4">
-                <p className="font-medium text-sm line-clamp-1">
-                    {item.product.name}
+                <div className="font-medium text-sm line-clamp-1 flex items-center">
+                    <span>{item.product.name}</span>
                     {item.unit && <Badge variant="secondary" className="ms-2 text-[10px] py-0 h-4">{item.unit}</Badge>}
-                </p>
+                </div>
                 {canEditAny ? (
                     <Dialog open={isEditingPrice} onOpenChange={setIsEditingPrice}>
                         <DialogTrigger asChild>

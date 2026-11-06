@@ -25,26 +25,47 @@ interface ExtractedItem {
 
 export async function POST(req: Request) {
   try {
-    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
-    let authenticatedBusinessId: string | null = null;
-
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.split('Bearer ')[1]?.trim();
-        if (token) {
-          const decoded = await adminAuth.verifyIdToken(token);
-          if (decoded?.businessId) {
-            authenticatedBusinessId = decoded.businessId;
-          }
-        }
-      } catch (e) {
-        console.warn('[analyze-sheet] Token verification warning:', e);
-      }
+    // This endpoint spends AI credit against a tenant's daily image quota and
+    // reads that tenant's catalogue. It must run for a verified caller, and the
+    // tenant is taken from their user document — never from the request body.
+    if (!adminAuth) {
+      return NextResponse.json({ error: 'Server authentication is not configured' }, { status: 503, headers: corsHeaders });
     }
 
-    const body = await req.json();
-    const { image, images, businessId: requestedBusinessId, prompt: customPrompt } = body;
-    const businessId = authenticatedBusinessId || requestedBusinessId;
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+    const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (!bearer) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+    }
+
+    let callerUid: string;
+    try {
+      const decoded = await adminAuth.verifyIdToken(bearer, true);
+      callerUid = decoded.uid;
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { image, images, prompt: customPrompt } = body;
+
+    if (!adminFirestore) {
+      return NextResponse.json({ error: 'Database unavailable' }, { status: 500, headers: corsHeaders });
+    }
+
+    const callerSnap = await adminFirestore.collection('users').doc(callerUid).get();
+    if (!callerSnap.exists) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: corsHeaders });
+    }
+    const caller = callerSnap.data() || {};
+    if (caller.status === 'suspended') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: corsHeaders });
+    }
+
+    const businessId = typeof caller.businessId === 'string' ? caller.businessId : '';
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business is linked to this account.' }, { status: 403, headers: corsHeaders });
+    }
 
     // Collect images into array (supports multiple images or single fallback)
     let rawImages: string[] = [];

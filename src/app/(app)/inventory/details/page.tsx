@@ -60,6 +60,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import type { Product, UserProfile, AuditLog, InventoryTransaction } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -295,18 +296,27 @@ function EditProductContent() {
         if (uidsToResolve.length === 0) return;
         const uniqueUids = Array.from(new Set(uidsToResolve));
 
-        fetch(`${apiBase()}/api/users/resolve`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ businessId: business.id, uids: uniqueUids }),
-        })
-            .then(res => res.json())
-            .then(data => {
+        (async () => {
+            try {
+                const token = await getAuth().currentUser?.getIdToken();
+                if (!token) return;
+
+                const res = await fetch(`${apiBase()}/api/users/resolve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ businessId: business.id, uids: uniqueUids }),
+                });
+                const data = await res.json();
                 if (data.success && data.users) {
                     setResolvedUserNames(prev => ({ ...prev, ...data.users }));
                 }
-            })
-            .catch(() => {});
+            } catch {
+                // Name resolution is cosmetic; leave raw UIDs on failure.
+            }
+        })();
     }, [stockLogs, business?.id, userMap, resolvedUserNames]);
 
     const resolveUserName = React.useCallback((val: string | undefined): string => {
@@ -639,18 +649,28 @@ function EditProductContent() {
 
     const combinedLogs = React.useMemo(() => {
         const all = [...pendingTxLogs, ...stockLogs];
-        const sorted = all.sort((a, b) => {
-            const getMs = (d: any): number => {
-                if (!d) return 0;
-                if (typeof d.toMillis === 'function') return d.toMillis();
-                if (typeof d.toDate === 'function') return d.toDate().getTime();
-                if (typeof d.getTime === 'function') return d.getTime();
-                if (typeof d.seconds === 'number') return d.seconds * 1000;
-                const parsed = new Date(d).getTime();
-                return isNaN(parsed) ? 0 : parsed;
-            };
-            return getMs(b.date) - getMs(a.date);
-        });
+        const getMs = (d: any): number => {
+            if (!d) return 0;
+            if (typeof d.toMillis === 'function') return d.toMillis();
+            if (typeof d.toDate === 'function') return d.toDate().getTime();
+            if (typeof d.getTime === 'function') return d.getTime();
+            if (typeof d.seconds === 'number') return d.seconds * 1000;
+            const parsed = new Date(d).getTime();
+            return isNaN(parsed) ? 0 : parsed;
+        };
+        /*
+         * Order by when the row was written, not by the business date it carries.
+         * A sale entered today but dated last week is still the newest ledger
+         * entry; ordering it by `date` made an older restock look newer than the
+         * sale that followed it, which invented a "System Reconciliation" row
+         * for stock that was actually correct. Rows written before `recordedAt`
+         * existed fall back to their date.
+         */
+        const recordedMs = (tx: any): number => {
+            const written = getMs(tx.recordedAt);
+            return written > 0 ? written : getMs(tx.date);
+        };
+        const sorted = all.sort((a, b) => recordedMs(b) - recordedMs(a));
 
         // Check if there is an unlogged discrepancy between the latest recorded transaction and live product stock
         const liveStock = Number(product?.stock) || 0;
@@ -659,7 +679,16 @@ function EditProductContent() {
 
         if (latestTx && latestTx.closingStock !== undefined && Number(latestTx.closingStock) !== liveStock) {
             const unloggedDiff = liveStock - Number(latestTx.closingStock);
-            if (unloggedDiff !== 0) {
+            /*
+             * Several rows can share one server timestamp (a chunk of offline
+             * sales flushes together), so their order is arbitrary. If any row
+             * from the newest write lands on the live count, the chain is settled.
+             */
+            const newestMs = recordedMs(latestTx);
+            const settled = sorted.some((tx: any) =>
+                recordedMs(tx) === newestMs && tx.closingStock !== undefined && Number(tx.closingStock) === liveStock
+            );
+            if (!settled && unloggedDiff !== 0) {
                 listWithReconcile.unshift({
                     id: `reconcile-gap-${product?.id || 'live'}`,
                     businessId: business?.id,

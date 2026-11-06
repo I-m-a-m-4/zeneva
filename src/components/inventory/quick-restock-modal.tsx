@@ -75,49 +75,22 @@ export function QuickRestockModal({
         const customDate = backdate ? new Date(backdate) : new Date();
         const dateDesc = backdate ? ` (Backdated to ${customDate.toLocaleDateString()})` : '';
 
+        /*
+         * Queue a *relative* adjustment, not an absolute `stock: newTotal`.
+         * newTotal is derived from this device's cached stock; if another till
+         * sold the item while this modal was open, writing the absolute figure
+         * erases those sales. The queue applies `increment(delta)` and writes
+         * the matching journal and audit rows in the same atomic batch.
+         */
         addToQueue({
-            type: 'update-product',
-            payload: { 
-                productId: product.id, 
-                values: { 
-                    stock: newTotal,
-                    updatedAt: customDate
-                } 
-            }
-        }, `Restocked ${product.name} (Added ${addedAmount})${dateDesc}`);
-
-        addToQueue({
-            type: 'add-audit-log',
+            type: 'adjust-stock',
             payload: {
-                action: 'product.stock_adjustment',
-                entityType: 'Product',
-                entityId: product.id,
-                entityName: product.name,
-                details: {
-                    adjustment: addedAmount,
-                    oldStock: currentStock,
-                    newStock: newTotal,
-                    reason: `Restocked ${addedAmount} units${dateDesc}`
-                },
-                createdAt: customDate
-            }
-        }, `Logged stock adjustment for ${product.name}`);
-
-        const isAddition = addedAmount >= 0;
-        addToQueue({
-            type: 'add-inventory-transaction',
-            payload: {
-                businessId: product.businessId || business?.id || '',
                 productId: product.id,
                 productName: product.name,
-                type: isAddition ? 'in' : 'out',
-                quantity: Math.abs(addedAmount),
-                closingStock: newTotal,
-                notes: `Quick restock: ${addedAmount > 0 ? '+' : ''}${addedAmount}${dateDesc}`,
-                createdBy: 'User',
-                date: customDate
+                delta: addedAmount,
+                date: backdate ? customDate : undefined
             }
-        }, `Logging inventory transaction for ${product.name}`);
+        }, `Restocked ${product.name} (${addedAmount > 0 ? '+' : ''}${addedAmount})${dateDesc}`);
         
         toast({
             title: 'Stock Updated',

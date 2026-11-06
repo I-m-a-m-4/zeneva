@@ -120,13 +120,17 @@ export default function DeveloperLogsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // Older documents wrote `unhandled_rejection`; current ones write
+  // `unhandledrejection`. Normalising makes both match the filter.
+  const normalizeLogType = (value: string) => (value || '').replace(/_/g, '').toLowerCase();
+
   const filteredLogs = logs.filter(log => {
     const matchesSearch = searchQuery === '' || 
       log.message.toLowerCase().includes(searchQuery.toLowerCase()) || 
       (log.url && log.url.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (log.stack && log.stack.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    const matchesType = typeFilter === 'all' || log.type.toLowerCase().includes(typeFilter.toLowerCase());
+    const matchesType = typeFilter === 'all' || normalizeLogType(log.type) === normalizeLogType(typeFilter);
     
     return matchesSearch && matchesType;
   });
@@ -185,10 +189,11 @@ export default function DeveloperLogsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                  <SelectItem value="unhandled_rejection">Promise</SelectItem>
-                  <SelectItem value="react_error">React</SelectItem>
-                  <SelectItem value="network">Network</SelectItem>
+                  <SelectItem value="react">UI (React)</SelectItem>
+                  <SelectItem value="window">Runtime</SelectItem>
+                  <SelectItem value="unhandledrejection">Promise</SelectItem>
+                  <SelectItem value="api">API</SelectItem>
+                  <SelectItem value="anomaly">Anomaly</SelectItem>
                 </SelectContent>
               </Select>
             </div>

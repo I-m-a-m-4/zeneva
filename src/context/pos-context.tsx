@@ -5,7 +5,7 @@ import type { Customer, Product, CartItem, BusinessInstance, Receipt, UserProfil
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { getAuth } from 'firebase/auth';
-import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment, getDoc, getDocFromServer, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum, Timestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, limit, addDoc, updateDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp, increment, getDoc, getDocFromServer, setDoc, getDocs, startAfter, getAggregateFromServer, count, sum, Timestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { logAuditEvent } from '@/lib/audit';
 import { secureStorage } from '@/lib/secure-storage';
@@ -37,6 +37,7 @@ import {   syncProductsToOffline,
   getCachedUsers,
   syncAuditLogsToOffline,
   getCachedAuditLogs,
+  purgeForeignRows,
   offlineDbUsable
 } from '@/lib/sqlite-sync';
 import { isNativeApp, isMobileApp, apiBase } from '@/lib/platform';
@@ -158,6 +159,33 @@ function purgeOwnedCaches() {
   }
 }
 
+/**
+ * Tenant that produced a queued action, when its payload names one.
+ *
+ * The queue is machine-wide, so pending work from the previous session survives
+ * a login switch. It used to be replayed under whoever signed in next, against
+ * that session's `businessId` — a sale queued while impersonating tenant A became
+ * a write in tenant B's books. Actions that name their tenant are therefore
+ * filtered by it; legacy actions with no marker are still processed, because
+ * dropping them would lose a sale that never reached the server.
+ */
+function queueActionBusinessId(action: any): string | null {
+  const payload = action?.payload;
+  return (
+    payload?.businessId ||
+    payload?.receiptData?.businessId ||
+    payload?.product?.businessId ||
+    payload?.customer?.businessId ||
+    null
+  );
+}
+
+function actionBelongsToBusiness(action: any, businessId: string | null | undefined): boolean {
+  if (!businessId) return true;
+  const owner = queueActionBusinessId(action);
+  return !owner || owner === businessId;
+}
+
 interface POSContextType {
   business: BusinessInstance | null;
   products: Product[] | null;
@@ -167,6 +195,7 @@ interface POSContextType {
   stats: BusinessStats | null;
   searchCustomers: (term: string) => Promise<Customer[]>;
   searchCustomersByField: (field: string, value: string) => Promise<Customer[]>;
+  refreshCustomers: () => Promise<void>;
   /**
    * Every customer in the business, before the active branch filters any out.
    *
@@ -438,6 +467,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [isConfettiActive, setIsConfettiActive] = useState(false);
   const hasShownSyncToast = useRef(false);
   const hasHydratedRef = useRef(false);
+  /**
+   * True while a cache wipe is in flight.
+   *
+   * The wipe and the SQLite continuity effect can run in the same commit (a
+   * business switch changes `businessId` before React has applied the state
+   * resets), so the effect has to stand down or it re-persists the outgoing
+   * tenant's rows after the delete.
+   */
+  const isResettingRef = useRef(false);
   /**
    * True once the local cache reads have settled, whatever they returned.
    *
@@ -1244,7 +1282,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     const base = initialBusiness || offlineBusiness;
     if (!base) return null;
-    const settingsUpdates = queuedActions.filter(a => a.type === 'update-settings');
+    const settingsUpdates = queuedActions.filter(
+      a => a.type === 'update-settings' && actionBelongsToBusiness(a, businessId)
+    );
     if (settingsUpdates.length === 0) return base;
     let result = { ...base };
     settingsUpdates.forEach(action => {
@@ -1257,10 +1297,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
       });
     });
     return result;
-  }, [initialBusiness, offlineBusiness, queuedActions]);
+  }, [initialBusiness, offlineBusiness, queuedActions, businessId]);
 
   const allReceipts = useMemo(() => {
-    const queuedSales = queuedActions.filter(a => a.type === 'complete-sale');
+    const queuedSales = queuedActions.filter(
+      a => a.type === 'complete-sale' && actionBelongsToBusiness(a, businessId)
+    );
     if (initialReceipts === null && syncedReceipts.length === 0 && queuedSales.length === 0 && !hasFullSyncedReceipts && isRealOnline && !!businessId) return null;
     
     let merged = [...(initialReceipts || [])];
@@ -1284,7 +1326,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
     
     // Filter out voided receipts currently in the sync queue
-    const voidedIds = new Set(queuedActions.filter(a => a.type === 'delete-receipt').map(a => a.payload.receiptId));
+    const voidedIds = new Set(
+      queuedActions
+        .filter(a => a.type === 'delete-receipt' && actionBelongsToBusiness(a, businessId))
+        .map(a => a.payload.receiptId)
+    );
     if (voidedIds.size > 0) {
       merged = merged.filter(r => !voidedIds.has(r.id));
     }
@@ -1393,7 +1439,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const baseStats = initialStats || offlineStats;
     if (!baseStats) return null;
 
-    const queuedSales = queuedActions.filter(a => a.type === 'complete-sale' && a.status === 'pending');
+    const queuedSales = queuedActions.filter(
+      a => a.type === 'complete-sale' && a.status === 'pending' && actionBelongsToBusiness(a, businessId)
+    );
     if (queuedSales.length === 0) return baseStats;
 
     // Optimistically apply pending offline sales to display metrics
@@ -1413,7 +1461,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       totalSales: (baseStats.totalSales || 0) + queuedSales.length,
       totalUnitsSold: (baseStats.totalUnitsSold || 0) + pendingUnits,
     };
-  }, [initialStats, offlineStats, queuedActions]);
+  }, [initialStats, offlineStats, queuedActions, businessId]);
 
   // --- Functions ---
   const refreshData = useCallback(async (silent = false) => {
@@ -1775,6 +1823,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
        *    empty state — the `null` vs `[]` collapse that put "No products found"
        *    on a POS whose catalogue had merely failed to load.
        */
+      /*
+       * During impersonation, local storage belongs to the admin machine, not the
+       * tenant. Recording full_customers_sync would suppress the owner's or next
+       * session's fetch, so use an impersonation peek stamp instead.
+       */
+      if (isImpersonating) {
+        setLastSyncMetadata(businessId, 'impersonation_customers_peek', Date.now());
+        setHasFullSyncedCustomers(true);
+        return;
+      }
+
       if (persisted) {
         setLastSyncMetadata(businessId, 'full_customers_sync', Date.now());
       } else {
@@ -1817,7 +1876,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsFullSyncingCustomers(false);
     }
-  }, [businessId, firestore, isFullSyncingCustomers, toast, user, isRealOnline]);
+  }, [businessId, firestore, isFullSyncingCustomers, toast, user, isRealOnline, isImpersonating]);
 
   const fetchFullProducts = useCallback(async (options?: { force?: boolean }) => {
     if (!user || !businessId || !firestore || isFullSyncingProducts) return;
@@ -2180,6 +2239,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     let allFetched: Receipt[] = [];
     let lastDoc: any = null;
     let hasMore = true;
+    /**
+     * Whether every page reached the local mirror. The `full_receipts_sync` stamp
+     * suppresses the next 24 hours of syncing, so it must describe a write that
+     * actually happened - otherwise a device whose database was locked shows an
+     * empty sales history and refuses to re-fetch it for a day.
+     */
+    let persisted = true;
     const BATCH_SIZE = 2500; 
 
     try {
@@ -2211,7 +2277,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
           });
 
           if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
-             await syncReceiptsToOffline(businessId, batch);
+             if (!(await syncReceiptsToOffline(businessId, batch))) persisted = false;
           } else {
              const cumulative = await idb.get<Receipt[]>('pos_synced_receipts') || [];
              const mergedIndexed = [...cumulative];
@@ -2228,7 +2294,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      setLastSyncMetadata(businessId, 'full_receipts_sync', Date.now());
+      if (persisted) {
+        setLastSyncMetadata(businessId, 'full_receipts_sync', Date.now());
+      } else {
+        reportAnomaly(
+          'receipt_cache_write_failed',
+          'Receipts were fetched but could not be written to the offline store; withholding the sync stamp so the next launch retries.',
+          { userId: user?.uid, businessId, details: { fetched: allFetched.length } },
+        );
+      }
       setHasFullSyncedReceipts(true);
       
       const lastToast = Number(localStorage.getItem('last_receipt_sync_toast_time') || 0);
@@ -2242,9 +2316,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
         return;
       }
       console.warn("Full Receipt Sync Failed:", error);
+      /*
+       * No stamp and no settled flag here. The fetch failed, so the next
+       * `checkFullSyncStatus` pass must retry, and the history page must keep
+       * showing a pending state instead of an empty one.
+       */
     } finally {
       setIsFullSyncingReceipts(false);
-      setHasFullSyncedReceipts(true);
     }
   }, [businessId, firestore, isFullSyncingReceipts, toast, user, isRealOnline]);
 
@@ -2267,7 +2345,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const effectiveProfile = currentUserProfile || offlineProfile;
     if (isProcessingQueueRef.current || isQueueProcessing || !isRealOnline || !firestore || !businessId || !effectiveProfile) return;
     const currentQueue = queuedActionsRef.current.length > 0 ? queuedActionsRef.current : queuedActions;
-    const pending = currentQueue.filter(a => a.status === 'pending');
+    /*
+     * Only replay this session's tenant. Queued work from another tenant stays
+     * pending until its owner signs back in - see `queueActionBusinessId`.
+     */
+    const pending = currentQueue.filter(
+      a => a.status === 'pending' && actionBelongsToBusiness(a, businessId)
+    );
     if (pending.length === 0) return;
     isProcessingQueueRef.current = true;
     setIsQueueProcessing(true);
@@ -2363,143 +2447,268 @@ export function POSProvider({ children }: { children: ReactNode }) {
            * `legacyAbsoluteStocks` rather than guessing a delta — a wrong guess
            * here corrupts a stock count permanently.
            */
-          const combinedSold = new Map<string, number>();
-          const legacyAbsoluteStocks = new Map<string, number>();
-          const consolidatedCust = new Map<string, { totalSpent: number, loyaltyPoints?: number, lastPurchaseAt?: Timestamp }>();
+          let combinedSold = new Map<string, number>();
+          let legacyAbsoluteStocks = new Map<string, number>();
+          let consolidatedCust = new Map<string, { totalSpent: number, loyaltyPoints?: number, lastPurchaseAt?: Timestamp }>();
           let aggregateSales = 0;
           let aggregateRev = 0;
           let aggregateUnits = 0;
+          let processedChunk: any[] = [];
 
           try {
-            chunk.forEach(action => {
-              // Write Discrete Receipt Record
-              const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
-              
-              // Preserve the date the sale actually belongs to.
-              //
-              // Two cases must beat the server clock, which is only correct for a
-              // sale recorded and synced in the same moment:
-              //   1. The admin backdated it (isBackdated).
-              //   2. It sat in the offline queue - a sale rung up on Monday and
-              //      synced on Wednesday is a Monday sale, not a Wednesday one.
-              // Case 2 also covers actions queued by an older build that predates
-              // the isBackdated flag, which would otherwise be stamped with the
-              // sync time and appear to "lose" the date the cashier chose.
-              const rawCreatedAt = action.payload.receiptData.createdAt;
-              const clientDate = rawCreatedAt ? safeToDate(rawCreatedAt) : null;
-              // safeToDate returns epoch 0 for anything unparseable - never trust that.
-              const hasClientDate = !!clientDate && clientDate.getTime() > 0;
-              const isOlderThanSync = hasClientDate && (Date.now() - clientDate!.getTime()) > 120_000;
-              const dateVal = hasClientDate && (action.payload.receiptData.isBackdated || isOlderThanSync)
-                ? Timestamp.fromDate(clientDate!)
-                : serverTimestamp();
+            /*
+             * A transaction, not a batch: deciding whether a sale still needs to
+             * run and applying its stock decrement must be one atomic step.
+             *
+             * A replay used to re-execute the whole batch - receipt, journal and
+             * `increment(-qty)` - because nothing checked whether the sale was
+             * already on the server. Ten executions of a 3-unit line is exactly
+             * how CIMETIDINE reached -45. Here every receipt is read inside the
+             * transaction and one that already exists is skipped; a concurrent
+             * writer makes the transaction retry and re-read rather than let a
+             * second decrement through.
+             */
+            const result = await runTransaction(firestore, async (transaction) => {
+              // Read phase - all reads must precede any write in a transaction.
+              const liveActions: any[] = [];
+              const seenReceipts = new Set<string>();
+              for (const action of chunk) {
+                const receiptId = action.payload.receiptData.id;
+                /*
+                 * Two queue entries for one receipt are the same sale. The read
+                 * below cannot see a write made later in this same transaction,
+                 * so collapse duplicates here or the stock would come off twice.
+                 */
+                if (seenReceipts.has(receiptId)) continue;
+                seenReceipts.add(receiptId);
 
-              batch.set(rRef, {
-                ...action.payload.receiptData, 
-                businessId: businessId, 
-                createdAt: dateVal 
-              });
+                const receiptSnap = await transaction.get(
+                  doc(firestore, 'receipts', receiptId)
+                );
+                // Existing receipt => this sale already committed. Skipping it
+                // makes a replay a no-op instead of a second stock decrement.
+                if (!receiptSnap.exists()) liveActions.push(action);
+              }
 
-              // Log Stock Movements (Idempotent write keyed by receipt ID and product ID)
-              action.payload.receiptData.items?.forEach((item: any) => {
-                if (!item.productId) return;
-                const txDocId = `sale_${action.payload.receiptData.id}_${item.productId}`;
-                const txRef = doc(firestore, 'inventory_transactions', txDocId);
-                batch.set(txRef, {
-                  businessId,
-                  productId: item.productId,
-                  productName: item.name || 'Unknown',
-                  type: 'out',
-                  quantity: item.quantity || 0,
-                  date: dateVal,
-                  notes: action.payload.receiptData.receiptNumber ? `Sale (Receipt #${action.payload.receiptData.receiptNumber})` : 'Sale',
-                  referenceId: action.payload.receiptData.id,
-                  createdBy: action.payload.receiptData.cashierName || action.payload.receiptData.createdBy || '',
-                  createdById: action.payload.receiptData.createdBy || '',
-                  cashierName: action.payload.receiptData.cashierName || '',
-                  priceOverridden: !!item.priceOverridden,
-                  priceOverrideNote: item.priceOverrideNote || null
+              const sold = new Map<string, number>();
+              const legacy = new Map<string, number>();
+              const cust = new Map<string, { totalSpent: number, loyaltyPoints?: number, lastPurchaseAt?: Timestamp }>();
+              let sales = 0;
+              let rev = 0;
+              let units = 0;
+
+              /*
+               * Preserve the date the sale actually belongs to.
+               *
+               * Two cases must beat the server clock, which is only correct for a
+               * sale recorded and synced in the same moment:
+               *   1. The admin backdated it (isBackdated).
+               *   2. It sat in the offline queue - a sale rung up on Monday and
+               *      synced on Wednesday is a Monday sale, not a Wednesday one.
+               * Case 2 also covers actions queued by an older build that predates
+               * the isBackdated flag, which would otherwise be stamped with the
+               * sync time and appear to "lose" the date the cashier chose.
+               */
+              const resolveSaleDate = (action: any) => {
+                const rawCreatedAt = action.payload.receiptData.createdAt;
+                const clientDate = rawCreatedAt ? safeToDate(rawCreatedAt) : null;
+                // safeToDate returns epoch 0 for anything unparseable - never trust that.
+                const hasClientDate = !!clientDate && clientDate.getTime() > 0;
+                const isOlderThanSync = hasClientDate && (Date.now() - clientDate!.getTime()) > 120_000;
+                return hasClientDate && (action.payload.receiptData.isBackdated || isOlderThanSync)
+                  ? Timestamp.fromDate(clientDate!)
+                  : serverTimestamp();
+              };
+
+              // Aggregate before writing: a transaction may not read after its
+              // first write, and the product reads below feed the journal balances.
+              liveActions.forEach(action => {
+                // Cascade product stock movements. Units are *summed*, because two
+                // sales of the same product in one chunk must both come off the shelf
+                // — a map of absolute figures collapsed them to the last one.
+                action.payload.productUpdates.forEach((u: any) => {
+                  const unitsSold = Number(u.quantitySold);
+                  if (Number.isFinite(unitsSold) && unitsSold > 0) {
+                    sold.set(u.id, (sold.get(u.id) || 0) + unitsSold);
+                  } else {
+                    legacy.set(u.id, u.newStock);
+                  }
                 });
-              });
 
-              // Cascade product stock movements. Units are *summed*, because two
-              // sales of the same product in one chunk must both come off the shelf
-              // — a map of absolute figures collapsed them to the last one.
-              action.payload.productUpdates.forEach((u: any) => {
-                const units = Number(u.quantitySold);
-                if (Number.isFinite(units) && units > 0) {
-                  combinedSold.set(u.id, (combinedSold.get(u.id) || 0) + units);
-                } else {
-                  legacyAbsoluteStocks.set(u.id, u.newStock);
+                // Cumulate operational metrics
+                sales += 1;
+                rev += (action.payload.receiptData.total || 0);
+                units += (action.payload.receiptData.items?.reduce((a: number, item: any) => a + (item.quantity || 0), 0) || 0);
+
+                // Aggregate Customer Ledger Deltas
+                const cu = action.payload.customerUpdate;
+                if (cu && cu.id) {
+                  const existing = cust.get(cu.id) || { totalSpent: 0 };
+                  // The date is either a real Timestamp (a backdated sale, or one
+                  // that sat in the offline queue) or a serverTimestamp sentinel,
+                  // which cannot be read or compared client-side. Only the former
+                  // can be ordered here; the sentinel case is left undefined and
+                  // resolved at flush time. Taking the max matters because several
+                  // sales to the same customer consolidate into one write.
+                  const dateVal = resolveSaleDate(action);
+                  const saleAt = dateVal instanceof Timestamp ? dateVal : undefined;
+                  cust.set(cu.id, {
+                    totalSpent: existing.totalSpent + (cu.totalSpent || 0),
+                    loyaltyPoints: cu.loyaltyPoints !== undefined ? cu.loyaltyPoints : existing.loyaltyPoints,
+                    lastPurchaseAt:
+                      saleAt && (!existing.lastPurchaseAt || saleAt.toMillis() > existing.lastPurchaseAt.toMillis())
+                        ? saleAt
+                        : existing.lastPurchaseAt,
+                  });
                 }
               });
 
-              // Cumulate operational metrics
-              aggregateSales += 1;
-              aggregateRev += (action.payload.receiptData.total || 0);
-              aggregateUnits += (action.payload.receiptData.items?.reduce((a: number, item: any) => a + (item.quantity || 0), 0) || 0);
-
-              // Aggregate Customer Ledger Deltas
-              const cu = action.payload.customerUpdate;
-              if (cu && cu.id) {
-                const existing = consolidatedCust.get(cu.id) || { totalSpent: 0 };
-                // `dateVal` is either a real Timestamp (a backdated sale, or one that
-                // sat in the offline queue) or a serverTimestamp sentinel, which
-                // cannot be read or compared client-side. Only the former can be
-                // ordered here; the sentinel case is left undefined and resolved at
-                // flush time. Taking the max matters because several sales to the
-                // same customer consolidate into one write.
-                const saleAt = dateVal instanceof Timestamp ? dateVal : undefined;
-                consolidatedCust.set(cu.id, {
-                  totalSpent: existing.totalSpent + (cu.totalSpent || 0),
-                  loyaltyPoints: cu.loyaltyPoints !== undefined ? cu.loyaltyPoints : existing.loyaltyPoints,
-                  lastPurchaseAt:
-                    saleAt && (!existing.lastPurchaseAt || saleAt.toMillis() > existing.lastPurchaseAt.toMillis())
-                      ? saleAt
-                      : existing.lastPurchaseAt,
-                });
-              }
-            });
-
-            // Step B: Flush all cumulative values from the local aggregation buffer into Firestore batch commands.
-            //
-            // Relative for anything that told us how many units moved, so a
-            // concurrent till's sale is added to rather than overwritten. The
-            // legacy map is only ever populated by actions queued before
-            // `quantitySold` existed, and a product cannot be in both.
-            combinedSold.forEach((units, pId) => {
-              batch.update(doc(firestore, 'products', pId), { stock: increment(-units), updatedAt: serverTimestamp() });
-            });
-
-            legacyAbsoluteStocks.forEach((stockVal, pId) => {
-              batch.update(doc(firestore, 'products', pId), { stock: stockVal, updatedAt: serverTimestamp() });
-            });
-
-            consolidatedCust.forEach((data, cId) => {
-              const updatesObj: any = { updatedAt: serverTimestamp() };
-              if (data.totalSpent > 0) updatesObj.totalSpent = increment(data.totalSpent);
-              if (data.loyaltyPoints !== undefined) updatesObj.loyaltyPoints = data.loyaltyPoints;
-              /**
-               * `lastPurchaseDate` was declared on `Customer` and read in four places
-               * but **never written to Firestore** — the only assignment was inside the
-               * `allCustomers` optimistic memo, which lives in memory and evaporates on
-               * reload. So Zen AI's `getAtRiskCustomers` filtered on a field that was
-               * always undefined and returned zero rows every time, and any "days
-               * since last purchase" feature was dead on arrival.
+              /*
+               * Read every product this chunk sells so each journal row can carry
+               * the balance it produced.
                *
-               * Taken from the receipt's own date rather than the clock, so a backdated
-               * or long-queued offline sale records when it actually happened.
+               * The stock write itself stays `increment(-units)` so concurrent
+               * tills compose instead of overwriting each other. This read is the
+               * shelf count this transaction starts from; `closingStock` is where
+               * it leaves that product. Sale rows used to carry no balance at all,
+               * which forced the stock-history screen to reconstruct one from
+               * dates - and a backdated sale made that reconstruction invent a
+               * "System Reconciliation" adjustment that never happened.
                */
-              updatesObj.lastPurchaseDate = data.lastPurchaseAt ?? serverTimestamp();
-              batch.update(doc(firestore, 'customers', cId), updatesObj);
+              const balance = new Map<string, number>();
+              for (const pId of new Set([...sold.keys(), ...legacy.keys()])) {
+                const productSnap = await transaction.get(doc(firestore, 'products', pId));
+                if (productSnap.exists()) {
+                  balance.set(pId, Number(productSnap.data().stock) || 0);
+                }
+              }
+
+              liveActions.forEach(action => {
+                // Write Discrete Receipt Record
+                const rRef = doc(firestore, 'receipts', action.payload.receiptData.id);
+                const dateVal = resolveSaleDate(action);
+
+                /*
+                 * Safe as a plain set: the read phase above proved this document
+                 * does not exist, and the transaction's snapshot isolation means a
+                 * concurrent commit of the same receipt aborts and retries us.
+                 */
+                transaction.set(rRef, {
+                  ...action.payload.receiptData,
+                  businessId: businessId,
+                  createdAt: dateVal
+                });
+
+                // Log Stock Movements (Idempotent write keyed by receipt ID and product ID)
+                //
+                // Aggregated per product: a receipt can carry the same product on
+                // two lines (different units, or the same item scanned twice), and
+                // both lines share one journal document id. Writing per line let
+                // the second line overwrite the first, so the ledger recorded a
+                // smaller movement than the stock actually lost.
+                const itemsByProduct = new Map<string, { name: string; quantity: number; movedUnits: number; priceOverridden: boolean; priceOverrideNote: string | null }>();
+                action.payload.receiptData.items?.forEach((item: any) => {
+                  if (!item.productId) return;
+                  const multiplier = Number(item.multiplier) || 1;
+                  const entry = itemsByProduct.get(item.productId) || {
+                    name: item.name || 'Unknown',
+                    quantity: 0,
+                    movedUnits: 0,
+                    priceOverridden: false,
+                    priceOverrideNote: null as string | null,
+                  };
+                  entry.name = item.name || entry.name;
+                  entry.quantity += Number(item.quantity) || 0;
+                  // `quantity` is what the cashier typed; a unit conversion (box →
+                  // pieces) moves `multiplier` times that off the shelf.
+                  entry.movedUnits += (Number(item.quantity) || 0) * multiplier;
+                  entry.priceOverridden = entry.priceOverridden || !!item.priceOverridden;
+                  entry.priceOverrideNote = item.priceOverrideNote || entry.priceOverrideNote;
+                  itemsByProduct.set(item.productId, entry);
+                });
+
+                itemsByProduct.forEach((entry, productId) => {
+                  const txDocId = `sale_${action.payload.receiptData.id}_${productId}`;
+                  const txRef = doc(firestore, 'inventory_transactions', txDocId);
+                  const previous = balance.get(productId);
+                  const row: any = {
+                    businessId,
+                    productId,
+                    productName: entry.name,
+                    type: 'out',
+                    quantity: entry.quantity,
+                    date: dateVal,
+                    // When the row was written. `date` alone cannot order the
+                    // ledger because backdating and offline sync both move it
+                    // into the past.
+                    recordedAt: serverTimestamp(),
+                    notes: action.payload.receiptData.receiptNumber ? `Sale (Receipt #${action.payload.receiptData.receiptNumber})` : 'Sale',
+                    referenceId: action.payload.receiptData.id,
+                    createdBy: action.payload.receiptData.cashierName || action.payload.receiptData.createdBy || '',
+                    createdById: action.payload.receiptData.createdBy || '',
+                    cashierName: action.payload.receiptData.cashierName || '',
+                    priceOverridden: entry.priceOverridden,
+                    priceOverrideNote: entry.priceOverrideNote
+                  };
+                  if (previous !== undefined && entry.movedUnits > 0) {
+                    row.previousStock = previous;
+                    row.closingStock = previous - entry.movedUnits;
+                    if (entry.movedUnits !== entry.quantity) row.unitsMoved = entry.movedUnits;
+                    balance.set(productId, previous - entry.movedUnits);
+                  }
+                  transaction.set(txRef, row);
+                });
+              });
+
+              // Flush the aggregation buffers through the same transaction, so the
+              // receipt, the stock decrement and the customer ledger all move
+              // together or not at all.
+              //
+              // Relative for anything that told us how many units moved, so a
+              // concurrent till's sale is added to rather than overwritten. The
+              // legacy map is only ever populated by actions queued before
+              // `quantitySold` existed, and a product cannot be in both.
+              sold.forEach((unitsSold, pId) => {
+                transaction.update(doc(firestore, 'products', pId), { stock: increment(-unitsSold), updatedAt: serverTimestamp() });
+              });
+
+              legacy.forEach((stockVal, pId) => {
+                transaction.update(doc(firestore, 'products', pId), { stock: stockVal, updatedAt: serverTimestamp() });
+              });
+
+              cust.forEach((data, cId) => {
+                const updatesObj: any = { updatedAt: serverTimestamp() };
+                if (data.totalSpent > 0) updatesObj.totalSpent = increment(data.totalSpent);
+                if (data.loyaltyPoints !== undefined) updatesObj.loyaltyPoints = data.loyaltyPoints;
+                /**
+                 * `lastPurchaseDate` was declared on `Customer` and read in four places
+                 * but **never written to Firestore** — the only assignment was inside the
+                 * `allCustomers` optimistic memo, which lives in memory and evaporates on
+                 * reload. So Zen AI's `getAtRiskCustomers` filtered on a field that was
+                 * always undefined and returned zero rows every time, and any "days
+                 * since last purchase" feature was dead on arrival.
+                 *
+                 * Taken from the receipt's own date rather than the clock, so a backdated
+                 * or long-queued offline sale records when it actually happened.
+                 */
+                updatesObj.lastPurchaseDate = data.lastPurchaseAt ?? serverTimestamp();
+                transaction.update(doc(firestore, 'customers', cId), updatesObj);
+              });
+
+              return { processed: liveActions, sold, legacy, cust, sales, rev, units };
             });
 
-            // Ship the final, lightweight consolidated payload!
-            await batch.commit();
+            processedChunk = result.processed;
+            combinedSold = result.sold;
+            legacyAbsoluteStocks = result.legacy;
+            consolidatedCust = result.cust;
+            aggregateSales = result.sales;
+            aggregateRev = result.rev;
+            aggregateUnits = result.units;
 
             // Dispatch webhooks for updated products
             const chunkProductIds = new Set<string>();
-            chunk.forEach(a => a.payload.productUpdates?.forEach((u: any) => chunkProductIds.add(u.id)));
+            processedChunk.forEach(a => a.payload.productUpdates?.forEach((u: any) => chunkProductIds.add(u.id)));
             if (chunkProductIds.size > 0) dispatchWebhooksForProducts(chunkProductIds);
 
             // ----------------------------------------------------------------
@@ -2523,7 +2732,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
               // Automatic Draft Purchase Order Generation for low stock items
               const productsBelowThreshold = new Map<string, { product: Product, orderQty: number }>();
 
-              chunk.forEach(action => {
+              processedChunk.forEach(action => {
                 action.payload.productUpdates.forEach((u: any) => {
                    const units = Number(u.quantitySold);
                    const pId = u.id;
@@ -2545,7 +2754,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                         productId: product.id,
                         name: product.name,
                         sku: product.sku || 'N/A',
-                        currentStock: product.stock - (chunk.find(a => a.payload.productUpdates.find((u: any) => u.id === product.id))?.payload.productUpdates.find((u: any) => u.id === product.id)?.quantitySold || 0),
+                        currentStock: product.stock - (processedChunk.find(a => a.payload.productUpdates.find((u: any) => u.id === product.id))?.payload.productUpdates.find((u: any) => u.id === product.id)?.quantitySold || 0),
                         reorderPoint: product.lowStockThreshold,
                         costPrice: product.costPrice || product.price || 0,
                         orderQty: orderQty
@@ -2586,7 +2795,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
             // 🚀 OPTIMIZATION FIX: Re-inject transaction records into the local edge cache
             // since real-time Firestore listeners have been severed to eliminate cost overruns.
-            const finalizedReceipts = chunk.map(c => {
+            const finalizedReceipts = processedChunk.map(c => {
               const rd = c.payload.receiptData;
               return {
                  ...rd,
@@ -2650,7 +2859,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
             // Detect non-retryable permanent errors (e.g. Permission Denied, Resource Exhausted, Failed Precondition)
             const errCode = execError?.code || '';
             const isPermanentError = ['permission-denied', 'not-found', 'already-exists', 'invalid-argument', 'failed-precondition'].includes(errCode);
-            
+
             if (isPermanentError) {
               console.warn("⚠️ Permanent Firestore rejection on aggregate batch. Discarding chunk to unblock queue.");
               chunk.forEach(action => successfullyCommitIds.push(action.id)); // Discard to unblock queue
@@ -2811,7 +3020,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
                     const newStock = Number(action.payload.values.stock) || 0;
                     const diff = newStock - oldStock;
                     if (diff !== 0) {
-                      const invTransRef = doc(collection(firestore, 'inventory_transactions'));
+                      // Deterministic id: a retried queue entry must overwrite
+                      // its own ledger row instead of appending a second copy.
+                      const invTransRef = doc(firestore, 'inventory_transactions', `inv_auto_${action.id}`);
                       batch.set(invTransRef, {
                         businessId,
                         productId: targetId,
@@ -2821,6 +3032,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                         previousStock: oldStock,
                         closingStock: newStock,
                         date: serverTimestamp(),
+                        recordedAt: serverTimestamp(),
                         notes: action.description || (diff > 0 ? `Stock restocked (+${diff})` : `Stock reduced (${diff})`),
                         referenceId: action.id || invTransRef.id,
                         createdBy: effectiveProfile?.name || currentUserProfile?.name || 'System'
@@ -2841,6 +3053,88 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 };
                 break;
               }
+              case 'adjust-stock': {
+                /*
+                 * Relative stock adjustment ("add N units"), as opposed to
+                 * `update-product`, which writes an absolute figure computed
+                 * from whatever this device had cached. An absolute write from a
+                 * stale cache silently erases sales that landed in between - the
+                 * second Quick Restock on 6 October wrote back 22 while the true
+                 * count was 19. `increment(delta)` composes with concurrent
+                 * sales, and the journal read makes a replay a no-op instead of
+                 * adding the delta twice.
+                 */
+                const delta = Number(action.payload.delta);
+                if (!Number.isFinite(delta) || delta === 0) break;
+
+                const productId = action.payload.productId;
+                const currentProd = syncedProductsRef.current.find(p => p.id === productId);
+                const productName = action.payload.productName || currentProd?.name || 'Product';
+
+                const rawDate = action.payload.date;
+                const parsedDate = rawDate ? new Date(rawDate) : null;
+                const hasDate = !!parsedDate && !Number.isNaN(parsedDate.getTime());
+                const dateVal = hasDate ? Timestamp.fromDate(parsedDate!) : serverTimestamp();
+
+                await runTransaction(firestore, async (transaction) => {
+                  const journalRef = doc(firestore, 'inventory_transactions', `adjust_${action.id}`);
+                  /*
+                   * The journal row is written in this same transaction, so it
+                   * existing means this adjustment already landed. Returning
+                   * here is what stops a replay from adding the delta again.
+                   */
+                  const journalSnap = await transaction.get(journalRef);
+                  if (journalSnap.exists()) return;
+
+                  // Read the shelf count in the transaction, so the journal's
+                  // closing balance is the count `increment(delta)` actually
+                  // produced rather than whatever this device had cached.
+                  const productRef = doc(firestore, 'products', productId);
+                  const productSnap = await transaction.get(productRef);
+                  const liveStock = productSnap.exists() ? (Number(productSnap.data().stock) || 0) : undefined;
+
+                  transaction.update(productRef, {
+                    stock: increment(delta),
+                    updatedAt: dateVal
+                  });
+
+                  transaction.set(journalRef, {
+                    businessId,
+                    productId,
+                    productName,
+                    type: delta > 0 ? 'in' : 'out',
+                    quantity: Math.abs(delta),
+                    ...(liveStock !== undefined ? { previousStock: liveStock, closingStock: liveStock + delta } : {}),
+                    date: dateVal,
+                    // `date` can be backdated; this is when the row was written.
+                    recordedAt: serverTimestamp(),
+                    notes: action.description || `Stock adjustment (${delta > 0 ? '+' : ''}${delta})`,
+                    referenceId: action.id,
+                    createdBy: effectiveProfile?.name || currentUserProfile?.name || 'System'
+                  });
+
+                  transaction.set(doc(firestore, 'businessInstances', businessId, 'auditLogs', `audit_${action.id}`), {
+                    action: 'product.stock_adjustment',
+                    entityType: 'Product',
+                    entityId: productId,
+                    entityName: productName,
+                    details: {
+                      adjustment: delta,
+                      reason: action.description || `Stock adjustment (${delta > 0 ? '+' : ''}${delta})`
+                    },
+                    createdAt: dateVal
+                  });
+                });
+
+                applyLocal = () => {
+                  setSyncedProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: (Number(p.stock) || 0) + delta } : p));
+                  if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+                    const current = syncedProductsRef.current.find(p => p.id === productId);
+                    if (current) syncProductToOffline(businessId, { ...current, stock: (Number(current.stock) || 0) + delta });
+                  }
+                };
+                break;
+              }
               case 'bulk-update-products': {
                 action.payload.productIds.forEach((id: string) => {
                   batch.update(doc(firestore, 'products', id), { ...action.payload.values, updatedAt: serverTimestamp() });
@@ -2854,7 +3148,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
                     const oldStock = Number(currentProd?.stock) || 0;
                     const diff = newStock - oldStock;
                     if (diff !== 0) {
-                      const invTransRef = doc(collection(firestore, 'inventory_transactions'));
+                      // One row per product, keyed by the action so a retry
+                      // overwrites rather than duplicates.
+                      const invTransRef = doc(firestore, 'inventory_transactions', `inv_auto_${action.id}_${id}`);
                       batch.set(invTransRef, {
                         businessId,
                         productId: id,
@@ -2864,6 +3160,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
                         previousStock: oldStock,
                         closingStock: newStock,
                         date: serverTimestamp(),
+                        recordedAt: serverTimestamp(),
                         notes: action.description || `Bulk stock update (${diff > 0 ? '+' : ''}${diff})`,
                         referenceId: action.id || invTransRef.id,
                         createdBy: effectiveProfile?.name || currentUserProfile?.name || 'System'
@@ -2895,38 +3192,84 @@ export function POSProvider({ children }: { children: ReactNode }) {
                 const invTransRef = collection(firestore, 'inventory_transactions');
                 const txDocId = action.id ? `inv_${action.id}` : undefined;
                 const docRef = txDocId ? doc(firestore, 'inventory_transactions', txDocId) : doc(invTransRef);
-                batch.set(docRef, { ...action.payload, date: serverTimestamp() });
+                /*
+                 * `date` is the movement's business date and may be backdated by
+                 * whoever queued it. Overwriting it with the write time here is
+                 * what made a restock recorded for yesterday look newer than a
+                 * sale that followed it. Keep the supplied date; `recordedAt`
+                 * carries the write time that orders the ledger.
+                 */
+                const parsedDate = action.payload.date ? safeToDate(action.payload.date) : null;
+                const dateVal = parsedDate && parsedDate.getTime() > 0
+                  ? Timestamp.fromDate(parsedDate)
+                  : serverTimestamp();
+                batch.set(docRef, { ...action.payload, date: dateVal, recordedAt: serverTimestamp() });
                 break;
               }
               case 'delete-receipt': {
-                batch.delete(doc(firestore, 'receipts', action.payload.receiptId));
-                
                 // Restock items and log inventory transactions
                 if (action.payload.receipt) {
+                  /*
+                   * Aggregate per product before writing. A receipt can carry the
+                   * same product on two lines; one journal row per product keeps
+                   * the return costed as a single movement.
+                   */
+                  const restock = new Map<string, { name: string; quantity: number }>();
                   action.payload.receipt.items?.forEach((item: any) => {
                     if (!item.productId) return;
-                    
-                    // Restock item
-                    if (item.quantity > 0) {
-                      batch.update(doc(firestore, 'products', item.productId), { 
-                        stock: increment(item.quantity), 
-                        updatedAt: serverTimestamp() 
-                      });
+                    // A unit-conversion line moved `quantity × multiplier` off the
+                    // shelf when it was sold, so a full void has to put that same
+                    // number back - not the bare line quantity.
+                    const quantity = (Number(item.quantity) || 0) * (Number(item.multiplier) || 1);
+                    if (quantity <= 0) return;
+                    const entry = restock.get(item.productId) || { name: item.name || 'Unknown', quantity: 0 };
+                    entry.quantity += quantity;
+                    restock.set(item.productId, entry);
+                  });
+
+                  await runTransaction(firestore, async (transaction) => {
+                    const receiptRef = doc(firestore, 'receipts', action.payload.receiptId);
+                    /*
+                     * The receipt's existence is the void's anchor. Reading it in
+                     * the transaction means a replay - or a concurrent void from
+                     * another device - sees it already gone and returns without
+                     * restocking a second time.
+                     */
+                    const receiptSnap = await transaction.get(receiptRef);
+                    if (!receiptSnap.exists()) return;
+
+                    // All reads precede writes; the counts are needed for each
+                    // return row's closing balance.
+                    const balances = new Map<string, number>();
+                    for (const productId of restock.keys()) {
+                      const productSnap = await transaction.get(doc(firestore, 'products', productId));
+                      if (productSnap.exists()) {
+                        balances.set(productId, Number(productSnap.data().stock) || 0);
+                      }
                     }
 
-                    // Log Stock Movement (Idempotent write keyed by voided receipt and productId)
-                    const txDocId = `void_${action.payload.receiptId}_${item.productId}`;
-                    const txRef = doc(firestore, 'inventory_transactions', txDocId);
-                    batch.set(txRef, {
-                      businessId,
-                      productId: item.productId,
-                      productName: item.name || 'Unknown',
-                      type: 'return',
-                      quantity: item.quantity || 0,
-                      date: serverTimestamp(),
-                      notes: action.payload.receipt.receiptNumber ? `Voided Sale (Receipt #${action.payload.receipt.receiptNumber})` : 'Voided Sale',
-                      referenceId: action.payload.receiptId,
-                      createdBy: currentUserProfile?.name || 'Unknown'
+                    transaction.delete(receiptRef);
+
+                    restock.forEach((entry, productId) => {
+                      const previous = balances.get(productId);
+                      transaction.update(doc(firestore, 'products', productId), { 
+                        stock: increment(entry.quantity), 
+                        updatedAt: serverTimestamp() 
+                      });
+
+                      transaction.set(doc(firestore, 'inventory_transactions', `void_${action.payload.receiptId}_${productId}`), {
+                        businessId,
+                        productId,
+                        productName: entry.name,
+                        type: 'return',
+                        quantity: entry.quantity,
+                        ...(previous !== undefined ? { previousStock: previous, closingStock: previous + entry.quantity } : {}),
+                        date: serverTimestamp(),
+                        recordedAt: serverTimestamp(),
+                        notes: action.payload.receipt.receiptNumber ? `Voided Sale (Receipt #${action.payload.receipt.receiptNumber})` : 'Voided Sale',
+                        referenceId: action.payload.receiptId,
+                        createdBy: currentUserProfile?.name || 'Unknown'
+                      });
                     });
                   });
                 }
@@ -2940,6 +3283,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
             // Webhook dispatches
             if (action.type === 'update-product') dispatchWebhooksForProducts(new Set([action.payload.productId]));
+            if (action.type === 'adjust-stock') dispatchWebhooksForProducts(new Set([action.payload.productId]));
             if (action.type === 'bulk-update-products') dispatchWebhooksForProducts(new Set(action.payload.productIds));
             if (action.type === 'delete-receipt' && action.payload.receipt?.items) {
                const rIds = new Set<string>();
@@ -3046,7 +3390,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const isSuperAdmin = effectiveProfile?.email === 'belloimam431@gmail.com';
     
     // Debug Log to catch the culprit
-    if (action.type === 'complete-sale' || action.type === 'add-product' || action.type === 'update-product' || action.type === 'delete-product') {
+    if (action.type === 'complete-sale' || action.type === 'add-product' || action.type === 'update-product' || action.type === 'adjust-stock' || action.type === 'delete-product') {
       console.log(`[POS RBAC] Checking action: ${action.type}`, {
         userRole,
         permissions,
@@ -3064,7 +3408,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
       
       // 2. Manage Inventory check
-      const inventoryActions = ['add-product', 'update-product', 'delete-product', 'bulk-update-products'];
+      const inventoryActions = ['add-product', 'update-product', 'adjust-stock', 'delete-product', 'bulk-update-products'];
       if (inventoryActions.includes(action.type) && permissions.manage_inventory === false) {
         console.warn(`[POS RBAC] Blocked ${action.type} due to manage_inventory: false`);
         toast({ variant: 'destructive', title: 'Permission Denied', description: 'You do not have permission to manage inventory.' });
@@ -3117,7 +3461,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     const id = uuidv4();
     const newAction: QueuedAction = { ...actionWithBranch, description, id, timestamp: Date.now(), status: 'pending' };
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction).catch(console.error);
+    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ && businessId) saveActionToOfflineQueue(newAction, businessId).catch(console.error);
     
     setQueuedActions(prev => [...prev, newAction]);
     queuedActionsRef.current = [...queuedActionsRef.current, newAction];
@@ -3180,56 +3524,68 @@ export function POSProvider({ children }: { children: ReactNode }) {
     secureStorage.removeItem(POS_CUSTOMER_KEY);
   }, []);
 
-  const nuclearReset = useCallback(async () => {
-    await resetPOS();
-    setQueuedActions([]);
-    // The IndexedDB queue fallback goes with `idb.clear()` below; clear the latch
-    // too, or the next successful localStorage write would try to remove a key
-    // that is already gone.
-    queueFallbackActiveRef.current = false;
-    setSyncedProducts([]); 
-    setSyncedCustomers([]); 
-    setSyncedReceipts([]);
-    setSyncedUsers([]);
-    setSyncedAuditLogs([]);
-    setOfflineProfile(null);
-    setOfflineBusiness(null);
-    setOfflineStats(null);
-    idb.clear();
-    
-    // Clear all secure storage keys to avoid bleeding data between logins
-    secureStorage.removeItem('pos_synced_products');
-    secureStorage.removeItem('pos_synced_customers');
-    secureStorage.removeItem('pos_synced_receipts');
-    secureStorage.removeItem('pos_synced_users');
-    secureStorage.removeItem('pos_synced_audit_logs');
-    secureStorage.removeItem(USER_PROFILE_KEY);
-    secureStorage.removeItem(BUSINESS_INSTANCE_KEY);
-    secureStorage.removeItem('pos_offline_stats');
-    secureStorage.removeItem('pos_last_synced_timestamp');
-    // The owner marker is deliberately *left standing*.
-    //
-    // `idb.clear()` above is async and nobody awaits this function, so the
-    // hydration effect can read IndexedDB before the clear lands. Keeping the
-    // outgoing business stamped means the next hydration sees a marker that
-    // disagrees with the new business and refuses the cache outright, instead of
-    // racing an unfinished wipe. A stale marker over an emptied cache is
-    // harmless: empty is exactly what makes the backfills run.
-    
-    // Clear all sync metadata from localStorage to trigger a fresh full sync on next login
-    if (typeof window !== 'undefined') {
-      try {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('zeneva_sync_metadata_')) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch (e) {
-        console.error("Failed to clear sync metadata from localStorage:", e);
+  const nuclearReset = useCallback(async (clearBusinessId?: string) => {
+    /*
+     * Stays set until the SQLite wipe has actually finished. `clearAllTables` is
+     * awaited now; it used to be fire-and-forget and not transactional, which is
+     * how rows from a finished impersonation survived on disk.
+     */
+    isResettingRef.current = true;
+    try {
+      await resetPOS();
+      setQueuedActions([]);
+      // The IndexedDB queue fallback goes with `idb.clear()` below; clear the latch
+      // too, or the next successful localStorage write would try to remove a key
+      // that is already gone.
+      queueFallbackActiveRef.current = false;
+      setSyncedProducts([]); 
+      setSyncedCustomers([]); 
+      setSyncedReceipts([]);
+      setSyncedUsers([]);
+      setSyncedAuditLogs([]);
+      setOfflineProfile(null);
+      setOfflineBusiness(null);
+      setOfflineStats(null);
+      idb.clear();
+      
+      // Clear all secure storage keys to avoid bleeding data between logins
+      secureStorage.removeItem('pos_synced_products');
+      secureStorage.removeItem('pos_synced_customers');
+      secureStorage.removeItem('pos_synced_receipts');
+      secureStorage.removeItem('pos_synced_users');
+      secureStorage.removeItem('pos_synced_audit_logs');
+      secureStorage.removeItem(USER_PROFILE_KEY);
+      secureStorage.removeItem(BUSINESS_INSTANCE_KEY);
+      secureStorage.removeItem('pos_offline_stats');
+      secureStorage.removeItem('pos_last_synced_timestamp');
+      // The owner marker is deliberately *left standing*.
+      //
+      // `idb.clear()` above is async and is not awaited, so the hydration effect
+      // can read IndexedDB before the clear lands. Keeping the outgoing business
+      // stamped means the next hydration sees a marker that disagrees with the
+      // new business and refuses the cache outright, instead of racing an
+      // unfinished wipe. A stale marker over an emptied cache is harmless: empty
+      // is exactly what makes the backfills run.
+      
+      // Clear all sync metadata from localStorage to trigger a fresh full sync on next login
+      if (typeof window !== 'undefined') {
+        try {
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('zeneva_sync_metadata_')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (e) {
+          console.error("Failed to clear sync metadata from localStorage:", e);
+        }
       }
+      
+      if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+        await clearAllTables(clearBusinessId);
+      }
+    } finally {
+      isResettingRef.current = false;
     }
-    
-    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) clearAllTables();
   }, [resetPOS]);
 
   const searchCustomers = useCallback(async (term: string) => {
@@ -3756,8 +4112,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
     if (isTauri) {
+      const hydrate = () => {
       // 1. Load Queue
-      getOfflineQueue().then(queue => {
+      getOfflineQueue(businessId).then(queue => {
         if (queue.length > 0) {
           setQueuedActions(prev => [...prev, ...queue.filter(a => !prev.find(p => p.id === a.id))]);
           if (isRealOnline) processQueue();
@@ -3874,6 +4231,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
           setSqliteOk(offlineDbUsable());
           setIsCacheHydrated(true);
         });
+      };
+
+      /*
+       * Repair tenancy before reading a single row. Rows filed under this
+       * business's column that belong to another tenant are re-filed to their
+       * real owner, and rows that belong here but were misfiled under another
+       * column are adopted, so the hydration below cannot put another business's
+       * customers or receipts on screen. Failure is non-fatal: hydration still
+       * runs, and the continuity effect refuses to re-persist foreign rows either
+       * way.
+       */
+      purgeForeignRows(businessId)
+        .catch(() => 0)
+        .then(hydrate);
     } else {
       // 2. Hydrate POS from IndexedDB for instant startup on Web/PWA (Evades 5MB LocalStorage Cap)
       //
@@ -3943,14 +4314,51 @@ export function POSProvider({ children }: { children: ReactNode }) {
   // and relaunching offline on another branch shows nothing.
   useEffect(() => {
     if (!isNativeApp() || !businessId) return;
-    if (allProducts && allProducts.length > 0) syncProductsToOffline(businessId, allProducts);
-    if (allCustomers && allCustomers.length > 0) syncCustomersToOffline(businessId, allCustomers);
-    if (allReceipts && allReceipts.length > 0) syncReceiptsToOffline(businessId, allReceipts);
-    if (users && users.length > 0) syncUsersToOffline(businessId, users);
-    if (auditLogs && auditLogs.length > 0) syncAuditLogsToOffline(businessId, auditLogs);
-    if (business) syncBusinessToOffline(business);
-    if (stats) syncStatsToOffline(businessId, stats);
-  }, [businessId, allProducts, allCustomers, allReceipts, users, auditLogs, business, stats]);
+    /*
+     * The reset below is asynchronous, and this effect runs in the same commit
+     * that changes `businessId`. Without this guard it re-persisted the previous
+     * tenant's in-memory rows under the new business id - the write landed after
+     * the wipe, so impersonated data survived on disk. Observed directly in the
+     * desktop database, where 224 customers and 225 receipts were filed under the
+     * admin's business but carried the impersonated tenant's id in their payload.
+     */
+    if (isResettingRef.current) return;
+
+    const owns = <T extends { businessId?: string }>(rows: T[]): T[] =>
+      rows.filter((row: any) => row?.businessId === businessId);
+
+    if (allProducts) {
+      const rows = owns(allProducts);
+      if (rows.length > 0) syncProductsToOffline(businessId, rows);
+    }
+    if (allCustomers) {
+      const rows = owns(allCustomers);
+      if (rows.length > 0) syncCustomersToOffline(businessId, rows);
+    }
+    if (allReceipts) {
+      const rows = owns(allReceipts);
+      if (rows.length > 0) syncReceiptsToOffline(businessId, rows);
+    }
+    if (users) {
+      const rows = owns(users);
+      if (rows.length > 0) syncUsersToOffline(businessId, rows);
+    }
+    if (auditLogs) {
+      const rows = owns(auditLogs);
+      if (rows.length > 0) syncAuditLogsToOffline(businessId, rows);
+    }
+    if (business && (business as any).id === businessId) syncBusinessToOffline(business);
+
+    /*
+     * Persist the *base* stats, never the memo that overlays pending sales.
+     * Writing the overlay meant an offline relaunch re-added the same queued sale
+     * on top of totals that already included it.
+     */
+    const baseStats = initialStats || offlineStats;
+    if (baseStats && (baseStats as any).id === businessId) {
+      syncStatsToOffline(businessId, baseStats);
+    }
+  }, [businessId, allProducts, allCustomers, allReceipts, users, auditLogs, business, initialStats, offlineStats]);
 
   /*
    * The sync-status check below must know how many products are actually in hand
@@ -3988,69 +4396,59 @@ export function POSProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     syncedCustomerCountRef.current = syncedCustomers.length;
     const known = Number((stats as any)?.totalCustomers ?? 0);
-    if (Number.isFinite(known) && known > 0) expectedCustomerCountRef.current = known;
-  }, [syncedCustomers, stats]);
+    if (Number.isFinite(known) && known > 0) {
+      expectedCustomerCountRef.current = known;
+      // If cache is hydrated and we have a severe shortfall compared to server stats, trigger a re-sync
+      const inHand = syncedCustomers.length;
+      if (
+        isCacheHydrated &&
+        !isFullSyncingCustomers &&
+        !forcedCustomerResyncRef.current &&
+        isRealOnline &&
+        inHand < Math.floor(known * 0.9)
+      ) {
+        forcedCustomerResyncRef.current = true;
+        fetchFullCustomers();
+      }
+    }
+  }, [syncedCustomers.length, stats, isCacheHydrated, isFullSyncingCustomers, isRealOnline, fetchFullCustomers]);
 
   useEffect(() => {
     if (!isMounted || !businessId || !firestore || isFullSyncingCustomers || !isRealOnline || !user || !canFetchSubData) return;
 
     const checkFullSyncStatus = async () => {
-      const [lastCustSync, lastProdSync, lastReceiptSync, lastProdPeek] = await Promise.all([
+      const [lastCustSync, lastProdSync, lastReceiptSync, lastProdPeek, lastCustPeek] = await Promise.all([
         getLastSyncMetadata(businessId, 'full_customers_sync'),
         getLastSyncMetadata(businessId, 'full_products_sync'),
         getLastSyncMetadata(businessId, 'full_receipts_sync'),
-        getLastSyncMetadata(businessId, 'impersonation_products_peek')
+        getLastSyncMetadata(businessId, 'impersonation_products_peek'),
+        getLastSyncMetadata(businessId, 'impersonation_customers_peek'),
       ]);
 
       if (lastProdSync > 0) setHasFullSyncedProducts(true);
       if (lastReceiptSync > 0) setHasFullSyncedReceipts(true);
-      if (lastCustSync > 0) setHasFullSyncedCustomers(true);
+      if (!isImpersonating && lastCustSync > 0) setHasFullSyncedCustomers(true);
 
       const now = Date.now();
       const dayInterval = 24 * 60 * 60 * 1000; // Changed from 1 hour to 24 hours to save reads
 
-      if (now - lastCustSync > dayInterval && !isFullSyncingCustomers) {
-        fetchFullCustomers();
-      } else if (!isFullSyncingCustomers && !forcedCustomerResyncRef.current && isCacheHydrated) {
-        /*
-         * The customer-book equivalent of `cacheContradictsStamp` below, which
-         * exists for products and had no counterpart here.
-         *
-         * A `full_customers_sync` stamp is a claim about what the store holds, and
-         * the stamp outlives what it certifies: it is written to localStorage
-         * (with a SQLite copy), while on desktop the customers themselves live in
-         * SQLite alone once the localStorage blob has been reclaimed. So a locked,
-         * deleted or half-written database leaves a fresh timestamp standing over
-         * a table that is empty or short, the 24-hour gate above skips the
-         * re-fetch, and staff spend the day unable to find customers who are
-         * plainly in Firestore — then create duplicates for them.
-         *
-         * Two contradictions are worth one re-sync, and neither can be detected
-         * by asking "is the cache empty":
-         *
-         *  - the store could not be read at all (`ok: false` at hydration), or
-         *  - it was read and holds materially fewer customers than the server-side
-         *    count says exist.
-         *
-         * `SHORTFALL_TOLERANCE` keeps the second from firing on ordinary drift:
-         * `stats.totalCustomers` is an aggregate recounted periodically and
-         * adjusted by increments, so it runs a few ahead or behind the synced
-         * array all the time. Only a real shortfall — a tenth of the book missing
-         * — is evidence of a broken sync rather than of a recent write.
-         *
-         * Latched to once per session by `forcedCustomerResyncRef`: the re-sync
-         * cannot fix a genuinely unwritable database, and without the latch it
-         * would re-run on every pass forever, paying for the whole book each time.
-         */
-        const expected = expectedCustomerCountRef.current;
-        const inHand = syncedCustomerCountRef.current;
-        const SHORTFALL_TOLERANCE = 0.9;
+      const expected = expectedCustomerCountRef.current;
+      const inHand = syncedCustomerCountRef.current;
+      const SHORTFALL_TOLERANCE = 0.9;
 
-        const unreadable = customerCacheUnreadableRef.current;
-        const short = lastCustSync > 0 && expected > 0 && inHand < Math.floor(expected * SHORTFALL_TOLERANCE);
+      const unreadable = customerCacheUnreadableRef.current;
+      const emptyContradictsStamp = lastCustSync > 0 && inHand === 0;
+      const short = expected > 0 && inHand < Math.floor(expected * SHORTFALL_TOLERANCE);
 
-        if (unreadable || short) {
-          forcedCustomerResyncRef.current = true;
+      if (isImpersonating) {
+        // While impersonating, local storage belongs to the admin machine, not the tenant.
+        // If in-memory customers are empty, or the peek stamp is stale, fetch full customers.
+        if ((inHand === 0 || now - lastCustPeek > dayInterval) && !isFullSyncingCustomers) {
+          fetchFullCustomers();
+        }
+      } else if (!isFullSyncingCustomers && (unreadable || emptyContradictsStamp || short) && !forcedCustomerResyncRef.current && isCacheHydrated) {
+        forcedCustomerResyncRef.current = true;
+        if (expected > 0 && (short || emptyContradictsStamp)) {
           reportAnomaly(
             unreadable ? 'customer_cache_lost' : 'customer_cache_short',
             unreadable
@@ -4058,8 +4456,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
               : `A full-customer-sync stamp is standing over ${inHand} customers where the server count says ${expected}; forcing one re-sync this session.`,
             { userId: user?.uid, businessId, details: { inHand, expected } },
           );
-          fetchFullCustomers();
         }
+        fetchFullCustomers();
+      } else if (now - lastCustSync > dayInterval && !isFullSyncingCustomers) {
+        fetchFullCustomers();
+      } else if (lastCustSync <= 0 && !isFullSyncingCustomers) {
+        fetchFullCustomers();
       }
 
       /*
@@ -4135,7 +4537,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     checkFullSyncStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted, businessId, firestore, isRealOnline, user, isCacheHydrated, canFetchSubData]);
+  }, [isMounted, businessId, firestore, isRealOnline, user, isCacheHydrated, canFetchSubData, isImpersonating]);
   
   // Initial Delta Sync (Silent Catch-up on mount)
   // Runs once on becoming online. The "no-op → reconnect → effect re-fires"
@@ -4251,13 +4653,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [toast, triggerRefresh, notifyImpersonationChange]);
 
   const stopImpersonation = useCallback(() => {
+    /*
+     * Clear only the impersonated tenant's cached rows. `businessId` still names
+     * that tenant at this point (the state update below has not been applied yet),
+     * and a full wipe would also throw away the admin's own offline catalogue.
+     */
+    const tenantToClear = businessId || undefined;
     setImpersonatedUserId(null);
     sessionStorage.removeItem('zeneva_impersonated_user_id');
     notifyImpersonationChange();
     toast({ title: 'Impersonation Ended', description: 'Returning to your administrator view.' });
-    nuclearReset();
+    nuclearReset(tenantToClear);
     triggerRefresh();
-  }, [toast, nuclearReset, triggerRefresh, notifyImpersonationChange]);
+  }, [toast, nuclearReset, triggerRefresh, notifyImpersonationChange, businessId]);
 
   const holdCurrentSale = useCallback((notes?: string) => {
     if (cart.length === 0) return;
@@ -4598,7 +5006,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     isProductCatalogPending, productSyncError, isCatalogUnverified, retryProductSync,
 
     impersonatedUserId, impersonateUser, stopImpersonation, isImpersonating,
-    searchCustomers, searchCustomersByField, findExistingCustomer, allCustomersUnfiltered: allCustomers, searchReceipts: async () => [],
+    searchCustomers, searchCustomersByField, findExistingCustomer, allCustomersUnfiltered: allCustomers, refreshCustomers: fetchFullCustomers, searchReceipts: async () => [],
     fetchReceiptsInRange, searchProducts, searchProductsByField, findProductBySku,
     fetchDetailedAnalytics, 
     fetchMonthlyAnalytics,
@@ -4611,7 +5019,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     stats, 
     isSubscriptionActive: resolveSubscriptionActive(business),
     isReadOnly: isCoreFeatureBlocked(business)
-  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, isProductCatalogPending, productSyncError, isCatalogUnverified, retryProductSync, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline]);
+  }), [business, products, receipts, customers, onlineOrders, currentUserProfile, isUserLoading, user, firestore, cart, selectedCustomer, taxRate, discount, paymentMethod, amountReceived, autoPrint, isConfettiActive, triggerRefresh, triggerConfetti, queuedActions, isQueueProcessing, addToQueue, processQueue, mutateBusiness, isSyncing, isFullSyncingCustomers, isFullSyncingProducts, isFullSyncingReceipts, isProductCatalogPending, productSyncError, isCatalogUnverified, retryProductSync, impersonatedUserId, isImpersonating, stats, currencySymbol, currencyCode, subtotal, tax, total, impersonateUser, stopImpersonation, searchCustomers, searchProducts, fetchDetailedAnalytics, fetchMonthlyAnalytics, isProfileReady, isLoadingBusiness, isLoadingProducts, isLoadingCustomers, isMounted, heldSales, voidReceipt, users, auditLogs, isRealOnline, fetchFullCustomers]);
 
   return <POSContext.Provider value={value}>{children}</POSContext.Provider>;
 }

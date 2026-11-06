@@ -1,18 +1,64 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { adminAuth, adminFirestore } from '@/firebase/admin';
+
+export const dynamic = 'force-dynamic';
 
 // Initialize Resend. In production, ensure RESEND_API_KEY is in your environment variables.
 const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
 
+// The export payload is a small profile object. Cap it so this endpoint cannot
+// be used to push large attachments through the shared Resend quota.
+const MAX_EXPORT_CHARS = 1_000_000;
+
 export async function POST(req: Request) {
     try {
-        const { email, data } = await req.json();
+        // This endpoint sends mail from our verified domain with the server's
+        // Resend key. Left open, it is an unauthenticated email relay: anyone
+        // could send an arbitrary attachment to any address, from us. The
+        // recipient must be the signed-in caller, never a value from the body.
+        if (!adminAuth) {
+            return NextResponse.json({ error: 'Server authentication is not configured.' }, { status: 503 });
+        }
 
-        if (!email || !data) {
-            return NextResponse.json({ error: 'Email and data are required.' }, { status: 400 });
+        const authHeader = req.headers.get('authorization') || '';
+        const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+        if (!bearer) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        let decoded;
+        try {
+            decoded = await adminAuth.verifyIdToken(bearer, true);
+        } catch {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await req.json().catch(() => ({}));
+        const data = body?.data;
+
+        if (data === undefined || data === null || typeof data !== 'object') {
+            return NextResponse.json({ error: 'Data is required.' }, { status: 400 });
+        }
+
+        // The address on the token is authoritative; the users document is the
+        // fallback for tokens minted without the email claim.
+        let email = decoded.email;
+        if (!email) {
+            const userSnap = adminFirestore
+                ? await adminFirestore.collection('users').doc(decoded.uid).get()
+                : null;
+            email = userSnap?.exists ? userSnap.data()?.email : undefined;
+        }
+
+        if (!email || typeof email !== 'string') {
+            return NextResponse.json({ error: 'No email address is linked to this account.' }, { status: 400 });
         }
 
         const jsonString = JSON.stringify(data, null, 2);
+        if (jsonString.length > MAX_EXPORT_CHARS) {
+            return NextResponse.json({ error: 'Export payload is too large.' }, { status: 413 });
+        }
         
         // Convert string to base64 for attachment
         const base64Data = Buffer.from(jsonString).toString('base64');

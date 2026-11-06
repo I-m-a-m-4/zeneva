@@ -12,6 +12,12 @@ export default function GlobalError({
   useEffect(() => {
     console.error('Root Error Caught:', error);
 
+    // Best effort and dynamically imported: if the crash is Firebase/config
+    // related, loading the logger must not take the fallback screen with it.
+    import('@/lib/error-logger')
+      .then(({ logErrorToFirestore }) => logErrorToFirestore(error, 'react', {}))
+      .catch(() => {});
+
     if (error.name === 'ChunkLoadError' || error.message?.includes('ChunkLoadError')) {
       console.warn('ChunkLoadError detected in root boundary, reloading...');
       window.location.reload();
@@ -98,7 +104,8 @@ export default function GlobalError({
                 marginBottom: '1.75rem',
               }}
             >
-              An unexpected error occurred while loading the application.
+              We&apos;ve automatically logged this issue and our team will investigate it. Please
+              try refreshing the page or navigating back.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -120,7 +127,7 @@ export default function GlobalError({
                 onMouseOver={(e) => (e.currentTarget.style.opacity = '0.92')}
                 onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
               >
-                Refresh Page
+                Reload Page
               </button>
 
               <button

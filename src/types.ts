@@ -318,7 +318,7 @@ export interface OnlineOrder {
 
 export interface QueuedAction {
     id: string;
-    type: 'complete-sale' | 'update-product' | 'add-customer' | 'update-customer' | 'delete-customer' | 'bulk-update-products' | 'add-product' | 'delete-product' | 'update-settings' | 'add-audit-log' | 'delete-receipt' | 'add-inventory-transaction';
+    type: 'complete-sale' | 'update-product' | 'adjust-stock' | 'add-customer' | 'update-customer' | 'delete-customer' | 'bulk-update-products' | 'add-product' | 'delete-product' | 'update-settings' | 'add-audit-log' | 'delete-receipt' | 'add-inventory-transaction';
     description: string;
     payload: any;
     timestamp: number;
@@ -1005,8 +1005,10 @@ export interface InventoryTransaction {
     productName: string;
     type: 'in' | 'out' | 'adjustment' | 'return';
     quantity: number; // Positive number representing the change amount
+    previousStock?: number; // The product's stock immediately before this transaction
     closingStock?: number; // The product's total stock immediately after this transaction
-    date: any; // Firestore Timestamp
+    date: any; // Business date of the movement (may be backdated)
+    recordedAt?: any; // When the row was written; orders the ledger regardless of backdating
     notes?: string;
     referenceId?: string; // e.g., Receipt ID or PO ID
     createdBy?: string;

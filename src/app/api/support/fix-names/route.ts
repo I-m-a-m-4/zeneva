@@ -1,8 +1,35 @@
 import { NextResponse } from 'next/server';
-import { adminFirestore } from '@/firebase/admin';
+import { adminAuth, adminFirestore } from '@/firebase/admin';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+export async function GET(request: Request) {
+    if (!adminAuth || !adminFirestore) {
+        return NextResponse.json({ success: false, error: 'Server not configured' }, { status: 503 });
+    }
+
     try {
+        const authorization = request.headers.get('authorization') || '';
+        const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+        if (!token) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
+        let uid: string;
+        try {
+            const decoded = await adminAuth.verifyIdToken(token, true);
+            uid = decoded.uid;
+        } catch {
+            return NextResponse.json({ success: false, error: 'Invalid or expired token' }, { status: 401 });
+        }
+
+        const callerDoc = await adminFirestore.collection('users').doc(uid).get();
+        const caller = callerDoc.data();
+        if (!caller || caller.status === 'suspended' || caller.role !== 'super-admin') {
+            return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+        }
+
         console.log('Starting DB fix for Unknown user support threads...');
         const threadsSnapshot = await adminFirestore.collection('supportThreads').get();
         let updatedCount = 0;

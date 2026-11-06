@@ -47,49 +47,47 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeProvider } from '@/components/theme-provider';
-import { allBlogPosts, getRelatedPosts } from '@/lib/blog-data';
+import { allBlogPosts, getPostDate, getReadingMinutes, getRelatedPosts } from '@/lib/blog-data';
 
 // Plan promo shown at the end of every article.
 //
 // The numbers are copied from two places and must be changed with them, not
 // guessed at here: the limits come from `PRODUCT_LIMITS` / `STAFF_LIMITS` /
-// `AI_DAILY_LIMITS` in `src/lib/plan.ts`, the prices from the constants at the
-// top of `src/app/pricing/pricing-content.tsx`. Both currencies are printed
+// `AI_MONTHLY_LIMITS` in `src/lib/plan.ts`, the prices from the constants at
+// the top of `src/app/pricing/pricing-content.tsx`. Both currencies are printed
 // because this page has no locale detection — the pricing page picks one by
 // timezone, a static article cannot.
 //
-// Deliberately absent: any "join thousands of retailers" line. The block this
-// replaced claimed a customer count nothing in the codebase can support, which
-// is the kind of copy that costs more trust than it wins.
+// Zen AI is metered in credits, not questions: one credit funds a cheap turn,
+// and a heavier analysis can draw more than one. The allowance is monthly.
+//
+// Deliberately absent: any "join thousands of retailers" line and any
+// "free forever" claim. The block this replaced stated product caps the
+// product does not enforce and a customer count nothing in the codebase can
+// support, which is the kind of copy that costs more trust than it wins.
 const PLAN_PROMO = [
   {
     name: 'Starter',
-    price: 'Free forever',
-    detail: '50 products, 1 user, 20 Zen AI questions a day. No trial clock, no card.',
+    price: '₦0 / $0',
+    detail: 'Unlimited products, 1 staff account, unlimited sales and receipts, basic analytics. No card required.',
   },
   {
     name: 'Pro',
     price: '₦10,000 / $10 a month',
-    detail: '1,500 products, 5 staff accounts, 100 Zen AI questions a day.',
+    detail: 'Everything in Starter, plus 5 staff accounts, 150 Zen AI credits a month, barcode POS, debt management and RBAC.',
     highlight: true,
   },
   {
     name: 'Business',
     price: '₦30,000 / $30 a month',
-    detail: 'Unlimited products, unlimited staff, 500 Zen AI questions a day.',
+    detail: 'Everything in Pro, with unlimited staff accounts and 600 Zen AI credits a month.',
   },
 ];
-
-// Rough reading time, on the same ~1000-characters-a-minute rule the rest of
-// the page already used. Static posts carry `content` as optional, so a post
-// still awaiting a body reads as 1 min rather than crashing on `.length`.
-function readingMinutes(content?: string): number {
-  return Math.ceil((content?.length || 0) / 1000) + 1;
-}
 
 export default function BlogPostClient({ initialPostData }: { initialPostData?: any }) {
   const params = useParams();
@@ -111,10 +109,12 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
       authorName: 'Zeneva Editorial',
       published: true,
       category: initialPostData.category,
+      directAnswer: initialPostData.directAnswer,
       faq: initialPostData.faq,
       tableData: initialPostData.tableData,
-      createdAt: { toDate: () => new Date('2026-04-19') },
-      updatedAt: { toDate: () => new Date('2026-04-19') }
+      publishedAt: initialPostData.publishedAt,
+      createdAt: { toDate: () => getPostDate(initialPostData) },
+      updatedAt: { toDate: () => getPostDate(initialPostData) }
     } as any;
   };
 
@@ -166,6 +166,12 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
   // which was billing reads on every visit for results nobody could see.
   const relatedPosts = React.useMemo(() => getRelatedPosts(id, 3), [id]);
 
+  const postDate = React.useMemo(() => {
+    const value = post?.createdAt as any;
+    const date = typeof value?.toDate === 'function' ? value.toDate() : null;
+    return date instanceof Date && !Number.isNaN(date.getTime()) ? date : getPostDate({});
+  }, [post]);
+
   React.useEffect(() => {
     if (!firestore || !id) return;
     if (initialPostData && initialPostData.slug === id) return;
@@ -205,12 +211,14 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                 authorName: 'Zeneva Editorial',
                 published: true,
                 category: staticPost.category,
+                directAnswer: staticPost.directAnswer,
                 // @ts-ignore
                 faq: staticPost.faq,
                 // @ts-ignore
                 tableData: staticPost.tableData,
-                createdAt: { toDate: () => new Date('2026-04-19') },
-                updatedAt: { toDate: () => new Date('2026-04-19') }
+                publishedAt: staticPost.publishedAt,
+                createdAt: { toDate: () => getPostDate(staticPost) },
+                updatedAt: { toDate: () => getPostDate(staticPost) }
               } as any);
             } else {
               router.push('/blog');
@@ -257,10 +265,19 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
         <main className="min-h-screen">
           {/* New Hero Section */}
           <section className="relative w-full pt-56 pb-32 md:pt-72 md:pb-48 min-h-[55vh] overflow-hidden flex flex-col justify-end lg:justify-center items-center">
-            {/* Background Image with Dark Overlay */}
-            <div 
-              className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-              style={{ backgroundImage: `url('/zeneva blog hero  image.png')` }}
+            {/* Background Image with Dark Overlay.
+                Was a CSS background pointing at a 2.1 MB PNG, which the browser
+                could not discover until the stylesheet applied — every article
+                paid full LCP cost for it. The WebP is 110 KB and `priority`
+                preloads it. alt="" because the title beneath it carries the
+                meaning. */}
+            <Image
+              src="/zeneva-blog-hero.webp"
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="z-0 object-cover object-center"
             />
             <div className="absolute inset-0 z-0 bg-black/80" /> {/* Dark overlay */}
 
@@ -282,13 +299,13 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                     <span className="text-white">{post.category || 'Operational Mastery'}</span>
                  </div>
                  <span className="text-white/30">•</span>
-                 <time dateTime={post.createdAt ? post.createdAt.toDate().toISOString() : ''} className="text-white">
-                   {post.createdAt ? format(post.createdAt.toDate(), 'MMMM d, yyyy') : 'Recently'}
+                 <time dateTime={postDate.toISOString()} className="text-white">
+                   {format(postDate, 'MMMM d, yyyy')}
                  </time>
                  <span className="text-white/30">•</span>
                  <div className="flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5 text-white/50" />
-                    <span className="text-white">{Math.ceil(post.content.length / 1000) + 3} min read</span>
+                    <span className="text-white">{getReadingMinutes(post.content)} min read</span>
                  </div>
               </div>
             </div>
@@ -312,6 +329,21 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                 [&_hr]:border-slate-100 [&_hr]:my-16
                 [&_table]:border-collapse [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-900 [&_th]:pb-4 [&_td]:py-4 [&_td]:border-t [&_td]:border-slate-100
               ">
+                {/* The straight answer was authored for all 37 posts but never
+                    rendered, so answer engines had to infer it from 2,000 words
+                    of prose. Keeping it above the body is the single biggest
+                    AI-citation lever on these pages. */}
+                {(post as any).directAnswer && (
+                  <div className="mb-12 rounded-2xl border border-orange-200 bg-orange-50/60 p-6">
+                    <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-orange-700">
+                      Quick answer
+                    </p>
+                    <p className="text-lg font-medium leading-relaxed text-slate-800">
+                      {(post as any).directAnswer}
+                    </p>
+                  </div>
+                )}
+
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -468,7 +500,7 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                           {p.excerpt}
                         </p>
                         <div className="mt-auto flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-900 group-hover:gap-2.5 transition-all">
-                          Read · {readingMinutes(p.content)} min
+                          Read · {getReadingMinutes(p.content)} min
                           <ArrowRight className="h-3 w-3" />
                         </div>
                       </Link>
@@ -612,7 +644,7 @@ export default function BlogPostClient({ initialPostData }: { initialPostData?: 
                             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
                                <span>{p.category}</span>
                                <span>·</span>
-                               <span>{readingMinutes(p.content)} MIN</span>
+                               <span>{getReadingMinutes(p.content)} MIN</span>
                             </div>
                          </Link>
                        ))}

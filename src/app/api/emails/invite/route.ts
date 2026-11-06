@@ -1,16 +1,87 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { adminAuth, adminFirestore } from '@/firebase/admin';
+
+export const dynamic = 'force-dynamic';
 
 // Initialize Resend. In production, ensure RESEND_API_KEY is in your environment variables.
 const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
 
+// Every value below is attacker-controlled from the client and lands inside an
+// HTML document, so escape before interpolating. The invitation link is also
+// parsed and protocol-checked, which blocks `javascript:` and attribute escapes.
+const escapeHtml = (value: unknown) =>
+    String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function POST(req: Request) {
     try {
-        const { to_email, to_name, business_name, inviter_name, invitation_link } = await req.json();
-
-        if (!to_email || !invitation_link) {
-            return NextResponse.json({ error: 'Email and invitation link are required.' }, { status: 400 });
+        // This sends mail from our verified domain with the server's key, so the
+        // caller must be a signed-in admin of the business doing the inviting.
+        if (!adminAuth) {
+            return NextResponse.json({ error: 'Server authentication is not configured.' }, { status: 503 });
         }
+
+        const authHeader = req.headers.get('authorization') || '';
+        const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+        if (!bearer) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        let decoded;
+        try {
+            decoded = await adminAuth.verifyIdToken(bearer, true);
+        } catch {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        if (!adminFirestore) {
+            return NextResponse.json({ error: 'Database unavailable.' }, { status: 500 });
+        }
+
+        const callerSnap = await adminFirestore.collection('users').doc(decoded.uid).get();
+        if (!callerSnap.exists) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        const caller = callerSnap.data() || {};
+        if (caller.status === 'suspended' || !['admin', 'owner', 'super-admin'].includes(caller.role)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        const body = await req.json().catch(() => ({}));
+        const to_email = typeof body?.to_email === 'string' ? body.to_email.trim() : '';
+        const to_name = typeof body?.to_name === 'string' ? body.to_name.trim().slice(0, 100) : '';
+        const business_name = typeof body?.business_name === 'string' ? body.business_name.trim().slice(0, 100) : '';
+        const inviter_name = typeof body?.inviter_name === 'string' ? body.inviter_name.trim().slice(0, 100) : '';
+        const invitation_link = typeof body?.invitation_link === 'string' ? body.invitation_link.trim() : '';
+
+        if (!EMAIL_PATTERN.test(to_email) || !invitation_link) {
+            return NextResponse.json({ error: 'A valid recipient email and invitation link are required.' }, { status: 400 });
+        }
+        if (to_email.length > 320 || invitation_link.length > 2000) {
+            return NextResponse.json({ error: 'Invitation payload is too large.' }, { status: 400 });
+        }
+
+        let invitationUrl: URL;
+        try {
+            invitationUrl = new URL(invitation_link);
+        } catch {
+            return NextResponse.json({ error: 'Invalid invitation link.' }, { status: 400 });
+        }
+        if (invitationUrl.protocol !== 'https:' && invitationUrl.protocol !== 'http:') {
+            return NextResponse.json({ error: 'Invalid invitation link.' }, { status: 400 });
+        }
+
+        const safeBusinessName = escapeHtml(business_name);
+        const safeToName = escapeHtml(to_name);
+        const safeInviterName = escapeHtml(inviter_name);
+        const safeInvitationLink = escapeHtml(invitationUrl.toString());
 
         const htmlTemplate = `
         <!DOCTYPE html>
@@ -18,7 +89,7 @@ export async function POST(req: Request) {
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>You've been invited to join ${business_name} on Zeneva</title>
+            <title>You've been invited to join ${safeBusinessName} on Zeneva</title>
             <style>
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -93,13 +164,13 @@ export async function POST(req: Request) {
                 </div>
                 <div class="content">
                     <h2>You've been invited!</h2>
-                    <p>Hello ${to_name},</p>
-                    <p><strong>${inviter_name}</strong> has invited you to join <strong>${business_name}</strong> on Zeneva.</p>
+                    <p>Hello ${safeToName},</p>
+                    <p><strong>${safeInviterName}</strong> has invited you to join <strong>${safeBusinessName}</strong> on Zeneva.</p>
                     <p>Zeneva is a powerful Point of Sale and Inventory Management system. Join your team to start managing sales, tracking inventory, and growing the business together.</p>
                     <div class="button-container">
-                        <a href="${invitation_link}" class="button">Accept Invitation</a>
+                        <a href="${safeInvitationLink}" class="button">Accept Invitation</a>
                     </div>
-                    <p>If you have any questions, please contact ${inviter_name} directly.</p>
+                    <p>If you have any questions, please contact ${safeInviterName} directly.</p>
                     <p>Best regards,<br>The Zeneva Team</p>
                 </div>
                 <div class="footer">
@@ -113,7 +184,7 @@ export async function POST(req: Request) {
         const response = await resend.emails.send({
             from: 'Zeneva <hello@zeneva.space>',
             to: [to_email],
-            subject: `You've been invited to join ${business_name} on Zeneva`,
+            subject: `You've been invited to join ${business_name.slice(0, 100)} on Zeneva`,
             html: htmlTemplate,
         });
 
